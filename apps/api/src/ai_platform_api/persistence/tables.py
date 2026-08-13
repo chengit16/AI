@@ -570,6 +570,92 @@ Index(
     role_menus.c.role_id,
     role_menus.c.visible,
 )
+
+menu_releases = Table(
+    "menu_releases",
+    metadata,
+    Column("release_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("release_number", Integer, nullable=False),
+    Column("release_kind", String(32), nullable=False),
+    Column("source_release_id", UUID(as_uuid=True), nullable=True),
+    Column("status", String(32), nullable=False),
+    Column("snapshot", JSONB, nullable=False),
+    Column("snapshot_digest", String(64), nullable=False),
+    Column("validation_errors", ARRAY(String(500)), nullable=False, server_default="{}"),
+    Column("rejection_reason", String(500), nullable=True),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("decided_by_account_id", UUID(as_uuid=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("validated_at", DateTime(timezone=True), nullable=True),
+    Column("decided_at", DateTime(timezone=True), nullable=True),
+    Column("published_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "release_number",
+        name="uq_menu_releases_workspace_number",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "release_id",
+        name="uq_menu_releases_workspace_release",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_menu_releases_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "source_release_id"],
+        [
+            f"{SCHEMA_TOKEN}.menu_releases.workspace_id",
+            f"{SCHEMA_TOKEN}.menu_releases.release_id",
+        ],
+        name="fk_menu_releases_source",
+    ),
+    CheckConstraint(
+        "release_kind IN ('standard', 'rollback')",
+        name="ck_menu_releases_kind",
+    ),
+    CheckConstraint(
+        "status IN ('draft', 'validated', 'approved', 'rejected', 'published')",
+        name="ck_menu_releases_status",
+    ),
+    CheckConstraint("release_number >= 1", name="ck_menu_releases_number"),
+    CheckConstraint("char_length(snapshot_digest) = 64", name="ck_menu_releases_digest"),
+    CheckConstraint("version >= 1", name="ck_menu_releases_version"),
+)
+
+Index(
+    "ix_menu_releases_workspace_status",
+    menu_releases.c.workspace_id,
+    menu_releases.c.status,
+    menu_releases.c.release_number,
+)
+
+workspace_menu_publications = Table(
+    "workspace_menu_publications",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("current_release_id", UUID(as_uuid=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workspace_menu_publications_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "current_release_id"],
+        [
+            f"{SCHEMA_TOKEN}.menu_releases.workspace_id",
+            f"{SCHEMA_TOKEN}.menu_releases.release_id",
+        ],
+        name="fk_workspace_menu_publications_release",
+    ),
+)
 Index(
     "ix_role_permission_grants_lookup",
     role_permission_grants.c.workspace_id,

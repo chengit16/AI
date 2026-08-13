@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1C-05` 待开始 |
+| 当前节点 | `P1C-06` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -228,7 +228,7 @@
 - 自动化验收：字段 PDP、跨角色/跨数据范围合并、四类出口投影、成员 HTTP 序列化、检索/引用遮罩、字段注册表 Schema、RBAC 回归和 Migration 往返通过；真实 PostgreSQL 验证自定义角色字段授权持久化以及新企业 owner/member 密级种子。统一 `./scripts/verify` 通过，React 测试 `3/3` 与生产构建、Ruff、mypy strict、契约兼容与漂移、Secret Scanner、SBOM、许可证和全量 pytest `225/225` 均通过。
 - 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建，八项本地诊断和数据库 Revision `20260814_0012` 通过；真实双账号 HTTP 闭环返回 2 条成员记录且每条只含 `membership_type` 与 `status`，受限 `account_id`、`display_name` 和对应原始值均未出现在响应文本中。
 - 当前边界：字段注册表已为 `KnowledgeBase`、`Document`、`Chunk`、`WorkflowInstance` 和 `Approval` 固定字段语义，但正式实体与管理入口分别在 `P1D`、`P1E` 和 `P1F` 建设。当前不扩展任意脚本 ABAC、SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
-- 提交：本提交。
+- 提交：`708c57a`。
 
 ### P1C-04 菜单页面接口统一绑定
 
@@ -241,6 +241,20 @@
 - 自动化验收：资源注册表绑定反例、个人/企业配置、未知资源、循环、跨空间、角色可见性、静态镜像漂移、API 策略绕过和真实 PostgreSQL 持久化通过。统一 `./scripts/verify` 通过，React 测试 `3/3` 与生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证和全量 pytest `234/234` 均通过。
 - 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、Revision `20260814_0013`、Valkey 和 Worker 八项诊断通过。真实合成账号分别将个人和企业菜单版本推进至 2，企业所有者角色动作菜单设为不可见；伪造个人空间 Header 读取企业菜单返回 `403 POLICY_DENIED`。
 - 当前边界：本节点只建立可配置覆盖层和角色可见性事实，不生成草稿、不可变发布快照、审批或回滚版本；这些进入 `P1C-05`。React 仍消费现有静态应用壳层，动态路由生成和按当前角色裁剪进入 `P1C-06`。未扩展 SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
+- 提交：`767bf39`。
+
+### P1C-05 菜单版本与发布
+
+- 状态：通过。
+- 发布状态机：菜单发布按 `draft → validated → approved/rejected → published` 转换，校验失败保留草稿并返回问题清单，拒绝必须提供原因；已拒绝或已发布版本不能继续转换，重复发布和非法越级转换稳定拒绝。
+- 不可变快照：创建草稿时冻结合并后的全部菜单、全部角色可见性、静态菜单接口绑定、`ResourceRegistry` 版本和工作空间菜单版本，并对规范 JSON 计算 SHA-256 摘要。状态更新 SQL 不包含快照或摘要字段，后续配置变更不能改写既有草稿和发布内容。
+- 发布与回滚：独立 `workspace_menu_publications` 保存每个空间的当前发布指针，发布校验、状态更新和指针切换在同一事务完成，失败不会污染当前版本。回滚不改写历史，而是复制同空间已发布快照、创建新的 `rollback` 发布记录并原子切换指针。
+- 治理边界：创建、校验、审批、发布、回滚和历史列表仅允许个人或企业空间所有者通过浏览器 Session 执行。活跃普通成员只可读取当前发布及完整消费快照，不能读取治理历史或执行发布动作；菜单可见性仍不替代后端 PDP，伪造空间 Header 继续失败关闭。
+- 数据与契约：新增 `menu_releases` 和 `workspace_menu_publications`，Revision 推进至 `20260814_0014`。OpenAPI 新增创建、校验、审批、发布、回滚、历史列表和当前发布 7 个接口；React/Python 类型、资源注册表、ReleaseManifest、兼容矩阵和本地诊断同步更新。`ResourceRegistry` 版本 3 包含 38 项 Permission、5 个页面、44 个 `ApiResource`、42 个 Menu 和 37 个 `MenuApiBinding`。
+- 自动化验收：发布领域专项 `7/7`，真实 PostgreSQL 发布与 Migration `base → head → base → head` 专项 `2/2`。统一 `./scripts/verify` 通过，React 测试 `3/3` 与生产构建、Ruff、mypy strict、架构、契约兼容与生成漂移、Secret Scanner、SBOM、许可证和全量 pytest `243/243` 均通过。
+- 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、Revision `20260814_0014`、Valkey 和 Worker 八项诊断通过。全合成 HTTP 场景完成个人空间首版/二版发布及回滚，回滚生成第 3 条历史记录；企业空间独立发布；企业普通成员读取当前发布返回 `200`，历史列表和创建发布返回 `403 POLICY_DENIED`，伪造个人空间 Header 读取企业当前发布同样返回 `403 POLICY_DENIED`。
+- 环境说明：本地剩余磁盘不足默认 50 GB 启动门禁时，仅对本次小规模验收进程设置 `AI_PLATFORM_MIN_FREE_DISK_GB=40`；`.env.example` 与启动器默认 50 GB 基线未降低。该覆盖只证明功能可运行，不是容量、百万 Chunk 或完整并发认证。
+- 当前边界：本节点提供稳定的当前发布消费契约，但 React 仍未按发布快照生成导航、路由和角色裁剪；这些进入 `P1C-06`。未扩展 SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
 - 提交：本提交。
 
 ## 4. 当前限制
@@ -252,4 +266,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-04`，当前进入 `P1C-05`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-05`，当前进入 `P1C-06`。

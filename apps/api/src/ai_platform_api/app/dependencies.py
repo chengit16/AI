@@ -8,6 +8,7 @@ from ai_platform_api.modules.authorization.application.field_registry import (
 )
 from ai_platform_api.modules.authorization.application.fields import FieldProjectionService
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
+from ai_platform_api.modules.authorization.application.menu_releases import MenuReleaseService
 from ai_platform_api.modules.authorization.application.menus import MenuConfigurationService
 from ai_platform_api.modules.authorization.application.policy import RbacPolicyDecisionPoint
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
@@ -81,6 +82,7 @@ class ApplicationContainer:
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
     menu_configuration: MenuConfigurationService | None = None
+    menu_releases: MenuReleaseService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -117,6 +119,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         resource_registry,
         SqlAlchemyMenuConfigurationUnitOfWork(database.sessions),
     )
+    menu_releases = MenuReleaseService(
+        resource_registry,
+        SqlAlchemyMenuConfigurationUnitOfWork(database.sessions),
+    )
     try:
         return ApplicationContainer(
             settings=settings,
@@ -132,6 +138,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 field_registry,
             ),
             menu_configuration=menu_configuration,
+            menu_releases=menu_releases,
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,

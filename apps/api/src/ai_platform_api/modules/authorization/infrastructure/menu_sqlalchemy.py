@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextvars import ContextVar
+from datetime import datetime
 from types import TracebackType
 from typing import Any, cast
 from uuid import UUID
@@ -17,15 +18,22 @@ from sqlalchemy.orm import Session
 
 from ai_platform_api.modules.authorization.domain.menus import (
     MenuConfigurationWriteConflictError,
+    MenuRelease,
     RoleMenuVisibility,
     WorkspaceMenuOverride,
 )
+from ai_platform_api.modules.authorization.infrastructure.menu_serialization import (
+    menu_release_from_row,
+    menu_release_values,
+)
 from ai_platform_api.persistence.tables import (
+    menu_releases,
     registered_menu_api_bindings,
     role_menus,
     roles,
     workspace_memberships,
     workspace_menu_overrides,
+    workspace_menu_publications,
     workspaces,
 )
 
@@ -198,6 +206,108 @@ class SqlAlchemyMenuConfigurationRepository:
                     }
                     for item in entries
                 ],
+            )
+
+    def list_all_role_menus(self, workspace_id: UUID) -> tuple[RoleMenuVisibility, ...]:
+        rows = self._session.execute(
+            select(role_menus)
+            .where(role_menus.c.workspace_id == workspace_id)
+            .order_by(role_menus.c.role_id, role_menus.c.menu_id)
+        )
+        return tuple(
+            RoleMenuVisibility(row.workspace_id, row.role_id, row.menu_id, row.visible)
+            for row in rows
+        )
+
+    def next_release_number(self, workspace_id: UUID) -> int:
+        current = self._session.scalar(
+            select(menu_releases.c.release_number)
+            .where(menu_releases.c.workspace_id == workspace_id)
+            .order_by(menu_releases.c.release_number.desc())
+            .limit(1)
+            .with_for_update()
+        )
+        return (current or 0) + 1
+
+    def add_release(self, release: MenuRelease) -> None:
+        self._session.execute(insert(menu_releases).values(**menu_release_values(release)))
+
+    def get_release(self, workspace_id: UUID, release_id: UUID) -> MenuRelease | None:
+        row = self._session.execute(
+            select(menu_releases).where(
+                menu_releases.c.workspace_id == workspace_id,
+                menu_releases.c.release_id == release_id,
+            )
+        ).one_or_none()
+        return menu_release_from_row(row) if row is not None else None
+
+    def list_releases(self, workspace_id: UUID) -> tuple[MenuRelease, ...]:
+        rows = self._session.execute(
+            select(menu_releases)
+            .where(menu_releases.c.workspace_id == workspace_id)
+            .order_by(menu_releases.c.release_number.desc())
+        )
+        return tuple(menu_release_from_row(row) for row in rows)
+
+    def save_release(self, release: MenuRelease) -> None:
+        # 快照和摘要只在创建时写入，状态转换不能借更新语句改写发布内容。
+        values = {
+            "status": release.status,
+            "validation_errors": list(release.validation_errors),
+            "rejection_reason": release.rejection_reason,
+            "decided_by_account_id": release.decided_by_account_id,
+            "validated_at": release.validated_at,
+            "decided_at": release.decided_at,
+            "published_at": release.published_at,
+            "version": release.version,
+        }
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(menu_releases)
+                .where(
+                    menu_releases.c.workspace_id == release.workspace_id,
+                    menu_releases.c.release_id == release.release_id,
+                    menu_releases.c.version == release.version - 1,
+                )
+                .values(**values)
+            ),
+        )
+        if result.rowcount != 1:
+            raise MenuConfigurationWriteConflictError
+
+    def get_current_release_id(self, workspace_id: UUID) -> UUID | None:
+        return self._session.scalar(
+            select(workspace_menu_publications.c.current_release_id).where(
+                workspace_menu_publications.c.workspace_id == workspace_id
+            )
+        )
+
+    def set_current_release(
+        self,
+        workspace_id: UUID,
+        release_id: UUID,
+        *,
+        published_at: datetime,
+    ) -> None:
+        current = self._session.scalar(
+            select(workspace_menu_publications.c.workspace_id)
+            .where(workspace_menu_publications.c.workspace_id == workspace_id)
+            .with_for_update()
+        )
+        if current is None:
+            self._session.execute(
+                insert(workspace_menu_publications).values(
+                    workspace_id=workspace_id,
+                    current_release_id=release_id,
+                    published_at=published_at,
+                )
+            )
+        else:
+            self._session.execute(
+                update(workspace_menu_publications)
+                .where(workspace_menu_publications.c.workspace_id == workspace_id)
+                .values(current_release_id=release_id, published_at=published_at)
             )
 
 

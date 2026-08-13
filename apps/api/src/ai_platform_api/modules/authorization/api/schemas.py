@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -89,3 +90,101 @@ class RoleMenuVisibilityResponse(BaseModel):
 
     role_id: UUID
     items: list[RoleMenuVisibilityEntry]
+
+
+class MenuReleaseDecisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    approved: bool
+    reason: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_reason(self) -> "MenuReleaseDecisionRequest":
+        if not self.approved and (self.reason is None or not self.reason.strip()):
+            raise ValueError("拒绝发布时必须填写原因")
+        return self
+
+
+class MenuReleaseResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    release_id: UUID
+    workspace_id: UUID
+    release_number: int = Field(ge=1)
+    release_kind: Literal["standard", "rollback"]
+    source_release_id: UUID | None
+    status: Literal["draft", "validated", "approved", "rejected", "published"]
+    snapshot_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    snapshot_schema_version: int = Field(ge=1)
+    registry_version: int = Field(ge=1)
+    menu_version: int = Field(ge=1)
+    menu_count: int = Field(ge=0)
+    role_menu_count: int = Field(ge=0)
+    menu_api_binding_count: int = Field(ge=0)
+    validation_errors: list[str]
+    rejection_reason: str | None
+    created_by_account_id: UUID
+    decided_by_account_id: UUID | None
+    created_at: datetime
+    validated_at: datetime | None
+    decided_at: datetime | None
+    published_at: datetime | None
+    version: int = Field(ge=1)
+
+
+class MenuReleaseSnapshotMenuEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    menu_id: UUID
+    menu_key: str
+    parent_menu_id: UUID | None
+    name: str
+    menu_type: Literal["directory", "page", "action"]
+    page_resource_id: UUID | None
+    permission_code: str | None
+    icon_key: str | None
+    sort_order: int = Field(ge=0)
+    source: Literal["system", "workspace"]
+    status: Literal["active", "disabled"]
+    visible: bool
+
+
+class MenuReleaseSnapshotRoleMenuEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role_id: UUID
+    menu_id: UUID
+    visible: bool
+
+
+class MenuReleaseSnapshotApiBindingEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    menu_id: UUID
+    api_resource_id: UUID
+    action_type: Literal["query", "mutation", "publish", "approve"]
+
+
+class MenuReleaseSnapshotResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(ge=1)
+    registry_version: int = Field(ge=1)
+    workspace_id: UUID
+    menu_version: int = Field(ge=1)
+    menus: list[MenuReleaseSnapshotMenuEntry]
+    role_menus: list[MenuReleaseSnapshotRoleMenuEntry]
+    menu_api_bindings: list[MenuReleaseSnapshotApiBindingEntry]
+
+
+class MenuReleaseListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[MenuReleaseResponse]
+
+
+class CurrentMenuReleaseResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    item: MenuReleaseResponse | None
+    snapshot: MenuReleaseSnapshotResponse | None

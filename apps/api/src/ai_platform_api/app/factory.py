@@ -64,6 +64,7 @@ def create_app(
     application.state.policy_decision_point = dependencies.policy
     application.state.role_permission_service = dependencies.role_permissions
     application.state.menu_configuration_service = dependencies.menu_configuration
+    application.state.menu_release_service = dependencies.menu_releases
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)

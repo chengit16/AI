@@ -8,6 +8,7 @@ from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.modules.authorization.application.fields import FieldProjectionService
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
+from ai_platform_api.modules.authorization.application.menu_releases import MenuReleaseService
 from ai_platform_api.modules.authorization.application.menus import MenuConfigurationService
 from ai_platform_api.modules.authorization.application.policy import (
     ApiResource,
@@ -84,6 +85,13 @@ def menu_configuration_service(request: Request) -> MenuConfigurationService:
     service = getattr(request.app.state, "menu_configuration_service", None)
     if not isinstance(service, MenuConfigurationService):
         raise RuntimeError("菜单配置服务尚未完成装配")
+    return service
+
+
+def menu_release_service(request: Request) -> MenuReleaseService:
+    service = getattr(request.app.state, "menu_release_service", None)
+    if not isinstance(service, MenuReleaseService):
+        raise RuntimeError("菜单发布服务尚未完成装配")
     return service
 
 

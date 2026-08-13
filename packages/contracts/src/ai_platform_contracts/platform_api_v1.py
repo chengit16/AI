@@ -47,6 +47,11 @@ class CreateRoleRequest(typing.TypedDict):
     role_key: str
 
 
+class CurrentMenuReleaseResponse(typing.TypedDict):
+    item: MenuReleaseResponse | None
+    snapshot: MenuReleaseSnapshotResponse | None
+
+
 class DepartmentListResponse(typing.TypedDict):
     items: list[DepartmentResponse]
 
@@ -132,6 +137,77 @@ class MemberOrganizationResponse(typing.TypedDict):
     membership_version: int
     position_ids: list[str]
     primary_department_id: str | None
+
+
+class MenuReleaseDecisionRequest(typing.TypedDict):
+    approved: bool
+    reason: typing.NotRequired[str | None]
+
+
+class MenuReleaseListResponse(typing.TypedDict):
+    items: list[MenuReleaseResponse]
+
+
+class MenuReleaseResponse(typing.TypedDict):
+    created_at: str
+    created_by_account_id: str
+    decided_at: str | None
+    decided_by_account_id: str | None
+    menu_api_binding_count: int
+    menu_count: int
+    menu_version: int
+    published_at: str | None
+    registry_version: int
+    rejection_reason: str | None
+    release_id: str
+    release_kind: typing.Literal["standard", "rollback"]
+    release_number: int
+    role_menu_count: int
+    snapshot_digest: str
+    snapshot_schema_version: int
+    source_release_id: str | None
+    status: typing.Literal["draft", "validated", "approved", "rejected", "published"]
+    validated_at: str | None
+    validation_errors: list[str]
+    version: int
+    workspace_id: str
+
+
+class MenuReleaseSnapshotApiBindingEntry(typing.TypedDict):
+    action_type: typing.Literal["query", "mutation", "publish", "approve"]
+    api_resource_id: str
+    menu_id: str
+
+
+class MenuReleaseSnapshotMenuEntry(typing.TypedDict):
+    icon_key: str | None
+    menu_id: str
+    menu_key: str
+    menu_type: typing.Literal["directory", "page", "action"]
+    name: str
+    page_resource_id: str | None
+    parent_menu_id: str | None
+    permission_code: str | None
+    sort_order: int
+    source: typing.Literal["system", "workspace"]
+    status: typing.Literal["active", "disabled"]
+    visible: bool
+
+
+class MenuReleaseSnapshotResponse(typing.TypedDict):
+    menu_api_bindings: list[MenuReleaseSnapshotApiBindingEntry]
+    menu_version: int
+    menus: list[MenuReleaseSnapshotMenuEntry]
+    registry_version: int
+    role_menus: list[MenuReleaseSnapshotRoleMenuEntry]
+    schema_version: int
+    workspace_id: str
+
+
+class MenuReleaseSnapshotRoleMenuEntry(typing.TypedDict):
+    menu_id: str
+    role_id: str
+    visible: bool
 
 
 class MoveDepartmentRequest(typing.TypedDict):

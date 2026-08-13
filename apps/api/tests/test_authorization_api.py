@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 from uuid import UUID, uuid4
@@ -9,12 +10,16 @@ from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.config import Settings
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
+from ai_platform_api.modules.authorization.application.menu_releases import MenuReleaseService
 from ai_platform_api.modules.authorization.application.menus import MenuConfigurationService
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.grants import RolePermissionGrant
 from ai_platform_api.modules.authorization.domain.menus import (
     MenuConfiguration,
+    MenuRelease,
+    MenuReleaseSnapshot,
+    MenuSnapshotItem,
     RoleMenuVisibility,
     WorkspaceMenuOverride,
 )
@@ -202,6 +207,144 @@ class StubMenuConfigurationService(MenuConfigurationService):
         )
 
 
+class StubMenuReleaseService(MenuReleaseService):
+    def __init__(self) -> None:
+        pass
+
+    def create_draft(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+    ) -> MenuRelease:
+        assert context.workspace_id == workspace_id
+        return self._release("draft")
+
+    def validate(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        release_id: UUID,
+    ) -> MenuRelease:
+        assert context.workspace_id == workspace_id and release_id == self._release_id()
+        return self._release("validated")
+
+    def decide(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        release_id: UUID,
+        approved: bool,
+        reason: str | None,
+    ) -> MenuRelease:
+        assert context.workspace_id == workspace_id and release_id == self._release_id()
+        assert approved is True and reason is None
+        return self._release("approved")
+
+    def publish(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        release_id: UUID,
+    ) -> MenuRelease:
+        assert context.workspace_id == workspace_id and release_id == self._release_id()
+        return self._release("published")
+
+    def rollback(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        source_release_id: UUID,
+    ) -> MenuRelease:
+        assert context.workspace_id == workspace_id and source_release_id == self._release_id()
+        return self._release("published", release_kind="rollback")
+
+    def list(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+    ) -> tuple[MenuRelease, ...]:
+        assert context.workspace_id == workspace_id
+        return (self._release("published"),)
+
+    def get_current(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+    ) -> MenuRelease | None:
+        assert context.workspace_id == workspace_id
+        return self._release("published")
+
+    @staticmethod
+    def _release_id() -> UUID:
+        return UUID("83000000-0000-4000-8000-000000000001")
+
+    @classmethod
+    def _release(
+        cls,
+        status: str,
+        *,
+        release_kind: str = "standard",
+    ) -> MenuRelease:
+        from typing import cast
+
+        from ai_platform_api.modules.authorization.domain.menus import (
+            MenuReleaseKind,
+            MenuReleaseStatus,
+        )
+
+        now = datetime(2026, 8, 14, tzinfo=UTC)
+        snapshot = MenuReleaseSnapshot(
+            schema_version=1,
+            registry_version=3,
+            workspace_id=WORKSPACE_ID,
+            menu_version=2,
+            menus=(
+                MenuSnapshotItem(
+                    menu_id=OVERVIEW_ID,
+                    menu_key="navigation.workspace.overview",
+                    parent_menu_id=DIRECTORY_ID,
+                    name="合成工作台",
+                    menu_type="page",
+                    page_resource_id=UUID("80000000-0000-4000-8000-000000000002"),
+                    permission_code="workspace.overview.access",
+                    icon_key="panel-top",
+                    sort_order=10,
+                    source="system",
+                    status="active",
+                    visible=True,
+                ),
+            ),
+            role_menus=(RoleMenuVisibility(WORKSPACE_ID, ROLE_ID, OVERVIEW_ID, True),),
+            menu_api_bindings=(),
+        )
+        return MenuRelease(
+            release_id=cls._release_id(),
+            workspace_id=WORKSPACE_ID,
+            release_number=1,
+            release_kind=cast("MenuReleaseKind", release_kind),
+            source_release_id=cls._release_id() if release_kind == "rollback" else None,
+            status=cast("MenuReleaseStatus", status),
+            snapshot=snapshot,
+            snapshot_digest="a" * 64,
+            validation_errors=(),
+            rejection_reason=None,
+            created_by_account_id=ACCOUNT_ID,
+            decided_by_account_id=ACCOUNT_ID if status in {"approved", "published"} else None,
+            created_at=now,
+            validated_at=now if status in {"validated", "approved", "published"} else None,
+            decided_at=now if status in {"approved", "published"} else None,
+            published_at=now if status == "published" else None,
+            version=1,
+        )
+
+
 class DenyPolicy:
     def decide(self, request: PolicyRequest) -> PolicyDecision:
         return PolicyDecision(
@@ -230,6 +373,7 @@ def authorization_client(policy: PolicyDecisionPoint) -> TestClient:
         policy=policy,
         role_permissions=StubRolePermissionService(),
         menu_configuration=StubMenuConfigurationService(),
+        menu_releases=StubMenuReleaseService(),
         authentication=StubAuthenticationService(),
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),
@@ -336,3 +480,40 @@ def test_hidden_role_menu_does_not_bypass_backend_policy() -> None:
 
     assert response.status_code == 403
     assert response.json()["code"] == "POLICY_DENIED"
+
+
+def test_menu_release_routes_share_registered_permissions_and_snapshot_contract() -> None:
+    client = authorization_client(AllowRegisteredPolicy())
+    base = f"/api/v1/workspaces/{WORKSPACE_ID}/menu-releases"
+    release_id = StubMenuReleaseService._release_id()
+    read_headers = {"X-Workspace-ID": str(WORKSPACE_ID)}
+    write_headers = {**read_headers, "X-CSRF-Token": "synthetic-authorization-csrf"}
+    with client:
+        created = client.post(base, headers=write_headers)
+        validated = client.post(f"{base}/{release_id}/validate", headers=write_headers)
+        decided = client.post(
+            f"{base}/{release_id}/decision",
+            headers=write_headers,
+            json={"approved": True},
+        )
+        published = client.post(f"{base}/{release_id}/publish", headers=write_headers)
+        rolled_back = client.post(f"{base}/{release_id}/rollback", headers=write_headers)
+        listed = client.get(base, headers=read_headers)
+        current = client.get(f"{base}/current", headers=read_headers)
+
+    assert [
+        created.status_code,
+        validated.status_code,
+        decided.status_code,
+        published.status_code,
+        rolled_back.status_code,
+        listed.status_code,
+        current.status_code,
+    ] == [200] * 7
+    assert created.json()["status"] == "draft"
+    assert validated.json()["status"] == "validated"
+    assert decided.json()["status"] == "approved"
+    assert published.json()["status"] == "published"
+    assert rolled_back.json()["release_kind"] == "rollback"
+    assert listed.json()["items"][0]["release_id"] == str(release_id)
+    assert current.json()["snapshot"]["menus"][0]["name"] == "合成工作台"
