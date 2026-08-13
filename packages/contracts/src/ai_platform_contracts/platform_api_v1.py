@@ -15,6 +15,10 @@ class AuthenticationContextResponse(typing.TypedDict):
     workspace_id: str
 
 
+class CreateEnterpriseWorkspaceRequest(typing.TypedDict):
+    name: str
+
+
 class ErrorResponse(typing.TypedDict):
     code: str
     message: str
@@ -29,6 +33,10 @@ class HealthResponse(typing.TypedDict):
     service: str
     status: typing.Literal["ok", "degraded"]
     version: str
+
+
+class InviteWorkspaceMemberRequest(typing.TypedDict):
+    login_name: str
 
 
 class LoginRequest(typing.TypedDict):
@@ -54,3 +62,40 @@ class RegistrationRequest(typing.TypedDict):
 class RegistrationResponse(typing.TypedDict):
     account_id: str
     personal_workspace_id: str
+
+
+class WorkspaceInvitationResponse(typing.TypedDict):
+    expires_at: str
+    invitation_id: str
+    status: typing.Literal["pending", "accepted", "cancelled", "expired"]
+    workspace_id: str
+
+
+class WorkspaceListResponse(typing.TypedDict):
+    items: list[WorkspaceSummaryResponse]
+
+
+class WorkspaceMemberListResponse(typing.TypedDict):
+    items: list[WorkspaceMemberResponse]
+
+
+class WorkspaceMemberResponse(typing.TypedDict):
+    account_id: str
+    display_name: str
+    membership_type: typing.Literal["owner", "member"]
+    status: typing.Literal["active", "disabled", "left"]
+
+
+class WorkspaceMembershipResponse(typing.TypedDict):
+    account_id: str
+    membership_type: typing.Literal["owner", "member"]
+    status: typing.Literal["active", "disabled", "left"]
+
+
+class WorkspaceSummaryResponse(typing.TypedDict):
+    membership_status: typing.Literal["active", "disabled", "left"]
+    membership_type: typing.Literal["owner", "member"]
+    name: str
+    status: typing.Literal["active", "suspended", "archived"]
+    workspace_id: str
+    workspace_type: typing.Literal["personal", "enterprise"]

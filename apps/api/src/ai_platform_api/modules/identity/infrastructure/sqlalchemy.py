@@ -246,9 +246,11 @@ class SqlAlchemyRegistrationWriter:
                 membership_id=registration.membership_id,
                 workspace_id=registration.personal_workspace_id,
                 account_id=registration.account_id,
+                membership_type="owner",
                 status="active",
                 created_at=registration.occurred_at,
                 updated_at=registration.occurred_at,
+                version=1,
             )
         )
 

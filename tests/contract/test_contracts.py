@@ -197,3 +197,45 @@ def test_identity_openapi_uses_stable_error_and_secret_schemas() -> None:
         assert responses["422"]["content"]["application/json"]["schema"] == {
             "$ref": "#/components/schemas/ErrorResponse"
         }
+
+
+def test_workspace_openapi_covers_enterprise_member_lifecycle() -> None:
+    baseline = load_json(CONTRACTS / "openapi/platform-api.v1.json")
+    paths = baseline["paths"]
+    expected_operations = {
+        "/api/v1/workspaces": ("get", "listAccessibleWorkspaces"),
+        "/api/v1/workspaces/enterprise": ("post", "createEnterpriseWorkspace"),
+        "/api/v1/workspaces/{workspace_id}/invitations": (
+            "post",
+            "inviteEnterpriseWorkspaceMember",
+        ),
+        "/api/v1/workspaces/invitations/{invitation_id}/accept": (
+            "post",
+            "acceptEnterpriseWorkspaceInvitation",
+        ),
+        "/api/v1/workspaces/{workspace_id}/switch": ("post", "switchWorkspaceContext"),
+        "/api/v1/workspaces/{workspace_id}/leave": ("post", "leaveEnterpriseWorkspace"),
+        "/api/v1/workspaces/{workspace_id}/members/{account_id}/disable": (
+            "post",
+            "disableEnterpriseWorkspaceMember",
+        ),
+        "/api/v1/workspaces/{workspace_id}/members": (
+            "get",
+            "listEnterpriseWorkspaceMembers",
+        ),
+    }
+    for path, (method, operation_id) in expected_operations.items():
+        assert paths[path][method]["operationId"] == operation_id
+        assert paths[path][method]["responses"]["500"]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ErrorResponse"
+        }
+
+    schemas = baseline["components"]["schemas"]
+    assert schemas["WorkspaceSummaryResponse"]["properties"]["workspace_type"]["enum"] == [
+        "personal",
+        "enterprise",
+    ]
+    assert schemas["WorkspaceMembershipResponse"]["properties"]["membership_type"]["enum"] == [
+        "owner",
+        "member",
+    ]

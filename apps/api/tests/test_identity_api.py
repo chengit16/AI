@@ -16,6 +16,7 @@ from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
 )
+from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.domain.models import (
     AccountCredential,
@@ -177,6 +178,7 @@ def identity_client() -> tuple[TestClient, ApiKeyService, MemorySessions]:
         authentication=authentication,
         api_keys=api_keys,
         registration=StubRegistrationService(),
+        enterprise_workspaces=cast("EnterpriseWorkspaceService", object()),
         secret_cipher=cast(EnvelopeSecretCipher, object()),
         sessions=cast(ValkeySessionStore, sessions),
     )

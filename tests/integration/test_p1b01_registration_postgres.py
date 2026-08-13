@@ -222,9 +222,11 @@ def test_personal_workspace_rejects_non_owner_even_with_active_membership(
                 membership_id=uuid4(),
                 workspace_id=owner.personal_workspace_id,
                 account_id=intruder.account_id,
+                membership_type="member",
                 status="active",
                 created_at=func.now(),
                 updated_at=func.now(),
+                version=1,
             )
         )
     token, _, _ = registration_database.authentication.login(

@@ -6,7 +6,11 @@ from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
 )
+from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
+from ai_platform_api.modules.identity.infrastructure.enterprise_sqlalchemy import (
+    SqlAlchemyEnterpriseUnitOfWork,
+)
 from ai_platform_api.modules.identity.infrastructure.security import (
     Argon2idPasswordAdapter,
     EnvelopeSecretCipher,
@@ -33,6 +37,7 @@ class ApplicationContainer:
     authentication: AuthenticationService
     api_keys: ApiKeyService
     registration: RegistrationService
+    enterprise_workspaces: EnterpriseWorkspaceService
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
 
@@ -74,6 +79,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 repository=reader,
                 unit_of_work=SqlAlchemyRegistrationUnitOfWork(database.sessions),
                 passwords=passwords,
+            ),
+            enterprise_workspaces=EnterpriseWorkspaceService(
+                unit_of_work=SqlAlchemyEnterpriseUnitOfWork(database.sessions),
             ),
             secret_cipher=EnvelopeSecretCipher(MasterKeyFile(settings.master_key_path)),
             sessions=sessions,

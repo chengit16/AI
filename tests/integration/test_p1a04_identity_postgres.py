@@ -137,9 +137,11 @@ def identity_database() -> Iterator[IdentityHarness]:
                 membership_id=MEMBERSHIP_ID,
                 workspace_id=WORKSPACE_ID,
                 account_id=ACCOUNT_ID,
+                membership_type="owner",
                 status="active",
                 created_at=now,
                 updated_at=now,
+                version=1,
             )
         )
 

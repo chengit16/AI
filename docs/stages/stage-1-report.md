@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1B-02` 待开始 |
+| 当前节点 | `P1B-03` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -124,6 +124,20 @@
 - 自动化验收：注册单元、HTTP、契约和 Worker 结构专项 `25/25`，真实 PostgreSQL 注册与 Migration 专项 `4/4`；统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `167/167` 均通过。
 - 容器验收：一键构建和 Migration 成功；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0006`、Valkey 和 Worker 八项诊断全部通过。使用全新合成账号执行真实 HTTP 闭环，注册 `201`、登录 `200`、个人空间上下文 `200`、重复注册 `409`，账号与空间事实一致。
 - 当前边界：本节点不实现企业空间创建、邀请、加入、离开、停用或空间切换，这些能力进入 `P1B-02`；不实现组织、角色、菜单、ABAC 或审批。
+- 提交：`eaf5011`。
+
+### P1B-02 企业空间与成员生命周期
+
+- 状态：通过。
+- 企业所有者：浏览器 Session 用户可从任一当前可访问空间创建企业空间；企业创建者在同一事务内成为唯一、活跃且不可移除的 `owner`。数据库部分唯一索引保证每个空间最多一个所有者，领域状态机禁止所有者离开或被停用，避免角色系统实施前出现无人治理空间。
+- 定向邀请：所有者按已注册且活跃的规范化登录名定向邀请成员，不依赖 SMTP；邀请默认 7 天有效，状态限定为 `pending / accepted / cancelled / expired`，同一账号在同一空间最多一个待处理邀请。过期邀请在再次邀请前关闭，邀请只能由目标账号接受且只能使用一次。
+- 成员生命周期：成员状态限定为 `active / disabled / left`；首次接受邀请创建成员关系，已停用或已离开的成员通过新邀请恢复。成员主动离开、所有者停用成员以及重新加入均在行锁事务中更新成员聚合版本，相关 Outbox 事件版本固定按 `1 → 2 → 3 → 4` 递增。
+- 可信治理边界：企业创建、邀请、接受、切换、离开、停用和成员列表均复用可信 `RequestContext`。空间切换不保存客户端“当前空间”事实，每次目标切换及后续请求重新查询 PostgreSQL；成员停用后下一次请求立即失败关闭。只有浏览器 Session 可以治理企业空间，即使 Open API Key 携带治理 Scope 也返回 `POLICY_DENIED`。
+- 事务与数据约束：企业空间、所有者成员、邀请、成员状态、不可变审计和 Outbox 在同一 PostgreSQL 事务提交。数据库同时约束成员唯一性、所有者唯一性、成员/邀请状态、邀请接受时间与到期时间；旧结构存在无法验证所有者的企业成员时 Migration 拒绝猜测或静默提权。
+- 契约与 Migration：新增企业空间和成员管理 OpenAPI，React/Python 生成类型、错误目录、ReleaseManifest 与兼容矩阵同步推进到 Revision `20260814_0007`。随机隔离 Schema 的 `base → head → base → head` 列、约束和索引快照一致；本地公共合成开发库因节点开发期间先运行旧 `0007`，已使用扩展式 `ADD COLUMN / ADD CONSTRAINT` 无损补齐成员 `version`，没有删除或改写成员状态。
+- 自动化验收：企业领域、HTTP、契约和应用装配专项 `35/35`，企业及身份 PostgreSQL/Valkey 与 Migration 专项 `11/11`，成员事件版本专项 `3/3`。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `175/175` 均通过。
+- 容器与 HTTP 验收：API、Worker、Web 和 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0007`、Valkey 和 Worker 八项诊断通过。使用全新合成双账号完成真实 HTTP 闭环：注册 `201/201`、登录 `200/200`、创建企业 `201`、邀请 `201`、接受 `200`、切换 `200`、停用前访问 `200`、停用 `200`，停用后立即返回 `403 POLICY_DENIED`。
+- 当前边界：本节点不实现部门树、岗位、角色、菜单、接口权限、字段级 ABAC、套餐或审批；这些能力继续按 `P1B-03` 及后续节点实施。邀请当前只面向已注册账号，不扩展邮件投递、公开邀请码或 SaaS 租户注册。
 - 提交：本提交。
 
 ## 4. 当前限制
@@ -135,4 +149,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，当前从 `P1A-01` 开始记录。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1B-02`，当前进入 `P1B-03`。

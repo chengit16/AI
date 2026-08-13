@@ -93,9 +93,11 @@ workspace_memberships = Table(
     Column("membership_id", UUID(as_uuid=True), primary_key=True),
     Column("workspace_id", UUID(as_uuid=True), nullable=False),
     Column("account_id", UUID(as_uuid=True), nullable=False),
+    Column("membership_type", String(32), nullable=False),
     Column("status", String(32), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
     UniqueConstraint("workspace_id", "account_id", name="uq_workspace_memberships_member"),
     ForeignKeyConstraint(
         ["workspace_id"],
@@ -111,11 +113,67 @@ workspace_memberships = Table(
         "status IN ('active', 'disabled', 'left')",
         name="ck_workspace_memberships_status",
     ),
+    CheckConstraint(
+        "membership_type IN ('owner', 'member')",
+        name="ck_workspace_memberships_type",
+    ),
+    CheckConstraint("version >= 1", name="ck_workspace_memberships_version"),
 )
 Index(
     "ix_workspace_memberships_account_workspace",
     workspace_memberships.c.account_id,
     workspace_memberships.c.workspace_id,
+)
+Index(
+    "uq_workspace_memberships_owner",
+    workspace_memberships.c.workspace_id,
+    unique=True,
+    postgresql_where=workspace_memberships.c.membership_type == "owner",
+)
+
+workspace_invitations = Table(
+    "workspace_invitations",
+    metadata,
+    Column("invitation_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("invited_account_id", UUID(as_uuid=True), nullable=False),
+    Column("invited_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("accepted_at", DateTime(timezone=True), nullable=True),
+    CheckConstraint(
+        "status IN ('pending', 'accepted', 'cancelled', 'expired')",
+        name="ck_workspace_invitations_status",
+    ),
+    CheckConstraint("expires_at > created_at", name="ck_workspace_invitations_expiry"),
+    CheckConstraint(
+        "(status = 'accepted' AND accepted_at IS NOT NULL) "
+        "OR (status <> 'accepted' AND accepted_at IS NULL)",
+        name="ck_workspace_invitations_accepted_at",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workspace_invitations_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["invited_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_workspace_invitations_account",
+    ),
+    ForeignKeyConstraint(
+        ["invited_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_workspace_invitations_inviter",
+    ),
+)
+Index(
+    "uq_workspace_invitations_pending",
+    workspace_invitations.c.workspace_id,
+    workspace_invitations.c.invited_account_id,
+    unique=True,
+    postgresql_where=workspace_invitations.c.status == "pending",
 )
 
 open_api_keys = Table(

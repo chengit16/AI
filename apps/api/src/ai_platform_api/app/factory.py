@@ -11,6 +11,7 @@ from ai_platform_api.app.errors import register_error_handlers
 from ai_platform_api.app.trace_middleware import TraceContextMiddleware
 from ai_platform_api.common.api_errors import ErrorResponse
 from ai_platform_api.config import Settings, get_settings
+from ai_platform_api.modules.identity.api.enterprise_routes import router as workspace_router
 from ai_platform_api.modules.identity.api.routes import router as identity_router
 from ai_platform_api.modules.system.api.health import router as health_router
 
@@ -45,9 +46,11 @@ def create_app(
     application.state.container = dependencies
     application.state.authentication_service = dependencies.authentication
     application.state.registration_service = dependencies.registration
+    application.state.enterprise_workspace_service = dependencies.enterprise_workspaces
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)
     application.include_router(health_router, prefix="/api/v1")
     application.include_router(identity_router, prefix="/api/v1")
+    application.include_router(workspace_router, prefix="/api/v1")
     return application

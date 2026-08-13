@@ -46,7 +46,7 @@ class AuthenticationService:
         self._session_ttl_seconds = session_ttl_seconds
 
     def login(self, login_name: str, password: str) -> tuple[str, str, UUID]:
-        account = self._repository.get_account_by_login(login_name.strip().lower())
+        account = self._repository.get_account_by_login(login_name.strip().casefold())
         password_valid = self._passwords.verify(
             account.password_hash if account is not None else None,
             password,
