@@ -1,0 +1,47 @@
+{
+  "dataset_version": "p0-07-v1",
+  "files": [
+    {
+      "file": "synthetic-handbook.md",
+      "sha256": "2f2537f04ce18bcb6b44b169da8c25fb70f52204d2307621cb1cc3108933870a",
+      "size_bytes": 206,
+      "synthetic": true
+    },
+    {
+      "file": "synthetic-ocr.png",
+      "sha256": "473a341e81973bf4a2f05c325680dddaa0cd813284b80e86b774c38653439e6c",
+      "size_bytes": 452,
+      "synthetic": true
+    },
+    {
+      "file": "synthetic-pdf-table.pdf",
+      "sha256": "9a12d47d7465920d61d06058ceb7fe881b5565626b01be7e4a31b5da5f823bca",
+      "size_bytes": 850,
+      "synthetic": true
+    },
+    {
+      "file": "synthetic-policy.txt",
+      "sha256": "8d85c59e088efb9766fc8340e3bab96348b66c9cb0b553214609152786e75608",
+      "size_bytes": 106,
+      "synthetic": true
+    },
+    {
+      "file": "synthetic-scan.pdf",
+      "sha256": "8e527d1d1dbfc71339fd84f95fbabf1db2388d355a8002d3b5fd53209315e783",
+      "size_bytes": 1011,
+      "synthetic": true
+    },
+    {
+      "file": "synthetic-table.docx",
+      "sha256": "286a98ffbb8e922745011da8d64828aa424e1cea77b41c095043bbb93973d729",
+      "size_bytes": 1024,
+      "synthetic": true
+    },
+    {
+      "file": "synthetic-text.pdf",
+      "sha256": "f2f26f564f164d38a765715b461245e9ec95991ef5339d159b9ab08b66fda464",
+      "size_bytes": 734,
+      "synthetic": true
+    }
+  ]
+}

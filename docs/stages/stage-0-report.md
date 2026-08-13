@@ -92,6 +92,22 @@
 - 容器验收：API 与 Worker 镜像使用 `uv sync --frozen` 成功重建，SQLAlchemy、psycopg 和 Alembic 依赖在 Linux/ARM64 镜像内可复现。
 - 安全与数据：全部 UUID、标题和敏感字段均为合成测试数据；未接入真实个人或企业资料。
 - 当前边界：本节点建立可靠性与授权最小基线，不实现正式账号认证、完整策略管理后台、Outbox 发布调度、乱序事件处理和跨工作空间复制流程，这些按后续阶段建设。
+- 提交：`6a13920`。
+
+### P0-07 文档解析、OCR 与切片链路
+
+- 状态：通过。
+- 数据集：`tests/fixtures/ingestion` 的 `p0-07-v1` 包含 7 个全合成样本：TXT、Markdown、文本 PDF、带线框表格 PDF、DOCX 表格、PNG OCR 和扫描 PDF；生成器只使用 Python 标准库，`manifest.json` 固定每个文件的 SHA-256 与字节数。
+- 解析边界：TXT/Markdown 使用本地确定性解析；PDF、DOCX 和图片使用 Apache Tika `3.2.3` 结构化 HTML；PDF 由 pdfplumber `0.11.8` 补充基础线框表格。Tika 输出的非法空字符引用在 Adapter 边缘兼容处理，正文仍使用 XML 结构化解析。
+- OCR：Tika Full 镜像中的 Tesseract `5.5.0` 对 PNG 精确识别 `TEST POLICY`，扫描 PDF 标记 `pdf:ocrPageCount=1`、生成非空 OCR 块并保留第 1 页来源。当前语言包没有中文，本节点不把英文 OCR 结果描述为中文 OCR 已通过；阶段 1D 必须接入 PaddleOCR 或等效中文 Adapter 后重新验收。
+- 表格：Markdown、DOCX 与 PDF 三类基础表格均恢复为 `table` 结构块；PDF 表格保留页码，DOCX 表格保留行列文本。复杂合并单元格、公式、XLSX 和 PPTX 不在 MVP 范围。
+- Chunk：结构感知切片优先保持页、段落和表格边界，超长块才使用字符窗口；稳定 `chunk_id` 基于文档版本、序号和内容哈希生成，重复执行结果一致；每个 Chunk 携带工作空间、知识库、文档版本、索引版本、部门、可见性、密级、来源位置、内容哈希、解析器和 OCR 标记。
+- 失败定位：大小、页数、Chunk 长度和重叠均由 `IngestionLimits` 注入；空文件、超限、格式不支持、解析器不可用、解析失败和空内容使用共享 `INGESTION_*` 稳定错误码，并区分是否可重试。
+- 实测结果：7 个样本全部解析成功并各生成 1 个 Chunk；本地 TXT/Markdown 为 0.5–2.0 ms，文本/表格 PDF 与 DOCX 为 7.2–9.9 ms，PNG OCR 为 146.2 ms，扫描 PDF OCR 为 247.5 ms。该结果只证明当前小样本链路正确，不构成大文件或容量认证。
+- 自动化验收：真实 Tika/PDF 集成测试 `8/8`、全量 pytest `46/46`、Web Vitest `1/1`、Node 架构测试 `3/3`；`./scripts/verify`、Ruff、mypy strict、契约兼容、生产构建和 Compose 配置全部通过。
+- 容器验收：Worker 镜像使用 `uv sync --frozen` 成功重建，容器内可导入 pdfplumber `0.11.8` 和 `PdfDocumentParser`，Linux/ARM64 依赖可复现。
+- 安全与数据：样本内容、UUID、制度、人员和密级信息均为合成数据；未发送到外部服务，Tika 与 OCR 仅在本机容器运行。
+- 当前边界：本节点验证解析、OCR 和 Chunk 产物，不实现对象存储、正式 `IngestionJob` 状态持久化、队列重试、Embedding、关键词索引和发布切换；这些由阶段 1D 及后续节点完成。
 - 提交：本节点提交完成后回填。
 
 ### P0-13 前端 UI/UX 设计基线

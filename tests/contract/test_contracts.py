@@ -73,7 +73,13 @@ def test_error_codes_are_unique_and_stable() -> None:
 
     assert catalog["schema_version"] == 1
     assert len(codes) == len(set(codes))
-    assert {"POLICY_DENIED", "SSE_EVENT_EXPIRED", "INTERNAL_ERROR"}.issubset(codes)
+    assert {
+        "POLICY_DENIED",
+        "INGESTION_PARSE_FAILED",
+        "INGESTION_PARSER_UNAVAILABLE",
+        "SSE_EVENT_EXPIRED",
+        "INTERNAL_ERROR",
+    }.issubset(codes)
     assert all(code == code.upper() for code in codes)
 
 

@@ -1,0 +1,4 @@
+# 固定测试文档按二进制追踪，避免 Git 对 PDF xref 等格式执行文本检查或换行转换。
+*.pdf binary
+*.docx binary
+*.png binary
