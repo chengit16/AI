@@ -14,6 +14,7 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR, UUID
 
@@ -118,6 +119,11 @@ workspace_memberships = Table(
         name="ck_workspace_memberships_type",
     ),
     CheckConstraint("version >= 1", name="ck_workspace_memberships_version"),
+    UniqueConstraint(
+        "workspace_id",
+        "membership_id",
+        name="uq_workspace_memberships_workspace_membership",
+    ),
 )
 Index(
     "ix_workspace_memberships_account_workspace",
@@ -174,6 +180,196 @@ Index(
     workspace_invitations.c.invited_account_id,
     unique=True,
     postgresql_where=workspace_invitations.c.status == "pending",
+)
+
+departments = Table(
+    "departments",
+    metadata,
+    Column("department_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("parent_department_id", UUID(as_uuid=True), nullable=True),
+    Column("name", String(120), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "department_id",
+        name="uq_departments_workspace_department",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_departments_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "parent_department_id"],
+        [f"{SCHEMA_TOKEN}.departments.workspace_id", f"{SCHEMA_TOKEN}.departments.department_id"],
+        name="fk_departments_parent",
+    ),
+    CheckConstraint("parent_department_id <> department_id", name="ck_departments_not_self_parent"),
+    CheckConstraint("status IN ('active', 'disabled')", name="ck_departments_status"),
+    CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 120", name="ck_departments_name"),
+    CheckConstraint("version >= 1", name="ck_departments_version"),
+)
+Index(
+    "uq_departments_sibling_name",
+    departments.c.workspace_id,
+    departments.c.parent_department_id,
+    func.lower(departments.c.name),
+    unique=True,
+    postgresql_nulls_not_distinct=True,
+)
+Index(
+    "ix_departments_workspace_parent",
+    departments.c.workspace_id,
+    departments.c.parent_department_id,
+)
+
+department_closure = Table(
+    "department_closure",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("ancestor_department_id", UUID(as_uuid=True), primary_key=True),
+    Column("descendant_department_id", UUID(as_uuid=True), primary_key=True),
+    Column("depth", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "ancestor_department_id"],
+        [f"{SCHEMA_TOKEN}.departments.workspace_id", f"{SCHEMA_TOKEN}.departments.department_id"],
+        name="fk_department_closure_ancestor",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "descendant_department_id"],
+        [f"{SCHEMA_TOKEN}.departments.workspace_id", f"{SCHEMA_TOKEN}.departments.department_id"],
+        name="fk_department_closure_descendant",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("depth >= 0", name="ck_department_closure_depth"),
+)
+Index(
+    "ix_department_closure_descendant",
+    department_closure.c.workspace_id,
+    department_closure.c.descendant_department_id,
+    department_closure.c.depth,
+)
+
+positions = Table(
+    "positions",
+    metadata,
+    Column("position_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("department_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "department_id",
+        "position_id",
+        name="uq_positions_workspace_department_position",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "department_id"],
+        [f"{SCHEMA_TOKEN}.departments.workspace_id", f"{SCHEMA_TOKEN}.departments.department_id"],
+        name="fk_positions_department",
+    ),
+    CheckConstraint("status IN ('active', 'disabled')", name="ck_positions_status"),
+    CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 120", name="ck_positions_name"),
+    CheckConstraint("version >= 1", name="ck_positions_version"),
+)
+Index("ix_positions_workspace_department", positions.c.workspace_id, positions.c.department_id)
+Index(
+    "uq_positions_department_name",
+    positions.c.workspace_id,
+    positions.c.department_id,
+    func.lower(positions.c.name),
+    unique=True,
+)
+
+membership_departments = Table(
+    "membership_departments",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("membership_id", UUID(as_uuid=True), primary_key=True),
+    Column("department_id", UUID(as_uuid=True), primary_key=True),
+    Column("is_primary", Boolean, nullable=False),
+    Column("assigned_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "membership_id"],
+        [
+            f"{SCHEMA_TOKEN}.workspace_memberships.workspace_id",
+            f"{SCHEMA_TOKEN}.workspace_memberships.membership_id",
+        ],
+        name="fk_membership_departments_membership",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "department_id"],
+        [f"{SCHEMA_TOKEN}.departments.workspace_id", f"{SCHEMA_TOKEN}.departments.department_id"],
+        name="fk_membership_departments_department",
+    ),
+)
+Index(
+    "uq_membership_departments_primary",
+    membership_departments.c.workspace_id,
+    membership_departments.c.membership_id,
+    unique=True,
+    postgresql_where=membership_departments.c.is_primary.is_(True),
+)
+Index(
+    "ix_membership_departments_scope",
+    membership_departments.c.workspace_id,
+    membership_departments.c.department_id,
+    membership_departments.c.membership_id,
+)
+
+membership_positions = Table(
+    "membership_positions",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("membership_id", UUID(as_uuid=True), primary_key=True),
+    Column("position_id", UUID(as_uuid=True), primary_key=True),
+    Column("department_id", UUID(as_uuid=True), nullable=False),
+    Column("assigned_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "membership_id"],
+        [
+            f"{SCHEMA_TOKEN}.workspace_memberships.workspace_id",
+            f"{SCHEMA_TOKEN}.workspace_memberships.membership_id",
+        ],
+        name="fk_membership_positions_membership",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "membership_id", "department_id"],
+        [
+            f"{SCHEMA_TOKEN}.membership_departments.workspace_id",
+            f"{SCHEMA_TOKEN}.membership_departments.membership_id",
+            f"{SCHEMA_TOKEN}.membership_departments.department_id",
+        ],
+        name="fk_membership_positions_department_assignment",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "department_id", "position_id"],
+        [
+            f"{SCHEMA_TOKEN}.positions.workspace_id",
+            f"{SCHEMA_TOKEN}.positions.department_id",
+            f"{SCHEMA_TOKEN}.positions.position_id",
+        ],
+        name="fk_membership_positions_position",
+    ),
+)
+Index(
+    "ix_membership_positions_scope",
+    membership_positions.c.workspace_id,
+    membership_positions.c.department_id,
+    membership_positions.c.position_id,
+    membership_positions.c.membership_id,
 )
 
 open_api_keys = Table(

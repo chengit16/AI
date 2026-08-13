@@ -5,6 +5,12 @@ from __future__ import annotations
 import typing
 
 
+class AssignMemberOrganizationRequest(typing.TypedDict):
+    department_ids: list[str]
+    position_ids: list[str]
+    primary_department_id: typing.NotRequired[str | None]
+
+
 class AuthenticationContextResponse(typing.TypedDict):
     actor_id: str
     authentication_method: str
@@ -15,8 +21,32 @@ class AuthenticationContextResponse(typing.TypedDict):
     workspace_id: str
 
 
+class CreateDepartmentRequest(typing.TypedDict):
+    name: str
+    parent_department_id: typing.NotRequired[str | None]
+
+
 class CreateEnterpriseWorkspaceRequest(typing.TypedDict):
     name: str
+
+
+class CreatePositionRequest(typing.TypedDict):
+    department_id: str
+    name: str
+
+
+class DepartmentListResponse(typing.TypedDict):
+    items: list[DepartmentResponse]
+
+
+class DepartmentResponse(typing.TypedDict):
+    department_id: str
+    depth: int
+    effective_active: bool
+    name: str
+    parent_department_id: str | None
+    status: typing.Literal["active", "disabled"]
+    version: int
 
 
 class ErrorResponse(typing.TypedDict):
@@ -51,6 +81,35 @@ class LoginResponse(typing.TypedDict):
 
 class LogoutResponse(typing.TypedDict):
     logged_out: bool
+
+
+class MemberOrganizationResponse(typing.TypedDict):
+    account_id: str
+    department_ids: list[str]
+    membership_version: int
+    position_ids: list[str]
+    primary_department_id: str | None
+
+
+class MoveDepartmentRequest(typing.TypedDict):
+    parent_department_id: typing.NotRequired[str | None]
+
+
+class OrganizationStatusRequest(typing.TypedDict):
+    active: bool
+
+
+class PositionListResponse(typing.TypedDict):
+    items: list[PositionResponse]
+
+
+class PositionResponse(typing.TypedDict):
+    department_id: str
+    effective_active: bool
+    name: str
+    position_id: str
+    status: typing.Literal["active", "disabled"]
+    version: int
 
 
 class RegistrationRequest(typing.TypedDict):

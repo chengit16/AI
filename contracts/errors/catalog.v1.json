@@ -6,6 +6,7 @@
     { "code": "AUTH_INVALID_CREDENTIALS", "http_status": 401, "message": "登录标识或密码无效", "retryable": false },
     { "code": "REGISTRATION_CONFLICT", "http_status": 409, "message": "该登录标识已被使用", "retryable": false },
     { "code": "WORKSPACE_LIFECYCLE_CONFLICT", "http_status": 409, "message": "工作空间邀请或成员状态不允许当前操作", "retryable": false },
+    { "code": "ORGANIZATION_CONFLICT", "http_status": 409, "message": "组织层级、状态、名称或成员归属不允许当前操作", "retryable": false },
     { "code": "CSRF_INVALID", "http_status": 403, "message": "请求缺少有效的 CSRF 凭证", "retryable": false },
     { "code": "WORKSPACE_REQUIRED", "http_status": 400, "message": "请求缺少有效的工作空间上下文", "retryable": false },
     { "code": "POLICY_DENIED", "http_status": 403, "message": "当前操作未获授权", "retryable": false },

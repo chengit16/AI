@@ -140,6 +140,7 @@ def test_error_codes_are_unique_and_stable() -> None:
         "MODEL_ROUTE_UNAVAILABLE",
         "MODEL_GATEWAY_UNAVAILABLE",
         "SSE_EVENT_EXPIRED",
+        "ORGANIZATION_CONFLICT",
         "INTERNAL_ERROR",
     }.issubset(codes)
     assert all(code == code.upper() for code in codes)
@@ -238,4 +239,51 @@ def test_workspace_openapi_covers_enterprise_member_lifecycle() -> None:
     assert schemas["WorkspaceMembershipResponse"]["properties"]["membership_type"]["enum"] == [
         "owner",
         "member",
+    ]
+
+
+def test_organization_openapi_covers_tree_position_and_assignment_lifecycle() -> None:
+    baseline = load_json(CONTRACTS / "openapi/platform-api.v1.json")
+    paths = baseline["paths"]
+    prefix = "/api/v1/workspaces/{workspace_id}/organization"
+    expected_operations = {
+        f"{prefix}/departments": {
+            "post": "createEnterpriseDepartment",
+            "get": "listEnterpriseDepartments",
+        },
+        f"{prefix}/departments/{{department_id}}/move": {"post": "moveEnterpriseDepartment"},
+        f"{prefix}/departments/{{department_id}}/status": {"post": "setEnterpriseDepartmentStatus"},
+        f"{prefix}/positions": {
+            "post": "createEnterprisePosition",
+            "get": "listEnterprisePositions",
+        },
+        f"{prefix}/positions/{{position_id}}/status": {"post": "setEnterprisePositionStatus"},
+        f"{prefix}/members/{{account_id}}": {
+            "put": "assignEnterpriseMemberOrganization",
+            "get": "getEnterpriseMemberOrganization",
+        },
+    }
+    for path, operations in expected_operations.items():
+        for method, operation_id in operations.items():
+            assert paths[path][method]["operationId"] == operation_id
+            assert paths[path][method]["responses"]["500"]["content"]["application/json"][
+                "schema"
+            ] == {"$ref": "#/components/schemas/ErrorResponse"}
+
+    schemas = baseline["components"]["schemas"]
+    assert schemas["DepartmentResponse"]["required"] == [
+        "department_id",
+        "parent_department_id",
+        "name",
+        "status",
+        "effective_active",
+        "depth",
+        "version",
+    ]
+    assert schemas["MemberOrganizationResponse"]["required"] == [
+        "account_id",
+        "department_ids",
+        "primary_department_id",
+        "position_ids",
+        "membership_version",
     ]

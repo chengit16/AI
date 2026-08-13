@@ -9,7 +9,7 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
 )
-from sqlalchemy import insert, select, update
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,8 @@ from ai_platform_api.modules.identity.domain.models import (
 )
 from ai_platform_api.persistence.tables import (
     accounts,
+    membership_departments,
+    membership_positions,
     workspace_invitations,
     workspace_memberships,
     workspaces,
@@ -208,6 +210,20 @@ class SqlAlchemyEnterpriseRepository:
         )
 
     def save_membership(self, membership: WorkspaceMembership) -> None:
+        if membership.status != "active":
+            # 离开或停用必须同步撤销组织归属，重新加入不能隐式恢复旧权限范围。
+            self._session.execute(
+                delete(membership_positions).where(
+                    membership_positions.c.workspace_id == membership.workspace_id,
+                    membership_positions.c.membership_id == membership.membership_id,
+                )
+            )
+            self._session.execute(
+                delete(membership_departments).where(
+                    membership_departments.c.workspace_id == membership.workspace_id,
+                    membership_departments.c.membership_id == membership.membership_id,
+                )
+            )
         self._session.execute(
             update(workspace_memberships)
             .where(

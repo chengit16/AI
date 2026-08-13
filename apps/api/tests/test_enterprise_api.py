@@ -18,6 +18,7 @@ from ai_platform_api.modules.identity.application.enterprise import (
     WorkspaceMemberSummary,
     WorkspaceSummary,
 )
+from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.domain.enterprise import (
     WorkspaceInvitation,
@@ -209,6 +210,7 @@ def enterprise_client() -> TestClient:
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),
         enterprise_workspaces=StubEnterpriseWorkspaceService(),
+        organization=cast("OrganizationService", object()),
         secret_cipher=cast("EnvelopeSecretCipher", object()),
         sessions=cast("ValkeySessionStore", closing),
     )
