@@ -3,8 +3,15 @@ from pathlib import Path
 
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.authorization.application.grants import RolePermissionService
+from ai_platform_api.modules.authorization.application.policy import RbacPolicyDecisionPoint
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
+from ai_platform_api.modules.authorization.domain.policy import PolicyDecisionPoint
 from ai_platform_api.modules.authorization.domain.resources import ResourceRegistry
+from ai_platform_api.modules.authorization.infrastructure.sqlalchemy import (
+    SqlAlchemyPolicyGrantRepository,
+    SqlAlchemyRolePermissionUnitOfWork,
+)
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
@@ -52,6 +59,8 @@ class ApplicationContainer:
     database: PlatformDatabase
     errors: ErrorCatalog
     resource_registry: ResourceRegistry
+    policy: PolicyDecisionPoint
+    role_permissions: RolePermissionService
     authentication: AuthenticationService
     api_keys: ApiKeyService
     registration: RegistrationService
@@ -85,12 +94,19 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     entitlement_access = SqlAlchemyEntitlementAccessReader(database.sessions)
     digester = Sha256SecretDigester()
     passwords = Argon2idPasswordAdapter()
+    resource_registry = load_resource_registry(Path(settings.resource_registry_path))
+    policy_reader = SqlAlchemyPolicyGrantRepository(database.sessions)
     try:
         return ApplicationContainer(
             settings=settings,
             database=database,
             errors=ErrorCatalog.load(settings.error_catalog_path),
-            resource_registry=load_resource_registry(Path(settings.resource_registry_path)),
+            resource_registry=resource_registry,
+            policy=RbacPolicyDecisionPoint(resource_registry, policy_reader),
+            role_permissions=RolePermissionService(
+                resource_registry,
+                SqlAlchemyRolePermissionUnitOfWork(database.sessions),
+            ),
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,

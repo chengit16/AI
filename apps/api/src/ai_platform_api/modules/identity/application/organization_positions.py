@@ -11,6 +11,7 @@ from ai_platform_api.modules.identity.application.organization_support import (
     normalized_name,
     organization_facts,
     position_summary,
+    require_active_enterprise,
     require_effective_department,
     require_owner,
 )
@@ -131,10 +132,19 @@ class PositionService:
     def list(self, context: RequestContext, *, workspace_id: UUID) -> tuple[PositionSummary, ...]:
         account_id = governance_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
-            require_owner(unit_of_work.organization, workspace_id, account_id)
+            direct_owner_call = context.authorized_permission_code is None
+            if direct_owner_call:
+                require_owner(unit_of_work.organization, workspace_id, account_id)
+            else:
+                require_active_enterprise(unit_of_work.organization, workspace_id, account_id)
             departments = unit_of_work.organization.list_departments(workspace_id)
             positions = unit_of_work.organization.list_positions(workspace_id)
         effective_departments = {
             item.department_id: item.effective_active for item in summarize_departments(departments)
         }
-        return tuple(position_summary(item, effective_departments) for item in positions)
+        summaries = tuple(position_summary(item, effective_departments) for item in positions)
+        if direct_owner_call or context.authorized_workspace:
+            return summaries
+        return tuple(
+            item for item in summaries if item.department_id in context.authorized_department_ids
+        )

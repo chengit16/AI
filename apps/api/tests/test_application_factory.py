@@ -7,6 +7,7 @@ from ai_platform_api.app.dependencies import ApplicationContainer
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.app.factory import create_app
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.authorization.application.grants import RolePermissionService
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
@@ -29,6 +30,8 @@ from ai_platform_api.modules.retrieval.domain.errors import CitationInvalidError
 from ai_platform_api.persistence.database import PlatformDatabase
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
+
+from test_support.authorization import AllowRegisteredPolicy
 
 ROOT = Path(__file__).parents[3]
 
@@ -60,6 +63,8 @@ def application_container(settings: Settings) -> tuple[ApplicationContainer, Clo
         resource_registry=load_resource_registry(
             ROOT / "contracts/authorization/resource-registry.v1.json"
         ),
+        policy=AllowRegisteredPolicy(),
+        role_permissions=cast("RolePermissionService", object()),
         authentication=cast("AuthenticationService", object()),
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),
@@ -228,7 +233,7 @@ def test_startup_rejects_incompatible_release_combination(tmp_path: Path) -> Non
     )
     incompatible = tmp_path / "incompatible.json"
     incompatible.write_text(
-        manifest.replace('"schema_revision": "20260814_0010"', '"schema_revision": "unknown"'),
+        manifest.replace('"schema_revision": "20260814_0011"', '"schema_revision": "unknown"'),
         encoding="utf-8",
     )
 

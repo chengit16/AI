@@ -339,8 +339,19 @@ class EnterpriseWorkspaceService:
         account_id = self._browser_account(context)
         self._require_current_workspace(context, workspace_id)
         with self._unit_of_work as unit_of_work:
-            self._require_owner(unit_of_work.enterprise, workspace_id, account_id)
-            return unit_of_work.enterprise.list_members(workspace_id)
+            if context.authorized_permission_code is None:
+                self._require_owner(unit_of_work.enterprise, workspace_id, account_id)
+                return unit_of_work.enterprise.list_members(workspace_id)
+            self._require_enterprise(unit_of_work.enterprise, workspace_id)
+            membership = unit_of_work.enterprise.get_membership(workspace_id, account_id)
+            if membership is None or membership.status != "active":
+                raise WorkspaceGovernanceDeniedError
+            members = unit_of_work.enterprise.list_members(workspace_id)
+            if context.authorized_workspace:
+                return members
+            return tuple(
+                member for member in members if member.account_id in context.authorized_account_ids
+            )
 
     def switch(self, context: RequestContext, *, workspace_id: UUID) -> WorkspaceSummary:
         account_id = self._browser_account(context)

@@ -4,11 +4,13 @@ from uuid import UUID
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.identity.application.organization_errors import (
     OrganizationConflictError,
+    OrganizationGovernanceDeniedError,
     OrganizationNotFoundError,
 )
 from ai_platform_api.modules.identity.application.organization_support import (
     governance_account,
     organization_facts,
+    require_active_enterprise,
     require_effective_department,
     require_owner,
     unique_ids,
@@ -113,7 +115,15 @@ class MemberOrganizationService:
     ) -> OrganizationAssignment:
         account_id = governance_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
-            require_owner(unit_of_work.organization, workspace_id, account_id)
+            if context.authorized_permission_code is None:
+                require_owner(unit_of_work.organization, workspace_id, account_id)
+            else:
+                require_active_enterprise(unit_of_work.organization, workspace_id, account_id)
+                if (
+                    not context.authorized_workspace
+                    and target_account_id not in context.authorized_account_ids
+                ):
+                    raise OrganizationGovernanceDeniedError
             membership = unit_of_work.organization.get_membership(workspace_id, target_account_id)
             if membership is None or membership.status != "active":
                 raise OrganizationNotFoundError

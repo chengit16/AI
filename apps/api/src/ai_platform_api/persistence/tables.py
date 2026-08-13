@@ -474,6 +474,46 @@ Index(
     role_bindings.c.status,
 )
 
+role_permission_grants = Table(
+    "role_permission_grants",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("role_id", UUID(as_uuid=True), primary_key=True),
+    Column("permission_code", String(160), primary_key=True),
+    Column("scope_type", String(32), nullable=False),
+    Column("department_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
+    Column("resource_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
+    ForeignKeyConstraint(
+        ["workspace_id", "role_id"],
+        [f"{SCHEMA_TOKEN}.roles.workspace_id", f"{SCHEMA_TOKEN}.roles.role_id"],
+        name="fk_role_permission_grants_role",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "permission_code ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$'",
+        name="ck_role_permission_grants_code",
+    ),
+    CheckConstraint(
+        "scope_type IN ('workspace', 'department_tree', 'self', 'resource')",
+        name="ck_role_permission_grants_scope",
+    ),
+    CheckConstraint(
+        "(scope_type IN ('workspace', 'self') AND cardinality(department_ids) = 0 "
+        "AND cardinality(resource_ids) = 0) OR "
+        "(scope_type = 'department_tree' AND cardinality(department_ids) > 0 "
+        "AND cardinality(resource_ids) = 0) OR "
+        "(scope_type = 'resource' AND cardinality(resource_ids) > 0 "
+        "AND cardinality(department_ids) = 0)",
+        name="ck_role_permission_grants_targets",
+    ),
+)
+Index(
+    "ix_role_permission_grants_lookup",
+    role_permission_grants.c.workspace_id,
+    role_permission_grants.c.permission_code,
+    role_permission_grants.c.role_id,
+)
+
 workspace_entitlements = Table(
     "workspace_entitlements",
     metadata,

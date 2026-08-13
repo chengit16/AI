@@ -59,6 +59,23 @@ def require_owner(
         raise OrganizationGovernanceDeniedError
 
 
+def require_active_enterprise(
+    repository: OrganizationRepository,
+    workspace_id: UUID,
+    account_id: UUID,
+) -> None:
+    workspace = repository.get_workspace(workspace_id)
+    membership = repository.get_membership(workspace_id, account_id)
+    if (
+        workspace is None
+        or workspace.workspace_type != "enterprise"
+        or workspace.status != "active"
+        or membership is None
+        or membership.status != "active"
+    ):
+        raise OrganizationGovernanceDeniedError
+
+
 def find_department(departments: tuple[Department, ...], department_id: UUID) -> Department:
     for department in departments:
         if department.department_id == department_id:

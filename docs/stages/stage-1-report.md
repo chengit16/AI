@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1C-02` 待开始 |
+| 当前节点 | `P1C-03` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -202,6 +202,19 @@
 - 自动化验收：注册表领域与反例 `4/4`，注册表加契约专项 `24/24`，API 启动与应用组合 `51/51`；统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试 `3/3`/生产构建、Ruff、mypy strict、架构、OpenAPI 覆盖、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `209/209` 均通过。
 - 容器与浏览器验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0010`、Valkey 和 Worker 八项诊断通过。真实浏览器确认注册表生成的空间总览、成员管理、组织架构和运行状态四个菜单全部可见并可导航，普通成员无权限状态保持，页面无横向溢出且控制台无错误。
 - 当前边界：本节点建立平台注册和发布前结构门禁，不把冻结注册表冒充工作空间 `MenuRelease`，不实现角色到 Permission 的实际授权、数据范围计算、页面/接口动态绑定、菜单草稿发布或字段级 ABAC；这些分别进入 `P1C-02` 至 `P1C-05`。注册表当前随代码发布，尚不允许管理员录入任意页面、组件、路由或接口。
+- 提交：`087d8ac`。
+
+### P1C-02 RBAC 与资源/数据级 ABAC
+
+- 状态：通过。
+- 授权事实：新增持久化 `RolePermissionGrant`，明确角色身份与业务 Permission 分离，并支持工作空间、部门子树、当前账号和明确资源集合四类数据范围。系统所有者与成员角色使用确定性默认授权；新空间写入与既有空间 Migration 使用同一权限集合，自定义角色可由企业所有者原子替换授权，系统角色不允许被改写。
+- 统一策略决策点：`RbacPolicyDecisionPoint` 统一校验注册 Permission、可信工作空间、有效成员、确定性角色继承、角色权限、数据范围和 Open API Key Scope。Scope 只能缩小创建者已有权限，不能扩大角色权限；策略存储、组织树或主体事实异常时返回拒绝，高风险与关键操作不产生可复用允许缓存。
+- API 安全边界：所有注册为 `authorized` 的 OpenAPI 操作在业务 Service 前按 `operation_id` 查找唯一 Permission 并执行策略决策，URL 直访或直接构造接口请求不能绕过。当前注册表扩展至 30 项 Permission 和 33 个 OpenAPI 操作；角色权限读取与替换接口分别绑定独立 Permission，页面可见性仍不构成授权。
+- 数据范围消费：可信 `RequestContext` 只承载 PDP 产生的最小范围。成员、部门、岗位和成员组织读取在 Application 层继续消费范围，工作空间范围返回全量，部门树、本人或资源范围仅返回匹配数据；Repository 与后续知识检索仍必须把范围转换为工作空间约束查询，不能只依赖前端过滤。
+- 数据与契约：新增 `role_permission_grants`，数据库 Revision 推进至 `20260814_0011`；复合外键关闭跨空间角色授权，Check Constraint 固定范围目标形态。OpenAPI、React/Python 类型、资源注册表、ReleaseManifest、兼容矩阵和本地诊断同步推进。
+- 自动化验收：策略领域、API 绕过、角色权限协议和真实 PostgreSQL 专项通过；Migration `base → head → base → head` 结构一致。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试 `3/3`/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `217/217` 均通过。
+- 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0011`、Valkey 和 Worker 八项诊断通过。使用全合成双账号完成真实 HTTP 闭环：所有者创建企业与邀请成员，建立根部门、授权子部门和范围外部门，为成员绑定部门角色并授予部门树读取；成员只读取到根与授权子部门 2 个节点，范围外部门未返回，成员清单和角色权限治理 URL 直访均返回 `403 POLICY_DENIED`。
+- 当前边界：本节点只产生空 `field_mask`，字段级敏感等级、响应掩码、日志/检索/模型上下文防泄漏进入 `P1C-03`。菜单草稿、页面接口动态绑定与发布回滚仍按 `P1C-04` 至 `P1C-06` 实施；未扩展 SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
 - 提交：本提交。
 
 ## 4. 当前限制
@@ -213,4 +226,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-01`，当前进入 `P1C-02`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-02`，当前进入 `P1C-03`。

@@ -180,6 +180,10 @@ class RegistrationResponse(typing.TypedDict):
     personal_workspace_id: str
 
 
+class ReplaceRolePermissionsRequest(typing.TypedDict):
+    items: list[RolePermissionEntry]
+
+
 class RoleBindingResponse(typing.TypedDict):
     binding_id: str
     department_id: str | None
@@ -192,6 +196,17 @@ class RoleBindingResponse(typing.TypedDict):
 
 class RoleListResponse(typing.TypedDict):
     items: list[RoleResponse]
+
+
+class RolePermissionEntry(typing.TypedDict):
+    department_ids: typing.NotRequired[list[str]]
+    permission_code: str
+    resource_ids: typing.NotRequired[list[str]]
+    scope_type: typing.Literal["workspace", "department_tree", "self", "resource"]
+
+
+class RolePermissionListResponse(typing.TypedDict):
+    items: list[RolePermissionEntry]
 
 
 class RoleResponse(typing.TypedDict):

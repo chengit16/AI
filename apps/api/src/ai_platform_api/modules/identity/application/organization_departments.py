@@ -11,6 +11,7 @@ from ai_platform_api.modules.identity.application.organization_support import (
     governance_account,
     normalized_name,
     organization_facts,
+    require_active_enterprise,
     require_owner,
     require_parent,
     require_unique_department_name,
@@ -196,5 +197,19 @@ class DepartmentService:
     def list(self, context: RequestContext, *, workspace_id: UUID) -> tuple[DepartmentSummary, ...]:
         account_id = governance_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
-            require_owner(unit_of_work.organization, workspace_id, account_id)
-            return summarize_departments(unit_of_work.organization.list_departments(workspace_id))
+            if context.authorized_permission_code is None:
+                require_owner(unit_of_work.organization, workspace_id, account_id)
+                return summarize_departments(
+                    unit_of_work.organization.list_departments(workspace_id)
+                )
+            require_active_enterprise(unit_of_work.organization, workspace_id, account_id)
+            summaries = summarize_departments(
+                unit_of_work.organization.list_departments(workspace_id)
+            )
+            if context.authorized_workspace:
+                return summaries
+            return tuple(
+                item
+                for item in summaries
+                if item.department_id in context.authorized_department_ids
+            )

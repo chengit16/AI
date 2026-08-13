@@ -1,0 +1,164 @@
+from __future__ import annotations
+
+from uuid import UUID, uuid4
+
+from ai_platform_api.modules.authorization.domain.grants import PolicyGrantReader
+from ai_platform_api.modules.authorization.domain.policy import (
+    PolicyDecision,
+    PolicyDecisionPoint,
+    PolicyRequest,
+    ResourceReference,
+    ResourceScope,
+)
+from ai_platform_api.modules.authorization.domain.resources import ApiResource, ResourceRegistry
+
+__all__ = [
+    "ApiResource",
+    "PolicyDecisionPoint",
+    "PolicyRequest",
+    "RbacPolicyDecisionPoint",
+    "ResourceReference",
+    "ResourceRegistry",
+]
+
+
+class RbacPolicyDecisionPoint:
+    """以注册表、可信主体、角色授权和数据范围形成唯一策略决策。"""
+
+    def __init__(self, registry: ResourceRegistry, grants: PolicyGrantReader) -> None:
+        self._registry = registry
+        self._grants = grants
+
+    def decide(self, request: PolicyRequest) -> PolicyDecision:
+        try:
+            return self._decide(request)
+        except Exception:
+            # 策略存储、组织树或角色事实异常时不能降级为放行。
+            return self._denied(request, "policy_unavailable")
+
+    def _decide(self, request: PolicyRequest) -> PolicyDecision:
+        if request.resource.workspace_id != request.context.workspace_id:
+            return self._denied(request, "workspace_mismatch")
+        permission = next(
+            (
+                item
+                for item in self._registry.permissions
+                if item.code == request.permission_code and item.status == "active"
+            ),
+            None,
+        )
+        if permission is None or permission.resource_type != request.resource.resource_type:
+            return self._denied(request, "permission_not_registered")
+        if (
+            request.context.credential_scopes is not None
+            and request.permission_code not in request.context.credential_scopes
+        ):
+            return self._denied(request, "credential_scope_denied")
+
+        subject = self._grants.resolve_subject(request.context)
+        if subject is None or not subject.role_ids:
+            return self._denied(request, "subject_not_active")
+        matching = tuple(
+            grant
+            for grant in self._grants.list_role_grants(
+                request.context.workspace_id,
+                subject.role_ids,
+            )
+            if grant.permission_code == request.permission_code
+        )
+        if not matching:
+            return self._denied(request, "permission_not_granted")
+
+        department_roots = frozenset(
+            department_id
+            for grant in matching
+            if grant.scope_type == "department_tree"
+            for department_id in grant.department_ids
+        )
+        scope = ResourceScope(
+            workspace=any(grant.scope_type == "workspace" for grant in matching),
+            department_ids=self._grants.expand_department_tree(
+                request.context.workspace_id,
+                department_roots,
+            )
+            if department_roots
+            else frozenset(),
+            account_ids=frozenset({subject.account_id})
+            if any(grant.scope_type == "self" for grant in matching)
+            else frozenset(),
+            resource_ids=frozenset(
+                resource_id
+                for grant in matching
+                if grant.scope_type == "resource"
+                for resource_id in grant.resource_ids
+            ),
+        )
+        if not _resource_matches_scope(request, scope):
+            return self._denied(
+                request,
+                "resource_out_of_scope",
+                policy_version=subject.role_version,
+                scope=scope,
+            )
+        high_risk = request.resource.attributes.get("risk_level") in {"high", "critical"}
+        return PolicyDecision(
+            decision_id=uuid4(),
+            decision="allow",
+            permission_code=request.permission_code,
+            workspace_id=request.context.workspace_id,
+            resource_scope=scope,
+            field_mask=frozenset(),
+            policy_version=subject.role_version,
+            cache_ttl_seconds=0 if high_risk else 30,
+            reason="role_permission_granted",
+        )
+
+    @staticmethod
+    def _denied(
+        request: PolicyRequest,
+        reason: str,
+        *,
+        policy_version: int = 1,
+        scope: ResourceScope | None = None,
+    ) -> PolicyDecision:
+        return PolicyDecision(
+            decision_id=uuid4(),
+            decision="deny",
+            permission_code=request.permission_code,
+            workspace_id=request.context.workspace_id,
+            resource_scope=scope or ResourceScope(),
+            field_mask=frozenset(),
+            policy_version=policy_version,
+            cache_ttl_seconds=0,
+            reason=reason,
+        )
+
+
+def _resource_matches_scope(request: PolicyRequest, scope: ResourceScope) -> bool:
+    if scope.workspace:
+        return True
+    attributes = request.resource.attributes
+    account_id = _uuid_attribute(attributes.get("account_id"))
+    department_id = _uuid_attribute(attributes.get("department_id"))
+    if account_id is not None:
+        return account_id in scope.account_ids or request.resource.resource_id in scope.resource_ids
+    if department_id is not None:
+        return (
+            department_id in scope.department_ids
+            or request.resource.resource_id in scope.resource_ids
+        )
+    if request.resource.resource_id != request.context.workspace_id:
+        return request.resource.resource_id in scope.resource_ids
+    # 集合读取允许进入用例，Repository 必须继续消费决策中的可执行范围。
+    return bool(scope.department_ids or scope.account_ids or scope.resource_ids)
+
+
+def _uuid_attribute(value: object) -> UUID | None:
+    if isinstance(value, UUID):
+        return value
+    if isinstance(value, str):
+        try:
+            return UUID(value)
+        except ValueError:
+            return None
+    return None

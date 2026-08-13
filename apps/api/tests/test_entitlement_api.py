@@ -9,6 +9,7 @@ from ai_platform_api.app.factory import create_app
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.authorization.application.grants import RolePermissionService
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
@@ -28,6 +29,8 @@ from ai_platform_api.modules.identity.infrastructure.security import EnvelopeSec
 from ai_platform_api.modules.identity.infrastructure.session import ValkeySessionStore
 from ai_platform_api.persistence.database import PlatformDatabase
 from fastapi.testclient import TestClient
+
+from test_support.authorization import AllowRegisteredPolicy
 
 ROOT = Path(__file__).parents[3]
 ACCOUNT_ID = UUID("10000000-0000-4000-8000-000000000031")
@@ -122,6 +125,8 @@ def entitlement_client() -> TestClient:
         resource_registry=load_resource_registry(
             ROOT / "contracts/authorization/resource-registry.v1.json"
         ),
+        policy=AllowRegisteredPolicy(),
+        role_permissions=cast("RolePermissionService", object()),
         authentication=StubAuthenticationService(),
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),

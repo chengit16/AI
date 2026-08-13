@@ -14,6 +14,7 @@ from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ai_platform_api.modules.authorization.domain.grants import system_role_permission_seed
 from ai_platform_api.modules.identity.domain.enterprise import (
     EnterpriseWorkspace,
     EnterpriseWriteConflictError,
@@ -37,6 +38,7 @@ from ai_platform_api.persistence.tables import (
     membership_departments,
     membership_positions,
     role_bindings,
+    role_permission_grants,
     roles,
     workspace_entitlements,
     workspace_feature_settings,
@@ -145,6 +147,25 @@ class SqlAlchemyEnterpriseRepository:
                         "version": binding.version,
                     }
                     for binding in system_bindings
+                ],
+            )
+            owner_role, member_role = system_roles
+            self._session.execute(
+                insert(role_permission_grants),
+                [
+                    {
+                        "workspace_id": grant.workspace_id,
+                        "role_id": grant.role_id,
+                        "permission_code": grant.permission_code,
+                        "scope_type": grant.scope_type,
+                        "department_ids": list(grant.department_ids),
+                        "resource_ids": list(grant.resource_ids),
+                    }
+                    for grant in system_role_permission_seed(
+                        workspace_id=workspace.workspace_id,
+                        owner_role_id=owner_role.role_id,
+                        member_role_id=member_role.role_id,
+                    )
                 ],
             )
         except IntegrityError as error:

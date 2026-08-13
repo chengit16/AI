@@ -5,6 +5,7 @@ from ai_platform_api.modules.authorization.domain.policy import (
     Decision,
     PolicyDecision,
     PolicyRequest,
+    ResourceScope,
 )
 
 
@@ -52,7 +53,10 @@ class StaticPolicyDecisionPoint:
             decision=decision,
             permission_code=request.permission_code,
             workspace_id=request.context.workspace_id,
-            resource_ids=allowed_resources,
+            resource_scope=ResourceScope(
+                workspace=allowed_resources is None and decision == "allow",
+                resource_ids=allowed_resources or frozenset(),
+            ),
             field_mask=field_mask,
             policy_version=self._policy_version,
             cache_ttl_seconds=30 if decision == "allow" else 0,

@@ -30,6 +30,8 @@
     { "code": "authorization.binding.create", "resource_type": "role_binding", "action": "create", "scope": "workspace", "status": "active" },
     { "code": "authorization.binding.revoke", "resource_type": "role_binding", "action": "revoke", "scope": "resource", "status": "active" },
     { "code": "authorization.effective_role.read", "resource_type": "effective_role", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "authorization.role_permission.read", "resource_type": "role_permission", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "authorization.role_permission.manage", "resource_type": "role_permission", "action": "manage", "scope": "resource", "status": "active" }
   ],
   "page_resources": [
     {
@@ -119,7 +121,9 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000028", "api_key": "authorization.role.status", "operation_id": "setEnterpriseRoleStatus", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/roles/{role_id}/status", "access_level": "authorized", "permission_code": "authorization.role.status", "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000029", "api_key": "authorization.binding.create", "operation_id": "bindEnterpriseRole", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/roles/bindings", "access_level": "authorized", "permission_code": "authorization.binding.create", "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000030", "api_key": "authorization.binding.revoke", "operation_id": "revokeEnterpriseRoleBinding", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/roles/bindings/{binding_id}/revoke", "access_level": "authorized", "permission_code": "authorization.binding.revoke", "risk_level": "high", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000031", "api_key": "authorization.effective_role.read", "operation_id": "getEffectiveEnterpriseRoles", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/roles/effective/{account_id}", "access_level": "authorized", "permission_code": "authorization.effective_role.read", "risk_level": "normal", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000031", "api_key": "authorization.effective_role.read", "operation_id": "getEffectiveEnterpriseRoles", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/roles/effective/{account_id}", "access_level": "authorized", "permission_code": "authorization.effective_role.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000032", "api_key": "authorization.role_permission.read", "operation_id": "listEnterpriseRolePermissions", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/roles/{role_id}/permissions", "access_level": "authorized", "permission_code": "authorization.role_permission.read", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000033", "api_key": "authorization.role_permission.manage", "operation_id": "replaceEnterpriseRolePermissions", "method": "PUT", "path_pattern": "/api/v1/workspaces/{workspace_id}/roles/{role_id}/permissions", "access_level": "authorized", "permission_code": "authorization.role_permission.manage", "risk_level": "critical", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },

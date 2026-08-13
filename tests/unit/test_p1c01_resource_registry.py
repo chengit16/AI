@@ -26,9 +26,9 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert len(resource_registry.permissions) == 28
+    assert len(resource_registry.permissions) == 30
     assert len(resource_registry.page_resources) == 5
-    assert len(resource_registry.api_resources) == 31
+    assert len(resource_registry.api_resources) == 33
     assert len(resource_registry.menus) == 5
     assert registry_openapi_violations() == ()
 

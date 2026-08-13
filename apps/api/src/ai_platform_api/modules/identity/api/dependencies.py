@@ -1,10 +1,19 @@
-from typing import Annotated
+from dataclasses import replace
+from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import Header, Request
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
+from ai_platform_api.modules.authorization.application.grants import RolePermissionService
+from ai_platform_api.modules.authorization.application.policy import (
+    ApiResource,
+    PolicyDecisionPoint,
+    PolicyRequest,
+    ResourceReference,
+    ResourceRegistry,
+)
 from ai_platform_api.modules.identity.application.authentication import AuthenticationService
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
 from ai_platform_api.modules.identity.application.entitlements import EntitlementService
@@ -15,6 +24,7 @@ from ai_platform_api.modules.identity.application.errors import (
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
+from ai_platform_api.modules.workspace.application.resources import AuthorizationDeniedError
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -61,6 +71,13 @@ def role_service(request: Request) -> RoleService:
     return service
 
 
+def role_permission_service(request: Request) -> RolePermissionService:
+    service = getattr(request.app.state, "role_permission_service", None)
+    if not isinstance(service, RolePermissionService):
+        raise RuntimeError("角色权限服务尚未完成装配")
+    return service
+
+
 def trusted_request_context(
     request: Request,
     workspace_header: Annotated[str | None, Header(alias="X-Workspace-ID")] = None,
@@ -85,17 +102,97 @@ def trusted_request_context(
         scheme, separator, credential = authorization.partition(" ")
         if scheme.lower() != "bearer" or not separator or not credential:
             raise AuthenticationRequiredError
-        return service.api_key_context(
+        context = service.api_key_context(
             credential=credential,
             workspace_id=workspace_id,
             request_id=request_id,
             trace=trace,
         )
-    return service.browser_context(
-        session_token=request.cookies.get("ai_platform_session"),
-        csrf_token=csrf_token,
-        require_csrf=request.method not in SAFE_METHODS,
-        workspace_id=workspace_id,
-        request_id=request_id,
-        trace=trace,
+    else:
+        context = service.browser_context(
+            session_token=request.cookies.get("ai_platform_session"),
+            csrf_token=csrf_token,
+            require_csrf=request.method not in SAFE_METHODS,
+            workspace_id=workspace_id,
+            request_id=request_id,
+            trace=trace,
+        )
+    return _authorize_registered_operation(request, context)
+
+
+def _authorize_registered_operation(request: Request, context: RequestContext) -> RequestContext:
+    operation_id = getattr(request.scope.get("route"), "operation_id", None)
+    registry = getattr(request.app.state, "resource_registry", None)
+    policy = getattr(request.app.state, "policy_decision_point", None)
+    if not isinstance(operation_id, str) or not isinstance(registry, ResourceRegistry):
+        raise AuthorizationDeniedError
+    api_resource = next(
+        (item for item in registry.api_resources if item.operation_id == operation_id),
+        None,
+    )
+    if api_resource is None or api_resource.status != "active":
+        raise AuthorizationDeniedError
+    if api_resource.access_level != "authorized":
+        return context
+    if api_resource.permission_code is None or not hasattr(policy, "decide"):
+        raise AuthorizationDeniedError
+    permission = next(
+        (item for item in registry.permissions if item.code == api_resource.permission_code),
+        None,
+    )
+    if permission is None:
+        raise AuthorizationDeniedError
+    decision = cast(PolicyDecisionPoint, policy).decide(
+        PolicyRequest(
+            context=context,
+            permission_code=api_resource.permission_code,
+            resource=_resource_reference(request, context, api_resource, permission.resource_type),
+        )
+    )
+    if not decision.allowed:
+        raise AuthorizationDeniedError
+    return replace(
+        context,
+        authorized_permission_code=decision.permission_code,
+        authorized_workspace=decision.resource_scope.workspace,
+        authorized_department_ids=decision.resource_scope.department_ids,
+        authorized_account_ids=decision.resource_scope.account_ids,
+        authorized_resource_ids=decision.resource_scope.resource_ids,
+    )
+
+
+def _resource_reference(
+    request: Request,
+    context: RequestContext,
+    api_resource: ApiResource,
+    resource_type: str,
+) -> ResourceReference:
+    values = request.path_params
+    resource_id = next(
+        (
+            value
+            for key in (
+                "account_id",
+                "department_id",
+                "position_id",
+                "role_id",
+                "binding_id",
+                "invitation_id",
+            )
+            if (value := values.get(key)) is not None
+        ),
+        context.workspace_id,
+    )
+    trusted_id = resource_id if isinstance(resource_id, UUID) else UUID(str(resource_id))
+    attributes: dict[str, object] = {
+        key: value
+        for key in ("account_id", "department_id", "position_id", "role_id")
+        if (value := values.get(key)) is not None
+    }
+    attributes["risk_level"] = api_resource.risk_level
+    return ResourceReference(
+        resource_type=resource_type,
+        resource_id=trusted_id,
+        workspace_id=context.workspace_id,
+        attributes=attributes,
     )

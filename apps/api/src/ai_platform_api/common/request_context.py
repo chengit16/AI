@@ -15,6 +15,11 @@ class RequestContext:
     user_id: UUID | None
     authentication_method: str
     credential_scopes: frozenset[str] | None
+    authorized_permission_code: str | None = None
+    authorized_workspace: bool = False
+    authorized_department_ids: frozenset[UUID] = frozenset()
+    authorized_account_ids: frozenset[UUID] = frozenset()
+    authorized_resource_ids: frozenset[UUID] = frozenset()
 
     @classmethod
     def trusted(
