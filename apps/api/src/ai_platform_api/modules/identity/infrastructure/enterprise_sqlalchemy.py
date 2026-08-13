@@ -29,10 +29,13 @@ from ai_platform_api.modules.identity.domain.models import (
     WorkspaceStatus,
     WorkspaceType,
 )
+from ai_platform_api.modules.identity.domain.roles import system_role_seed
 from ai_platform_api.persistence.tables import (
     accounts,
     membership_departments,
     membership_positions,
+    role_bindings,
+    roles,
     workspace_invitations,
     workspace_memberships,
     workspaces,
@@ -65,11 +68,52 @@ class SqlAlchemyEnterpriseRepository:
                     name=workspace.name,
                     owner_account_id=None,
                     entitlement_version=1,
+                    role_version=1,
                     status="active",
                     **audit_values,
                 )
             )
             self.add_membership(owner)
+            system_roles, system_bindings = system_role_seed(
+                workspace_id=workspace.workspace_id,
+                owner_membership_id=owner.membership_id,
+                occurred_at=workspace.created_at,
+            )
+            self._session.execute(
+                insert(roles),
+                [
+                    {
+                        "role_id": role.role_id,
+                        "workspace_id": role.workspace_id,
+                        "role_key": role.role_key,
+                        "name": role.name,
+                        "status": role.status,
+                        "system_managed": role.system_managed,
+                        "created_at": role.created_at,
+                        "updated_at": role.updated_at,
+                        "version": role.version,
+                    }
+                    for role in system_roles
+                ],
+            )
+            self._session.execute(
+                insert(role_bindings),
+                [
+                    {
+                        "binding_id": binding.binding_id,
+                        "workspace_id": binding.workspace_id,
+                        "role_id": binding.role_id,
+                        "scope_type": binding.scope_type,
+                        "department_id": binding.department_id,
+                        "membership_id": binding.membership_id,
+                        "status": binding.status,
+                        "created_at": binding.created_at,
+                        "revoked_at": binding.revoked_at,
+                        "version": binding.version,
+                    }
+                    for binding in system_bindings
+                ],
+            )
         except IntegrityError as error:
             raise EnterpriseWriteConflictError from error
 
@@ -210,6 +254,12 @@ class SqlAlchemyEnterpriseRepository:
         )
 
     def save_membership(self, membership: WorkspaceMembership) -> None:
+        previous_status = self._session.scalar(
+            select(workspace_memberships.c.status).where(
+                workspace_memberships.c.membership_id == membership.membership_id,
+                workspace_memberships.c.workspace_id == membership.workspace_id,
+            )
+        )
         if membership.status != "active":
             # 离开或停用必须同步撤销组织归属，重新加入不能隐式恢复旧权限范围。
             self._session.execute(
@@ -223,6 +273,32 @@ class SqlAlchemyEnterpriseRepository:
                     membership_departments.c.workspace_id == membership.workspace_id,
                     membership_departments.c.membership_id == membership.membership_id,
                 )
+            )
+            self._session.execute(
+                update(role_bindings)
+                .where(
+                    role_bindings.c.workspace_id == membership.workspace_id,
+                    role_bindings.c.membership_id == membership.membership_id,
+                    role_bindings.c.status == "active",
+                    role_bindings.c.role_id.in_(
+                        select(roles.c.role_id).where(
+                            roles.c.workspace_id == membership.workspace_id,
+                            roles.c.system_managed.is_(False),
+                        )
+                    ),
+                )
+                .values(
+                    status="revoked",
+                    revoked_at=membership.updated_at,
+                    version=role_bindings.c.version + 1,
+                )
+            )
+            # 成员状态变化会改变有效角色，即使没有自定义成员绑定也必须推进版本。
+        if previous_status != membership.status:
+            self._session.execute(
+                update(workspaces)
+                .where(workspaces.c.workspace_id == membership.workspace_id)
+                .values(role_version=workspaces.c.role_version + 1)
             )
         self._session.execute(
             update(workspace_memberships)

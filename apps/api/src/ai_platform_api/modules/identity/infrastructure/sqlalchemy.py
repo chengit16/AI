@@ -28,9 +28,12 @@ from ai_platform_api.modules.identity.domain.registration import (
     AccountRegistration,
     DuplicateLoginNameError,
 )
+from ai_platform_api.modules.identity.domain.roles import system_role_seed
 from ai_platform_api.persistence.tables import (
     accounts,
     open_api_keys,
+    role_bindings,
+    roles,
     workspace_memberships,
     workspaces,
 )
@@ -237,6 +240,7 @@ class SqlAlchemyRegistrationWriter:
                 name=registration.personal_workspace_name,
                 owner_account_id=registration.account_id,
                 entitlement_version=1,
+                role_version=1,
                 status="active",
                 **audit_values,
             )
@@ -252,6 +256,46 @@ class SqlAlchemyRegistrationWriter:
                 updated_at=registration.occurred_at,
                 version=1,
             )
+        )
+        system_roles, system_bindings = system_role_seed(
+            workspace_id=registration.personal_workspace_id,
+            owner_membership_id=registration.membership_id,
+            occurred_at=registration.occurred_at,
+        )
+        self._session.execute(
+            insert(roles),
+            [
+                {
+                    "role_id": role.role_id,
+                    "workspace_id": role.workspace_id,
+                    "role_key": role.role_key,
+                    "name": role.name,
+                    "status": role.status,
+                    "system_managed": role.system_managed,
+                    "created_at": role.created_at,
+                    "updated_at": role.updated_at,
+                    "version": role.version,
+                }
+                for role in system_roles
+            ],
+        )
+        self._session.execute(
+            insert(role_bindings),
+            [
+                {
+                    "binding_id": binding.binding_id,
+                    "workspace_id": binding.workspace_id,
+                    "role_id": binding.role_id,
+                    "scope_type": binding.scope_type,
+                    "department_id": binding.department_id,
+                    "membership_id": binding.membership_id,
+                    "status": binding.status,
+                    "created_at": binding.created_at,
+                    "revoked_at": binding.revoked_at,
+                    "version": binding.version,
+                }
+                for binding in system_bindings
+            ],
         )
 
 

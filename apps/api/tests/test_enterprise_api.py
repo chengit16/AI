@@ -20,10 +20,12 @@ from ai_platform_api.modules.identity.application.enterprise import (
 )
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
+from ai_platform_api.modules.identity.application.roles import RoleService
 from ai_platform_api.modules.identity.domain.enterprise import (
     WorkspaceInvitation,
     WorkspaceMembership,
 )
+from ai_platform_api.modules.identity.infrastructure.role_cache import ValkeyRoleResolutionCache
 from ai_platform_api.modules.identity.infrastructure.security import EnvelopeSecretCipher
 from ai_platform_api.modules.identity.infrastructure.session import ValkeySessionStore
 from ai_platform_api.persistence.database import PlatformDatabase
@@ -211,6 +213,8 @@ def enterprise_client() -> TestClient:
         registration=cast("RegistrationService", object()),
         enterprise_workspaces=StubEnterpriseWorkspaceService(),
         organization=cast("OrganizationService", object()),
+        roles=cast("RoleService", object()),
+        role_cache=cast("ValkeyRoleResolutionCache", closing),
         secret_cipher=cast("EnvelopeSecretCipher", object()),
         sessions=cast("ValkeySessionStore", closing),
     )

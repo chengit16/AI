@@ -74,6 +74,7 @@ class MemberOrganizationService:
                     position_ids=normalized_positions,
                     occurred_at=now,
                 )
+                unit_of_work.organization.bump_role_version(workspace_id)
                 event, audit = organization_facts(
                     context=context,
                     workspace_id=workspace_id,

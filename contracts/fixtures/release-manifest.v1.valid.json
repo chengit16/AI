@@ -23,7 +23,7 @@
     }
   ],
   "database": {
-    "schema_revision": "20260814_0008"
+    "schema_revision": "20260814_0009"
   },
   "images": [
     {
@@ -84,7 +84,7 @@
       "reference": "local/ai-platform-worker:0.1.0"
     }
   ],
-  "manifest_digest": "sha256:bbd26c3652813803cef51e4cda96ed6288879a46ac8e691812f0ee802bea81c0",
+  "manifest_digest": "sha256:75fe9f4557c0550b42a506982d824ece740471e9aacc9ec9a1e44a1d00734f87",
   "release_version": "0.1.0",
   "runtimes": {
     "node": "24.19.0",

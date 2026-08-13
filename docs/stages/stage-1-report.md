@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1B-04` 待开始 |
+| 当前节点 | `P1B-05` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -151,6 +151,19 @@
 - 自动化验收：组织领域与 HTTP 专项 `4/4`，真实 PostgreSQL 专项 `3/3`；统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `183/183` 均通过。随机隔离 Schema 的 `base → head → base → head` 列、约束和索引快照一致。
 - 容器与 HTTP 验收：API、Worker、Web 和 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0008`、Valkey 和 Worker 八项诊断通过。使用全新合成双账号完成真实 HTTP 闭环：注册 `201/201`、登录 `200/200`、企业与邀请 `201/201`、接受 `200`、根/子部门 `201/201`、岗位 `201`、成员归属写入/回读 `200/200`，普通成员访问组织治理稳定返回 `403 POLICY_DENIED`。
 - 当前边界：本节点不实现空间角色、部门角色和确定性继承计算，也不实现菜单、接口权限、字段级 ABAC、套餐或审批；这些继续按 `P1B-04`、`P1C` 及后续节点实施。当前部门树采用全量闭包重建以优先保证本地 MVP 一致性，超大组织的增量闭包优化需由后续容量证据驱动。
+- 提交：`a8bf242`。
+
+### P1B-04 确定性角色继承
+
+- 状态：通过。
+- 角色事实：每个新旧工作空间均具有确定性 ID 的系统角色 `workspace_owner` 和 `workspace_member`。自定义角色在空间内按 `role_key` 和大小写不敏感名称保持唯一，支持启用与停用；系统角色不可停用，系统绑定不可由普通角色接口撤销。
+- 绑定与继承：自定义角色支持 `workspace`、`department` 和 `member` 三类累加绑定。同一角色可从多个来源生效并按稳定顺序去重；部门绑定沿有效部门后代继承，成员只归属子部门时可获得祖先部门角色，任一祖先停用后不会继续传递。
+- 治理与读取：角色写入和角色清单只允许企业所有者通过浏览器 Session 执行；普通成员只能读取自己的有效角色，所有者可读取企业成员的有效角色。个人空间、伪造当前空间、普通成员治理和跨账号读取均失败关闭。本节点只建立角色身份，不提前实现 `P1C` 的权限项、菜单、RBAC 决策或字段级 ABAC。
+- 撤权与缓存：PostgreSQL 的 `workspaces.role_version` 是缓存失效事实，Valkey 键包含工作空间、成员和角色版本，只保存可重建结果。角色和绑定变化、部门移动或启停、成员组织归属和成员状态变化均推进版本；旧缓存无需同步删除也不能再次命中。成员停用或离开时清空组织归属并撤销自定义成员绑定，重新加入不隐式恢复旧角色。
+- 数据与契约：新增 `roles`、`role_bindings` 和 `role_version`，Revision 推进到 `20260814_0009`。角色、部门和成员目标使用工作空间复合外键关闭跨空间绑定；Migration 为既有空间补齐系统角色与绑定并保持应用写入相同的确定性 ID。角色 OpenAPI、`ROLE_CONFLICT`、React/Python 生成类型、ReleaseManifest、兼容矩阵和本地 Revision 诊断同步推进。
+- 自动化验收：角色领域和 HTTP 专项 `4/4`，真实 PostgreSQL/Valkey 专项 `3/3`，既有身份、企业、组织与 Migration 集成回归 `14/14`。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `191/191` 均通过；随机隔离 Schema 的 `base → head → base → head` 结构一致。
+- 容器与 HTTP 验收：API、Worker、Web 和 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0009`、Valkey 和 Worker 八项诊断通过。使用全新合成双账号完成真实 HTTP 闭环：注册 `201/201`、登录 `200/200`、企业与邀请 `201/201`、接受 `200`、根/子部门 `201/201`、成员归属 `200`、角色/部门绑定 `201/201`、所有者和成员有效角色读取 `200/200`、普通成员治理 `403 POLICY_DENIED`、撤销和重新计算 `200/200`；角色版本由 `4` 推进至 `5`，自定义角色即时消失。
+- 当前边界：本节点不定义权限码、菜单页面权限、接口绑定、字段级 ABAC、套餐配额或审批；这些继续按 `P1B-05`、`P1C` 及后续节点实施。Valkey 只承担性能优化，任何缓存损坏或丢失都可从 PostgreSQL 重建。
 - 提交：本提交。
 
 ## 4. 当前限制
@@ -162,4 +175,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1B-03`，当前进入 `P1B-04`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1B-04`，当前进入 `P1B-05`。

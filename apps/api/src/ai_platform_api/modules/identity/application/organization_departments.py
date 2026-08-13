@@ -135,6 +135,7 @@ class DepartmentService:
                 unit_of_work.organization.replace_department_closure(
                     workspace_id, build_department_closure(updated_departments)
                 )
+                unit_of_work.organization.bump_role_version(workspace_id)
                 unit_of_work.audit.add(audit)
                 unit_of_work.outbox.add(event)
                 unit_of_work.commit()
@@ -184,6 +185,7 @@ class DepartmentService:
                     attributes={"previous_status": current.status},
                 )
                 unit_of_work.organization.save_department(updated)
+                unit_of_work.organization.bump_role_version(workspace_id)
                 unit_of_work.audit.add(audit)
                 unit_of_work.outbox.add(event)
                 unit_of_work.commit()

@@ -14,6 +14,8 @@ from ai_platform_api.modules.identity.application.authentication import (
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
+from ai_platform_api.modules.identity.application.roles import RoleService
+from ai_platform_api.modules.identity.infrastructure.role_cache import ValkeyRoleResolutionCache
 from ai_platform_api.modules.identity.infrastructure.security import EnvelopeSecretCipher
 from ai_platform_api.modules.identity.infrastructure.session import ValkeySessionStore
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
@@ -48,6 +50,7 @@ class ClosingSessions:
 def application_container(settings: Settings) -> tuple[ApplicationContainer, ClosingDatabase]:
     database = ClosingDatabase()
     sessions = ClosingSessions()
+    role_cache = ClosingSessions()
     container = ApplicationContainer(
         settings=settings,
         database=cast(PlatformDatabase, database),
@@ -57,6 +60,8 @@ def application_container(settings: Settings) -> tuple[ApplicationContainer, Clo
         registration=cast("RegistrationService", object()),
         enterprise_workspaces=cast("EnterpriseWorkspaceService", object()),
         organization=cast("OrganizationService", object()),
+        roles=cast("RoleService", object()),
+        role_cache=cast("ValkeyRoleResolutionCache", role_cache),
         secret_cipher=cast("EnvelopeSecretCipher", object()),
         sessions=cast("ValkeySessionStore", sessions),
     )
@@ -217,7 +222,7 @@ def test_startup_rejects_incompatible_release_combination(tmp_path: Path) -> Non
     )
     incompatible = tmp_path / "incompatible.json"
     incompatible.write_text(
-        manifest.replace('"schema_revision": "20260814_0008"', '"schema_revision": "unknown"'),
+        manifest.replace('"schema_revision": "20260814_0009"', '"schema_revision": "unknown"'),
         encoding="utf-8",
     )
 

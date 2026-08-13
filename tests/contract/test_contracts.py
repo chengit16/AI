@@ -141,6 +141,7 @@ def test_error_codes_are_unique_and_stable() -> None:
         "MODEL_GATEWAY_UNAVAILABLE",
         "SSE_EVENT_EXPIRED",
         "ORGANIZATION_CONFLICT",
+        "ROLE_CONFLICT",
         "INTERNAL_ERROR",
     }.issubset(codes)
     assert all(code == code.upper() for code in codes)
@@ -286,4 +287,35 @@ def test_organization_openapi_covers_tree_position_and_assignment_lifecycle() ->
         "primary_department_id",
         "position_ids",
         "membership_version",
+    ]
+
+
+def test_role_openapi_covers_role_binding_and_effective_resolution() -> None:
+    baseline = load_json(CONTRACTS / "openapi/platform-api.v1.json")
+    paths = baseline["paths"]
+    prefix = "/api/v1/workspaces/{workspace_id}/roles"
+    expected_operations = {
+        prefix: {
+            "post": "createEnterpriseRole",
+            "get": "listEnterpriseRoles",
+        },
+        f"{prefix}/{{role_id}}/status": {"post": "setEnterpriseRoleStatus"},
+        f"{prefix}/bindings": {"post": "bindEnterpriseRole"},
+        f"{prefix}/bindings/{{binding_id}}/revoke": {"post": "revokeEnterpriseRoleBinding"},
+        f"{prefix}/effective/{{account_id}}": {"get": "getEffectiveEnterpriseRoles"},
+    }
+    for path, operations in expected_operations.items():
+        for method, operation_id in operations.items():
+            assert paths[path][method]["operationId"] == operation_id
+            assert paths[path][method]["responses"]["500"]["content"]["application/json"][
+                "schema"
+            ] == {"$ref": "#/components/schemas/ErrorResponse"}
+
+    schemas = baseline["components"]["schemas"]
+    assert schemas["CreateRoleBindingRequest"]["required"] == ["role_id", "scope_type"]
+    assert schemas["EffectiveRoleSetResponse"]["required"] == [
+        "account_id",
+        "membership_id",
+        "role_version",
+        "roles",
     ]

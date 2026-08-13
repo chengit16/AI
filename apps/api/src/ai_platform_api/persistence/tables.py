@@ -57,6 +57,7 @@ workspaces = Table(
     Column("name", String(120), nullable=False),
     Column("owner_account_id", UUID(as_uuid=True), nullable=True),
     Column("entitlement_version", Integer, nullable=False),
+    Column("role_version", Integer, nullable=False, server_default="1"),
     Column("status", String(32), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
@@ -69,6 +70,7 @@ workspaces = Table(
         name="ck_workspaces_status",
     ),
     CheckConstraint("entitlement_version >= 1", name="ck_workspaces_entitlement_version"),
+    CheckConstraint("role_version >= 1", name="ck_workspaces_role_version"),
     CheckConstraint("version >= 1", name="ck_workspaces_version"),
     ForeignKeyConstraint(
         ["owner_account_id"],
@@ -370,6 +372,105 @@ Index(
     membership_positions.c.department_id,
     membership_positions.c.position_id,
     membership_positions.c.membership_id,
+)
+
+roles = Table(
+    "roles",
+    metadata,
+    Column("role_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("role_key", String(64), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("system_managed", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("workspace_id", "role_id", name="uq_roles_workspace_role"),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_roles_workspace",
+    ),
+    CheckConstraint("role_key ~ '^[a-z][a-z0-9_]{2,63}$'", name="ck_roles_key"),
+    CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 120", name="ck_roles_name"),
+    CheckConstraint("status IN ('active', 'disabled')", name="ck_roles_status"),
+    CheckConstraint("version >= 1", name="ck_roles_version"),
+)
+Index("uq_roles_workspace_key", roles.c.workspace_id, roles.c.role_key, unique=True)
+Index(
+    "uq_roles_workspace_name",
+    roles.c.workspace_id,
+    func.lower(roles.c.name),
+    unique=True,
+)
+
+role_bindings = Table(
+    "role_bindings",
+    metadata,
+    Column("binding_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("role_id", UUID(as_uuid=True), nullable=False),
+    Column("scope_type", String(32), nullable=False),
+    Column("department_id", UUID(as_uuid=True), nullable=True),
+    Column("membership_id", UUID(as_uuid=True), nullable=True),
+    Column("status", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("revoked_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "role_id"],
+        [f"{SCHEMA_TOKEN}.roles.workspace_id", f"{SCHEMA_TOKEN}.roles.role_id"],
+        name="fk_role_bindings_role",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "department_id"],
+        [f"{SCHEMA_TOKEN}.departments.workspace_id", f"{SCHEMA_TOKEN}.departments.department_id"],
+        name="fk_role_bindings_department",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "membership_id"],
+        [
+            f"{SCHEMA_TOKEN}.workspace_memberships.workspace_id",
+            f"{SCHEMA_TOKEN}.workspace_memberships.membership_id",
+        ],
+        name="fk_role_bindings_membership",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "scope_type IN ('workspace', 'department', 'member')",
+        name="ck_role_bindings_scope",
+    ),
+    CheckConstraint("status IN ('active', 'revoked')", name="ck_role_bindings_status"),
+    CheckConstraint(
+        "(scope_type = 'workspace' AND department_id IS NULL AND membership_id IS NULL) "
+        "OR (scope_type = 'department' AND department_id IS NOT NULL AND membership_id IS NULL) "
+        "OR (scope_type = 'member' AND department_id IS NULL AND membership_id IS NOT NULL)",
+        name="ck_role_bindings_target",
+    ),
+    CheckConstraint(
+        "(status = 'active' AND revoked_at IS NULL) "
+        "OR (status = 'revoked' AND revoked_at IS NOT NULL)",
+        name="ck_role_bindings_revoked_at",
+    ),
+    CheckConstraint("version >= 1", name="ck_role_bindings_version"),
+)
+Index(
+    "uq_role_bindings_active_scope",
+    role_bindings.c.workspace_id,
+    role_bindings.c.role_id,
+    role_bindings.c.scope_type,
+    role_bindings.c.department_id,
+    role_bindings.c.membership_id,
+    unique=True,
+    postgresql_nulls_not_distinct=True,
+    postgresql_where=role_bindings.c.status == "active",
+)
+Index(
+    "ix_role_bindings_member",
+    role_bindings.c.workspace_id,
+    role_bindings.c.membership_id,
+    role_bindings.c.status,
 )
 
 open_api_keys = Table(

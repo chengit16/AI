@@ -19,6 +19,7 @@ from ai_platform_api.modules.identity.application.authentication import (
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
+from ai_platform_api.modules.identity.application.roles import RoleService
 from ai_platform_api.modules.identity.domain.models import (
     AccountCredential,
     ApiKeyWriter,
@@ -28,6 +29,7 @@ from ai_platform_api.modules.identity.domain.models import (
     WorkspaceAccess,
 )
 from ai_platform_api.modules.identity.domain.registration import RegistrationResult
+from ai_platform_api.modules.identity.infrastructure.role_cache import ValkeyRoleResolutionCache
 from ai_platform_api.modules.identity.infrastructure.security import (
     Argon2idPasswordAdapter,
     EnvelopeSecretCipher,
@@ -181,6 +183,8 @@ def identity_client() -> tuple[TestClient, ApiKeyService, MemorySessions]:
         registration=StubRegistrationService(),
         enterprise_workspaces=cast("EnterpriseWorkspaceService", object()),
         organization=cast("OrganizationService", object()),
+        roles=cast("RoleService", object()),
+        role_cache=cast("ValkeyRoleResolutionCache", sessions),
         secret_cipher=cast(EnvelopeSecretCipher, object()),
         sessions=cast(ValkeySessionStore, sessions),
     )

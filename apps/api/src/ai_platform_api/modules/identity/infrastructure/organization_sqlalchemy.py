@@ -391,6 +391,17 @@ class SqlAlchemyOrganizationRepository:
             membership.version,
         )
 
+    def bump_role_version(self, workspace_id: UUID) -> int:
+        result = self._session.execute(
+            update(workspaces)
+            .where(workspaces.c.workspace_id == workspace_id)
+            .values(role_version=workspaces.c.role_version + 1)
+            .returning(workspaces.c.role_version)
+        ).scalar_one_or_none()
+        if result is None:
+            raise OrganizationWriteConflictError
+        return cast(int, result)
+
 
 class SqlAlchemyOrganizationUnitOfWork:
     def __init__(self, session_factory: SessionFactory) -> None:

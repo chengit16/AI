@@ -35,6 +35,18 @@ class CreatePositionRequest(typing.TypedDict):
     name: str
 
 
+class CreateRoleBindingRequest(typing.TypedDict):
+    account_id: typing.NotRequired[str | None]
+    department_id: typing.NotRequired[str | None]
+    role_id: str
+    scope_type: typing.Literal["workspace", "department", "member"]
+
+
+class CreateRoleRequest(typing.TypedDict):
+    name: str
+    role_key: str
+
+
 class DepartmentListResponse(typing.TypedDict):
     items: list[DepartmentResponse]
 
@@ -47,6 +59,25 @@ class DepartmentResponse(typing.TypedDict):
     parent_department_id: str | None
     status: typing.Literal["active", "disabled"]
     version: int
+
+
+class EffectiveRoleResponse(typing.TypedDict):
+    name: str
+    role_id: str
+    role_key: str
+    sources: list[EffectiveRoleSourceResponse]
+
+
+class EffectiveRoleSetResponse(typing.TypedDict):
+    account_id: str
+    membership_id: str
+    role_version: int
+    roles: list[EffectiveRoleResponse]
+
+
+class EffectiveRoleSourceResponse(typing.TypedDict):
+    scope_id: str
+    scope_type: typing.Literal["workspace", "department", "member"]
 
 
 class ErrorResponse(typing.TypedDict):
@@ -121,6 +152,33 @@ class RegistrationRequest(typing.TypedDict):
 class RegistrationResponse(typing.TypedDict):
     account_id: str
     personal_workspace_id: str
+
+
+class RoleBindingResponse(typing.TypedDict):
+    binding_id: str
+    department_id: str | None
+    membership_id: str | None
+    role_id: str
+    scope_type: typing.Literal["workspace", "department", "member"]
+    status: typing.Literal["active", "revoked"]
+    version: int
+
+
+class RoleListResponse(typing.TypedDict):
+    items: list[RoleResponse]
+
+
+class RoleResponse(typing.TypedDict):
+    name: str
+    role_id: str
+    role_key: str
+    status: typing.Literal["active", "disabled"]
+    system_managed: bool
+    version: int
+
+
+class RoleStatusRequest(typing.TypedDict):
+    active: bool
 
 
 class WorkspaceInvitationResponse(typing.TypedDict):

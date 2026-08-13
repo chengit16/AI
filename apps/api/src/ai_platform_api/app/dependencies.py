@@ -9,11 +9,16 @@ from ai_platform_api.modules.identity.application.authentication import (
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
+from ai_platform_api.modules.identity.application.roles import RoleService
 from ai_platform_api.modules.identity.infrastructure.enterprise_sqlalchemy import (
     SqlAlchemyEnterpriseUnitOfWork,
 )
 from ai_platform_api.modules.identity.infrastructure.organization_sqlalchemy import (
     SqlAlchemyOrganizationUnitOfWork,
+)
+from ai_platform_api.modules.identity.infrastructure.role_cache import ValkeyRoleResolutionCache
+from ai_platform_api.modules.identity.infrastructure.roles_sqlalchemy import (
+    SqlAlchemyRoleUnitOfWork,
 )
 from ai_platform_api.modules.identity.infrastructure.security import (
     Argon2idPasswordAdapter,
@@ -43,12 +48,17 @@ class ApplicationContainer:
     registration: RegistrationService
     enterprise_workspaces: EnterpriseWorkspaceService
     organization: OrganizationService
+    roles: RoleService
+    role_cache: ValkeyRoleResolutionCache
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
 
     def close(self) -> None:
         try:
-            self.sessions.close()
+            try:
+                self.role_cache.close()
+            finally:
+                self.sessions.close()
         finally:
             self.database.close()
 
@@ -60,6 +70,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     )
     database = PlatformDatabase.create(settings.database_url)
     sessions = ValkeySessionStore(settings.valkey_url)
+    role_cache = ValkeyRoleResolutionCache(settings.valkey_url)
     reader = SqlAlchemyIdentityReader(database.sessions)
     digester = Sha256SecretDigester()
     passwords = Argon2idPasswordAdapter()
@@ -91,10 +102,16 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             organization=OrganizationService(
                 unit_of_work=SqlAlchemyOrganizationUnitOfWork(database.sessions),
             ),
+            roles=RoleService(
+                unit_of_work=SqlAlchemyRoleUnitOfWork(database.sessions),
+                cache=role_cache,
+            ),
+            role_cache=role_cache,
             secret_cipher=EnvelopeSecretCipher(MasterKeyFile(settings.master_key_path)),
             sessions=sessions,
         )
     except Exception:
+        role_cache.close()
         sessions.close()
         database.close()
         raise

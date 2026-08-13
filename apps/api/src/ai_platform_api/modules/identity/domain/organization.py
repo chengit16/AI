@@ -280,6 +280,8 @@ class OrganizationRepository(Protocol):
         membership: WorkspaceMembership,
     ) -> OrganizationAssignment: ...
 
+    def bump_role_version(self, workspace_id: UUID) -> int: ...
+
 
 class OrganizationUnitOfWork(Protocol):
     @property

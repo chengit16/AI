@@ -13,6 +13,7 @@ from ai_platform_api.modules.identity.application.errors import (
 )
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
+from ai_platform_api.modules.identity.application.roles import RoleService
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -42,6 +43,13 @@ def organization_service(request: Request) -> OrganizationService:
     service = getattr(request.app.state, "organization_service", None)
     if not isinstance(service, OrganizationService):
         raise RuntimeError("企业组织服务尚未完成装配")
+    return service
+
+
+def role_service(request: Request) -> RoleService:
+    service = getattr(request.app.state, "role_service", None)
+    if not isinstance(service, RoleService):
+        raise RuntimeError("企业角色服务尚未完成装配")
     return service
 
 
