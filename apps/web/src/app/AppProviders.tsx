@@ -4,11 +4,8 @@ import type { PropsWithChildren } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 15_000,
-    },
+    queries: { refetchOnWindowFocus: false, retry: 1, staleTime: 15_000 },
+    mutations: { retry: false },
   },
 });
 
@@ -20,7 +17,10 @@ export function AppProviders({ children }: PropsWithChildren) {
           colorPrimary: "#176b52",
           colorInfo: "#176b52",
           colorSuccess: "#2d7a59",
+          colorWarning: "#b56f18",
+          colorError: "#b43a3a",
           borderRadius: 6,
+          controlHeight: 44,
           fontFamily: '"Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif',
         },
       }}

@@ -29,6 +29,7 @@ class LoginResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     account_id: UUID
+    personal_workspace_id: UUID | None = None
     csrf_token: str
 
 

@@ -155,13 +155,13 @@ def test_registration_creates_exactly_one_personal_workspace_with_audit_and_even
     assert audit.attributes == {"workspace_type": "personal"}
     assert event.payload == {"personal_workspace_id": str(result.personal_workspace_id)}
 
-    token, _, _ = registration_database.authentication.login(
+    login = registration_database.authentication.login(
         "synthetic.p1b01@example.com",
         "synthetic-password-123",
     )
     try:
         context = registration_database.authentication.browser_context(
-            session_token=token,
+            session_token=login.session_token,
             csrf_token=None,
             require_csrf=False,
             workspace_id=result.personal_workspace_id,
@@ -170,7 +170,7 @@ def test_registration_creates_exactly_one_personal_workspace_with_audit_and_even
         )
         assert context.workspace_id == result.personal_workspace_id
     finally:
-        registration_database.authentication.logout(token)
+        registration_database.authentication.logout(login.session_token)
 
 
 def test_duplicate_login_rolls_back_without_second_personal_workspace(
@@ -234,14 +234,14 @@ def test_personal_workspace_rejects_non_owner_even_with_active_membership(
                 version=1,
             )
         )
-    token, _, _ = registration_database.authentication.login(
+    login = registration_database.authentication.login(
         "synthetic.intruder.p1b01@example.com",
         "synthetic-password-123",
     )
     try:
         with pytest.raises(WorkspaceContextDeniedError):
             registration_database.authentication.browser_context(
-                session_token=token,
+                session_token=login.session_token,
                 csrf_token=None,
                 require_csrf=False,
                 workspace_id=owner.personal_workspace_id,
@@ -249,4 +249,4 @@ def test_personal_workspace_rejects_non_owner_even_with_active_membership(
                 trace=TRACE,
             )
     finally:
-        registration_database.authentication.logout(token)
+        registration_database.authentication.logout(login.session_token)

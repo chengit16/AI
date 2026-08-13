@@ -223,7 +223,7 @@ def browser_context() -> RequestContext:
 def test_session_token_is_hashed_in_valkey_and_cross_workspace_is_denied(
     identity_database: IdentityHarness,
 ) -> None:
-    token, csrf_token, _ = identity_database.authentication.login(
+    login = identity_database.authentication.login(
         "owner@example.com",
         "synthetic-password-123",
     )
@@ -232,25 +232,26 @@ def test_session_token_is_hashed_in_valkey_and_cross_workspace_is_denied(
         matching_keys = cast(list[str], client.keys("session:v1:*"))
 
         assert matching_keys
-        assert all(token not in key for key in matching_keys)
+        assert all(login.session_token not in key for key in matching_keys)
+        assert login.personal_workspace_id == WORKSPACE_ID
         with pytest.raises(WorkspaceContextDeniedError):
             identity_database.authentication.browser_context(
-                session_token=token,
-                csrf_token=csrf_token,
+                session_token=login.session_token,
+                csrf_token=login.csrf_token,
                 require_csrf=True,
                 workspace_id=OTHER_WORKSPACE_ID,
                 request_id=uuid4(),
                 trace=TRACE,
             )
     finally:
-        identity_database.authentication.logout(token)
+        identity_database.authentication.logout(login.session_token)
         client.close()
 
 
 def test_membership_change_is_checked_on_each_request(
     identity_database: IdentityHarness,
 ) -> None:
-    token, _, _ = identity_database.authentication.login(
+    login = identity_database.authentication.login(
         "owner@example.com",
         "synthetic-password-123",
     )
@@ -263,7 +264,7 @@ def test_membership_change_is_checked_on_each_request(
     try:
         with pytest.raises(WorkspaceContextDeniedError):
             identity_database.authentication.browser_context(
-                session_token=token,
+                session_token=login.session_token,
                 csrf_token=None,
                 require_csrf=False,
                 workspace_id=WORKSPACE_ID,
@@ -277,7 +278,7 @@ def test_membership_change_is_checked_on_each_request(
                 .where(workspace_memberships.c.membership_id == MEMBERSHIP_ID)
                 .values(status="active")
             )
-        identity_database.authentication.logout(token)
+        identity_database.authentication.logout(login.session_token)
 
 
 def test_api_key_plaintext_never_enters_postgres_and_revocation_is_immediate(
@@ -319,7 +320,7 @@ def test_api_key_plaintext_never_enters_postgres_and_revocation_is_immediate(
 def test_auth_version_change_invalidates_existing_session(
     identity_database: IdentityHarness,
 ) -> None:
-    token, _, _ = identity_database.authentication.login(
+    login = identity_database.authentication.login(
         "owner@example.com",
         "synthetic-password-123",
     )
@@ -330,7 +331,7 @@ def test_auth_version_change_invalidates_existing_session(
 
     with pytest.raises(AuthenticationRequiredError):
         identity_database.authentication.browser_context(
-            session_token=token,
+            session_token=login.session_token,
             csrf_token=None,
             require_csrf=False,
             workspace_id=WORKSPACE_ID,

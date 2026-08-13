@@ -71,13 +71,13 @@ def login(
     service: Annotated[AuthenticationService, Depends(authentication_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> LoginResponse:
-    session_token, csrf_token, account_id = service.login(
+    result = service.login(
         body.login_name,
         body.password.get_secret_value(),
     )
     response.set_cookie(
         key="ai_platform_session",
-        value=session_token,
+        value=result.session_token,
         max_age=settings.session_ttl_seconds,
         httponly=True,
         secure=settings.session_cookie_secure,
@@ -85,7 +85,11 @@ def login(
         path="/",
     )
     response.headers["Cache-Control"] = "no-store"
-    return LoginResponse(account_id=account_id, csrf_token=csrf_token)
+    return LoginResponse(
+        account_id=result.account_id,
+        personal_workspace_id=result.personal_workspace_id,
+        csrf_token=result.csrf_token,
+    )
 
 
 @router.post(

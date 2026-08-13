@@ -119,6 +119,7 @@ class LoginRequest(typing.TypedDict):
 class LoginResponse(typing.TypedDict):
     account_id: str
     csrf_token: str
+    personal_workspace_id: typing.NotRequired[str | None]
 
 
 class LogoutResponse(typing.TypedDict):

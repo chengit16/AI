@@ -33,6 +33,9 @@ class MemoryIdentityReader:
             return self.account
         return None
 
+    def get_personal_workspace_id(self, account_id: UUID) -> UUID | None:
+        return None
+
     def get_workspace_access(self, account_id: UUID, workspace_id: UUID) -> None:
         return None
 

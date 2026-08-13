@@ -1,0 +1,26 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.symbol {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  color: var(--color-nav-bg);
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.name {
+  color: var(--color-nav-text-strong);
+  font-size: 16px;
+  font-weight: 700;
+}

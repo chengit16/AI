@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1B-06` 待开始 |
+| 当前节点 | `P1C-01` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -177,6 +177,19 @@
 - 自动化验收：真实 PostgreSQL/Valkey、Migration 与身份回归专项 `8/8`，权益 Application 拆分后的专项 `5/5`。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `197/197` 均通过；随机隔离 Schema 的 `base → head → base → head` 结构一致。
 - 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0010`、Valkey 和 Worker 八项诊断通过。使用全新合成双账号完成真实 HTTP 闭环：注册 `201/201`、登录 `200/200`、个人套餐读取 `200`、个人启用 Open API `403 ENTITLEMENT_DENIED`、企业创建/邀请/接受 `201/201/200`、普通成员读取 `200` 且治理 `403 POLICY_DENIED`、所有者读取和启用 `200/200`，权益版本由 `1` 推进至 `2`。
 - 当前边界：本节点不实现商业定价、购买订阅、SaaS 计费、普通 HTTP 用量写入、知识库/Agent/问答业务模块或页面；后续模块必须复用当前原子配额入口。套餐管理页面进入 `P1B-06`，菜单权限、字段级 ABAC 与审批继续按 `P1C` 及后续节点实施。
+- 提交：`e18f015`。
+
+### P1B-06 个人与企业空间管理页面
+
+- 状态：通过。
+- 正式前端结构：React 应用迁入 `app`、`routes`、`pages`、`components`、`hooks`、`api/services`、`store` 和 `styles` 分层；业务页面按路由懒加载，TanStack Query 管理服务端状态，Zustand 只保存当前账号、工作空间与 CSRF 会话状态。浏览器 Session 仅进入 `sessionStorage`，Cookie、CSRF、工作空间头与稳定错误码统一由 API Client 处理。
+- 登录与空间闭环：登录响应在不破坏 V1 旧消费者的前提下新增可选 `personal_workspace_id`，服务端实际登录必须解析唯一有效个人空间后才创建 Session，前端拒绝缺失该字段的残缺响应。页面支持注册、登录、退出、个人/企业空间切换、创建企业空间和按邀请 ID 加入企业。
+- 治理页面：空间总览展示类型、身份、状态、套餐权益、五类配额与 Open API 开关；成员页支持邀请、清单和停用；组织页支持多级部门、岗位和成员归属。个人空间显示对应空状态，企业普通成员访问成员和组织治理时由后端拒绝并显示无权限状态，前端菜单隐藏不作为安全边界。
+- 交互与响应式：桌面使用可折叠固定侧栏，移动和低高度横屏使用顶部栏与抽屉导航；公共控件最小交互高度为 44 px。`375×812`、`390×844`、`768×1024`、`1024×768`、`1440×900` 和 `844×390` 六类视口无横向溢出；移动抽屉、成员页、组织页和普通成员无权限页均无控制台错误。
+- 并发缺陷修复：真实组织页面的三个并发请求暴露应用容器复用 UoW 实例时共享 Session 的竞态。Identity、Registration、Enterprise、Entitlement、Organization 和 Role UoW 统一改为 `ContextVar` 隔离当前 Session 与 Repository/Writer，并以双线程重叠事务测试确认六类 UoW 不串线、不互相关闭 Session。
+- 自动化验收：UoW 并发专项 `6/6`，Identity、Organization 与并发回归组合 `17/17`。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试 `2/2`/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `204/204` 均通过。Ant Design 公共块约 `305.59 KB gzip`，业务路由块约 `1～9 KB gzip`；公共块警告记录为后续性能观察项，不在本地 MVP 阶段更换既定组件技术栈。
+- 容器与浏览器验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0010`、Valkey 和 Worker 八项诊断通过。使用全合成账号完成注册登录、个人空间读取、创建并自动切换企业空间、套餐读取、Open API 开关、部门和岗位创建、成员邀请与接受；普通企业成员访问成员及组织治理均稳定显示无权限状态。
+- 当前边界：本节点使用静态注册菜单承载所有现有页面，不提前实现菜单草稿、动态发布、页面与接口统一权限码或字段级 ABAC；这些继续按 `P1C` 实施。页面不新增 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：本提交。
 
 ## 4. 当前限制
@@ -188,4 +201,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1B-05`，当前进入 `P1B-06`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1B-06`，当前进入 `P1C-01`。

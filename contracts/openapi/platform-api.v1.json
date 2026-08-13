@@ -4871,6 +4871,18 @@
             "format": "uuid",
             "title": "Account Id"
           },
+          "personal_workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Personal Workspace Id"
+          },
           "csrf_token": {
             "type": "string",
             "title": "Csrf Token"

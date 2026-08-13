@@ -25,6 +25,7 @@ from ai_platform_api.modules.identity.domain.models import (
     IdentityReader,
     IdentityUnitOfWork,
     IssuedApiKey,
+    LoginResult,
     OpenApiKey,
     PasswordVerifier,
     SecretDigester,
@@ -51,13 +52,18 @@ class AuthenticationService:
         self._session_ttl_seconds = session_ttl_seconds
         self._entitlements = entitlements
 
-    def login(self, login_name: str, password: str) -> tuple[str, str, UUID]:
+    def login(self, login_name: str, password: str) -> LoginResult:
         account = self._repository.get_account_by_login(login_name.strip().casefold())
         password_valid = self._passwords.verify(
             account.password_hash if account is not None else None,
             password,
         )
         if account is None or account.status != "active" or not password_valid:
+            raise InvalidCredentialsError
+
+        # 默认个人空间是浏览器建立可信工作空间上下文的入口，缺失时拒绝创建残缺会话。
+        personal_workspace_id = self._repository.get_personal_workspace_id(account.account_id)
+        if personal_workspace_id is None:
             raise InvalidCredentialsError
 
         csrf_token = secrets.token_urlsafe(32)
@@ -67,7 +73,7 @@ class AuthenticationService:
             csrf_digest=self._secrets.digest(csrf_token),
         )
         token = self._sessions.create(session, self._session_ttl_seconds)
-        return token, csrf_token, account.account_id
+        return LoginResult(token, csrf_token, account.account_id, personal_workspace_id)
 
     def browser_context(
         self,

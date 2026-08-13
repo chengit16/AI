@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from types import TracebackType
 from typing import cast
@@ -75,6 +76,16 @@ class SqlAlchemyIdentityReader(IdentityReader):
                 ).where(accounts.c.account_id == account_id)
             ).one_or_none()
         return self._account(row._mapping if row is not None else None)
+
+    def get_personal_workspace_id(self, account_id: UUID) -> UUID | None:
+        with self._session_factory() as session:
+            return session.execute(
+                select(workspaces.c.workspace_id).where(
+                    workspaces.c.owner_account_id == account_id,
+                    workspaces.c.workspace_type == "personal",
+                    workspaces.c.status == "active",
+                )
+            ).scalar_one_or_none()
 
     def get_workspace_access(
         self,
@@ -183,12 +194,30 @@ class SqlAlchemyApiKeyWriter:
 class SqlAlchemyIdentityUnitOfWork(IdentityUnitOfWork):
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
-        self._session: Session | None = None
+        self._state: ContextVar[tuple[Session, SqlAlchemyApiKeyWriter] | None] = ContextVar(
+            "identity_unit_of_work", default=None
+        )
 
     def __enter__(self) -> SqlAlchemyIdentityUnitOfWork:
-        self._session = self._session_factory()
-        self.api_keys = SqlAlchemyApiKeyWriter(self._session)
+        if self._state.get() is not None:
+            raise RuntimeError("Identity Unit of Work 不允许在同一上下文重复进入")
+        session = self._session_factory()
+        api_keys = SqlAlchemyApiKeyWriter(session)
+        self._state.set((session, api_keys))
         return self
+
+    @property
+    def api_keys(self) -> SqlAlchemyApiKeyWriter:
+        state = self._state.get()
+        if state is None:
+            raise RuntimeError("Identity Unit of Work 尚未进入事务范围")
+        return state[1]
+
+    def _session(self) -> Session:
+        state = self._state.get()
+        if state is None:
+            raise RuntimeError("Identity Unit of Work 尚未进入事务范围")
+        return state[0]
 
     def __exit__(
         self,
@@ -196,16 +225,16 @@ class SqlAlchemyIdentityUnitOfWork(IdentityUnitOfWork):
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        if self._session is not None:
+        state = self._state.get()
+        if state is not None:
+            session = state[0]
             if exc_type is not None:
-                self._session.rollback()
-            self._session.close()
-            self._session = None
+                session.rollback()
+            session.close()
+            self._state.set(None)
 
     def commit(self) -> None:
-        if self._session is None:
-            raise RuntimeError("Identity Unit of Work 尚未进入事务范围")
-        self._session.commit()
+        self._session().commit()
 
 
 class SqlAlchemyRegistrationWriter:
@@ -336,34 +365,53 @@ class SqlAlchemyRegistrationUnitOfWork:
 
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
-        self._session: Session | None = None
-        self._registrations: SqlAlchemyRegistrationWriter | None = None
-        self._audit: SqlAlchemyAuditWriter | None = None
-        self._outbox: SqlAlchemyOutboxWriter | None = None
+        self._state: ContextVar[
+            tuple[
+                Session,
+                SqlAlchemyRegistrationWriter,
+                SqlAlchemyAuditWriter,
+                SqlAlchemyOutboxWriter,
+            ]
+            | None
+        ] = ContextVar("registration_unit_of_work", default=None)
 
     def __enter__(self) -> None:
-        self._session = self._session_factory()
-        self._registrations = SqlAlchemyRegistrationWriter(self._session)
-        self._audit = SqlAlchemyAuditWriter(self._session)
-        self._outbox = SqlAlchemyOutboxWriter(self._session)
+        if self._state.get() is not None:
+            raise RuntimeError("Registration Unit of Work 不允许在同一上下文重复进入")
+        session = self._session_factory()
+        self._state.set(
+            (
+                session,
+                SqlAlchemyRegistrationWriter(session),
+                SqlAlchemyAuditWriter(session),
+                SqlAlchemyOutboxWriter(session),
+            )
+        )
+
+    def _current(
+        self,
+    ) -> tuple[
+        Session,
+        SqlAlchemyRegistrationWriter,
+        SqlAlchemyAuditWriter,
+        SqlAlchemyOutboxWriter,
+    ]:
+        state = self._state.get()
+        if state is None:
+            raise RuntimeError("Registration Unit of Work 尚未进入事务范围")
+        return state
 
     @property
     def registrations(self) -> SqlAlchemyRegistrationWriter:
-        if self._registrations is None:
-            raise RuntimeError("Registration Unit of Work 尚未进入事务范围")
-        return self._registrations
+        return self._current()[1]
 
     @property
     def audit(self) -> SqlAlchemyAuditWriter:
-        if self._audit is None:
-            raise RuntimeError("Registration Unit of Work 尚未进入事务范围")
-        return self._audit
+        return self._current()[2]
 
     @property
     def outbox(self) -> SqlAlchemyOutboxWriter:
-        if self._outbox is None:
-            raise RuntimeError("Registration Unit of Work 尚未进入事务范围")
-        return self._outbox
+        return self._current()[3]
 
     def __exit__(
         self,
@@ -371,22 +419,20 @@ class SqlAlchemyRegistrationUnitOfWork:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        if self._session is not None:
+        state = self._state.get()
+        if state is not None:
+            session = state[0]
             if exc_type is not None:
-                self._session.rollback()
-            self._session.close()
-            self._session = None
-            self._registrations = None
-            self._audit = None
-            self._outbox = None
+                session.rollback()
+            session.close()
+            self._state.set(None)
 
     def commit(self) -> None:
-        if self._session is None:
-            raise RuntimeError("Registration Unit of Work 尚未进入事务范围")
+        session = self._current()[0]
         try:
-            self._session.commit()
+            session.commit()
         except IntegrityError as error:
-            self._session.rollback()
+            session.rollback()
             if _is_login_conflict(error):
                 raise DuplicateLoginNameError from error
             raise

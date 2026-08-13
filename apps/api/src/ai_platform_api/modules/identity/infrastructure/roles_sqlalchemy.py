@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextvars import ContextVar
 from types import TracebackType
 from typing import Any, cast
 from uuid import UUID
@@ -286,35 +287,54 @@ class SqlAlchemyRoleRepository:
 class SqlAlchemyRoleUnitOfWork:
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
-        self._session: Session | None = None
-        self._roles: SqlAlchemyRoleRepository | None = None
-        self._audit: SqlAlchemyAuditWriter | None = None
-        self._outbox: SqlAlchemyOutboxWriter | None = None
+        self._state: ContextVar[
+            tuple[
+                Session,
+                SqlAlchemyRoleRepository,
+                SqlAlchemyAuditWriter,
+                SqlAlchemyOutboxWriter,
+            ]
+            | None
+        ] = ContextVar("role_unit_of_work", default=None)
 
     def __enter__(self) -> SqlAlchemyRoleUnitOfWork:
-        self._session = self._session_factory()
-        self._roles = SqlAlchemyRoleRepository(self._session)
-        self._audit = SqlAlchemyAuditWriter(self._session)
-        self._outbox = SqlAlchemyOutboxWriter(self._session)
+        if self._state.get() is not None:
+            raise RuntimeError("Role Unit of Work 不允许在同一上下文重复进入")
+        session = self._session_factory()
+        self._state.set(
+            (
+                session,
+                SqlAlchemyRoleRepository(session),
+                SqlAlchemyAuditWriter(session),
+                SqlAlchemyOutboxWriter(session),
+            )
+        )
         return self
+
+    def _current(
+        self,
+    ) -> tuple[
+        Session,
+        SqlAlchemyRoleRepository,
+        SqlAlchemyAuditWriter,
+        SqlAlchemyOutboxWriter,
+    ]:
+        state = self._state.get()
+        if state is None:
+            raise RuntimeError("Role Unit of Work 尚未进入事务范围")
+        return state
 
     @property
     def roles(self) -> SqlAlchemyRoleRepository:
-        if self._roles is None:
-            raise RuntimeError("Role Unit of Work 尚未进入事务范围")
-        return self._roles
+        return self._current()[1]
 
     @property
     def audit(self) -> SqlAlchemyAuditWriter:
-        if self._audit is None:
-            raise RuntimeError("Role Unit of Work 尚未进入事务范围")
-        return self._audit
+        return self._current()[2]
 
     @property
     def outbox(self) -> SqlAlchemyOutboxWriter:
-        if self._outbox is None:
-            raise RuntimeError("Role Unit of Work 尚未进入事务范围")
-        return self._outbox
+        return self._current()[3]
 
     def __exit__(
         self,
@@ -322,20 +342,18 @@ class SqlAlchemyRoleUnitOfWork:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        if self._session is not None:
+        state = self._state.get()
+        if state is not None:
+            session = state[0]
             if exc_type is not None:
-                self._session.rollback()
-            self._session.close()
-            self._session = None
-            self._roles = None
-            self._audit = None
-            self._outbox = None
+                session.rollback()
+            session.close()
+            self._state.set(None)
 
     def commit(self) -> None:
-        if self._session is None:
-            raise RuntimeError("Role Unit of Work 尚未进入事务范围")
+        session = self._current()[0]
         try:
-            self._session.commit()
+            session.commit()
         except IntegrityError as error:
-            self._session.rollback()
+            session.rollback()
             raise RoleWriteConflictError from error

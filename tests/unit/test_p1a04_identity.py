@@ -85,12 +85,16 @@ class MemoryIdentity:
             )
         }
         self.api_keys: dict[UUID, OpenApiKey] = {}
+        self.personal_workspace_id: UUID | None = WORKSPACE_ID
 
     def get_account_by_login(self, login_name: str) -> AccountCredential | None:
         return self.account if login_name == self.account.login_name else None
 
     def get_account(self, account_id: UUID) -> AccountCredential | None:
         return self.account if account_id == self.account.account_id else None
+
+    def get_personal_workspace_id(self, account_id: UUID) -> UUID | None:
+        return self.personal_workspace_id if account_id == ACCOUNT_ID else None
 
     def get_workspace_access(
         self,
@@ -199,21 +203,22 @@ def test_password_uses_argon2id_and_rejects_short_or_wrong_password() -> None:
 
 def test_browser_session_requires_valid_csrf_and_active_workspace_membership() -> None:
     service, _, sessions, _ = authentication_fixture()
-    session_token, csrf_token, account_id = service.login(
+    result = service.login(
         "OWNER@EXAMPLE.COM",
         "synthetic-password-123",
     )
 
     context = service.browser_context(
-        session_token=session_token,
-        csrf_token=csrf_token,
+        session_token=result.session_token,
+        csrf_token=result.csrf_token,
         require_csrf=True,
         workspace_id=WORKSPACE_ID,
         request_id=REQUEST_ID,
         trace=TRACE,
     )
 
-    assert account_id == ACCOUNT_ID
+    assert result.account_id == ACCOUNT_ID
+    assert result.personal_workspace_id == WORKSPACE_ID
     assert sessions.created_ttl == 43_200
     assert context.actor_id == ACCOUNT_ID
     assert context.user_id == ACCOUNT_ID
@@ -222,7 +227,7 @@ def test_browser_session_requires_valid_csrf_and_active_workspace_membership() -
     assert context.credential_scopes is None
     with pytest.raises(CsrfValidationError):
         service.browser_context(
-            session_token=session_token,
+            session_token=result.session_token,
             csrf_token="forged-csrf",
             require_csrf=True,
             workspace_id=WORKSPACE_ID,
@@ -231,7 +236,7 @@ def test_browser_session_requires_valid_csrf_and_active_workspace_membership() -
         )
     with pytest.raises(WorkspaceContextDeniedError):
         service.browser_context(
-            session_token=session_token,
+            session_token=result.session_token,
             csrf_token=None,
             require_csrf=False,
             workspace_id=OTHER_WORKSPACE_ID,
@@ -242,7 +247,7 @@ def test_browser_session_requires_valid_csrf_and_active_workspace_membership() -
 
 def test_disabled_account_or_changed_auth_version_invalidates_session() -> None:
     service, identity, sessions, _ = authentication_fixture()
-    session_token, _, _ = service.login("owner@example.com", "synthetic-password-123")
+    result = service.login("owner@example.com", "synthetic-password-123")
     identity.account = AccountCredential(
         account_id=identity.account.account_id,
         login_name=identity.account.login_name,
@@ -253,7 +258,7 @@ def test_disabled_account_or_changed_auth_version_invalidates_session() -> None:
 
     with pytest.raises(AuthenticationRequiredError):
         service.browser_context(
-            session_token=session_token,
+            session_token=result.session_token,
             csrf_token=None,
             require_csrf=False,
             workspace_id=WORKSPACE_ID,
@@ -261,7 +266,7 @@ def test_disabled_account_or_changed_auth_version_invalidates_session() -> None:
             trace=TRACE,
         )
 
-    assert sessions.resolve(session_token) is None
+    assert sessions.resolve(result.session_token) is None
 
 
 def test_login_does_not_distinguish_unknown_account_from_wrong_password() -> None:
@@ -271,6 +276,14 @@ def test_login_does_not_distinguish_unknown_account_from_wrong_password() -> Non
         service.login("unknown@example.com", "synthetic-password-123")
     with pytest.raises(InvalidCredentialsError):
         service.login("owner@example.com", "wrong-password")
+
+
+def test_login_rejects_account_without_active_personal_workspace() -> None:
+    service, identity, _, _ = authentication_fixture()
+    identity.personal_workspace_id = None
+
+    with pytest.raises(InvalidCredentialsError):
+        service.login("owner@example.com", "synthetic-password-123")
 
 
 def test_open_api_key_is_one_time_secret_with_scoped_actor() -> None:

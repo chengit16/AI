@@ -1,0 +1,127 @@
+.summary,
+.section,
+.featureRow {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.summary {
+  padding: var(--space-6);
+}
+.summaryHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.summaryHeading > div {
+  flex: 1;
+}
+.summaryHeading h2,
+.sectionHeading h2,
+.featureRow h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.summaryHeading p,
+.sectionHeading p,
+.featureRow p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.workspaceIcon,
+.featureIcon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--color-brand);
+  background: var(--color-brand-soft);
+  border-radius: var(--radius-md);
+}
+.section {
+  margin-top: var(--space-6);
+}
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+.sectionHeading > span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.quotaGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+}
+.quotaItem {
+  min-width: 0;
+  padding: var(--space-5);
+  border-right: 1px solid var(--color-border-soft);
+}
+.quotaItem:last-child {
+  border-right: 0;
+}
+.quotaItem > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.quotaItem strong {
+  font-size: 14px;
+}
+.quotaItem span,
+.quotaItem small {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+.quotaItem p {
+  margin: var(--space-5) 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.quotaItem b {
+  color: var(--color-text-strong);
+  font-size: 19px;
+}
+.quotaItem small {
+  display: block;
+  margin-top: var(--space-2);
+}
+.featureRow {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding: var(--space-5) var(--space-6);
+}
+.featureRow > div {
+  flex: 1;
+}
+
+@media (max-width: 1024px) {
+  .quotaGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .quotaItem {
+    border-bottom: 1px solid var(--color-border-soft);
+  }
+}
+@media (max-width: 560px) {
+  .quotaGrid {
+    grid-template-columns: 1fr;
+  }
+  .quotaItem {
+    border-right: 0;
+  }
+  .summary,
+  .sectionHeading {
+    padding: var(--space-5);
+  }
+}

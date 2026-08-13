@@ -50,6 +50,14 @@ class BrowserSession:
 
 
 @dataclass(frozen=True)
+class LoginResult:
+    session_token: str
+    csrf_token: str
+    account_id: UUID
+    personal_workspace_id: UUID
+
+
+@dataclass(frozen=True)
 class OpenApiKey:
     key_id: UUID
     actor_id: UUID
@@ -88,6 +96,8 @@ class IdentityReader(Protocol):
 
     def get_account(self, account_id: UUID) -> AccountCredential | None: ...
 
+    def get_personal_workspace_id(self, account_id: UUID) -> UUID | None: ...
+
     def get_workspace_access(
         self,
         account_id: UUID,
@@ -104,7 +114,8 @@ class ApiKeyWriter(Protocol):
 
 
 class IdentityUnitOfWork(Protocol):
-    api_keys: ApiKeyWriter
+    @property
+    def api_keys(self) -> ApiKeyWriter: ...
 
     def __enter__(self) -> IdentityUnitOfWork: ...
 

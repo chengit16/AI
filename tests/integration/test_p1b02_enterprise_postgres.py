@@ -204,13 +204,13 @@ def test_enterprise_invite_join_switch_disable_reactivate_and_leave(
     )
     assert switched.membership_status == "active"
 
-    token, _, _ = enterprise_database.authentication.login(
+    login = enterprise_database.authentication.login(
         member.login_name,
         "synthetic-password-123",
     )
     try:
         trusted = enterprise_database.authentication.browser_context(
-            session_token=token,
+            session_token=login.session_token,
             csrf_token=None,
             require_csrf=False,
             workspace_id=workspace.workspace_id,
@@ -232,7 +232,7 @@ def test_enterprise_invite_join_switch_disable_reactivate_and_leave(
             )
         with pytest.raises(WorkspaceContextDeniedError):
             enterprise_database.authentication.browser_context(
-                session_token=token,
+                session_token=login.session_token,
                 csrf_token=None,
                 require_csrf=False,
                 workspace_id=workspace.workspace_id,
@@ -240,7 +240,7 @@ def test_enterprise_invite_join_switch_disable_reactivate_and_leave(
                 trace=TRACE,
             )
     finally:
-        enterprise_database.authentication.logout(token)
+        enterprise_database.authentication.logout(login.session_token)
 
     reinvitation = enterprise_database.enterprise.invite(
         owner_context,

@@ -707,6 +707,8 @@ export type components = {
       readonly account_id: string;
       /** Csrf Token */
       readonly csrf_token: string;
+      /** Personal Workspace Id */
+      readonly personal_workspace_id?: string | null;
     };
     /** LogoutResponse */
     readonly LogoutResponse: {

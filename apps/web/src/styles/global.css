@@ -1,0 +1,67 @@
+:root {
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  min-width: 320px;
+  background: var(--color-canvas);
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 3px solid rgba(23, 107, 82, 0.35);
+  outline-offset: 2px;
+}
+.ant-btn {
+  min-height: 44px;
+}
+.ant-btn-icon-only {
+  min-width: 44px;
+  min-height: 44px;
+}
+.ant-table-wrapper .ant-table {
+  border-radius: 0;
+}
+
+@media (max-width: 720px) {
+  body {
+    font-size: 16px;
+  }
+  .ant-modal {
+    max-width: calc(100vw - 24px);
+  }
+  .ant-drawer-content-wrapper {
+    max-width: calc(100vw - 32px);
+  }
+}
+
+@media (max-width: 900px) and (max-height: 500px) {
+  body {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

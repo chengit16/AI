@@ -83,6 +83,9 @@ class MemoryIdentity:
     def get_account(self, account_id: UUID) -> AccountCredential | None:
         return self.account if account_id == ACCOUNT_ID else None
 
+    def get_personal_workspace_id(self, account_id: UUID) -> UUID | None:
+        return WORKSPACE_ID if account_id == ACCOUNT_ID else None
+
     def get_workspace_access(
         self,
         account_id: UUID,
@@ -218,6 +221,7 @@ def test_login_cookie_context_csrf_and_logout_flow() -> None:
         cookie = login.headers["set-cookie"]
 
         assert login.status_code == 200
+        assert login.json()["personal_workspace_id"] == str(WORKSPACE_ID)
         assert login.headers["cache-control"] == "no-store"
         assert "ai_platform_session=synthetic-http-session" in cookie
         assert "HttpOnly" in cookie
