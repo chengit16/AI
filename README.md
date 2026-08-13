@@ -2,7 +2,7 @@
 
 本仓库用于建设同时支持个人空间和企业空间的 AI 智能平台。产品采用浏览器访问的 Web 形态，首期以 Docker Compose 在本地运行。
 
-当前已完成阶段 0 的节点验收，正在执行阶段关闭与阶段 1 启动流程。完整产品与架构设计见 [AI 智能平台 V2 架构设计](./ai-intelligent-platform-v2-design.md)，实时进度见 [项目进度看板](./docs/project-progress.md)。
+阶段 0 已完成并冻结，当前进入阶段 1：工作空间、企业治理与知识问答 MVP。完整产品与架构设计见 [AI 智能平台 V2 架构设计](./ai-intelligent-platform-v2-design.md)，实时进度见 [项目进度看板](./docs/project-progress.md)。
 
 ## 文档入口
 

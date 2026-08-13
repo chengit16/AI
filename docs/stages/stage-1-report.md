@@ -5,9 +5,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
-| 状态 | 待阶段 0 关闭后启动 |
+| 状态 | 进行中 |
 | 报告日期 | 2026-08-13 |
-| 当前节点 | `P1A-01` 待开始 |
+| 当前节点 | `P1A-01` 进行中 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -38,4 +38,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 关闭后从 `P1A-01` 开始记录。
+`not_run`。阶段 0 已关闭，当前从 `P1A-01` 开始记录。
