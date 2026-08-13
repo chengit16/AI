@@ -5,7 +5,7 @@
 本目录记录 `P0-12` 的可复现供应链基线：
 
 - `python-production.cdx.json`：由 `uv.lock` 导出的 Python 生产依赖 CycloneDX 1.5 SBOM，不包含开发依赖和 `ai-validation` 模型验证依赖。
-- `node-production.cdx.json`：由 `pnpm-lock.yaml` 和冻结安装图生成的 Web 生产依赖 CycloneDX 1.5 SBOM。
+- `node-production.cdx.json`：由 `pnpm-lock.yaml`、冻结安装图和包清单生成的 Web 生产依赖 CycloneDX 1.5 SBOM。
 - `dependency-licenses.json`：Python 与 Node 生产依赖许可证清单。
 - 本文档：镜像、模型、解析器和关键组件的许可证决策、漏洞扫描结果与发布边界。
 
@@ -16,7 +16,7 @@
 .venv/bin/python scripts/generate_supply_chain.py --check
 ```
 
-Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 42 个生产组件；许可证清单读取当前 macOS 冻结环境中实际安装的 37 个适用组件。两者数量不同是跨平台条件依赖导致的预期结果，Linux 镜像发布时仍需按镜像内实际安装结果生成发布级许可证清单。
+Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 55 个生产组件；许可证清单读取当前 macOS 冻结环境中实际安装的 49 个适用组件。两者数量不同是跨平台条件依赖导致的预期结果。Node SBOM 与许可证清单包含 76 个生产组件，生成器直接遍历冻结安装图及各包 `package.json`，不依赖 pnpm Store 的机器本地索引。Linux 镜像发布时仍需按镜像内实际安装结果生成发布级许可证清单。
 
 ## 2. 漏洞审计结果
 
@@ -37,6 +37,7 @@ Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 42 个�
 | React、Ant Design、TanStack Query、Zustand | 见 Node SBOM | MIT | 允许 | 保留许可证与版权声明 |
 | lucide-react | 见 Node SBOM | ISC | 允许 | 保留许可证与版权声明 |
 | FastAPI / Starlette | 0.141.1 / 1.6.0 | MIT / BSD-3-Clause | 允许 | 保留许可证与版权声明 |
+| Celery / Kombu | 5.5.3 / 5.5.4 | BSD-3-Clause | 允许 | 任务按至少一次投递和幂等消费设计，保留许可证与版权声明 |
 | psycopg | 3.2.10 | LGPL-3.0 | 允许动态依赖 | 分发包保留许可证、修改说明和可替换边界，发布前复核 LGPL 义务 |
 | PostgreSQL / pgvector | 16 / 0.8.6 | PostgreSQL License | 允许 | 宽松许可证，可进入商业包 |
 | Redis | 7.4 | RSALv2 或 SSPLv1 | 只保留阶段 0 历史验证 | 已由 `P1A-02` 从默认组合移除，不进入商业发布包 |

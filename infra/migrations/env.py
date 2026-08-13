@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from ai_platform_api.persistence.tables import metadata
@@ -15,9 +16,18 @@ def schema_name() -> str:
     return config.get_main_option("ai_platform_schema", "public")
 
 
+def database_configuration() -> dict[str, str]:
+    configuration = config.get_section(config.config_ini_section, {})
+    # 容器和测试环境由部署入口注入数据库地址；ini 中的回环地址只作为本机默认值。
+    injected_url = os.environ.get("AI_PLATFORM_DATABASE_URL")
+    if injected_url:
+        configuration["sqlalchemy.url"] = injected_url
+    return configuration
+
+
 def run_migrations_offline() -> None:
     context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
+        url=database_configuration()["sqlalchemy.url"],
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -30,7 +40,7 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        database_configuration(),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

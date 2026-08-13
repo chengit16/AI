@@ -1,6 +1,7 @@
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -15,6 +16,7 @@ from ai_platform_api.modules.integration.application.consumer import (
     IdempotentProjectionConsumer,
 )
 from ai_platform_api.modules.integration.infrastructure.sqlalchemy import (
+    SqlAlchemyAuditWriter,
     SqlAlchemyConsumerUnitOfWork,
     SqlAlchemyOutboxWriter,
     get_outbox_event,
@@ -76,7 +78,10 @@ def database() -> Iterator[DatabaseHarness]:
 
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "infra/migrations"))
-    config.set_main_option("prepend_sys_path", str(ROOT / "apps/api/src"))
+    config.set_main_option(
+        "prepend_sys_path",
+        f"{ROOT / 'apps/api/src'}:{ROOT / 'packages/backend/src'}",
+    )
     config.set_main_option("sqlalchemy.url", database_url)
     config.set_main_option("ai_platform_schema", schema)
     command.upgrade(config, "head")
@@ -114,7 +119,11 @@ def stored_resource_event(database: DatabaseHarness) -> StoredResourceEvent:
     request_context = context(actor_id, workspace_id)
     service = CreateWorkspaceResource(
         grant(actor_id, workspace_id),
-        SqlAlchemyWorkspaceUnitOfWork(database.sessions, SqlAlchemyOutboxWriter),
+        SqlAlchemyWorkspaceUnitOfWork(
+            database.sessions,
+            SqlAlchemyOutboxWriter,
+            SqlAlchemyAuditWriter,
+        ),
         event_id_factory=lambda: event_id,
     )
     service.execute(
@@ -199,7 +208,11 @@ def test_outbox_constraint_failure_rolls_back_business_record(
     resource_id = UUID("30000000-0000-4000-8000-000000000002")
     service = CreateWorkspaceResource(
         grant(actor_id, workspace_id),
-        SqlAlchemyWorkspaceUnitOfWork(database.sessions, SqlAlchemyOutboxWriter),
+        SqlAlchemyWorkspaceUnitOfWork(
+            database.sessions,
+            SqlAlchemyOutboxWriter,
+            SqlAlchemyAuditWriter,
+        ),
         event_id_factory=lambda: stored_resource_event.event_id,
     )
 
@@ -231,7 +244,11 @@ def test_cross_workspace_read_does_not_reveal_resource(
     other_workspace_id = UUID("20000000-0000-4000-8000-000000000003")
     service = ReadWorkspaceResource(
         grant(actor_id, other_workspace_id),
-        SqlAlchemyWorkspaceUnitOfWork(database.sessions, SqlAlchemyOutboxWriter),
+        SqlAlchemyWorkspaceUnitOfWork(
+            database.sessions,
+            SqlAlchemyOutboxWriter,
+            SqlAlchemyAuditWriter,
+        ),
     )
 
     with pytest.raises(ResourceNotFoundError):
@@ -257,7 +274,11 @@ def test_policy_scope_and_field_mask_are_enforced(
 
     resource = ReadWorkspaceResource(
         masked_policy,
-        SqlAlchemyWorkspaceUnitOfWork(database.sessions, SqlAlchemyOutboxWriter),
+        SqlAlchemyWorkspaceUnitOfWork(
+            database.sessions,
+            SqlAlchemyOutboxWriter,
+            SqlAlchemyAuditWriter,
+        ),
     ).execute(request_context, resource_id)
 
     assert resource.title == "合成资源 A"
@@ -271,7 +292,11 @@ def test_policy_scope_and_field_mask_are_enforced(
     with pytest.raises(AuthorizationDeniedError):
         ReadWorkspaceResource(
             out_of_scope_policy,
-            SqlAlchemyWorkspaceUnitOfWork(database.sessions, SqlAlchemyOutboxWriter),
+            SqlAlchemyWorkspaceUnitOfWork(
+                database.sessions,
+                SqlAlchemyOutboxWriter,
+                SqlAlchemyAuditWriter,
+            ),
         ).execute(request_context, resource_id)
 
 
@@ -287,7 +312,11 @@ def test_unavailable_policy_defaults_to_deny(
     with pytest.raises(AuthorizationDeniedError):
         ReadWorkspaceResource(
             unavailable_policy,
-            SqlAlchemyWorkspaceUnitOfWork(database.sessions, SqlAlchemyOutboxWriter),
+            SqlAlchemyWorkspaceUnitOfWork(
+                database.sessions,
+                SqlAlchemyOutboxWriter,
+                SqlAlchemyAuditWriter,
+            ),
         ).execute(context(actor_id, workspace_id), resource_id)
 
 
@@ -303,8 +332,27 @@ def test_duplicate_event_is_consumed_once(
         SqlAlchemyConsumerUnitOfWork(database.sessions),
     )
 
-    assert consumer.handle(event) is True
-    assert consumer.handle(event) is False
+    processed_at = datetime.now(UTC)
+    assert (
+        consumer.handle(
+            event,
+            task_id=uuid4(),
+            trace_id=event.trace_id,
+            traceparent=event.traceparent,
+            processed_at=processed_at,
+        )
+        is True
+    )
+    assert (
+        consumer.handle(
+            event,
+            task_id=uuid4(),
+            trace_id=event.trace_id,
+            traceparent=event.traceparent,
+            processed_at=processed_at,
+        )
+        is False
+    )
 
     with database.sessions() as session:
         receipt_count = session.scalar(

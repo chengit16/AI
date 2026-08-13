@@ -9,7 +9,6 @@ x-python-environment: &python-environment
   AI_PLATFORM_VALKEY_URL: redis://valkey:6379/0
   AI_PLATFORM_MINIO_ENDPOINT: http://minio:9000
   AI_PLATFORM_TIKA_URL: http://tika:9998
-  AI_PLATFORM_MASTER_KEY_PATH: /run/secrets/ai-platform-master.key
   AI_PLATFORM_MODEL_PROVIDER: mock
 
 services:
@@ -79,12 +78,16 @@ services:
     build:
       context: ../..
       dockerfile: infra/docker/api.Dockerfile
-    environment: *python-environment
+    environment:
+      <<: *python-environment
+      AI_PLATFORM_MASTER_KEY_PATH: /run/secrets/ai-platform-master.key
     ports:
       - "127.0.0.1:${AI_PLATFORM_API_PORT:-8000}:8000"
     volumes:
       - ${AI_PLATFORM_ROOT:-../../.ai-platform}/secrets/master.key:/run/secrets/ai-platform-master.key:ro
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       valkey:
@@ -107,18 +110,29 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    environment: *python-environment
+    command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   worker:
     build:
       context: ../..
       dockerfile: infra/docker/worker.Dockerfile
-    environment: *python-environment
-    command:
-      [
-        "python",
-        "-c",
-        "import signal,time; signal.signal(signal.SIGTERM, lambda *_: exit(0)); print('worker ready', flush=True); time.sleep(10**9)",
-      ]
+    environment:
+      <<: *python-environment
+      AI_PLATFORM_TASK_SIGNING_KEY_PATH: /run/secrets/ai-platform-task-signing.key
+    volumes:
+      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/secrets/task-signing.key:/run/secrets/ai-platform-task-signing.key:ro
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       valkey:
@@ -128,7 +142,11 @@ services:
       tika:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-m", "ai_platform_worker.health"]
+      test:
+        [
+          "CMD-SHELL",
+          "uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app inspect ping --destination celery@$$HOSTNAME --timeout 3 | grep -q pong",
+        ]
       interval: 10s
       timeout: 5s
       retries: 20

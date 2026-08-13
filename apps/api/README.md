@@ -19,6 +19,7 @@ uv run uvicorn ai_platform_api.main:app --app-dir apps/api/src --host 127.0.0.1 
 - `app/` 创建应用、注册 Middleware、统一异常映射并管理进程级依赖生命周期。
 - `modules/{domain}/api` 处理 HTTP 协议，`application` 编排用例，`domain` 保存业务规则，`infrastructure` 提供 Adapter。
 - `ApplicationContainer` 持有进程级 Engine、Session Factory 和错误目录；业务模块只接收实际需要的窄接口，不读取容器本身。
+- `packages/backend` 承载 API 与 Worker 已发生真实复用的数据库、审计、Outbox、消费幂等和 Trace 内核；API 保留兼容导入入口，跨进程协议仍以 `contracts/` 为事实来源。
 - 应用启动时校验配置的 `ReleaseManifest` 与兼容矩阵；缺失、损坏或组合不兼容时拒绝启动。仓库默认文件是全合成 Golden Fixture，只验证机制，不代表真实发布制品。
 - 已知平台异常按 `contracts/errors/catalog.v1.json` 映射；未知异常只返回 `INTERNAL_ERROR`，不会把数据库、供应商或 Python 原始异常暴露给客户端。
 
@@ -29,6 +30,10 @@ uv run uvicorn ai_platform_api.main:app --app-dir apps/api/src --host 127.0.0.1 
 ```bash
 uv run --locked alembic upgrade head
 ```
+
+Docker Compose 本地环境通过一次性 `migrate` 服务先执行相同命令，成功后才启动 API 和 Worker。Alembic 在容器中显式读取 `AI_PLATFORM_DATABASE_URL`，`./platform doctor` 同时核对当前 Revision；该本地便利能力不改变未来共享或生产环境必须先备份、独立审批并执行 Migration 的规则。
+
+工作空间写用例把业务事实、不可变审计记录和 Outbox 事件放在同一事务提交。审计表由 PostgreSQL Trigger 拒绝更新和删除，修正必须追加新事实；审计属性不得复制敏感字段正文。
 
 数据库、权限、Outbox 和幂等测试会创建随机临时 Schema，并在结束后清理。默认连接本地开发 PostgreSQL，也可使用 `AI_PLATFORM_TEST_DATABASE_URL` 指定独立测试数据库：
 

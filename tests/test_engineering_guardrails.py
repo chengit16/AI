@@ -29,6 +29,18 @@ def test_domain_cannot_import_valkey_client(tmp_path: Path) -> None:
     assert "domain 层禁止依赖 valkey" in violations[0].message
 
 
+def test_shared_backend_domain_cannot_import_sqlalchemy(tmp_path: Path) -> None:
+    root = tmp_path / "ai_platform_backend"
+    path = root / "integration" / "domain.py"
+    path.parent.mkdir(parents=True)
+    path.write_text("from sqlalchemy import Table\n", encoding="utf-8")
+
+    violations = violations_for_file(path, root)
+
+    assert len(violations) == 1
+    assert "domain 层禁止依赖 sqlalchemy" in violations[0].message
+
+
 def test_api_cannot_import_infrastructure(tmp_path: Path) -> None:
     root = tmp_path / "package"
     path = root / "modules" / "workspace" / "api" / "routes.py"

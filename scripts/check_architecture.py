@@ -10,6 +10,7 @@ ROOT = Path(__file__).parents[1]
 PYTHON_ROOTS = (
     ROOT / "apps/api/src/ai_platform_api",
     ROOT / "apps/worker/src/ai_platform_worker",
+    ROOT / "packages/backend/src/ai_platform_backend",
 )
 
 
@@ -33,6 +34,14 @@ def imported_modules(source: str) -> list[tuple[int, str]]:
 
 def layer_for(path: Path) -> str | None:
     parts = path.parts
+    if len(parts) >= 2 and parts[0] == "integration":
+        layer = parts[1].removesuffix(".py")
+        if layer in {"application", "domain", "infrastructure"}:
+            return layer
+        if layer in {"consumer"}:
+            return "application"
+        if layer in {"envelope", "persistence", "sqlalchemy"}:
+            return "infrastructure"
     if "modules" not in parts:
         return None
     module_index = parts.index("modules")

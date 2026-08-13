@@ -2,6 +2,7 @@ from collections.abc import Callable
 from types import TracebackType
 from uuid import UUID
 
+from ai_platform_backend.integration.domain import AuditWriter
 from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
@@ -52,18 +53,22 @@ class SqlAlchemyWorkspaceUnitOfWork:
         self,
         session_factory: Callable[[], Session],
         outbox_factory: Callable[[Session], OutboxWriter],
+        audit_factory: Callable[[Session], AuditWriter],
     ) -> None:
         self._session_factory = session_factory
         self._outbox_factory = outbox_factory
+        self._audit_factory = audit_factory
         self._session: Session | None = None
         self.resources: WorkspaceResourceRepository
         self.outbox: OutboxWriter
+        self.audit: AuditWriter
 
     def __enter__(self) -> "SqlAlchemyWorkspaceUnitOfWork":
         self._session = self._session_factory()
         self.resources = SqlAlchemyWorkspaceResourceRepository(self._session)
         # 跨模块基础设施由装配入口注入，工作空间模块只依赖 Outbox 领域端口。
         self.outbox = self._outbox_factory(self._session)
+        self.audit = self._audit_factory(self._session)
         return self
 
     def __exit__(

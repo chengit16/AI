@@ -211,7 +211,7 @@ def test_startup_rejects_incompatible_release_combination(tmp_path: Path) -> Non
     )
     incompatible = tmp_path / "incompatible.json"
     incompatible.write_text(
-        manifest.replace('"schema_revision": "20260813_0004"', '"schema_revision": "unknown"'),
+        manifest.replace('"schema_revision": "20260813_0005"', '"schema_revision": "unknown"'),
         encoding="utf-8",
     )
 

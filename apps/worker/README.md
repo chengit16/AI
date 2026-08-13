@@ -4,10 +4,26 @@
 
 本目录的新增和修改统一执行 [`docs/governance/backend-code-standards.md`](../../docs/governance/backend-code-standards.md)。
 
-阶段 0 最小健康检查：
+Worker 使用 Celery 5.5 和 Valkey Broker，PostgreSQL 仍是任务与业务状态的唯一事实来源。本地运行由 Celery Worker 与 Beat 共同承载两个版本化任务：
+
+- `platform.outbox.dispatch.v1`：周期认领到期 Outbox，使用 `SKIP LOCKED`、短租约、有限指数退避和死信状态。
+- `platform.integration.consume.v1`：验签内部任务信封，延续 W3C Trace，并在同一 PostgreSQL 事务写入消费回执与投影。
+
+任务按至少一次投递设计。发布成功但确认失败、Worker 退出或 Broker 重投都可能产生重复任务，消费者必须用 `consumer_name + event_id` 保证业务副作用幂等，不能依赖 Broker 去重。
+
+本地只读健康信息：
 
 ```bash
 uv run python -m ai_platform_worker.health
+```
+
+本地 Compose 会生成独立的 32 字节 `task-signing.key`。只有 Worker 挂载该密钥，API 只挂载平台主加密密钥；Broker 中的主体和 Trace 只有在任务信封 HMAC 验签成功后才可信。可用以下命令检查真实 Worker 与全部服务：
+
+```bash
+./platform doctor
+docker compose --env-file .env -f infra/compose/compose.yaml exec -T worker \
+  uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app \
+  inspect registered --timeout 3
 ```
 
 ## 文档解析、OCR 与切片

@@ -24,7 +24,10 @@ def migration_database() -> Iterator[tuple[Config, Connection, str]]:
         connection.commit()
         config = Config(str(ROOT / "alembic.ini"))
         config.set_main_option("script_location", str(ROOT / "infra/migrations"))
-        config.set_main_option("prepend_sys_path", str(ROOT / "apps/api/src"))
+        config.set_main_option(
+            "prepend_sys_path",
+            f"{ROOT / 'apps/api/src'}:{ROOT / 'packages/backend/src'}",
+        )
         config.set_main_option("sqlalchemy.url", database_url)
         config.set_main_option("ai_platform_schema", schema)
         try:
@@ -88,9 +91,10 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260813_0004"
+    assert current_revision(connection, schema) == "20260813_0005"
     assert business_tables(connection, schema) == {
         "accounts",
+        "audit_records",
         "consumer_receipts",
         "open_api_keys",
         "outbox_events",
@@ -112,5 +116,5 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260813_0004"
+    assert current_revision(connection, schema) == "20260813_0005"
     assert schema_snapshot(connection, schema) == first_head

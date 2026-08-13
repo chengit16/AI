@@ -7,6 +7,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic==1.16.5",
     "argon2-cffi==25.1.0",
+    "celery==5.5.3",
     "cryptography==50.0.0",
     "fastapi==0.141.1",
     "pdfplumber==0.11.10",
@@ -38,7 +39,7 @@ package = false
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers --import-mode=importlib"
-pythonpath = [".", "apps/api/src", "apps/worker/src"]
+pythonpath = [".", "apps/api/src", "apps/worker/src", "packages/backend/src"]
 testpaths = ["tests", "apps/api/tests", "apps/worker/tests"]
 
 [tool.ruff]
@@ -59,10 +60,20 @@ strict = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["ai_platform_api.*", "ai_platform_worker.*"]
+module = ["ai_platform_api.*", "ai_platform_worker.*", "ai_platform_backend.*"]
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 # pgvector 0.4.1 尚未发布 PEP 561 标记，调用处仍由 SQLAlchemy 类型与集成测试约束。
 module = ["pgvector.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Celery 5.5 未发布 PEP 561 标记；例外仅覆盖 Worker 接入层，业务与共享内核仍执行 strict。
+module = ["celery", "celery.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Celery 的 shared_task 装饰器没有可消费类型，只在任务注册边缘关闭该单项检查。
+module = ["ai_platform_worker.consumers.integration_events"]
+disallow_untyped_decorators = false

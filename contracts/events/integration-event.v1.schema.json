@@ -15,6 +15,9 @@
     "occurred_at": { "type": "string", "format": "date-time" },
     "trace_id": { "type": "string", "minLength": 16, "maxLength": 64 },
     "traceparent": { "type": "string", "pattern": "^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$" },
+    "actor_id": { "type": ["string", "null"], "format": "uuid" },
+    "user_id": { "type": ["string", "null"], "format": "uuid" },
+    "request_id": { "type": ["string", "null"], "format": "uuid" },
     "payload": { "type": "object" }
   }
 }

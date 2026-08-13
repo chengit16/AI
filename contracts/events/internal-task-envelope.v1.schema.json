@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/events/internal-task-envelope.v1.schema.json",
+  "title": "内部签名任务信封 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_name", "task_id", "issued_at", "event", "schema_version", "signature"],
+  "properties": {
+    "task_name": { "type": "string", "const": "platform.integration.consume.v1" },
+    "task_id": { "type": "string", "format": "uuid" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "event": { "$ref": "./integration-event.v1.schema.json" },
+    "schema_version": { "const": 1 },
+    "signature": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

@@ -19,6 +19,9 @@ NODE_SBOM = OUTPUT_DIR / "node-production.cdx.json"
 LICENSE_INVENTORY = OUTPUT_DIR / "dependency-licenses.json"
 PYTHON_DIRECT = {
     "alembic",
+    "argon2-cffi",
+    "celery",
+    "cryptography",
     "fastapi",
     "pdfplumber",
     "pgvector",
@@ -92,25 +95,39 @@ def npm_purl(name: str, version: str) -> str:
     return f"pkg:npm/{quote(name, safe='')}@{version}"
 
 
+def node_package_path(node_modules: Path, name: str) -> Path | None:
+    candidate = node_modules.joinpath(*name.split("/"))
+    return candidate.resolve() if candidate.exists() else None
+
+
+def package_node_modules(package_path: Path) -> Path:
+    for parent in package_path.parents:
+        if parent.name == "node_modules":
+            return parent
+    raise RuntimeError(f"Node 包不位于 node_modules 中: {package_path}")
+
+
 def collect_node_graph(
-    dependencies: dict[str, Any],
+    package_paths: dict[str, Path],
     components: dict[str, dict[str, Any]],
     edges: dict[str, set[str]],
+    visited_paths: set[Path],
 ) -> set[str]:
     direct_refs: set[str] = set()
-    for name, dependency in dependencies.items():
-        if not isinstance(dependency, dict) or "version" not in dependency:
+    for expected_name, package_path in package_paths.items():
+        manifest_path = package_path / "package.json"
+        if package_path in visited_paths or not manifest_path.is_file():
             continue
-        version = str(dependency["version"])
+        visited_paths.add(package_path)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise TypeError(f"Node 包清单顶层必须是对象: {manifest_path}")
+        name = str(manifest.get("name") or expected_name)
+        version = str(manifest.get("version") or "")
+        if not version:
+            raise ValueError(f"Node 包缺少版本: {manifest_path}")
         ref = package_key(name, version)
         direct_refs.add(ref)
-        package_path = Path(str(dependency.get("path", "")))
-        manifest_path = package_path / "package.json"
-        manifest: dict[str, Any] = {}
-        if manifest_path.is_file():
-            loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                manifest = loaded
         component: dict[str, Any] = {
             "type": "library",
             "bom-ref": ref,
@@ -122,34 +139,45 @@ def collect_node_graph(
         if isinstance(license_value, str) and license_value:
             component["licenses"] = [{"license": {"id": license_value}}]
         components[ref] = component
-        child_dependencies = dependency.get("dependencies", {})
-        if isinstance(child_dependencies, dict):
-            child_refs = collect_node_graph(child_dependencies, components, edges)
-            edges[ref].update(child_refs)
+        dependency_names: set[str] = set()
+        for field in ("dependencies", "optionalDependencies", "peerDependencies"):
+            declared = manifest.get(field, {})
+            if isinstance(declared, dict):
+                dependency_names.update(str(dependency_name) for dependency_name in declared)
+        node_modules = package_node_modules(package_path)
+        children = {
+            dependency_name: dependency_path
+            for dependency_name in sorted(dependency_names)
+            if (dependency_path := node_package_path(node_modules, dependency_name)) is not None
+        }
+        child_refs = collect_node_graph(children, components, edges, visited_paths)
+        edges[ref].update(child_refs)
     return direct_refs
 
 
 def generate_node_sbom() -> dict[str, Any]:
-    installed = run_json(["pnpm", "list", "--prod", "--json", "--depth", "Infinity"])
-    if not isinstance(installed, list):
-        raise TypeError("pnpm 依赖图顶层必须是数组")
-    workspace = next(
-        (
-            item
-            for item in installed
-            if isinstance(item, dict) and item.get("path") == str(ROOT / NODE_IMPORTER)
-        ),
-        None,
-    )
-    if workspace is None:
-        raise RuntimeError(f"找不到 {NODE_IMPORTER} 的已安装生产依赖图")
+    workspace = ROOT / NODE_IMPORTER
+    workspace_manifest = json.loads((workspace / "package.json").read_text(encoding="utf-8"))
+    if not isinstance(workspace_manifest, dict):
+        raise TypeError(f"{NODE_IMPORTER}/package.json 顶层必须是对象")
+    declared_dependencies = workspace_manifest.get("dependencies", {})
+    if not isinstance(declared_dependencies, dict):
+        raise TypeError("前端生产依赖必须是对象")
+    workspace_node_modules = workspace / "node_modules"
+    direct_packages = {
+        name: package_path
+        for dependency_name in sorted(declared_dependencies)
+        if (package_path := node_package_path(workspace_node_modules, str(dependency_name)))
+        is not None
+        for name in [str(dependency_name)]
+    }
+    if len(direct_packages) != len(declared_dependencies):
+        missing = sorted(set(map(str, declared_dependencies)) - set(direct_packages))
+        raise RuntimeError(f"缺少已安装的前端生产依赖: {', '.join(missing)}")
     components: dict[str, dict[str, Any]] = {}
     edges: dict[str, set[str]] = defaultdict(set)
-    dependencies = workspace.get("dependencies", {})
-    if not isinstance(dependencies, dict):
-        raise TypeError("前端生产依赖必须是对象")
     root_ref = "@ai-platform/web@0.0.0"
-    direct_refs = collect_node_graph(dependencies, components, edges)
+    direct_refs = collect_node_graph(direct_packages, components, edges, set())
     dependency_graph = [{"ref": root_ref, "dependsOn": sorted(direct_refs)}]
     dependency_graph.extend(
         {"ref": ref, "dependsOn": sorted(edges.get(ref, set()))} for ref in sorted(components)
@@ -211,35 +239,40 @@ def python_licenses(python_sbom: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(records, key=lambda record: (record["name"].lower(), record["version"]))
 
 
-def node_licenses() -> list[dict[str, Any]]:
-    document = run_json(["pnpm", "licenses", "list", "--prod", "--json", "--long"])
-    if not isinstance(document, dict):
-        raise TypeError("pnpm 许可证清单顶层必须是对象")
+def node_licenses(node_sbom: dict[str, Any]) -> list[dict[str, Any]]:
+    """从已解析的生产组件生成清单，避免依赖 pnpm Store 的机器本地索引。"""
     records: list[dict[str, Any]] = []
-    for license_name, packages in document.items():
-        if not isinstance(packages, list):
-            continue
-        for package in packages:
-            for version in package.get("versions", []):
-                records.append(
-                    {
-                        "name": package["name"],
-                        "version": version,
-                        "license": license_name,
-                    }
-                )
+    for component in node_sbom["components"]:
+        licenses = component.get("licenses", [])
+        license_names = sorted(
+            str(entry["license"]["id"])
+            for entry in licenses
+            if isinstance(entry, dict)
+            and isinstance(entry.get("license"), dict)
+            and isinstance(entry["license"].get("id"), str)
+        )
+        records.append(
+            {
+                "name": str(component["name"]),
+                "version": str(component["version"]),
+                "license": " OR ".join(license_names) if license_names else "UNKNOWN",
+            }
+        )
     return sorted(records, key=lambda record: (record["name"], record["version"]))
 
 
-def generate_license_inventory(python_sbom: dict[str, Any]) -> dict[str, Any]:
+def generate_license_inventory(
+    python_sbom: dict[str, Any],
+    node_sbom: dict[str, Any],
+) -> dict[str, Any]:
     python_records = python_licenses(python_sbom)
-    node_records = node_licenses()
+    node_records = node_licenses(node_sbom)
     unknown_python = [record["name"] for record in python_records if record["license"] == "UNKNOWN"]
     return {
         "inventory_version": "p0-12-v1",
         "sources": {
             "python": "uv.lock 与当前冻结 .venv 包元数据",
-            "node": "pnpm-lock.yaml 与 pnpm licenses list --prod",
+            "node": "pnpm-lock.yaml、生产依赖图与各包 package.json",
         },
         "summary": {
             "python_packages": len(python_records),
@@ -253,10 +286,11 @@ def generate_license_inventory(python_sbom: dict[str, Any]) -> dict[str, Any]:
 
 def expected_outputs() -> dict[Path, str]:
     python_sbom = generate_python_sbom()
+    node_sbom = generate_node_sbom()
     return {
         PYTHON_SBOM: stable_json(python_sbom),
-        NODE_SBOM: stable_json(generate_node_sbom()),
-        LICENSE_INVENTORY: stable_json(generate_license_inventory(python_sbom)),
+        NODE_SBOM: stable_json(node_sbom),
+        LICENSE_INVENTORY: stable_json(generate_license_inventory(python_sbom, node_sbom)),
     }
 
 

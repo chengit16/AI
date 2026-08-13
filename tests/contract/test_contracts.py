@@ -6,6 +6,7 @@ import pytest
 from ai_platform_api.main import app
 from ai_platform_api.modules.release.application.manifest import ReleaseManifestService
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+from referencing import Registry, Resource
 
 from scripts.generate_release_manifest import parse_inputs
 
@@ -20,17 +21,38 @@ def load_json(path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], document)
 
 
+def contract_registry() -> Registry[Any]:
+    registry: Registry[Any] = Registry()
+    for schema_path in CONTRACTS.rglob("*.schema.json"):
+        schema = load_json(schema_path)
+        schema_id = schema.get("$id")
+        if isinstance(schema_id, str):
+            registry = registry.with_resource(schema_id, Resource.from_contents(schema))
+    return registry
+
+
+CONTRACT_REGISTRY = contract_registry()
+
+
 def assert_valid(schema_path: str, fixture_path: str) -> None:
     schema = load_json(CONTRACTS / schema_path)
     fixture = load_json(CONTRACTS / fixture_path)
     Draft202012Validator.check_schema(schema)
-    Draft202012Validator(schema, format_checker=FormatChecker()).validate(fixture)
+    Draft202012Validator(
+        schema,
+        format_checker=FormatChecker(),
+        registry=CONTRACT_REGISTRY,
+    ).validate(fixture)
 
 
 def validator(schema_path: str) -> Draft202012Validator:
     schema = load_json(CONTRACTS / schema_path)
     Draft202012Validator.check_schema(schema)
-    return Draft202012Validator(schema, format_checker=FormatChecker())
+    return Draft202012Validator(
+        schema,
+        format_checker=FormatChecker(),
+        registry=CONTRACT_REGISTRY,
+    )
 
 
 def test_core_domain_contract_fixture() -> None:
@@ -58,6 +80,13 @@ def test_integration_event_contract_fixture() -> None:
     assert_valid(
         "events/integration-event.v1.schema.json",
         "fixtures/integration-event.v1.valid.json",
+    )
+
+
+def test_internal_task_envelope_contract_fixture() -> None:
+    assert_valid(
+        "events/internal-task-envelope.v1.schema.json",
+        "fixtures/internal-task-envelope.v1.valid.json",
     )
 
 

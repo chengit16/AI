@@ -4,6 +4,8 @@ from types import TracebackType
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from ai_platform_backend.integration.domain import AuditRecord, AuditWriter
+
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.policy import (
@@ -33,6 +35,7 @@ class ResourceNotFoundError(PlatformError):
 class WorkspaceUnitOfWork(Protocol):
     resources: WorkspaceResourceRepository
     outbox: OutboxWriter
+    audit: AuditWriter
 
     def __enter__(self) -> "WorkspaceUnitOfWork": ...
 
@@ -86,10 +89,30 @@ class CreateWorkspaceResource:
             occurred_at=datetime.now(UTC),
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            request_id=context.request_id,
             payload={"title": resource.title},
+        )
+        audit = AuditRecord(
+            audit_id=self._event_id_factory(),
+            workspace_id=context.workspace_id,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            action="workspace.resource.create",
+            resource_type="workspace_resource",
+            resource_id=resource.resource_id,
+            outcome="succeeded",
+            occurred_at=event.occurred_at,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            # 审计属性只保留版本等非敏感结构，不复制资源标题或受保护字段正文。
+            attributes={"resource_version": resource.version},
         )
         with self._unit_of_work as unit_of_work:
             unit_of_work.resources.add(resource)
+            unit_of_work.audit.add(audit)
             unit_of_work.outbox.add(event)
             unit_of_work.commit()
         return event

@@ -8,7 +8,7 @@
 | `domain/` | 核心标识、消息和后置扩展接口的数据契约 |
 | `policy/` | 跨进程策略请求与决策结果契约 |
 | `sse/` | SSE 消息事件信封契约 |
-| `events/` | Transactional Outbox 集成事件信封契约 |
+| `events/` | Transactional Outbox 集成事件与内部签名任务信封契约 |
 | `errors/` | 稳定错误码目录 |
 | `release/` | `ReleaseManifest`、兼容矩阵及运行组合规则 |
 | `fixtures/` | Python 和未来 Go 实现共用的 Golden Fixtures |
@@ -28,6 +28,7 @@
 - 策略中心失败、超时或响应不符合 Schema 时默认拒绝。
 - `field_mask` 和 `resource_scope` 由数据责任模块执行，代理层不能自行降低约束。
 - SSE 和集成事件的 `event_id` 用于幂等，业务顺序分别由 `sequence_no` 和 `aggregate_version` 表达。
+- 内部任务信封必须在生产者签名、消费者验签后才能恢复可信主体和 Trace；Broker 中的普通载荷不构成身份事实。
 
 ## 4. 验证
 
