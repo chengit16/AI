@@ -99,6 +99,17 @@
 - 当前边界：本节点只建立规范和阶段 1 落地顺序，不修改阶段 0 Web 实现或依赖配置；当前实施节点仍为 `P0-06`。
 - 交付文档：[`docs/governance/frontend-code-standards.md`](../governance/frontend-code-standards.md)。
 - 验证内容：文档链接与路径检查、`git diff --check`，以及现有 Web 的 ESLint、TypeScript、Vitest 和生产构建。
+- 提交：`c362020`。
+
+### P0-15 后端代码规范
+
+- 状态：通过。
+- 范围：建立适用于 FastAPI 模块化单体、独立 Worker 和未来 Go 演进的后端代码规范，覆盖模块接口、Python 类型、模型转换、工作空间权限、事务、SQLAlchemy、Migration、Outbox、SSE、外部 Adapter、安全、可观测性和测试。
+- 核心约束：Router 只做协议适配；Application 用例统一授权和事务；业务数据、审计事实与 Outbox 同事务；Repository 强制接收可信工作空间范围；Worker 按至少一次投递和幂等设计；语言间只共享版本化契约。
+- 适度设计：按真实业务领域组织深模块，不建设万能 `BaseService`/`BaseRepository`，不要求简单健康检查机械套用完整分层，不提前创建空 Go 工程。
+- 强制入口：根目录 `AGENTS.md`、API/Worker README 和项目 README 均已链接本规范，后续对 `apps/api`、`apps/worker` 和 Python 后端模块的新增修改必须执行。
+- 交付文档：[`docs/governance/backend-code-standards.md`](../governance/backend-code-standards.md)。
+- 验证内容：文档链接与路径、`git diff --check`、Ruff 格式与 Lint、mypy strict 和完整 pytest。
 - 提交：本节点提交完成后回填。
 
 ## 4. 当前限制

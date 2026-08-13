@@ -22,6 +22,13 @@
 - 前端接口以仓库 `contracts/` 为事实来源，不使用其他项目的 Apifox 定义或统一响应类型。
 - 新代码保持 React 19、TanStack Query、Zustand、Ant Design 6、Fetch/SSE 和 CSS Token 技术边界，不照搬参考项目的旧版本或专属依赖。
 
+## Python 后端代码规范
+
+- `apps/api`、`apps/worker` 及 Python 后端模块的新增和修改执行 `docs/governance/backend-code-standards.md`。
+- 后端按业务领域和数据写入权组织模块，严格执行可信 `RequestContext`、工作空间隔离、统一策略、事务、Outbox、Worker 幂等和稳定错误码规则。
+- HTTP、SSE、事件和跨模块接口以仓库 `contracts/` 为事实来源，不得传递 ORM、Python 异常类、Pickle 对象或框架上下文。
+- 每个 Python 后端节点至少通过 Ruff 格式与 Lint、mypy strict 和 pytest；涉及数据库、权限、Worker、SSE 或契约时追加对应集成与安全测试。
+
 ## 节点交付
 
 执行 `docs/governance/delivery-and-git.md`：每个节点通过验收、同步文档后形成一次独立 Git 提交。未经验证的工作不得在进度看板中标记为完成。

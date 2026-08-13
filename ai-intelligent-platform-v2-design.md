@@ -2191,6 +2191,10 @@ GPT 中转的 `base_url`、API Key、模型 ID/别名、能力和数据政策均
 
 Web 前端以 `digitizing` React 项目的成熟工程规则作为参考，但只采用与当前平台匹配的目录分层、职责拆分、严格类型、公共组件兼容、命名、测试和质量门禁。平台继续使用 React 19、TanStack Query、Zustand、Ant Design 6、Fetch/SSE、CSS/CSS Modules 和仓库契约，不引入参考项目的 axios、ahooks、Less、TailwindCSS、styled-components、`@seakoi/console-kit`、`@seakoi/corebox` 或 Apifox 事实源。完整规范见 [`docs/governance/frontend-code-standards.md`](./docs/governance/frontend-code-standards.md)。
 
+### 21.15 后端代码规范
+
+Python 后端按业务领域和数据写入权组织深模块，以较小稳定接口隐藏权限、事务、数据库和外部协议复杂性。FastAPI Router 只负责协议适配，Application 用例负责授权和事务，Domain 保存核心规则，Infrastructure 提供 SQLAlchemy、对象存储和模型供应商 Adapter；简单功能不机械套用完整分层。平台统一执行可信 `RequestContext`、工作空间强制隔离、策略中心默认拒绝、业务数据与 Outbox 同事务、Worker 至少一次投递与幂等、SSE 持久化恢复和语言无关契约。完整规范见 [`docs/governance/backend-code-standards.md`](./docs/governance/backend-code-standards.md)。
+
 平台账号、工作空间成员和模型供应商账号是三个不同概念：浏览器登录只识别平台 `Account`，成员权限由 `WorkspaceMembership` 决定，模型凭证只属于平台或工作空间配置，三者不得共用凭证或生命周期。
 
 首期本地账号由首次启动创建管理员，采用用户名/邮箱加密码登录，不强依赖 SMTP。忘记密码通过本机管理命令生成一次性重置令牌；启用 SaaS 或真实企业试点前，再补充邮件验证、MFA、风控、OIDC/SAML 和账号恢复流程。

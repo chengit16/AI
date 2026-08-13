@@ -11,6 +11,7 @@
 - [阶段 0 实施计划](./docs/stages/stage-0-plan.md)：阶段 0 的建设顺序、节点交付物和完成门禁。
 - [前端 UI/UX 设计基线](./docs/design/ui-ux-baseline.md)：布局、动态菜单、响应式、可访问性和阶段 1 优化清单。
 - [Web 前端代码规范](./docs/governance/frontend-code-standards.md)：React、目录、状态、接口、样式、测试和质量门禁。
+- [后端代码规范](./docs/governance/backend-code-standards.md)：Python 模块、权限、事务、数据、Worker、SSE、测试和未来 Go 边界。
 
 ## 当前原则
 
