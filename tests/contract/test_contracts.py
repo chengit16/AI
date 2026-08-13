@@ -80,6 +80,10 @@ def test_error_codes_are_unique_and_stable() -> None:
         "RETRIEVAL_SCOPE_DENIED",
         "RETRIEVAL_CONFIGURATION_ERROR",
         "CITATION_INVALID",
+        "MODEL_REQUEST_REJECTED",
+        "MODEL_DATA_BOUNDARY_DENIED",
+        "MODEL_ROUTE_UNAVAILABLE",
+        "MODEL_GATEWAY_UNAVAILABLE",
         "SSE_EVENT_EXPIRED",
         "INTERNAL_ERROR",
     }.issubset(codes)

@@ -124,6 +124,18 @@
 - 当前边界：本节点建立可实施的检索与引用技术基线，不实现正式知识库发布任务、生产 Embedding Worker、在线模型下载、查询改写、来源权威性评分、LLM Grading 或百万 Chunk 容量认证；这些分别按阶段 1D/1E、后置能力和条件容量认证建设。
 - 提交：本节点提交完成后回填。
 
+### P0-09 Mock 模型网关、主备路由、降级与计量
+
+- 状态：通过。
+- 统一边界：新增 `model_gateway` 深模块，业务模块只能依赖 `ModelGateway` 的统一请求/结果接口，不能直接调用供应商 SDK、读取 API Key 或自行决定备用模型。Provider 只通过窄 `ModelProvider` Protocol 注入，Mock Adapter 不联网。
+- 路由规则：路由声明模型类型、外部/私有位置和 generation、streaming、tools、structured output 能力；请求先按能力和数据外发边界过滤，禁止外发时只允许 `private` 路由。没有候选路由返回 `MODEL_ROUTE_UNAVAILABLE` 或 `MODEL_DATA_BOUNDARY_DENIED`，不会以降级文本掩盖授权失败。
+- 故障策略：超时、限流和服务暂不可用允许按固定上限重试；达到连续失败阈值后打开短期熔断并尝试备用路由；认证、内容策略、非法请求和能力不支持不会盲目切备用。所有路由失败时可配置确定性规则降级，否则返回 `MODEL_GATEWAY_UNAVAILABLE`。
+- 预算与响应：策略固定单次/总超时、每路由最大尝试次数、Prompt/输出/响应字符上限；响应为空、超长或 Usage 超出声明上限时失败关闭，不能把不可信结果交给上层。价格使用整数微单位估算，避免浮点误差。
+- 可观测性：每次尝试记录调用 ID、路由、Provider、模型、Trace ID/Traceparent、尝试序号、状态、耗时、失败分类、Provider Request ID、Token Usage 和估算成本；Provider 原始响应和密钥不进入日志或错误对象。
+- 自动化验收：Mock 故障矩阵单元测试 `9/9`；覆盖成功计量、超时有限重试后备援、内容策略禁止旁路、输入预算、私有数据边界、缺少 Provider、能力不匹配、熔断和恢复探测。契约新增 `MODEL_REQUEST_REJECTED`、`MODEL_DATA_BOUNDARY_DENIED`、`MODEL_ROUTE_UNAVAILABLE` 和 `MODEL_GATEWAY_UNAVAILABLE`。
+- 当前边界：本节点不接入 GPT 中转自定义 URL/Key、通义千问、DeepSeek 或其他真实供应商，不实现在线能力探测、密钥加密存储、供应商管理菜单、流式 Provider Adapter 和真实成本结算；这些在阶段 1 模型配置与真实供应商联调时建设。
+- 提交：本节点提交完成后回填。
+
 ### P0-13 前端 UI/UX 设计基线
 
 - 状态：通过。
