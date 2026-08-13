@@ -42,10 +42,22 @@ def layer_for(path: Path) -> str | None:
     return layer if layer in {"api", "application", "domain", "infrastructure"} else None
 
 
+def business_module_for(path: Path) -> str | None:
+    parts = path.parts
+    if "modules" not in parts:
+        return None
+    module_index = parts.index("modules")
+    if len(parts) <= module_index + 1:
+        return None
+    return parts[module_index + 1]
+
+
 def violations_for_file(path: Path, root: Path) -> list[Violation]:
-    layer = layer_for(path.relative_to(root))
+    relative_path = path.relative_to(root)
+    layer = layer_for(relative_path)
     if layer is None:
         return []
+    business_module = business_module_for(relative_path)
 
     forbidden_prefixes = {
         "domain": ("fastapi", "celery", "sqlalchemy", "redis", "pydantic"),
@@ -79,6 +91,20 @@ def violations_for_file(path: Path, root: Path) -> list[Violation]:
             violations.append(
                 Violation(path, line, "infrastructure 层只能向 domain 接口提供 Adapter"),
             )
+        imported_parts = imported.split(".")
+        if (
+            business_module is not None
+            and "modules" in imported_parts
+            and "infrastructure" in imported_parts
+        ):
+            imported_module_index = imported_parts.index("modules")
+            if (
+                len(imported_parts) > imported_module_index + 1
+                and imported_parts[imported_module_index + 1] != business_module
+            ):
+                violations.append(
+                    Violation(path, line, "业务模块禁止依赖其他模块的 infrastructure 实现"),
+                )
     return violations
 
 

@@ -7,5 +7,6 @@
   "aggregate_version": 1,
   "occurred_at": "2026-08-13T08:00:00Z",
   "trace_id": "0123456789abcdef0123456789abcdef",
+  "traceparent": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
   "payload": { "release_version": 1 }
 }

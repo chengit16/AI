@@ -6,6 +6,7 @@
     "user_id": "33333333-3333-4333-8333-333333333333",
     "request_id": "44444444-4444-4444-8444-444444444444",
     "trace_id": "0123456789abcdef0123456789abcdef",
+    "traceparent": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
     "permission_code": "knowledge.document.read"
   },
   "agent_release": {

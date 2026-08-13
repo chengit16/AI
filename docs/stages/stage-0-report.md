@@ -79,6 +79,21 @@
 - 已知限制：当前凭证为本地开发默认值，只允许本机开发使用；未执行 Linux 宿主机兼容验收、真实模型供应商验收和容量认证。
 - 提交：`79cf8c8`。
 
+### P0-06 工作空间隔离、策略、Trace 与 Outbox 基线
+
+- 状态：通过。
+- 数据库：引入 SQLAlchemy 2、psycopg 3 和 Alembic；使用随机临时 PostgreSQL Schema 验证从空库升级，测试结束后清理，不修改既有本地业务数据。
+- 隔离与策略：Repository 在同一 SQL 中强制 `workspace_id + resource_id`；跨空间资源统一返回不存在；策略未显式授权、资源超出范围、空间不匹配或策略服务不可用时默认拒绝；`resource_ids` 和 `field_mask` 在数据责任模块执行。
+- 事务与事件：业务资源和 Outbox 事件使用同一 Session 与事务；重复 `event_id` 触发数据库约束时业务写入整体回滚；事件记录 `trace_id` 和 W3C `traceparent`。
+- 幂等消费：消费者 Claim、投影更新和 Receipt 在同一事务提交；同一 `event_id` 重复处理时第二次不产生副作用，投影 `apply_count` 保持为 1。
+- Trace：HTTP 边缘只接受有效 W3C `traceparent` 和 UUID 请求 ID；合法父 Trace 延续相同 Trace ID 并生成新 Span，非法输入替换为可信值，响应返回 `traceparent` 与 `x-request-id`。
+- 模块边界：工作空间模块仅依赖 Outbox 领域端口，由装配处注入基础设施实现；架构门禁新增“禁止依赖其他业务模块私有 Infrastructure”反例。
+- 自动化验收：PostgreSQL 集成测试 `7/7`、全量 pytest `31/31`、Web Vitest `1/1`、Node 架构测试 `3/3`；`./scripts/verify`、Ruff、mypy strict、契约兼容、生产构建和 Compose 配置全部通过。
+- 容器验收：API 与 Worker 镜像使用 `uv sync --frozen` 成功重建，SQLAlchemy、psycopg 和 Alembic 依赖在 Linux/ARM64 镜像内可复现。
+- 安全与数据：全部 UUID、标题和敏感字段均为合成测试数据；未接入真实个人或企业资料。
+- 当前边界：本节点建立可靠性与授权最小基线，不实现正式账号认证、完整策略管理后台、Outbox 发布调度、乱序事件处理和跨工作空间复制流程，这些按后续阶段建设。
+- 提交：本节点提交完成后回填。
+
 ### P0-13 前端 UI/UX 设计基线
 
 - 状态：通过。
@@ -123,7 +138,7 @@
 - 阶段 1 预留：1A 建立 `ReleaseManifest`、契约生成无 Diff 和 CI 必需检查；1D 建立不可变 `AiRuntimeConfigVersion`，版本化 Prompt、模型路由、切片、索引、检索与安全配置。
 - 当前边界：本节点不选择 CI 提供商，不联网新增契约生成或扫描依赖；依赖漏洞、许可证、SBOM 和完整 Secret Scanner 仍由 `P0-12`/阶段 1A 交付，不标记为已通过。
 - 验证内容：`./scripts/verify` 明确以状态码 0 完成；Web Vitest `1/1`、Node 架构测试 `3/3`、pytest `18/18`，前端生产构建、Ruff、mypy、完整 OpenAPI 漂移、契约兼容、模块依赖、敏感文件和 Git Diff 检查全部通过。
-- 提交：本节点提交完成后回填。
+- 提交：`3fffe1a`。
 
 ## 4. 当前限制
 

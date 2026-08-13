@@ -58,6 +58,14 @@ def test_integration_event_contract_fixture() -> None:
     )
 
 
+def test_integration_event_rejects_invalid_traceparent() -> None:
+    fixture = load_json(CONTRACTS / "fixtures/integration-event.v1.valid.json")
+    fixture["traceparent"] = "invalid"
+
+    with pytest.raises(ValidationError):
+        validator("events/integration-event.v1.schema.json").validate(fixture)
+
+
 def test_error_codes_are_unique_and_stable() -> None:
     catalog = load_json(CONTRACTS / "errors/catalog.v1.json")
     validator("errors/catalog.v1.schema.json").validate(catalog)

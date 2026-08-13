@@ -5,8 +5,11 @@ description = "AI 智能平台 Python 工程与质量工具入口"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic==1.16.5",
     "fastapi==0.116.2",
+    "psycopg[binary]==3.2.10",
     "pydantic-settings==2.11.0",
+    "sqlalchemy==2.0.44",
     "uvicorn[standard]==0.37.0",
 ]
 

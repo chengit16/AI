@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from ai_platform_api.app.trace_middleware import TraceContextMiddleware
 from ai_platform_api.config import get_settings
 from ai_platform_api.routes.health import router as health_router
 
@@ -15,6 +16,7 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json",
         redoc_url=None,
     )
+    application.add_middleware(TraceContextMiddleware)
     application.include_router(health_router, prefix="/api/v1")
     return application
 

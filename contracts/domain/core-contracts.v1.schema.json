@@ -34,6 +34,7 @@
         "user_id": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
         "request_id": { "$ref": "#/$defs/uuid" },
         "trace_id": { "type": "string", "minLength": 16, "maxLength": 64 },
+        "traceparent": { "type": "string", "pattern": "^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$" },
         "permission_code": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"

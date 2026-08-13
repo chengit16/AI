@@ -32,6 +32,21 @@ def test_api_cannot_import_infrastructure(tmp_path: Path) -> None:
     assert "api 层禁止直接依赖 infrastructure" in violations[0].message
 
 
+def test_module_cannot_import_another_modules_infrastructure(tmp_path: Path) -> None:
+    root = tmp_path / "package"
+    path = root / "modules" / "workspace" / "infrastructure" / "repository.py"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "from package.modules.integration.infrastructure.outbox import Outbox\n",
+        encoding="utf-8",
+    )
+
+    violations = violations_for_file(path, root)
+
+    assert len(violations) == 1
+    assert "业务模块禁止依赖其他模块的 infrastructure 实现" in violations[0].message
+
+
 def test_contract_check_rejects_removed_enum_value() -> None:
     errors: list[str] = []
 
