@@ -15,6 +15,10 @@
           "200": {
             "description": "Successful Response",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
@@ -32,6 +36,10 @@
           "503": {
             "description": "依赖尚未就绪",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
@@ -39,6 +47,19 @@
   },
   "components": {
     "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message", "retryable", "request_id", "trace_id"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$", "title": "Code" },
+          "message": { "type": "string", "title": "Message" },
+          "retryable": { "type": "boolean", "title": "Retryable" },
+          "request_id": { "type": "string", "format": "uuid", "title": "Request Id" },
+          "trace_id": { "type": "string", "minLength": 16, "maxLength": 64, "title": "Trace Id" }
+        },
+        "title": "ErrorResponse"
+      },
       "HealthResponse": {
         "type": "object",
         "additionalProperties": false,

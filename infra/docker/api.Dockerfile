@@ -11,6 +11,9 @@ RUN pip install --no-cache-dir uv==0.10.7 \
     && uv sync --frozen --no-dev --no-install-project
 
 COPY apps/api/src ./apps/api/src
+COPY contracts/errors ./contracts/errors
+COPY contracts/fixtures/release-manifest.v1.valid.json ./contracts/fixtures/release-manifest.v1.valid.json
+COPY contracts/release ./contracts/release
 
 EXPOSE 8000
 

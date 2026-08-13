@@ -7,7 +7,7 @@ from urllib.request import urlopen
 from fastapi import APIRouter, Depends, Response, status
 
 from ai_platform_api.config import Settings, get_settings
-from ai_platform_api.schemas import HealthResponse
+from ai_platform_api.modules.system.api.schemas import HealthResponse
 
 router = APIRouter(prefix="/health", tags=["系统健康"])
 

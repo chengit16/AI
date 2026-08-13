@@ -12,9 +12,19 @@ uv run uvicorn ai_platform_api.main:app --app-dir apps/api/src --host 127.0.0.1 
 
 健康端点为 `/api/v1/health/live` 和 `/api/v1/health/ready`，OpenAPI 文档位于 `/api/docs`。
 
+## 应用装配与模块边界
+
+`ai_platform_api.main` 只保留 ASGI 入口，正式装配集中在 `app/factory.py`：
+
+- `app/` 创建应用、注册 Middleware、统一异常映射并管理进程级依赖生命周期。
+- `modules/{domain}/api` 处理 HTTP 协议，`application` 编排用例，`domain` 保存业务规则，`infrastructure` 提供 Adapter。
+- `ApplicationContainer` 持有进程级 Engine、Session Factory 和错误目录；业务模块只接收实际需要的窄接口，不读取容器本身。
+- 应用启动时校验配置的 `ReleaseManifest` 与兼容矩阵；缺失、损坏或组合不兼容时拒绝启动。仓库默认文件是全合成 Golden Fixture，只验证机制，不代表真实发布制品。
+- 已知平台异常按 `contracts/errors/catalog.v1.json` 映射；未知异常只返回 `INTERNAL_ERROR`，不会把数据库、供应商或 Python 原始异常暴露给客户端。
+
 ## 数据库 Migration 与集成测试
 
-阶段 0 使用 Alembic 管理 PostgreSQL Schema。生产和共享数据环境不随应用启动自动迁移；本地手动升级命令为：
+平台使用 Alembic 管理唯一一条 PostgreSQL Schema 演进流水线。生产和共享数据环境不随应用启动自动迁移；本地手动升级命令为：
 
 ```bash
 uv run --locked alembic upgrade head
@@ -26,6 +36,8 @@ uv run --locked alembic upgrade head
 AI_PLATFORM_TEST_DATABASE_URL='postgresql+psycopg://user:password@127.0.0.1:5432/database' \
   uv run --locked pytest tests/integration
 ```
+
+`P1A-03` 额外固定 `base → head → base → head` 往返门禁，并比较两次 Head 的列、约束和索引快照。Down Migration 只用于本地可逆性检查；真实数据升级仍依赖执行前备份和恢复演练，不能把 downgrade 当作唯一恢复手段。
 
 ## 混合检索与模型验证
 

@@ -4,6 +4,7 @@ from types import TracebackType
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.policy import (
     PolicyDecisionPoint,
@@ -17,12 +18,16 @@ from ai_platform_api.modules.workspace.domain.resource import (
 )
 
 
-class AuthorizationDeniedError(Exception):
+class AuthorizationDeniedError(PlatformError):
     """稳定表示策略拒绝，不向调用方泄露内部策略原因。"""
 
+    error_code = "POLICY_DENIED"
 
-class ResourceNotFoundError(Exception):
+
+class ResourceNotFoundError(PlatformError):
     """资源不存在或位于其他工作空间时使用相同结果。"""
+
+    error_code = "RESOURCE_NOT_FOUND"
 
 
 class WorkspaceUnitOfWork(Protocol):

@@ -7,6 +7,7 @@
     { "code": "POLICY_DENIED", "http_status": 403, "message": "当前操作未获授权", "retryable": false },
     { "code": "POLICY_UNAVAILABLE", "http_status": 503, "message": "权限策略暂时不可用，操作已默认拒绝", "retryable": true },
     { "code": "RESOURCE_NOT_FOUND", "http_status": 404, "message": "请求的资源不存在或不可见", "retryable": false },
+    { "code": "METHOD_NOT_ALLOWED", "http_status": 405, "message": "当前资源不支持该请求方法", "retryable": false },
     { "code": "IDEMPOTENCY_CONFLICT", "http_status": 409, "message": "幂等键已用于不同的请求", "retryable": false },
     { "code": "RELEASE_MANIFEST_INVALID", "http_status": 422, "message": "发布清单格式、摘要或构建元数据无效", "retryable": false },
     { "code": "RELEASE_COMBINATION_INCOMPATIBLE", "http_status": 409, "message": "Web、API、Worker、契约、数据库或镜像组合不兼容", "retryable": false },
@@ -27,6 +28,7 @@
     { "code": "CONVERSATION_BUSY", "http_status": 409, "message": "当前会话已有进行中的生成任务", "retryable": true },
     { "code": "SSE_EVENT_EXPIRED", "http_status": 410, "message": "请求恢复的流式事件已超过保留期", "retryable": false },
     { "code": "SSE_REPLAY_LIMIT_EXCEEDED", "http_status": 409, "message": "待回放事件超过上限，请读取最终消息快照", "retryable": false },
+    { "code": "STREAM_RUN_CLOSED", "http_status": 409, "message": "流式生成已结束，不能继续追加事件", "retryable": false },
     { "code": "INTERNAL_ERROR", "http_status": 500, "message": "平台处理请求时发生内部错误", "retryable": true }
   ]
 }

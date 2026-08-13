@@ -31,7 +31,7 @@ def test_readiness_returns_503_when_dependency_is_unavailable() -> None:
     app.dependency_overrides[get_settings] = lambda: Settings(dependency_checks_enabled=True)
     try:
         with patch(
-            "ai_platform_api.routes.health.dependency_checks",
+            "ai_platform_api.modules.system.api.health.dependency_checks",
             return_value={"postgres": False},
         ):
             response = client.get("/api/v1/health/ready")

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import yaml  # type: ignore[import-untyped]
 from ai_platform_api.config import Settings
-from ai_platform_api.routes.health import dependency_checks
+from ai_platform_api.modules.system.api.health import dependency_checks
 
 ROOT = Path(__file__).parents[1]
 
@@ -28,8 +28,8 @@ def test_dependency_health_reports_valkey() -> None:
     settings = Settings(dependency_checks_enabled=True)
 
     with (
-        patch("ai_platform_api.routes.health.check_tcp", return_value=True),
-        patch("ai_platform_api.routes.health.check_http", return_value=True),
+        patch("ai_platform_api.modules.system.api.health.check_tcp", return_value=True),
+        patch("ai_platform_api.modules.system.api.health.check_http", return_value=True),
     ):
         checks = dependency_checks(settings)
 

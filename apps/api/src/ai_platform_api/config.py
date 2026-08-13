@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     environment: str = "local"
     version: str = "0.0.0"
     dependency_checks_enabled: bool = False
+    error_catalog_path: str = "contracts/errors/catalog.v1.json"
+    release_manifest_path: str = "contracts/fixtures/release-manifest.v1.valid.json"
+    compatibility_matrix_path: str = "contracts/release/compatibility-matrix.v1.json"
     database_url: str = "postgresql+psycopg://ai_platform@127.0.0.1:5432/ai_platform"
     valkey_url: str = "redis://127.0.0.1:6379/0"
     minio_endpoint: str = "http://127.0.0.1:9000"

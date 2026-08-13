@@ -44,6 +44,33 @@ def test_api_cannot_import_infrastructure(tmp_path: Path) -> None:
     assert "api 层禁止直接依赖 infrastructure" in violations[0].message
 
 
+def test_api_cannot_import_sqlalchemy(tmp_path: Path) -> None:
+    root = tmp_path / "package"
+    path = root / "modules" / "workspace" / "api" / "routes.py"
+    path.parent.mkdir(parents=True)
+    path.write_text("from sqlalchemy.orm import Session\n", encoding="utf-8")
+
+    violations = violations_for_file(path, root)
+
+    assert len(violations) == 1
+    assert "api 层禁止依赖 sqlalchemy" in violations[0].message
+
+
+def test_application_cannot_import_infrastructure(tmp_path: Path) -> None:
+    root = tmp_path / "package"
+    path = root / "modules" / "workspace" / "application" / "create.py"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "from package.modules.workspace.infrastructure.repository import Repository\n",
+        encoding="utf-8",
+    )
+
+    violations = violations_for_file(path, root)
+
+    assert len(violations) == 1
+    assert "application 层禁止直接依赖 infrastructure" in violations[0].message
+
+
 def test_module_cannot_import_another_modules_infrastructure(tmp_path: Path) -> None:
     root = tmp_path / "package"
     path = root / "modules" / "workspace" / "infrastructure" / "repository.py"

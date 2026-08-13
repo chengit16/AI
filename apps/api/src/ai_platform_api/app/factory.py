@@ -1,0 +1,48 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from ai_platform_api.app.dependencies import (
+    ApplicationContainer,
+    build_application_container,
+)
+from ai_platform_api.app.errors import ErrorResponse, register_error_handlers
+from ai_platform_api.app.trace_middleware import TraceContextMiddleware
+from ai_platform_api.config import Settings, get_settings
+from ai_platform_api.modules.system.api.health import router as health_router
+
+
+def create_app(
+    settings: Settings | None = None,
+    container: ApplicationContainer | None = None,
+) -> FastAPI:
+    resolved_settings = settings or get_settings()
+    dependencies = container or build_application_container(resolved_settings)
+    if dependencies.settings != resolved_settings:
+        raise ValueError("应用配置与依赖容器配置不一致")
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            dependencies.close()
+
+    application = FastAPI(
+        title="AI 智能平台 API",
+        summary="个人空间与企业空间共用的平台服务接口",
+        version=resolved_settings.version,
+        openapi_version="3.1.0",
+        docs_url="/api/docs",
+        openapi_url="/api/openapi.json",
+        redoc_url=None,
+        lifespan=lifespan,
+        responses={500: {"model": ErrorResponse, "description": "平台内部错误"}},
+    )
+    application.state.container = dependencies
+    application.dependency_overrides[get_settings] = lambda: resolved_settings
+    application.add_middleware(TraceContextMiddleware)
+    register_error_handlers(application, dependencies.errors)
+    application.include_router(health_router, prefix="/api/v1")
+    return application
