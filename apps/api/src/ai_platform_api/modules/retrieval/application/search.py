@@ -153,7 +153,7 @@ class HybridRetriever:
             )
         evidence = tuple(
             Evidence(
-                chunk=candidate.chunk,
+                chunk=candidate.chunk.apply_field_mask(scope.field_mask),
                 score=(
                     candidate.rerank_score
                     if candidate.rerank_score is not None

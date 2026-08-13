@@ -1,12 +1,14 @@
-from typing import Annotated
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
 from ai_platform_api.common.api_errors import error_responses
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.authorization.application.fields import FieldProjectionService
 from ai_platform_api.modules.identity.api.dependencies import (
     enterprise_workspace_service,
+    field_projection_service,
     trusted_request_context,
 )
 from ai_platform_api.modules.identity.api.enterprise_schemas import (
@@ -15,6 +17,7 @@ from ai_platform_api.modules.identity.api.enterprise_schemas import (
     WorkspaceInvitationResponse,
     WorkspaceListResponse,
     WorkspaceMemberListResponse,
+    WorkspaceMemberProjectionResponse,
     WorkspaceMemberResponse,
     WorkspaceMembershipResponse,
     WorkspaceSummaryResponse,
@@ -39,12 +42,33 @@ def _workspace_response(workspace: WorkspaceSummary) -> WorkspaceSummaryResponse
     )
 
 
-def _member_response(member: WorkspaceMemberSummary) -> WorkspaceMemberResponse:
-    return WorkspaceMemberResponse(
-        account_id=member.account_id,
-        display_name=member.display_name,
-        membership_type=member.membership_type,
-        status=member.status,
+def _member_response(
+    member: WorkspaceMemberSummary,
+    projection: FieldProjectionService,
+    field_mask: frozenset[str],
+) -> WorkspaceMemberResponse | WorkspaceMemberProjectionResponse:
+    visible = projection.response(
+        "workspace_member",
+        {
+            "account_id": member.account_id,
+            "display_name": member.display_name,
+            "membership_type": member.membership_type,
+            "status": member.status,
+        },
+        field_mask,
+    )
+    if set(visible) == {"account_id", "display_name", "membership_type", "status"}:
+        return WorkspaceMemberResponse(
+            account_id=cast(UUID, visible["account_id"]),
+            display_name=cast(str, visible["display_name"]),
+            membership_type=cast(Literal["owner", "member"], visible["membership_type"]),
+            status=cast(Literal["active", "disabled", "left"], visible["status"]),
+        )
+    return WorkspaceMemberProjectionResponse(
+        account_id=cast(UUID | None, visible.get("account_id")),
+        display_name=cast(str | None, visible.get("display_name")),
+        membership_type=cast(Literal["owner", "member"] | None, visible.get("membership_type")),
+        status=cast(Literal["active", "disabled", "left"] | None, visible.get("status")),
     )
 
 
@@ -179,6 +203,7 @@ def disable_workspace_member(
 @router.get(
     "/{workspace_id}/members",
     response_model=WorkspaceMemberListResponse,
+    response_model_exclude_none=True,
     operation_id="listEnterpriseWorkspaceMembers",
     responses=error_responses(400, 401, 403, 422, 500),
 )
@@ -186,10 +211,11 @@ def list_workspace_members(
     workspace_id: UUID,
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
+    projection: Annotated[FieldProjectionService, Depends(field_projection_service)],
 ) -> WorkspaceMemberListResponse:
     return WorkspaceMemberListResponse(
         items=[
-            _member_response(item)
+            _member_response(item, projection, context.authorized_field_mask)
             for item in service.list_members(context, workspace_id=workspace_id)
         ]
     )

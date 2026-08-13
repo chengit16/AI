@@ -52,10 +52,21 @@ class WorkspaceMembershipResponse(BaseModel):
 
 
 class WorkspaceMemberResponse(WorkspaceMembershipResponse):
+    model_config = ConfigDict(extra="forbid")
+
     display_name: str
+
+
+class WorkspaceMemberProjectionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    account_id: UUID | None = None
+    display_name: str | None = None
+    membership_type: Literal["owner", "member"] | None = None
+    status: Literal["active", "disabled", "left"] | None = None
 
 
 class WorkspaceMemberListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    items: list[WorkspaceMemberResponse]
+    items: list[WorkspaceMemberResponse | WorkspaceMemberProjectionResponse]

@@ -8,6 +8,7 @@ from uuid import UUID
 from ai_platform_backend.integration.domain import AuditWriter, OutboxWriter
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.policy import DataScopeType
 
 OWNER_PERMISSION_CODES = (
@@ -58,6 +59,8 @@ class RolePermissionGrant:
     scope_type: DataScopeType
     department_ids: frozenset[UUID] = frozenset()
     resource_ids: frozenset[UUID] = frozenset()
+    maximum_security_level: SecurityLevel = "RESTRICTED"
+    field_mask: frozenset[str] = frozenset()
 
     def assert_valid(self) -> None:
         if self.scope_type in {"workspace", "self"}:
@@ -152,9 +155,21 @@ def system_role_permission_seed(
     """系统角色的默认授权必须同时供 Migration 与新空间写入使用。"""
 
     return tuple(
-        RolePermissionGrant(workspace_id, owner_role_id, code, "workspace")
+        RolePermissionGrant(
+            workspace_id,
+            owner_role_id,
+            code,
+            "workspace",
+            maximum_security_level="RESTRICTED",
+        )
         for code in OWNER_PERMISSION_CODES
     ) + tuple(
-        RolePermissionGrant(workspace_id, member_role_id, code, "workspace")
+        RolePermissionGrant(
+            workspace_id,
+            member_role_id,
+            code,
+            "workspace",
+            maximum_security_level="INTERNAL",
+        )
         for code in MEMBER_PERMISSION_CODES
     )

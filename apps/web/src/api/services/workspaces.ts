@@ -3,6 +3,16 @@ import { apiRequest } from "@/api/client";
 
 export type Workspace = components["schemas"]["WorkspaceSummaryResponse"];
 export type WorkspaceMember = components["schemas"]["WorkspaceMemberResponse"];
+type WorkspaceMemberView = components["schemas"]["WorkspaceMemberListResponse"]["items"][number];
+
+function isWorkspaceMember(item: WorkspaceMemberView): item is WorkspaceMember {
+  return (
+    typeof item.account_id === "string" &&
+    typeof item.display_name === "string" &&
+    (item.membership_type === "owner" || item.membership_type === "member") &&
+    (item.status === "active" || item.status === "disabled" || item.status === "left")
+  );
+}
 
 export async function getWorkspaces(signal?: AbortSignal) {
   const response = await apiRequest<components["schemas"]["WorkspaceListResponse"]>(
@@ -25,7 +35,8 @@ export async function getWorkspaceMembers(workspaceId: string, signal?: AbortSig
     `/api/v1/workspaces/${workspaceId}/members`,
     { signal },
   );
-  return response.items;
+  // 治理页面依赖稳定成员标识；字段级 ABAC 投影后的记录不能用于停用或组织归属操作。
+  return response.items.filter(isWorkspaceMember);
 }
 
 export function inviteWorkspaceMember(workspaceId: string, loginName: string) {

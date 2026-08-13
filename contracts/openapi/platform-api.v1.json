@@ -5622,6 +5622,25 @@
             },
             "type": "array",
             "title": "Resource Ids"
+          },
+          "maximum_security_level": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "INTERNAL",
+              "CONFIDENTIAL",
+              "RESTRICTED"
+            ],
+            "title": "Maximum Security Level",
+            "default": "RESTRICTED"
+          },
+          "field_mask": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Field Mask"
           }
         },
         "additionalProperties": false,
@@ -5766,7 +5785,14 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/WorkspaceMemberResponse"
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/WorkspaceMemberResponse"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkspaceMemberProjectionResponse"
+                }
+              ]
             },
             "type": "array",
             "title": "Items"
@@ -5778,6 +5804,67 @@
           "items"
         ],
         "title": "WorkspaceMemberListResponse"
+      },
+      "WorkspaceMemberProjectionResponse": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "membership_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "owner",
+                  "member"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Membership Type"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "disabled",
+                  "left"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WorkspaceMemberProjectionResponse"
       },
       "WorkspaceMemberResponse": {
         "properties": {

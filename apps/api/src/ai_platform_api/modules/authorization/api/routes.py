@@ -69,6 +69,8 @@ def replace_role_permissions(
                 item.scope_type,
                 frozenset(item.department_ids),
                 frozenset(item.resource_ids),
+                item.maximum_security_level,
+                frozenset(item.field_mask),
             )
             for item in body.items
         ),
@@ -82,4 +84,6 @@ def _entry(grant: RolePermissionGrant) -> RolePermissionEntry:
         scope_type=grant.scope_type,
         department_ids=sorted(grant.department_ids, key=lambda value: value.int),
         resource_ids=sorted(grant.resource_ids, key=lambda value: value.int),
+        maximum_security_level=grant.maximum_security_level,
+        field_mask=sorted(grant.field_mask),
     )

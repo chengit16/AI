@@ -9,8 +9,18 @@ from ai_platform_api.app.factory import create_app
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.authorization.application.field_registry import (
+    load_field_policy_registry,
+)
+from ai_platform_api.modules.authorization.application.fields import FieldProjectionService
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
+from ai_platform_api.modules.authorization.domain.policy import (
+    PolicyDecision,
+    PolicyDecisionPoint,
+    PolicyRequest,
+    ResourceScope,
+)
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
@@ -206,9 +216,29 @@ class StubEnterpriseWorkspaceService(EnterpriseWorkspaceService):
         )
 
 
-def enterprise_client() -> TestClient:
+class MaskMemberIdentityPolicy:
+    def decide(self, request: PolicyRequest) -> PolicyDecision:
+        return PolicyDecision(
+            decision_id=UUID("90000000-0000-4000-8000-000000000024"),
+            decision="allow",
+            permission_code=request.permission_code,
+            workspace_id=request.context.workspace_id,
+            resource_scope=ResourceScope(workspace=True),
+            field_mask=frozenset({"account_id", "display_name"}),
+            policy_version=1,
+            cache_ttl_seconds=0,
+            reason="synthetic_field_mask",
+        )
+
+
+def enterprise_client(
+    policy: PolicyDecisionPoint | None = None,
+) -> TestClient:
     settings = Settings(environment="test")
     closing = ClosingDependency()
+    field_registry = load_field_policy_registry(
+        ROOT / "contracts/authorization/field-policy-registry.v1.json"
+    )
     container = ApplicationContainer(
         settings=settings,
         database=cast(PlatformDatabase, closing),
@@ -216,7 +246,7 @@ def enterprise_client() -> TestClient:
         resource_registry=load_resource_registry(
             ROOT / "contracts/authorization/resource-registry.v1.json"
         ),
-        policy=AllowRegisteredPolicy(),
+        policy=policy or AllowRegisteredPolicy(),
         role_permissions=cast("RolePermissionService", object()),
         authentication=StubAuthenticationService(),
         api_keys=cast("ApiKeyService", object()),
@@ -228,6 +258,8 @@ def enterprise_client() -> TestClient:
         role_cache=cast("ValkeyRoleResolutionCache", closing),
         secret_cipher=cast("EnvelopeSecretCipher", object()),
         sessions=cast("ValkeySessionStore", closing),
+        field_policy_registry=field_registry,
+        field_projection=FieldProjectionService(field_registry),
     )
     return TestClient(create_app(settings, container))
 
@@ -301,3 +333,19 @@ def test_enterprise_workspace_routes_preserve_contract_and_browser_governance() 
         )
     assert denied.status_code == 403
     assert denied.json()["code"] == "POLICY_DENIED"
+
+
+def test_member_response_omits_masked_fields_before_serialization() -> None:
+    client = enterprise_client(cast("PolicyDecisionPoint", MaskMemberIdentityPolicy()))
+    client.cookies.set("ai_platform_session", "synthetic-enterprise-session")
+
+    with client:
+        response = client.get(
+            f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}/members",
+            headers={"X-Workspace-ID": str(ENTERPRISE_WORKSPACE_ID)},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [{"membership_type": "member", "status": "active"}]}
+    assert "合成成员" not in response.text
+    assert str(ACCOUNT_ID) not in response.text

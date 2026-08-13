@@ -10,6 +10,7 @@ from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.config import Settings
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
+from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.grants import RolePermissionGrant
 from ai_platform_api.modules.authorization.domain.policy import (
     DataScopeType,
@@ -95,7 +96,14 @@ class StubRolePermissionService(RolePermissionService):
         workspace_id: UUID,
         role_id: UUID,
         entries: tuple[
-            tuple[str, DataScopeType, frozenset[UUID], frozenset[UUID]],
+            tuple[
+                str,
+                DataScopeType,
+                frozenset[UUID],
+                frozenset[UUID],
+                SecurityLevel,
+                frozenset[str],
+            ],
             ...,
         ],
     ) -> tuple[RolePermissionGrant, ...]:
@@ -103,6 +111,8 @@ class StubRolePermissionService(RolePermissionService):
         assert entries[0][1:] == (
             "department_tree",
             frozenset({DEPARTMENT_ID}),
+            frozenset(),
+            "RESTRICTED",
             frozenset(),
         )
         return self._grants()

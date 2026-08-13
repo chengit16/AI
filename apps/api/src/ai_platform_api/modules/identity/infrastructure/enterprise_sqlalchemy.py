@@ -160,6 +160,8 @@ class SqlAlchemyEnterpriseRepository:
                         "scope_type": grant.scope_type,
                         "department_ids": list(grant.department_ids),
                         "resource_ids": list(grant.resource_ids),
+                        "maximum_security_level": grant.maximum_security_level,
+                        "field_mask": sorted(grant.field_mask),
                     }
                     for grant in system_role_permission_seed(
                         workspace_id=workspace.workspace_id,

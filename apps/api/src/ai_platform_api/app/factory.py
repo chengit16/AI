@@ -55,6 +55,7 @@ def create_app(
     application.state.organization_service = dependencies.organization
     application.state.role_service = dependencies.roles
     application.state.resource_registry = dependencies.resource_registry
+    application.state.field_projection_service = dependencies.field_projection
     application.state.policy_decision_point = dependencies.policy
     application.state.role_permission_service = dependencies.role_permissions
     application.dependency_overrides[get_settings] = lambda: resolved_settings

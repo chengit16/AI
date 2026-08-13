@@ -1,11 +1,16 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.authorization.application.field_registry import (
+    load_field_policy_registry,
+)
+from ai_platform_api.modules.authorization.application.fields import FieldProjectionService
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
 from ai_platform_api.modules.authorization.application.policy import RbacPolicyDecisionPoint
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
+from ai_platform_api.modules.authorization.domain.fields import FieldPolicyRegistry
 from ai_platform_api.modules.authorization.domain.policy import PolicyDecisionPoint
 from ai_platform_api.modules.authorization.domain.resources import ResourceRegistry
 from ai_platform_api.modules.authorization.infrastructure.sqlalchemy import (
@@ -71,6 +76,12 @@ class ApplicationContainer:
     role_cache: ValkeyRoleResolutionCache
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
+    field_policy_registry: FieldPolicyRegistry = field(
+        default_factory=lambda: FieldPolicyRegistry(1, 1, ())
+    )
+    field_projection: FieldProjectionService = field(
+        default_factory=lambda: FieldProjectionService(FieldPolicyRegistry(1, 1, ()))
+    )
 
     def close(self) -> None:
         try:
@@ -95,6 +106,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     digester = Sha256SecretDigester()
     passwords = Argon2idPasswordAdapter()
     resource_registry = load_resource_registry(Path(settings.resource_registry_path))
+    field_registry = load_field_policy_registry(Path(settings.field_policy_registry_path))
     policy_reader = SqlAlchemyPolicyGrantRepository(database.sessions)
     try:
         return ApplicationContainer(
@@ -102,10 +114,13 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             database=database,
             errors=ErrorCatalog.load(settings.error_catalog_path),
             resource_registry=resource_registry,
-            policy=RbacPolicyDecisionPoint(resource_registry, policy_reader),
+            field_policy_registry=field_registry,
+            field_projection=FieldProjectionService(field_registry),
+            policy=RbacPolicyDecisionPoint(resource_registry, policy_reader, field_registry),
             role_permissions=RolePermissionService(
                 resource_registry,
                 SqlAlchemyRolePermissionUnitOfWork(database.sessions),
+                field_registry,
             ),
             authentication=AuthenticationService(
                 repository=reader,

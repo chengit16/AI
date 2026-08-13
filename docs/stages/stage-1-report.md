@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1C-03` 待开始 |
+| 当前节点 | `P1C-04` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -215,6 +215,19 @@
 - 自动化验收：策略领域、API 绕过、角色权限协议和真实 PostgreSQL 专项通过；Migration `base → head → base → head` 结构一致。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试 `3/3`/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `217/217` 均通过。
 - 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0011`、Valkey 和 Worker 八项诊断通过。使用全合成双账号完成真实 HTTP 闭环：所有者创建企业与邀请成员，建立根部门、授权子部门和范围外部门，为成员绑定部门角色并授予部门树读取；成员只读取到根与授权子部门 2 个节点，范围外部门未返回，成员清单和角色权限治理 URL 直访均返回 `403 POLICY_DENIED`。
 - 当前边界：本节点只产生空 `field_mask`，字段级敏感等级、响应掩码、日志/检索/模型上下文防泄漏进入 `P1C-03`。菜单草稿、页面接口动态绑定与发布回滚仍按 `P1C-04` 至 `P1C-06` 实施；未扩展 SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
+- 提交：`1faad49`。
+
+### P1C-03 字段级 ABAC
+
+- 状态：通过。
+- 字段策略：新增版本化 `FieldPolicyRegistry` 与 JSON Schema，固定 `PUBLIC`、`INTERNAL`、`CONFIDENTIAL`、`RESTRICTED` 四级密级，首期注册成员、知识、文档、Chunk、工作流实例和审批敏感字段。知识、工作流与审批实体仍按各自阶段创建，当前不提前建立空业务表。
+- 授权模型：`RolePermissionGrant` 新增最高可读密级与显式 `field_mask`。单资源读取只合并实际覆盖该资源的授权，取最高密级并对显式遮罩求交集；集合读取采用所有数据范围中的最低密级并合并显式遮罩，避免某个范围的高密级角色放宽其他记录。未知字段名和非法密级拒绝写入；系统所有者默认 `RESTRICTED`，普通成员默认 `INTERNAL`。
+- 执行边界：PDP 按资源类型、资源密级和角色授权计算 `field_mask`，存在敏感字段的结果不产生允许缓存。`RequestContext` 只承载可信决策结果；统一 `FieldProjectionService` 在 HTTP 响应、运行日志属性、检索元数据和模型上下文生成前投影，未注册资源失败关闭。
+- 真实落点：成员清单接口在 Pydantic 序列化前移除受限身份字段，OpenAPI V1 保留原完整响应并新增兼容投影视图；阶段 0 检索搜索、全文精读与引用在返回前清空受限来源位置，正文被遮罩时整体拒绝；模型上下文 Builder 只接受投影后的 JSON，不向 Provider 传递原始字段。
+- 数据与契约：`role_permission_grants` 新增 `maximum_security_level` 和 `field_mask`，数据库 Revision 推进至 `20260814_0012`。OpenAPI、React/Python 类型、ReleaseManifest、兼容矩阵、字段注册表 Schema 和契约兼容门禁同步更新。
+- 自动化验收：字段 PDP、跨角色/跨数据范围合并、四类出口投影、成员 HTTP 序列化、检索/引用遮罩、字段注册表 Schema、RBAC 回归和 Migration 往返通过；真实 PostgreSQL 验证自定义角色字段授权持久化以及新企业 owner/member 密级种子。统一 `./scripts/verify` 通过，React 测试 `3/3` 与生产构建、Ruff、mypy strict、契约兼容与漂移、Secret Scanner、SBOM、许可证和全量 pytest `225/225` 均通过。
+- 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建，八项本地诊断和数据库 Revision `20260814_0012` 通过；真实双账号 HTTP 闭环返回 2 条成员记录且每条只含 `membership_type` 与 `status`，受限 `account_id`、`display_name` 和对应原始值均未出现在响应文本中。
+- 当前边界：字段注册表已为 `KnowledgeBase`、`Document`、`Chunk`、`WorkflowInstance` 和 `Approval` 固定字段语义，但正式实体与管理入口分别在 `P1D`、`P1E` 和 `P1F` 建设。当前不扩展任意脚本 ABAC、SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
 - 提交：本提交。
 
 ## 4. 当前限制
@@ -226,4 +239,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-02`，当前进入 `P1C-03`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-03`，当前进入 `P1C-04`。

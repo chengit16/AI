@@ -483,6 +483,8 @@ role_permission_grants = Table(
     Column("scope_type", String(32), nullable=False),
     Column("department_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
     Column("resource_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
+    Column("maximum_security_level", String(32), nullable=False),
+    Column("field_mask", ARRAY(String(160)), nullable=False, server_default="{}"),
     ForeignKeyConstraint(
         ["workspace_id", "role_id"],
         [f"{SCHEMA_TOKEN}.roles.workspace_id", f"{SCHEMA_TOKEN}.roles.role_id"],
@@ -496,6 +498,10 @@ role_permission_grants = Table(
     CheckConstraint(
         "scope_type IN ('workspace', 'department_tree', 'self', 'resource')",
         name="ck_role_permission_grants_scope",
+    ),
+    CheckConstraint(
+        "maximum_security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
+        name="ck_role_permission_grants_security_level",
     ),
     CheckConstraint(
         "(scope_type IN ('workspace', 'self') AND cardinality(department_ids) = 0 "

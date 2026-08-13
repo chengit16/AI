@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.grants import (
     PolicySubject,
     RolePermissionGrant,
@@ -233,6 +234,8 @@ class SqlAlchemyRolePermissionRepository:
                         "scope_type": grant.scope_type,
                         "department_ids": list(grant.department_ids),
                         "resource_ids": list(grant.resource_ids),
+                        "maximum_security_level": grant.maximum_security_level,
+                        "field_mask": sorted(grant.field_mask),
                     }
                     for grant in grants
                 ],
@@ -332,6 +335,8 @@ def _grant(row: Row[Any]) -> RolePermissionGrant:
         scope_type=cast("DataScopeType", row.scope_type),
         department_ids=frozenset(row.department_ids),
         resource_ids=frozenset(row.resource_ids),
+        maximum_security_level=cast("SecurityLevel", row.maximum_security_level),
+        field_mask=frozenset(row.field_mask),
     )
 
 

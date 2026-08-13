@@ -878,6 +878,14 @@ export type components = {
     readonly RolePermissionEntry: {
       /** Department Ids */
       readonly department_ids?: readonly string[];
+      /** Field Mask */
+      readonly field_mask?: readonly string[];
+      /**
+       * Maximum Security Level
+       * @default RESTRICTED
+       * @enum {string}
+       */
+      readonly maximum_security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
       /** Permission Code */
       readonly permission_code: string;
       /** Resource Ids */
@@ -950,7 +958,21 @@ export type components = {
     /** WorkspaceMemberListResponse */
     readonly WorkspaceMemberListResponse: {
       /** Items */
-      readonly items: readonly components["schemas"]["WorkspaceMemberResponse"][];
+      readonly items: readonly (
+        | components["schemas"]["WorkspaceMemberResponse"]
+        | components["schemas"]["WorkspaceMemberProjectionResponse"]
+      )[];
+    };
+    /** WorkspaceMemberProjectionResponse */
+    readonly WorkspaceMemberProjectionResponse: {
+      /** Account Id */
+      readonly account_id?: string | null;
+      /** Display Name */
+      readonly display_name?: string | null;
+      /** Membership Type */
+      readonly membership_type?: ("owner" | "member") | null;
+      /** Status */
+      readonly status?: ("active" | "disabled" | "left") | null;
     };
     /** WorkspaceMemberResponse */
     readonly WorkspaceMemberResponse: {

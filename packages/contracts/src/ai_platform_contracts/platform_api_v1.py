@@ -200,6 +200,10 @@ class RoleListResponse(typing.TypedDict):
 
 class RolePermissionEntry(typing.TypedDict):
     department_ids: typing.NotRequired[list[str]]
+    field_mask: typing.NotRequired[list[str]]
+    maximum_security_level: typing.NotRequired[
+        typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    ]
     permission_code: str
     resource_ids: typing.NotRequired[list[str]]
     scope_type: typing.Literal["workspace", "department_tree", "self", "resource"]
@@ -234,7 +238,14 @@ class WorkspaceListResponse(typing.TypedDict):
 
 
 class WorkspaceMemberListResponse(typing.TypedDict):
-    items: list[WorkspaceMemberResponse]
+    items: list[WorkspaceMemberResponse | WorkspaceMemberProjectionResponse]
+
+
+class WorkspaceMemberProjectionResponse(typing.TypedDict):
+    account_id: typing.NotRequired[str | None]
+    display_name: typing.NotRequired[str | None]
+    membership_type: typing.NotRequired[typing.Literal["owner", "member"] | None]
+    status: typing.NotRequired[typing.Literal["active", "disabled", "left"] | None]
 
 
 class WorkspaceMemberResponse(typing.TypedDict):

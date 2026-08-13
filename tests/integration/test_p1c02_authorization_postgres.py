@@ -9,6 +9,9 @@ from uuid import UUID, uuid4
 import pytest
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
+from ai_platform_api.modules.authorization.application.field_registry import (
+    load_field_policy_registry,
+)
 from ai_platform_api.modules.authorization.application.grants import (
     RolePermissionConflictError,
     RolePermissionService,
@@ -43,7 +46,12 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyRegistrationUnitOfWork,
 )
 from ai_platform_api.persistence.database import create_platform_engine, create_session_factory
-from ai_platform_api.persistence.tables import audit_records, outbox_events, role_permission_grants
+from ai_platform_api.persistence.tables import (
+    audit_records,
+    outbox_events,
+    role_permission_grants,
+    roles,
+)
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, select, text
@@ -95,6 +103,9 @@ def authorization_database() -> Iterator[AuthorizationHarness]:
     sessions = create_session_factory(engine)
     reader = SqlAlchemyIdentityReader(sessions)
     registry = load_resource_registry(ROOT / "contracts/authorization/resource-registry.v1.json")
+    field_registry = load_field_policy_registry(
+        ROOT / "contracts/authorization/field-policy-registry.v1.json"
+    )
     try:
         yield AuthorizationHarness(
             engine=engine,
@@ -109,10 +120,12 @@ def authorization_database() -> Iterator[AuthorizationHarness]:
             permissions=RolePermissionService(
                 registry,
                 SqlAlchemyRolePermissionUnitOfWork(sessions),
+                field_registry,
             ),
             policy=RbacPolicyDecisionPoint(
                 registry,
                 SqlAlchemyPolicyGrantRepository(sessions),
+                field_registry,
             ),
         )
     finally:
@@ -260,6 +273,16 @@ def test_system_grants_and_custom_role_scope_are_persistent(
                 "department_tree",
                 frozenset({root.department_id}),
                 frozenset(),
+                "INTERNAL",
+                frozenset(),
+            ),
+            (
+                "workspace.member.read",
+                "department_tree",
+                frozenset({root.department_id}),
+                frozenset(),
+                "INTERNAL",
+                frozenset({"display_name"}),
             ),
         ),
     )
@@ -290,14 +313,40 @@ def test_system_grants_and_custom_role_scope_are_persistent(
     )
     assert child_decision.allowed is True
     assert outside_decision.allowed is False
+    member_decision = decide(
+        authorization_database,
+        member_context,
+        "workspace.member.read",
+        "workspace_member",
+        workspace_id,
+    )
+    assert member_decision.allowed is True
+    assert member_decision.field_mask == frozenset(
+        {"account_id", "display_name", "identity_number", "login_name", "phone_number"}
+    )
 
     with authorization_database.engine.connect() as connection:
-        stored = connection.scalar(
-            select(role_permission_grants.c.permission_code).where(
+        stored = connection.execute(
+            select(
+                role_permission_grants.c.permission_code,
+                role_permission_grants.c.maximum_security_level,
+                role_permission_grants.c.field_mask,
+            ).where(
                 role_permission_grants.c.workspace_id == workspace_id,
                 role_permission_grants.c.role_id == reader_role.role_id,
+                role_permission_grants.c.permission_code == "organization.department.read",
             )
-        )
+        ).one()
+        stored_field_policy = connection.execute(
+            select(
+                role_permission_grants.c.maximum_security_level,
+                role_permission_grants.c.field_mask,
+            ).where(
+                role_permission_grants.c.workspace_id == workspace_id,
+                role_permission_grants.c.role_id == reader_role.role_id,
+                role_permission_grants.c.permission_code == "workspace.member.read",
+            )
+        ).one()
         audit_count = connection.scalar(
             select(audit_records.c.audit_id).where(
                 audit_records.c.action == "authorization.role_permissions.replace"
@@ -308,7 +357,8 @@ def test_system_grants_and_custom_role_scope_are_persistent(
                 outbox_events.c.event_type == "authorization.role_permissions.replaced"
             )
         )
-    assert stored == "organization.department.read"
+    assert tuple(stored) == ("organization.department.read", "INTERNAL", [])
+    assert tuple(stored_field_policy) == ("INTERNAL", ["display_name"])
     assert audit_count is not None and event_count is not None
 
 
@@ -335,3 +385,33 @@ def test_system_roles_cannot_be_rewritten(authorization_database: AuthorizationH
             role_id=owner_role.role_id,
             entries=(),
         )
+
+
+def test_system_role_security_clearance_is_seeded_for_new_workspace(
+    authorization_database: AuthorizationHarness,
+) -> None:
+    owner = register(authorization_database, "security-seed-owner")
+    workspace = authorization_database.enterprise.create(
+        context(owner),
+        name="合成字段密级企业",
+    )
+
+    with authorization_database.engine.connect() as connection:
+        levels: dict[str, str] = {
+            str(row.role_key): str(row.maximum_security_level)
+            for row in connection.execute(
+                select(roles.c.role_key, role_permission_grants.c.maximum_security_level)
+                .join(
+                    role_permission_grants,
+                    (role_permission_grants.c.workspace_id == roles.c.workspace_id)
+                    & (role_permission_grants.c.role_id == roles.c.role_id),
+                )
+                .where(roles.c.workspace_id == workspace.workspace_id)
+                .distinct()
+            )
+        }
+
+    assert levels == {
+        "workspace_member": "INTERNAL",
+        "workspace_owner": "RESTRICTED",
+    }

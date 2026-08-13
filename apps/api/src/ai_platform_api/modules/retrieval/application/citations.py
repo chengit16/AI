@@ -38,5 +38,7 @@ class CitationService:
             index_version_id=chunk.index_version_id,
             quote=normalized_quote,
             content_hash=chunk.content_hash,
-            source_position=chunk.source_position,
+            source_position=(
+                {} if "source_position" in scope.field_mask else chunk.source_position
+            ),
         )

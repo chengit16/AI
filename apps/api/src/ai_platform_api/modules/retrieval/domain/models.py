@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Protocol
 from uuid import UUID
 
@@ -66,6 +66,15 @@ class StoredChunk:
     content: str
     content_hash: str
     source_position: dict[str, object]
+
+    def apply_field_mask(self, field_mask: frozenset[str]) -> "StoredChunk":
+        """正文受限时由调用方整体拒绝；可独立隐藏的来源元数据在离开责任模块前清空。"""
+
+        if "content" in field_mask:
+            raise ValueError("正文受限时不能投影 Chunk")
+        if "source_position" in field_mask:
+            return replace(self, source_position={})
+        return self
 
 
 @dataclass(frozen=True)

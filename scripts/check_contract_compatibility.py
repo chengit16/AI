@@ -10,7 +10,16 @@ from typing import Any
 
 ROOT = Path(__file__).parents[1]
 CONTRACTS = ROOT / "contracts"
-CONTRACT_DIRS = ("openapi", "domain", "policy", "sse", "events", "errors", "release")
+CONTRACT_DIRS = (
+    "openapi",
+    "authorization",
+    "domain",
+    "policy",
+    "sse",
+    "events",
+    "errors",
+    "release",
+)
 
 
 def git_json(base_ref: str, relative_path: Path) -> dict[str, Any] | None:

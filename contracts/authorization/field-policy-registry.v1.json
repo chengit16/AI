@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "registry_version": 1,
+  "rules": [
+    { "resource_type": "workspace_member", "field_name": "account_id", "security_level": "CONFIDENTIAL" },
+    { "resource_type": "workspace_member", "field_name": "display_name", "security_level": "INTERNAL" },
+    { "resource_type": "workspace_member", "field_name": "login_name", "security_level": "RESTRICTED" },
+    { "resource_type": "workspace_member", "field_name": "phone_number", "security_level": "RESTRICTED" },
+    { "resource_type": "workspace_member", "field_name": "identity_number", "security_level": "RESTRICTED" },
+    { "resource_type": "workspace_member", "field_name": "membership_type", "security_level": "PUBLIC" },
+    { "resource_type": "workspace_member", "field_name": "status", "security_level": "PUBLIC" },
+    { "resource_type": "knowledge_base", "field_name": "created_by_account_id", "security_level": "CONFIDENTIAL" },
+    { "resource_type": "document", "field_name": "original_object_key", "security_level": "RESTRICTED", "inherit_resource_level": true },
+    { "resource_type": "document", "field_name": "source_path", "security_level": "RESTRICTED", "inherit_resource_level": true },
+    { "resource_type": "document", "field_name": "source_url", "security_level": "CONFIDENTIAL", "inherit_resource_level": true },
+    { "resource_type": "document", "field_name": "created_by_account_id", "security_level": "CONFIDENTIAL" },
+    { "resource_type": "document", "field_name": "department_ids", "security_level": "INTERNAL" },
+    { "resource_type": "document", "field_name": "security_level", "security_level": "PUBLIC" },
+    { "resource_type": "document", "field_name": "permission_labels", "security_level": "CONFIDENTIAL" },
+    { "resource_type": "chunk", "field_name": "content", "security_level": "INTERNAL", "inherit_resource_level": true },
+    { "resource_type": "chunk", "field_name": "source_position", "security_level": "CONFIDENTIAL", "inherit_resource_level": true },
+    { "resource_type": "chunk", "field_name": "department_ids", "security_level": "INTERNAL" },
+    { "resource_type": "chunk", "field_name": "security_level", "security_level": "PUBLIC" },
+    { "resource_type": "chunk", "field_name": "phone_number", "security_level": "RESTRICTED", "inherit_resource_level": true },
+    { "resource_type": "chunk", "field_name": "identity_number", "security_level": "RESTRICTED", "inherit_resource_level": true },
+    { "resource_type": "chunk", "field_name": "contract_amount", "security_level": "CONFIDENTIAL", "inherit_resource_level": true },
+    { "resource_type": "workflow_instance", "field_name": "input", "security_level": "INTERNAL", "inherit_resource_level": true },
+    { "resource_type": "workflow_instance", "field_name": "output", "security_level": "INTERNAL", "inherit_resource_level": true },
+    { "resource_type": "approval", "field_name": "comment", "security_level": "INTERNAL", "inherit_resource_level": true },
+    { "resource_type": "approval", "field_name": "conditions", "security_level": "CONFIDENTIAL", "inherit_resource_level": true }
+  ]
+}

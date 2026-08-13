@@ -342,6 +342,33 @@ def test_citation_must_match_authorized_versioned_source_text() -> None:
         service.issue(scope(), UUID(int=999), "差旅报销")
 
 
+def test_source_position_mask_is_applied_before_retrieval_output() -> None:
+    chunk = stored_chunk(1, "差旅报销应在三十天内提交。")
+    index = FakeSearchIndex(
+        chunks=(chunk,),
+        keyword_candidates=(candidate(chunk, "keyword", 1, 0.9),),
+        vector_candidates=(candidate(chunk, "vector", 1, 0.95),),
+    )
+    masked_scope = scope(field_mask=frozenset({"source_position"}))
+
+    result = HybridRetriever(index, FakeEmbeddingProvider(), FakeReranker(())).search(
+        "差旅报销期限",
+        masked_scope,
+        budget(),
+    )
+    citation = CitationService(index).issue(masked_scope, chunk.chunk_id, "差旅报销")
+    read = AuthorizedDocumentReader(index).read(
+        masked_scope,
+        DOCUMENT_VERSION_ID,
+        1,
+        ReaderBudget(surrounding_chunks=0, max_chunks=1, max_characters=100),
+    )
+
+    assert result.evidence[0].chunk.source_position == {}
+    assert citation.source_position == {}
+    assert read[0].source_position == {}
+
+
 def test_private_visibility_requires_explicit_document_scope() -> None:
     with pytest.raises(ValueError, match="私有文档"):
         AuthorizedSearchScope(

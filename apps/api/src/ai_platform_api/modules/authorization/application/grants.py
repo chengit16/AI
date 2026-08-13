@@ -7,6 +7,10 @@ from ai_platform_backend.integration.domain import AuditRecord
 
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.authorization.domain.fields import (
+    FieldPolicyRegistry,
+    SecurityLevel,
+)
 from ai_platform_api.modules.authorization.domain.grants import (
     InvalidRolePermissionGrantError,
     RolePermissionGrant,
@@ -53,9 +57,11 @@ class RolePermissionService:
         self,
         registry: ResourceRegistry,
         unit_of_work: RolePermissionUnitOfWork,
+        field_registry: FieldPolicyRegistry | None = None,
     ) -> None:
         self._registry = registry
         self._unit_of_work = unit_of_work
+        self._field_registry = field_registry or FieldPolicyRegistry(1, 1, ())
 
     def list(
         self,
@@ -79,7 +85,14 @@ class RolePermissionService:
         workspace_id: UUID,
         role_id: UUID,
         entries: tuple[
-            tuple[str, DataScopeType, frozenset[UUID], frozenset[UUID]],
+            tuple[
+                str,
+                DataScopeType,
+                frozenset[UUID],
+                frozenset[UUID],
+                SecurityLevel,
+                frozenset[str],
+            ],
             ...,
         ],
     ) -> tuple[RolePermissionGrant, ...]:
@@ -93,8 +106,17 @@ class RolePermissionService:
                 scope_type,
                 department_ids,
                 resource_ids,
+                maximum_security_level,
+                field_mask,
             )
-            for permission_code, scope_type, department_ids, resource_ids in entries
+            for (
+                permission_code,
+                scope_type,
+                department_ids,
+                resource_ids,
+                maximum_security_level,
+                field_mask,
+            ) in entries
         )
         if len({grant.permission_code for grant in grants}) != len(grants):
             raise RolePermissionValidationError
@@ -103,6 +125,10 @@ class RolePermissionService:
                 grant.assert_valid()
                 permission = permission_by_code.get(grant.permission_code)
                 if permission is None or permission.status != "active":
+                    raise RolePermissionValidationError
+                if not grant.field_mask.issubset(
+                    self._field_registry.fields_for(permission.resource_type)
+                ):
                     raise RolePermissionValidationError
         except InvalidRolePermissionGrantError as error:
             raise RolePermissionValidationError from error

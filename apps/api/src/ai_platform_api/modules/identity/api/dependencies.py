@@ -6,6 +6,7 @@ from fastapi import Header, Request
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
+from ai_platform_api.modules.authorization.application.fields import FieldProjectionService
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
 from ai_platform_api.modules.authorization.application.policy import (
     ApiResource,
@@ -75,6 +76,13 @@ def role_permission_service(request: Request) -> RolePermissionService:
     service = getattr(request.app.state, "role_permission_service", None)
     if not isinstance(service, RolePermissionService):
         raise RuntimeError("角色权限服务尚未完成装配")
+    return service
+
+
+def field_projection_service(request: Request) -> FieldProjectionService:
+    service = getattr(request.app.state, "field_projection_service", None)
+    if not isinstance(service, FieldProjectionService):
+        raise RuntimeError("字段投影服务尚未完成装配")
     return service
 
 
@@ -158,6 +166,7 @@ def _authorize_registered_operation(request: Request, context: RequestContext) -
         authorized_department_ids=decision.resource_scope.department_ids,
         authorized_account_ids=decision.resource_scope.account_ids,
         authorized_resource_ids=decision.resource_scope.resource_ids,
+        authorized_field_mask=decision.field_mask,
     )
 
 

@@ -20,6 +20,7 @@ class RequestContext:
     authorized_department_ids: frozenset[UUID] = frozenset()
     authorized_account_ids: frozenset[UUID] = frozenset()
     authorized_resource_ids: frozenset[UUID] = frozenset()
+    authorized_field_mask: frozenset[str] = frozenset()
 
     @classmethod
     def trusted(

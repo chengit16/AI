@@ -58,4 +58,7 @@ class AuthorizedDocumentReader:
                 continue
             selected.append(chunk)
             used_characters += len(chunk.content)
-        return tuple(sorted(selected, key=lambda chunk: chunk.sequence_no))
+        return tuple(
+            chunk.apply_field_mask(scope.field_mask)
+            for chunk in sorted(selected, key=lambda chunk: chunk.sequence_no)
+        )
