@@ -3,6 +3,8 @@
   "errors": [
     { "code": "VALIDATION_ERROR", "http_status": 422, "message": "请求参数不符合接口约定", "retryable": false },
     { "code": "AUTH_REQUIRED", "http_status": 401, "message": "需要有效的登录或接口凭证", "retryable": false },
+    { "code": "AUTH_INVALID_CREDENTIALS", "http_status": 401, "message": "登录标识或密码无效", "retryable": false },
+    { "code": "CSRF_INVALID", "http_status": 403, "message": "请求缺少有效的 CSRF 凭证", "retryable": false },
     { "code": "WORKSPACE_REQUIRED", "http_status": 400, "message": "请求缺少有效的工作空间上下文", "retryable": false },
     { "code": "POLICY_DENIED", "http_status": 403, "message": "当前操作未获授权", "retryable": false },
     { "code": "POLICY_UNAVAILABLE", "http_status": 503, "message": "权限策略暂时不可用，操作已默认拒绝", "retryable": true },

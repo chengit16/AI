@@ -10,23 +10,13 @@ from uuid import UUID, uuid4
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHttpException
 
+from ai_platform_api.common.api_errors import ErrorResponse
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.trace import TraceContext
 
 logger = logging.getLogger(__name__)
-
-
-class ErrorResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    code: str = Field(pattern=r"^[A-Z][A-Z0-9_]+$")
-    message: str
-    retryable: bool
-    request_id: UUID
-    trace_id: str = Field(min_length=16, max_length=64)
 
 
 @dataclass(frozen=True)

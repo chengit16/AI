@@ -88,15 +88,19 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260813_0003"
+    assert current_revision(connection, schema) == "20260813_0004"
     assert business_tables(connection, schema) == {
+        "accounts",
         "consumer_receipts",
+        "open_api_keys",
         "outbox_events",
         "resource_projections",
         "retrieval_chunks",
         "stream_events",
         "stream_runs",
+        "workspace_memberships",
         "workspace_resources",
+        "workspaces",
     }
 
     command.downgrade(config, "base")
@@ -108,5 +112,5 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260813_0003"
+    assert current_revision(connection, schema) == "20260813_0004"
     assert schema_snapshot(connection, schema) == first_head

@@ -14,6 +14,7 @@ class RequestContext:
     workspace_id: UUID
     user_id: UUID | None
     authentication_method: str
+    credential_scopes: frozenset[str] | None
 
     @classmethod
     def trusted(
@@ -24,6 +25,7 @@ class RequestContext:
         trace: TraceContext,
         user_id: UUID | None = None,
         authentication_method: str = "test",
+        credential_scopes: frozenset[str] | None = None,
         request_id: UUID | None = None,
     ) -> "RequestContext":
         return cls(
@@ -33,4 +35,5 @@ class RequestContext:
             workspace_id=workspace_id,
             user_id=user_id,
             authentication_method=authentication_method,
+            credential_scopes=credential_scopes,
         )

@@ -30,7 +30,7 @@ ensure_environment() {
     log "已根据 .env.example 创建本地 .env"
   fi
 
-  # 本地数据目录由 .env 配置；当前节点不生成业务主密钥，避免产生未被使用的秘密材料。
+  # 本地数据与密钥目录由 .env 配置，主密钥生成在独立函数中完成。
   local root_path
   root_path="$(awk -F= '$1 == "AI_PLATFORM_ROOT" {print substr($0, index($0, "=") + 1)}' "$ENV_FILE" | tail -n 1)"
   root_path="${root_path:-./.ai-platform}"
@@ -43,7 +43,20 @@ ensure_environment() {
     "$root_path/data/valkey" \
     "$root_path/data/objects" \
     "$root_path/logs" \
-    "$root_path/runtime"
+    "$root_path/runtime" \
+    "$root_path/secrets"
+}
+
+ensure_master_key() {
+  local master_key="$AI_PLATFORM_ROOT/secrets/master.key"
+  [[ ! -L "$master_key" ]] || fail "平台主密钥不能是符号链接"
+  if [[ ! -f "$master_key" ]]; then
+    umask 077
+    openssl rand 32 >"$master_key"
+    log "已生成本地平台主密钥"
+  fi
+  chmod 600 "$master_key"
+  [[ "$(wc -c <"$master_key" | tr -d ' ')" == "32" ]] || fail "平台主密钥长度必须为 32 字节"
 }
 
 check_runtime() {
@@ -98,6 +111,8 @@ start() {
   check_runtime
   check_resources
   ensure_environment
+  require_command openssl
+  ensure_master_key
   for port in 3000 8000 5432 6379 9000 9001 9998; do
     check_port "$port"
   done

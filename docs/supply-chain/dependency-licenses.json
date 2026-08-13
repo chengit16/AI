@@ -409,6 +409,18 @@
     },
     {
       "direct": false,
+      "license": "MIT",
+      "name": "argon2-cffi",
+      "version": "25.1.0"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "argon2-cffi-bindings",
+      "version": "25.1.0"
+    },
+    {
+      "direct": false,
       "license": "MIT-0",
       "name": "cffi",
       "version": "2.1.1"
@@ -540,6 +552,12 @@
       "version": "6.0.3"
     },
     {
+      "direct": false,
+      "license": "MIT",
+      "name": "redis",
+      "version": "6.4.0"
+    },
+    {
       "direct": true,
       "license": "MIT",
       "name": "SQLAlchemy",
@@ -594,7 +612,7 @@
   },
   "summary": {
     "node_packages": 76,
-    "python_packages": 34,
+    "python_packages": 37,
     "unknown_python_licenses": []
   }
 }

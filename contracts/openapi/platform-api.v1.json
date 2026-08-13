@@ -43,10 +43,94 @@
           }
         }
       }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "loginWithPassword",
+        "summary": "Login",
+        "tags": ["身份认证"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logoutCurrentSession",
+        "summary": "Logout",
+        "tags": ["身份认证"],
+        "parameters": [
+          { "name": "X-Workspace-ID", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "X-Workspace-Id" } },
+          { "name": "Authorization", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Authorization" } },
+          { "name": "X-CSRF-Token", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "X-Csrf-Token" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LogoutResponse" } } } },
+          "400": { "description": "请求上下文无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "身份凭证无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "请求未获授权", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "422": { "description": "请求参数无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "500": { "description": "平台内部错误", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/auth/context": {
+      "get": {
+        "operationId": "getAuthenticationContext",
+        "summary": "Get Authentication Context",
+        "tags": ["身份认证"],
+        "parameters": [
+          { "name": "X-Workspace-ID", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "X-Workspace-Id" } },
+          { "name": "Authorization", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Authorization" } },
+          { "name": "X-CSRF-Token", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "X-Csrf-Token" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthenticationContextResponse" } } } },
+          "400": { "description": "请求上下文无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "身份凭证无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "请求未获授权", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "422": { "description": "请求参数无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "500": { "description": "平台内部错误", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AuthenticationContextResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["request_id", "trace_id", "actor_id", "user_id", "workspace_id", "authentication_method", "credential_scopes"],
+        "properties": {
+          "request_id": { "type": "string", "format": "uuid", "title": "Request Id" },
+          "trace_id": { "type": "string", "title": "Trace Id" },
+          "actor_id": { "type": "string", "format": "uuid", "title": "Actor Id" },
+          "user_id": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }], "title": "User Id" },
+          "workspace_id": { "type": "string", "format": "uuid", "title": "Workspace Id" },
+          "authentication_method": { "type": "string", "title": "Authentication Method" },
+          "credential_scopes": { "anyOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "null" }], "title": "Credential Scopes" }
+        },
+        "title": "AuthenticationContextResponse"
+      },
       "ErrorResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -76,6 +160,35 @@
           }
         },
         "title": "HealthResponse"
+      },
+      "LoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["login_name", "password"],
+        "properties": {
+          "login_name": { "type": "string", "minLength": 1, "maxLength": 255, "title": "Login Name" },
+          "password": { "type": "string", "minLength": 1, "maxLength": 1024, "format": "password", "writeOnly": true, "title": "Password" }
+        },
+        "title": "LoginRequest"
+      },
+      "LoginResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["account_id", "csrf_token"],
+        "properties": {
+          "account_id": { "type": "string", "format": "uuid", "title": "Account Id" },
+          "csrf_token": { "type": "string", "title": "Csrf Token" }
+        },
+        "title": "LoginResponse"
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["logged_out"],
+        "properties": {
+          "logged_out": { "type": "boolean", "title": "Logged Out" }
+        },
+        "title": "LogoutResponse"
       }
     }
   }

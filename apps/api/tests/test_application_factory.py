@@ -7,6 +7,12 @@ from ai_platform_api.app.dependencies import ApplicationContainer
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.app.factory import create_app
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.identity.application.authentication import (
+    ApiKeyService,
+    AuthenticationService,
+)
+from ai_platform_api.modules.identity.infrastructure.security import EnvelopeSecretCipher
+from ai_platform_api.modules.identity.infrastructure.session import ValkeySessionStore
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
 from ai_platform_api.modules.release.domain.errors import (
     ReleaseCombinationIncompatibleError,
@@ -28,14 +34,32 @@ class ClosingDatabase:
         self.closed = True
 
 
-def test_factory_uses_injected_settings_and_closes_dependencies() -> None:
-    settings = Settings(app_name="synthetic-api", environment="synthetic-test")
+class ClosingSessions:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def application_container(settings: Settings) -> tuple[ApplicationContainer, ClosingDatabase]:
     database = ClosingDatabase()
+    sessions = ClosingSessions()
     container = ApplicationContainer(
         settings=settings,
         database=cast(PlatformDatabase, database),
         errors=ErrorCatalog.load(ROOT / "contracts/errors/catalog.v1.json"),
+        authentication=cast("AuthenticationService", object()),
+        api_keys=cast("ApiKeyService", object()),
+        secret_cipher=cast("EnvelopeSecretCipher", object()),
+        sessions=cast("ValkeySessionStore", sessions),
     )
+    return container, database
+
+
+def test_factory_uses_injected_settings_and_closes_dependencies() -> None:
+    settings = Settings(app_name="synthetic-api", environment="test")
+    container, database = application_container(settings)
     application = create_app(settings, container)
 
     with TestClient(application) as client:
@@ -43,16 +67,14 @@ def test_factory_uses_injected_settings_and_closes_dependencies() -> None:
 
     assert response.status_code == 200
     assert response.json()["service"] == "synthetic-api"
-    assert response.json()["environment"] == "synthetic-test"
+    assert response.json()["environment"] == "test"
     assert database.closed is True
 
 
 def test_factory_rejects_container_from_another_configuration() -> None:
-    settings = Settings(environment="synthetic-a")
-    container = ApplicationContainer(
-        settings=Settings(environment="synthetic-b"),
-        database=cast(PlatformDatabase, ClosingDatabase()),
-        errors=ErrorCatalog.load(ROOT / "contracts/errors/catalog.v1.json"),
+    settings = Settings(environment="synthetic-a", session_cookie_secure=True)
+    container, _ = application_container(
+        Settings(environment="synthetic-b", session_cookie_secure=True)
     )
 
     try:
@@ -65,12 +87,8 @@ def test_factory_rejects_container_from_another_configuration() -> None:
 
 @contextmanager
 def error_client() -> Iterator[TestClient]:
-    settings = Settings(environment="synthetic-test")
-    container = ApplicationContainer(
-        settings=settings,
-        database=cast(PlatformDatabase, ClosingDatabase()),
-        errors=ErrorCatalog.load(ROOT / "contracts/errors/catalog.v1.json"),
-    )
+    settings = Settings(environment="test")
+    container, _ = application_container(settings)
     application = create_app(settings, container)
     router = APIRouter(prefix="/synthetic")
 
@@ -193,7 +211,7 @@ def test_startup_rejects_incompatible_release_combination(tmp_path: Path) -> Non
     )
     incompatible = tmp_path / "incompatible.json"
     incompatible.write_text(
-        manifest.replace('"schema_revision": "20260813_0003"', '"schema_revision": "unknown"'),
+        manifest.replace('"schema_revision": "20260813_0004"', '"schema_revision": "unknown"'),
         encoding="utf-8",
     )
 

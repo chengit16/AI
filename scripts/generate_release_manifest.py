@@ -12,14 +12,16 @@ API_SOURCE = ROOT / "apps" / "api" / "src"
 # 脚本需要在尚未安装项目包的构建容器中运行，因此显式加载仓库内 API 源码。
 sys.path.insert(0, str(API_SOURCE))
 
+from ai_platform_api.modules.release.application import (  # noqa: E402
+    serialization as release_serialization,
+)
 from ai_platform_api.modules.release.application.manifest import (  # noqa: E402
     ReleaseManifestService,
 )
-from ai_platform_api.modules.release.application.serialization import (  # noqa: E402
-    load_json,
-    parse_inputs,
-    parse_matrix,
-)
+
+load_json = release_serialization.load_json
+parse_inputs = release_serialization.parse_inputs
+parse_matrix = release_serialization.parse_matrix
 
 DEFAULT_MATRIX = ROOT / "contracts" / "release" / "compatibility-matrix.v1.json"
 

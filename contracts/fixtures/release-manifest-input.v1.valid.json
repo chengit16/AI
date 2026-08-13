@@ -23,7 +23,7 @@
       "source_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     }
   ],
-  "database": { "schema_revision": "20260813_0003" },
+  "database": { "schema_revision": "20260813_0004" },
   "runtimes": { "node": "24.19.0", "python": "3.12.12" },
   "images": [
     {

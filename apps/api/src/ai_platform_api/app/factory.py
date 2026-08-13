@@ -7,9 +7,11 @@ from ai_platform_api.app.dependencies import (
     ApplicationContainer,
     build_application_container,
 )
-from ai_platform_api.app.errors import ErrorResponse, register_error_handlers
+from ai_platform_api.app.errors import register_error_handlers
 from ai_platform_api.app.trace_middleware import TraceContextMiddleware
+from ai_platform_api.common.api_errors import ErrorResponse
 from ai_platform_api.config import Settings, get_settings
+from ai_platform_api.modules.identity.api.routes import router as identity_router
 from ai_platform_api.modules.system.api.health import router as health_router
 
 
@@ -41,8 +43,10 @@ def create_app(
         responses={500: {"model": ErrorResponse, "description": "平台内部错误"}},
     )
     application.state.container = dependencies
+    application.state.authentication_service = dependencies.authentication
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)
     application.include_router(health_router, prefix="/api/v1")
+    application.include_router(identity_router, prefix="/api/v1")
     return application

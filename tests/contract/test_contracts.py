@@ -146,3 +146,22 @@ def test_openapi_baseline_matches_fastapi_implementation() -> None:
 
     assert baseline["openapi"] == "3.1.0"
     assert generated == baseline
+
+
+def test_identity_openapi_uses_stable_error_and_secret_schemas() -> None:
+    baseline = load_json(CONTRACTS / "openapi/platform-api.v1.json")
+    paths = baseline["paths"]
+    schemas = baseline["components"]["schemas"]
+
+    assert paths["/api/v1/auth/login"]["post"]["operationId"] == "loginWithPassword"
+    assert schemas["LoginRequest"]["properties"]["password"]["writeOnly"] is True
+    assert "HTTPValidationError" not in schemas
+    for path, method in (
+        ("/api/v1/auth/login", "post"),
+        ("/api/v1/auth/logout", "post"),
+        ("/api/v1/auth/context", "get"),
+    ):
+        responses = paths[path][method]["responses"]
+        assert responses["422"]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ErrorResponse"
+        }
