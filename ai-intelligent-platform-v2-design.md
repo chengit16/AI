@@ -2187,6 +2187,10 @@ GPT 中转的 `base_url`、API Key、模型 ID/别名、能力和数据政策均
 
 前端布局、动态菜单、个人/企业空间导航、响应式断点、可访问性、加载/错误状态和阶段 1 优化清单统一记录在 [`docs/design/ui-ux-baseline.md`](./docs/design/ui-ux-baseline.md)。阶段 0 的运行状态页属于技术验证界面，保留当前临时绿色主题；阶段 1 业务页面齐备后，再统一评审主色调、字体、暗色模式和语义色 Token。UI/UX 变更同样遵循节点验收、文档同步和独立 Git 提交规则。
 
+### 21.14 Web 前端代码规范
+
+Web 前端以 `digitizing` React 项目的成熟工程规则作为参考，但只采用与当前平台匹配的目录分层、职责拆分、严格类型、公共组件兼容、命名、测试和质量门禁。平台继续使用 React 19、TanStack Query、Zustand、Ant Design 6、Fetch/SSE、CSS/CSS Modules 和仓库契约，不引入参考项目的 axios、ahooks、Less、TailwindCSS、styled-components、`@seakoi/console-kit`、`@seakoi/corebox` 或 Apifox 事实源。完整规范见 [`docs/governance/frontend-code-standards.md`](./docs/governance/frontend-code-standards.md)。
+
 平台账号、工作空间成员和模型供应商账号是三个不同概念：浏览器登录只识别平台 `Account`，成员权限由 `WorkspaceMembership` 决定，模型凭证只属于平台或工作空间配置，三者不得共用凭证或生命周期。
 
 首期本地账号由首次启动创建管理员，采用用户名/邮箱加密码登录，不强依赖 SMTP。忘记密码通过本机管理命令生成一次性重置令牌；启用 SaaS 或真实企业试点前，再补充邮件验证、MFA、风控、OIDC/SAML 和账号恢复流程。

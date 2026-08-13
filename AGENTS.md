@@ -16,6 +16,12 @@
 - 新增和修改的代码注释统一使用中文，说明业务规则、边界和设计原因。
 - 自解释代码不添加复述行为的低价值注释。
 
+## Web 前端代码规范
+
+- `apps/web` 的新增和修改执行 `docs/governance/frontend-code-standards.md`。
+- 前端接口以仓库 `contracts/` 为事实来源，不使用其他项目的 Apifox 定义或统一响应类型。
+- 新代码保持 React 19、TanStack Query、Zustand、Ant Design 6、Fetch/SSE 和 CSS Token 技术边界，不照搬参考项目的旧版本或专属依赖。
+
 ## 节点交付
 
 执行 `docs/governance/delivery-and-git.md`：每个节点通过验收、同步文档后形成一次独立 Git 提交。未经验证的工作不得在进度看板中标记为完成。

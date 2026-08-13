@@ -10,6 +10,7 @@
 - [交付与 Git 管理规范](./docs/governance/delivery-and-git.md)：节点完成定义、提交规则和文档更新要求。
 - [阶段 0 实施计划](./docs/stages/stage-0-plan.md)：阶段 0 的建设顺序、节点交付物和完成门禁。
 - [前端 UI/UX 设计基线](./docs/design/ui-ux-baseline.md)：布局、动态菜单、响应式、可访问性和阶段 1 优化清单。
+- [Web 前端代码规范](./docs/governance/frontend-code-standards.md)：React、目录、状态、接口、样式、测试和质量门禁。
 
 ## 当前原则
 

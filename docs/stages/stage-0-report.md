@@ -88,6 +88,17 @@
 - 主色调决策：阶段 0 继续使用当前深绿/荧光绿临时方案，等阶段 1 业务页面齐备后统一评审主色调、字体、暗色模式和语义色 Token。
 - 交付文档：[`docs/design/ui-ux-baseline.md`](../design/ui-ux-baseline.md)。
 - 已知限制：本节点只建立设计和验收基线，不修改阶段 0 运行中心代码，不提前实现阶段 1 动态菜单或空间切换。
+- 提交：`fdaefea`。
+
+### P0-14 Web 前端代码规范
+
+- 状态：通过。
+- 范围：参考 `digitizing` 的成熟 React 工程实践，形成适配当前 AI 平台的目录职责、命名、严格类型、React/Hooks、状态边界、API/SSE、样式、测试和 Git 质量门禁。
+- 采用内容：页面、组件、Hook、Store 和 Service 分层；公共组件兼容保护；文件规模预警；严格 TypeScript；Conventional Commit 和按风险补充测试。
+- 排除内容：不引入 axios、ahooks `useRequest`、Less、TailwindCSS、styled-components、`@seakoi/console-kit`、`@seakoi/corebox` 或 Apifox 事实源，也不降级当前 React 19、React Router 8、Ant Design 6 和 Vite 8。
+- 当前边界：本节点只建立规范和阶段 1 落地顺序，不修改阶段 0 Web 实现或依赖配置；当前实施节点仍为 `P0-06`。
+- 交付文档：[`docs/governance/frontend-code-standards.md`](../governance/frontend-code-standards.md)。
+- 验证内容：文档链接与路径检查、`git diff --check`，以及现有 Web 的 ESLint、TypeScript、Vitest 和生产构建。
 - 提交：本节点提交完成后回填。
 
 ## 4. 当前限制
