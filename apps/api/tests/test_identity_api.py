@@ -16,6 +16,7 @@ from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
 )
+from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.domain.models import (
     AccountCredential,
     ApiKeyWriter,
@@ -24,6 +25,7 @@ from ai_platform_api.modules.identity.domain.models import (
     OpenApiKey,
     WorkspaceAccess,
 )
+from ai_platform_api.modules.identity.domain.registration import RegistrationResult
 from ai_platform_api.modules.identity.infrastructure.security import (
     Argon2idPasswordAdapter,
     EnvelopeSecretCipher,
@@ -130,6 +132,30 @@ class ClosingDatabase:
         return None
 
 
+class StubRegistrationService(RegistrationService):
+    def __init__(self) -> None:
+        pass
+
+    def register(
+        self,
+        *,
+        login_name: str,
+        display_name: str,
+        password: str,
+        request_id: UUID,
+        trace: TraceContext,
+    ) -> RegistrationResult:
+        assert login_name == "NEW.USER@EXAMPLE.COM"
+        assert display_name == "合成新用户"
+        assert password == "synthetic-password-456"
+        assert request_id
+        assert trace.trace_id
+        return RegistrationResult(
+            account_id=UUID("10000000-0000-4000-8000-000000000023"),
+            personal_workspace_id=UUID("20000000-0000-4000-8000-000000000023"),
+        )
+
+
 def identity_client() -> tuple[TestClient, ApiKeyService, MemorySessions]:
     settings = Settings(environment="test")
     passwords = Argon2idPasswordAdapter()
@@ -150,6 +176,7 @@ def identity_client() -> tuple[TestClient, ApiKeyService, MemorySessions]:
         errors=ErrorCatalog.load(ROOT / "contracts/errors/catalog.v1.json"),
         authentication=authentication,
         api_keys=api_keys,
+        registration=StubRegistrationService(),
         secret_cipher=cast(EnvelopeSecretCipher, object()),
         sessions=cast(ValkeySessionStore, sessions),
     )
@@ -210,7 +237,29 @@ def test_login_cookie_context_csrf_and_logout_flow() -> None:
 
         expired = client.get("/api/v1/auth/context", headers=workspace_header)
         assert expired.status_code == 401
-        assert expired.json()["code"] == "AUTH_REQUIRED"
+    assert expired.json()["code"] == "AUTH_REQUIRED"
+
+
+def test_registration_returns_account_and_default_personal_workspace() -> None:
+    client, _, _ = identity_client()
+
+    with client:
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "login_name": "NEW.USER@EXAMPLE.COM",
+                "display_name": "合成新用户",
+                "password": "synthetic-password-456",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "account_id": "10000000-0000-4000-8000-000000000023",
+        "personal_workspace_id": "20000000-0000-4000-8000-000000000023",
+    }
+    assert "synthetic-password-456" not in response.text
 
 
 def test_missing_workspace_and_invalid_login_use_stable_errors() -> None:

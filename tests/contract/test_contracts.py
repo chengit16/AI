@@ -183,10 +183,13 @@ def test_identity_openapi_uses_stable_error_and_secret_schemas() -> None:
     schemas = baseline["components"]["schemas"]
 
     assert paths["/api/v1/auth/login"]["post"]["operationId"] == "loginWithPassword"
+    assert paths["/api/v1/auth/register"]["post"]["operationId"] == "registerPersonalAccount"
     assert schemas["LoginRequest"]["properties"]["password"]["writeOnly"] is True
+    assert schemas["RegistrationRequest"]["properties"]["password"]["writeOnly"] is True
     assert "HTTPValidationError" not in schemas
     for path, method in (
         ("/api/v1/auth/login", "post"),
+        ("/api/v1/auth/register", "post"),
         ("/api/v1/auth/logout", "post"),
         ("/api/v1/auth/context", "get"),
     ):

@@ -1,12 +1,15 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from ai_platform_api.common.api_errors import error_responses
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.config import Settings, get_settings
 from ai_platform_api.modules.identity.api.dependencies import (
     authentication_service,
+    registration_service,
     trusted_request_context,
 )
 from ai_platform_api.modules.identity.api.schemas import (
@@ -14,11 +17,46 @@ from ai_platform_api.modules.identity.api.schemas import (
     LoginRequest,
     LoginResponse,
     LogoutResponse,
+    RegistrationRequest,
+    RegistrationResponse,
 )
 from ai_platform_api.modules.identity.application.authentication import AuthenticationService
 from ai_platform_api.modules.identity.application.errors import AuthenticationRequiredError
+from ai_platform_api.modules.identity.application.registration import RegistrationService
 
 router = APIRouter(prefix="/auth", tags=["身份认证"])
+
+
+@router.post(
+    "/register",
+    response_model=RegistrationResponse,
+    operation_id="registerPersonalAccount",
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(409, 422, 500),
+)
+def register(
+    body: RegistrationRequest,
+    request: Request,
+    response: Response,
+    service: Annotated[RegistrationService, Depends(registration_service)],
+) -> RegistrationResponse:
+    state = request.scope.get("state", {})
+    request_id = state.get("request_id")
+    trace = state.get("trace_context")
+    if not isinstance(request_id, UUID) or not isinstance(trace, TraceContext):
+        raise RuntimeError("可信请求标识尚未建立")
+    result = service.register(
+        login_name=body.login_name,
+        display_name=body.display_name,
+        password=body.password.get_secret_value(),
+        request_id=request_id,
+        trace=trace,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return RegistrationResponse(
+        account_id=result.account_id,
+        personal_workspace_id=result.personal_workspace_id,
+    )
 
 
 @router.post(

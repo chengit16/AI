@@ -44,6 +44,7 @@ def create_app(
     )
     application.state.container = dependencies
     application.state.authentication_service = dependencies.authentication
+    application.state.registration_service = dependencies.registration
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)

@@ -6,6 +6,7 @@ from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
 )
+from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.infrastructure.security import (
     Argon2idPasswordAdapter,
     EnvelopeSecretCipher,
@@ -16,6 +17,7 @@ from ai_platform_api.modules.identity.infrastructure.session import ValkeySessio
 from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityReader,
     SqlAlchemyIdentityUnitOfWork,
+    SqlAlchemyRegistrationUnitOfWork,
 )
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
 from ai_platform_api.persistence.database import PlatformDatabase
@@ -30,6 +32,7 @@ class ApplicationContainer:
     errors: ErrorCatalog
     authentication: AuthenticationService
     api_keys: ApiKeyService
+    registration: RegistrationService
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
 
@@ -49,6 +52,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     sessions = ValkeySessionStore(settings.valkey_url)
     reader = SqlAlchemyIdentityReader(database.sessions)
     digester = Sha256SecretDigester()
+    passwords = Argon2idPasswordAdapter()
     try:
         return ApplicationContainer(
             settings=settings,
@@ -57,7 +61,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,
-                passwords=Argon2idPasswordAdapter(),
+                passwords=passwords,
                 secrets_digester=digester,
                 session_ttl_seconds=settings.session_ttl_seconds,
             ),
@@ -65,6 +69,11 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 repository=reader,
                 unit_of_work=SqlAlchemyIdentityUnitOfWork(database.sessions),
                 secrets_digester=digester,
+            ),
+            registration=RegistrationService(
+                repository=reader,
+                unit_of_work=SqlAlchemyRegistrationUnitOfWork(database.sessions),
+                passwords=passwords,
             ),
             secret_cipher=EnvelopeSecretCipher(MasterKeyFile(settings.master_key_path)),
             sessions=sessions,

@@ -9,6 +9,7 @@ from uuid import UUID
 AccountStatus = Literal["active", "disabled"]
 WorkspaceStatus = Literal["active", "suspended", "archived"]
 MembershipStatus = Literal["active", "disabled", "left"]
+WorkspaceType = Literal["personal", "enterprise"]
 
 
 @dataclass(frozen=True)
@@ -26,10 +27,19 @@ class WorkspaceAccess:
     account_id: UUID
     workspace_status: WorkspaceStatus
     membership_status: MembershipStatus
+    workspace_type: WorkspaceType = "enterprise"
+    owner_account_id: UUID | None = None
 
     @property
     def active(self) -> bool:
-        return self.workspace_status == "active" and self.membership_status == "active"
+        owner_allowed = (
+            self.workspace_type != "personal" or self.owner_account_id == self.account_id
+        )
+        return (
+            self.workspace_status == "active"
+            and self.membership_status == "active"
+            and owner_allowed
+        )
 
 
 @dataclass(frozen=True)

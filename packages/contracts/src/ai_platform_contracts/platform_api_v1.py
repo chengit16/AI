@@ -43,3 +43,14 @@ class LoginResponse(typing.TypedDict):
 
 class LogoutResponse(typing.TypedDict):
     logged_out: bool
+
+
+class RegistrationRequest(typing.TypedDict):
+    display_name: str
+    login_name: str
+    password: str
+
+
+class RegistrationResponse(typing.TypedDict):
+    account_id: str
+    personal_workspace_id: str

@@ -11,6 +11,7 @@ from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
 )
+from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.infrastructure.security import EnvelopeSecretCipher
 from ai_platform_api.modules.identity.infrastructure.session import ValkeySessionStore
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
@@ -51,6 +52,7 @@ def application_container(settings: Settings) -> tuple[ApplicationContainer, Clo
         errors=ErrorCatalog.load(ROOT / "contracts/errors/catalog.v1.json"),
         authentication=cast("AuthenticationService", object()),
         api_keys=cast("ApiKeyService", object()),
+        registration=cast("RegistrationService", object()),
         secret_cipher=cast("EnvelopeSecretCipher", object()),
         sessions=cast("ValkeySessionStore", sessions),
     )
@@ -211,7 +213,7 @@ def test_startup_rejects_incompatible_release_combination(tmp_path: Path) -> Non
     )
     incompatible = tmp_path / "incompatible.json"
     incompatible.write_text(
-        manifest.replace('"schema_revision": "20260813_0005"', '"schema_revision": "unknown"'),
+        manifest.replace('"schema_revision": "20260814_0006"', '"schema_revision": "unknown"'),
         encoding="utf-8",
     )
 

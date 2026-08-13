@@ -2,114 +2,443 @@
   "openapi": "3.1.0",
   "info": {
     "title": "AI 智能平台 API",
-    "version": "0.0.0",
-    "summary": "个人空间与企业空间共用的平台服务接口"
+    "summary": "个人空间与企业空间共用的平台服务接口",
+    "version": "0.0.0"
   },
   "paths": {
     "/api/v1/health/live": {
       "get": {
-        "operationId": "getLiveness",
+        "tags": [
+          "系统健康"
+        ],
         "summary": "Get Liveness",
-        "tags": ["系统健康"],
+        "operationId": "getLiveness",
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "平台内部错误",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/health/ready": {
       "get": {
-        "operationId": "getReadiness",
+        "tags": [
+          "系统健康"
+        ],
         "summary": "Get Readiness",
-        "tags": ["系统健康"],
+        "operationId": "getReadiness",
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
-          },
-          "503": {
-            "description": "依赖尚未就绪",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "平台内部错误",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "身份认证"
+        ],
+        "summary": "Register",
+        "operationId": "registerPersonalAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/auth/login": {
       "post": {
-        "operationId": "loginWithPassword",
+        "tags": [
+          "身份认证"
+        ],
         "summary": "Login",
-        "tags": ["身份认证"],
+        "operationId": "loginWithPassword",
         "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
         },
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } }
-          },
-          "401": {
-            "description": "身份凭证无效",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          },
-          "422": {
-            "description": "请求参数无效",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "平台内部错误",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/auth/logout": {
       "post": {
-        "operationId": "logoutCurrentSession",
+        "tags": [
+          "身份认证"
+        ],
         "summary": "Logout",
-        "tags": ["身份认证"],
+        "operationId": "logoutCurrentSession",
         "parameters": [
-          { "name": "X-Workspace-ID", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "X-Workspace-Id" } },
-          { "name": "Authorization", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Authorization" } },
-          { "name": "X-CSRF-Token", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "X-Csrf-Token" } }
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Successful Response", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LogoutResponse" } } } },
-          "400": { "description": "请求上下文无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "401": { "description": "身份凭证无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "请求未获授权", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "422": { "description": "请求参数无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "500": { "description": "平台内部错误", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/auth/context": {
       "get": {
-        "operationId": "getAuthenticationContext",
+        "tags": [
+          "身份认证"
+        ],
         "summary": "Get Authentication Context",
-        "tags": ["身份认证"],
+        "operationId": "getAuthenticationContext",
         "parameters": [
-          { "name": "X-Workspace-ID", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "X-Workspace-Id" } },
-          { "name": "Authorization", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "Authorization" } },
-          { "name": "X-CSRF-Token", "in": "header", "required": false, "schema": { "anyOf": [{ "type": "string" }, { "type": "null" }], "title": "X-Csrf-Token" } }
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Successful Response", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthenticationContextResponse" } } } },
-          "400": { "description": "请求上下文无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "401": { "description": "身份凭证无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "请求未获授权", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "422": { "description": "请求参数无效", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "500": { "description": "平台内部错误", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticationContextResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -117,78 +446,264 @@
   "components": {
     "schemas": {
       "AuthenticationContextResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["request_id", "trace_id", "actor_id", "user_id", "workspace_id", "authentication_method", "credential_scopes"],
         "properties": {
-          "request_id": { "type": "string", "format": "uuid", "title": "Request Id" },
-          "trace_id": { "type": "string", "title": "Trace Id" },
-          "actor_id": { "type": "string", "format": "uuid", "title": "Actor Id" },
-          "user_id": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }], "title": "User Id" },
-          "workspace_id": { "type": "string", "format": "uuid", "title": "Workspace Id" },
-          "authentication_method": { "type": "string", "title": "Authentication Method" },
-          "credential_scopes": { "anyOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "null" }], "title": "Credential Scopes" }
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "trace_id": {
+            "type": "string",
+            "title": "Trace Id"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Actor Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "authentication_method": {
+            "type": "string",
+            "title": "Authentication Method"
+          },
+          "credential_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Scopes"
+          }
         },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "trace_id",
+          "actor_id",
+          "user_id",
+          "workspace_id",
+          "authentication_method",
+          "credential_scopes"
+        ],
         "title": "AuthenticationContextResponse"
       },
       "ErrorResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["code", "message", "retryable", "request_id", "trace_id"],
         "properties": {
-          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$", "title": "Code" },
-          "message": { "type": "string", "title": "Message" },
-          "retryable": { "type": "boolean", "title": "Retryable" },
-          "request_id": { "type": "string", "format": "uuid", "title": "Request Id" },
-          "trace_id": { "type": "string", "minLength": 16, "maxLength": 64, "title": "Trace Id" }
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]+$",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "retryable": {
+            "type": "boolean",
+            "title": "Retryable"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "trace_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 16,
+            "title": "Trace Id"
+          }
         },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "retryable",
+          "request_id",
+          "trace_id"
+        ],
         "title": "ErrorResponse"
       },
       "HealthResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["service", "status", "version", "environment", "checks"],
         "properties": {
-          "service": { "type": "string", "title": "Service" },
-          "status": { "type": "string", "enum": ["ok", "degraded"], "title": "Status" },
-          "version": { "type": "string", "title": "Version" },
-          "environment": { "type": "string", "title": "Environment" },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
           "checks": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "degraded"
+              ]
+            },
             "type": "object",
-            "additionalProperties": { "type": "string", "enum": ["ok", "degraded"] },
             "title": "Checks"
           }
         },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service",
+          "status",
+          "version",
+          "environment",
+          "checks"
+        ],
         "title": "HealthResponse"
       },
       "LoginRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["login_name", "password"],
         "properties": {
-          "login_name": { "type": "string", "minLength": 1, "maxLength": 255, "title": "Login Name" },
-          "password": { "type": "string", "minLength": 1, "maxLength": 1024, "format": "password", "writeOnly": true, "title": "Password" }
+          "login_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Login Name"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "format": "password",
+            "title": "Password",
+            "writeOnly": true
+          }
         },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "login_name",
+          "password"
+        ],
         "title": "LoginRequest"
       },
       "LoginResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["account_id", "csrf_token"],
         "properties": {
-          "account_id": { "type": "string", "format": "uuid", "title": "Account Id" },
-          "csrf_token": { "type": "string", "title": "Csrf Token" }
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "csrf_token": {
+            "type": "string",
+            "title": "Csrf Token"
+          }
         },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "csrf_token"
+        ],
         "title": "LoginResponse"
       },
       "LogoutResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["logged_out"],
         "properties": {
-          "logged_out": { "type": "boolean", "title": "Logged Out" }
+          "logged_out": {
+            "type": "boolean",
+            "title": "Logged Out"
+          }
         },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "logged_out"
+        ],
         "title": "LogoutResponse"
+      },
+      "RegistrationRequest": {
+        "properties": {
+          "login_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Login Name"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 12,
+            "format": "password",
+            "title": "Password",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "login_name",
+          "display_name",
+          "password"
+        ],
+        "title": "RegistrationRequest"
+      },
+      "RegistrationResponse": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "personal_workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Personal Workspace Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "account_id",
+          "personal_workspace_id"
+        ],
+        "title": "RegistrationResponse"
       }
     }
   }

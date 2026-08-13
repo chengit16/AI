@@ -55,6 +55,23 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/auth/register": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Register */
+    readonly post: operations["registerPersonalAccount"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/health/live": {
     readonly parameters: {
       readonly query?: never;
@@ -177,6 +194,31 @@ export type components = {
     readonly LogoutResponse: {
       /** Logged Out */
       readonly logged_out: boolean;
+    };
+    /** RegistrationRequest */
+    readonly RegistrationRequest: {
+      /** Display Name */
+      readonly display_name: string;
+      /** Login Name */
+      readonly login_name: string;
+      /**
+       * Password
+       * Format: password
+       */
+      readonly password: string;
+    };
+    /** RegistrationResponse */
+    readonly RegistrationResponse: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      readonly account_id: string;
+      /**
+       * Personal Workspace Id
+       * Format: uuid
+       */
+      readonly personal_workspace_id: string;
     };
   };
   responses: never;
@@ -349,6 +391,57 @@ export interface operations {
       };
       /** @description 请求未获授权 */
       readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly registerPersonalAccount: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["RegistrationRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["RegistrationResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
         headers: {
           readonly [name: string]: unknown;
         };

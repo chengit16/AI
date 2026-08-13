@@ -10,6 +10,21 @@ class LoginRequest(BaseModel):
     password: SecretStr = Field(min_length=1, max_length=1024)
 
 
+class RegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    login_name: str = Field(min_length=3, max_length=255)
+    display_name: str = Field(min_length=1, max_length=120)
+    password: SecretStr = Field(min_length=12, max_length=1024)
+
+
+class RegistrationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    account_id: UUID
+    personal_workspace_id: UUID
+
+
 class LoginResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

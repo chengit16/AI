@@ -42,6 +42,10 @@ accounts = Table(
     CheckConstraint("status IN ('active', 'disabled')", name="ck_accounts_status"),
     CheckConstraint("auth_version >= 1", name="ck_accounts_auth_version"),
     CheckConstraint("version >= 1", name="ck_accounts_version"),
+    CheckConstraint(
+        "login_name = lower(btrim(login_name)) AND char_length(login_name) >= 3",
+        name="ck_accounts_normalized_login",
+    ),
 )
 
 workspaces = Table(
@@ -70,6 +74,17 @@ workspaces = Table(
         [f"{SCHEMA_TOKEN}.accounts.account_id"],
         name="fk_workspaces_owner",
     ),
+    CheckConstraint(
+        "(workspace_type = 'personal' AND owner_account_id IS NOT NULL) "
+        "OR (workspace_type = 'enterprise' AND owner_account_id IS NULL)",
+        name="ck_workspaces_owner_by_type",
+    ),
+)
+Index(
+    "uq_workspaces_personal_owner",
+    workspaces.c.owner_account_id,
+    unique=True,
+    postgresql_where=workspaces.c.workspace_type == "personal",
 )
 
 workspace_memberships = Table(

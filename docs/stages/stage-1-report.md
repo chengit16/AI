@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1B-01` 待开始 |
+| 当前节点 | `P1B-02` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -99,7 +99,7 @@
 - 容器验收：API、Worker 与 Migration 镜像从冻结锁文件重建；Migration 从公共空 Schema 升级至 `20260813_0005` 后以状态 0 退出；Celery 实际注册两个版本化任务。固定合成事件最终为 `published|1|1|1`，即一次发布尝试、一个消费回执和一次投影，投影 Trace 与原事件保持同一 Trace。宿主机两类密钥均为 32 字节 `0600`，容器内按职责只读挂载；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项诊断全部通过。
 - 已知警告：Starlette `TestClient` 的 `httpx2` 迁移仍由 `P1A-06` 处理；本节点没有把 Broker 当作最终事实，也没有引入 Durable Run 或后置能力。
 - 当前边界：本节点只建立通用可靠运行链和示例投影，不实现业务任务管理页面、人工死信恢复、业务告警或分布式 Trace 后端；发布级扫描、Secret Scanner 和制品归档进入 `P1A-06`。
-- 提交：本提交。
+- 提交：`b14c4b6`。
 
 ### P1A-06 供应链与本地门禁
 
@@ -112,6 +112,18 @@
 - 自动化验收：工程与供应链专项 `20/20`；统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容、契约生成、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest 均通过。正式发布门禁按预期以状态 1 拒绝当前未配置组合。
 - 容器验收：现有冻结镜像组合未改变运行时功能；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项诊断全部通过。
 - 当前边界：Docker Scout 1.24.0 已安装，但未获镜像组件和漏洞元数据外发授权，未执行扫描；正式流水线需授权 Scout 或使用完全本地的 Trivy/Grype。Linux 验收等待可用宿主机。两者不阻断 `P1B` 本地功能实施，也不得描述为正式发布通过。
+- 提交：`f2d2a83`。
+
+### P1B-01 账号与个人空间
+
+- 状态：通过。
+- 注册事务：新增公开注册用例，在一个 PostgreSQL 事务内创建账号、唯一默认个人空间、所有者成员关系、不可变审计和 Outbox 事件；任一写入失败时整体回滚。审计属性只记录空间类型，事件载荷只记录个人空间 ID，不复制登录名、显示名或密码。
+- 账号与空间约束：登录名统一执行 `strip().casefold()`，数据库约束要求小写、去除首尾空格且至少 3 个字符；应用预检查处理常见重复，数据库唯一约束关闭并发竞态，对外稳定映射 `REGISTRATION_CONFLICT` 与 HTTP `409`。个人空间必须有所有者、企业空间不得设置个人所有者，每个账号最多拥有一个个人空间。
+- 可信访问：个人空间除账号、空间和成员状态均有效外，还必须由当前账号实际拥有；非所有者即使存在活跃成员关系也失败关闭。注册接口只返回账号 ID 与默认个人空间 ID，不隐式建立登录会话，后续仍通过既有密码登录和服务端 Session 边界认证。
+- Migration 与契约：新增 Revision `20260814_0006`，升级前显式拒绝不满足新约束的历史事实，不静默改写身份数据；完整 `base → head → base → head` 往返结构一致。OpenAPI、React/Python 生成类型、错误目录、ReleaseManifest、兼容矩阵和本地 Revision 诊断同步推进。
+- 自动化验收：注册单元、HTTP、契约和 Worker 结构专项 `25/25`，真实 PostgreSQL 注册与 Migration 专项 `4/4`；统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `167/167` 均通过。
+- 容器验收：一键构建和 Migration 成功；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0006`、Valkey 和 Worker 八项诊断全部通过。使用全新合成账号执行真实 HTTP 闭环，注册 `201`、登录 `200`、个人空间上下文 `200`、重复注册 `409`，账号与空间事实一致。
+- 当前边界：本节点不实现企业空间创建、邀请、加入、离开、停用或空间切换，这些能力进入 `P1B-02`；不实现组织、角色、菜单、ABAC 或审批。
 - 提交：本提交。
 
 ## 4. 当前限制

@@ -10,6 +10,7 @@ from ai_platform_api.modules.identity.application.errors import (
     AuthenticationRequiredError,
     WorkspaceRequiredError,
 )
+from ai_platform_api.modules.identity.application.registration import RegistrationService
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -18,6 +19,13 @@ def authentication_service(request: Request) -> AuthenticationService:
     service = getattr(request.app.state, "authentication_service", None)
     if not isinstance(service, AuthenticationService):
         raise RuntimeError("身份认证服务尚未完成装配")
+    return service
+
+
+def registration_service(request: Request) -> RegistrationService:
+    service = getattr(request.app.state, "registration_service", None)
+    if not isinstance(service, RegistrationService):
+        raise RuntimeError("注册服务尚未完成装配")
     return service
 
 

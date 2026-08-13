@@ -13,6 +13,18 @@ class InvalidCredentialsError(PlatformError):
     error_code = "AUTH_INVALID_CREDENTIALS"
 
 
+class RegistrationConflictError(PlatformError):
+    """规范化登录名已被占用时返回稳定冲突，不暴露账号的其他状态。"""
+
+    error_code = "REGISTRATION_CONFLICT"
+
+
+class RegistrationValidationError(PlatformError):
+    """注册输入没有满足应用层的规范化与密码安全约束。"""
+
+    error_code = "VALIDATION_ERROR"
+
+
 class CsrfValidationError(PlatformError):
     """浏览器写请求缺少与 Session 绑定的 CSRF 证明。"""
 
