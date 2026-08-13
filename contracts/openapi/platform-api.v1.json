@@ -9,6 +9,7 @@
     "/api/v1/health/live": {
       "get": {
         "operationId": "getLiveness",
+        "summary": "Get Liveness",
         "tags": ["系统健康"],
         "responses": {
           "200": {
@@ -21,10 +22,15 @@
     "/api/v1/health/ready": {
       "get": {
         "operationId": "getReadiness",
+        "summary": "Get Readiness",
         "tags": ["系统健康"],
         "responses": {
           "200": {
             "description": "Successful Response",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          },
+          "503": {
+            "description": "依赖尚未就绪",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
           }
         }

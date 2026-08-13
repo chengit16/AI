@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     app_name: str = "ai-platform-api"
     environment: str = "local"
     version: str = "0.0.0"
+    dependency_checks_enabled: bool = False
+    database_url: str = "postgresql+psycopg://ai_platform@127.0.0.1:5432/ai_platform"
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    minio_endpoint: str = "http://127.0.0.1:9000"
+    tika_url: str = "http://127.0.0.1:9998"
 
 
 @lru_cache

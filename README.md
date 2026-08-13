@@ -16,3 +16,14 @@
 - 节点提交前必须完成测试并同步相关文档。
 - 未通过验收的工作不得在进度看板中标记为完成。
 - 容量认证、真实模型供应商和企业客户不阻塞本地阶段 0。
+
+## 本地运行
+
+Docker Desktop 运行后执行：
+
+```bash
+./platform start
+./platform doctor
+```
+
+默认访问地址为 `http://127.0.0.1:3000/status`。停止服务使用 `./platform stop`，本地数据会保留在 `.env` 的 `AI_PLATFORM_ROOT` 目录中。

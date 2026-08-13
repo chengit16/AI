@@ -100,9 +100,7 @@ def test_openapi_baseline_matches_fastapi_implementation() -> None:
     assert baseline["openapi"] == "3.1.0"
     assert generated["openapi"] == baseline["openapi"]
     assert generated["info"] == baseline["info"]
-    assert set(generated["paths"]) == set(baseline["paths"])
+    assert generated["paths"] == baseline["paths"]
     generated_health = generated["components"]["schemas"]["HealthResponse"]
     baseline_health = baseline["components"]["schemas"]["HealthResponse"]
     assert generated_health == baseline_health
-    for path, path_item in baseline["paths"].items():
-        assert generated["paths"][path]["get"]["operationId"] == path_item["get"]["operationId"]

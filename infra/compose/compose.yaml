@@ -1,0 +1,149 @@
+name: ai-intelligent-platform
+
+x-python-environment: &python-environment
+  AI_PLATFORM_ENVIRONMENT: local
+  AI_PLATFORM_VERSION: 0.0.0
+  AI_PLATFORM_DEPENDENCY_CHECKS_ENABLED: "true"
+  AI_PLATFORM_DATABASE_URL: postgresql+psycopg://ai_platform:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/ai_platform
+  AI_PLATFORM_REDIS_URL: redis://redis:6379/0
+  AI_PLATFORM_MINIO_ENDPOINT: http://minio:9000
+  AI_PLATFORM_TIKA_URL: http://tika:9998
+  AI_PLATFORM_MODEL_PROVIDER: mock
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ai_platform
+      POSTGRES_USER: ai_platform
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_platform -d ai_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ai-platform-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-development-only}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/data/objects:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  tika:
+    image: apache/tika:3.2.3.0-full
+    ports:
+      - "127.0.0.1:${TIKA_PORT:-9998}:9998"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:9998/version >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    environment: *python-environment
+    ports:
+      - "127.0.0.1:${AI_PLATFORM_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      tika:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/ready', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    environment: *python-environment
+    command:
+      [
+        "python",
+        "-c",
+        "import signal,time; signal.signal(signal.SIGTERM, lambda *_: exit(0)); print('worker ready', flush=True); time.sleep(10**9)",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      tika:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "ai_platform_worker.health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+    ports:
+      - "127.0.0.1:${AI_PLATFORM_WEB_PORT:-3000}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped

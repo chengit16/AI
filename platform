@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_FILE="$PROJECT_DIR/infra/compose/compose.yaml"
+ENV_FILE="$PROJECT_DIR/.env"
+DEFAULT_ENV_FILE="$PROJECT_DIR/.env.example"
+
+log() {
+  printf '[AI Platform] %s\n' "$*"
+}
+
+fail() {
+  printf '[AI Platform] 错误: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "缺少命令: $1"
+}
+
+compose() {
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+ensure_environment() {
+  if [[ ! -f "$ENV_FILE" ]]; then
+    cp "$DEFAULT_ENV_FILE" "$ENV_FILE"
+    log "已根据 .env.example 创建本地 .env"
+  fi
+
+  # 本地数据目录由 .env 配置；当前节点不生成业务主密钥，避免产生未被使用的秘密材料。
+  local root_path
+  root_path="$(awk -F= '$1 == "AI_PLATFORM_ROOT" {print substr($0, index($0, "=") + 1)}' "$ENV_FILE" | tail -n 1)"
+  root_path="${root_path:-./.ai-platform}"
+  if [[ "$root_path" != /* ]]; then
+    root_path="$PROJECT_DIR/${root_path#./}"
+  fi
+  export AI_PLATFORM_ROOT="$root_path"
+  mkdir -p \
+    "$root_path/data/postgres" \
+    "$root_path/data/redis" \
+    "$root_path/data/objects" \
+    "$root_path/logs" \
+    "$root_path/runtime"
+}
+
+check_runtime() {
+  require_command docker
+  require_command curl
+  docker info >/dev/null 2>&1 || fail "Docker Engine 未运行"
+  docker compose version >/dev/null 2>&1 || fail "Docker Compose 不可用"
+}
+
+check_resources() {
+  local cpu_count memory_bytes free_kb
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    cpu_count="$(sysctl -n hw.logicalcpu)"
+    memory_bytes="$(sysctl -n hw.memsize)"
+  else
+    cpu_count="$(getconf _NPROCESSORS_ONLN)"
+    memory_bytes="$(awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo)"
+  fi
+  free_kb="$(df -Pk "$PROJECT_DIR" | awk 'NR == 2 {print $4}')"
+  log "主机资源: ${cpu_count} 核 CPU，$((memory_bytes / 1024 / 1024 / 1024)) GB 内存，$((free_kb / 1024 / 1024)) GB 可用磁盘"
+  (( cpu_count >= 8 )) || log "警告: CPU 少于建议的 8 核，功能可运行但处理速度可能较慢"
+  (( memory_bytes >= 16 * 1024 * 1024 * 1024 )) || log "警告: 内存少于建议的 16 GB，请限制本地数据集规模"
+  (( free_kb >= 50 * 1024 * 1024 )) || fail "可用磁盘少于 50 GB，不能安全启动本地数据服务"
+}
+
+check_port() {
+  local port="$1"
+  if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+    if ! compose ps --format json 2>/dev/null | grep -q "127.0.0.1:$port"; then
+      fail "端口 $port 已被其他进程占用"
+    fi
+  fi
+}
+
+wait_until_healthy() {
+  local deadline=$((SECONDS + 300))
+  while (( SECONDS < deadline )); do
+    local unhealthy
+    unhealthy="$(compose ps --format json | grep -cE '"Health":"(starting|unhealthy)"' || true)"
+    local running
+    running="$(compose ps --services --status running | wc -l | tr -d ' ')"
+    if [[ "$unhealthy" == "0" && "$running" == "7" ]]; then
+      return 0
+    fi
+    sleep 3
+  done
+  compose ps
+  fail "服务未在 300 秒内全部通过健康检查"
+}
+
+start() {
+  check_runtime
+  check_resources
+  ensure_environment
+  for port in 3000 8000 5432 6379 9000 9001 9998; do
+    check_port "$port"
+  done
+  compose config --quiet
+  log "正在构建并启动本地服务"
+  compose up -d --build
+  wait_until_healthy
+  log "平台已就绪: http://127.0.0.1:3000/status"
+}
+
+stop() {
+  ensure_environment
+  compose down
+  log "平台服务已停止，本地数据目录已保留"
+}
+
+status() {
+  ensure_environment
+  compose ps
+}
+
+logs() {
+  ensure_environment
+  compose logs --tail=200 "${@:1}"
+}
+
+doctor() {
+  check_runtime
+  ensure_environment
+  compose config --quiet
+
+  local failed=0
+  local checks=(
+    "Web|http://127.0.0.1:3000/status"
+    "API|http://127.0.0.1:8000/api/v1/health/ready"
+    "MinIO|http://127.0.0.1:9000/minio/health/live"
+    "Tika|http://127.0.0.1:9998/version"
+  )
+  local item name url
+  for item in "${checks[@]}"; do
+    name="${item%%|*}"
+    url="${item#*|}"
+    if curl --fail --silent --show-error --max-time 5 "$url" >/dev/null; then
+      log "$name: 正常"
+    else
+      log "$name: 失败"
+      failed=1
+    fi
+  done
+
+  if compose exec -T postgres pg_isready -U ai_platform -d ai_platform >/dev/null; then
+    log "PostgreSQL: 正常"
+  else
+    log "PostgreSQL: 失败"
+    failed=1
+  fi
+  if [[ "$(compose exec -T redis redis-cli ping)" == "PONG" ]]; then
+    log "Redis: 正常"
+  else
+    log "Redis: 失败"
+    failed=1
+  fi
+  if [[ "$(compose ps --services --filter status=running | grep -c '^worker$' || true)" == "1" ]]; then
+    log "Worker: 正常"
+  else
+    log "Worker: 失败"
+    failed=1
+  fi
+
+  (( failed == 0 )) || fail "存在未通过的诊断项"
+  log "全部诊断项通过"
+}
+
+usage() {
+  cat <<'EOF'
+用法: ./platform <command>
+
+命令:
+  start    检查环境、构建镜像并启动全部服务
+  stop     停止服务并保留本地数据
+  restart  重启全部服务
+  status   显示容器与健康状态
+  logs     查看最近日志，可追加服务名
+  doctor   执行服务与基础设施诊断
+EOF
+}
+
+command_name="${1:-}"
+case "$command_name" in
+  start) start ;;
+  stop) stop ;;
+  restart) stop; start ;;
+  status) status ;;
+  logs) shift; logs "$@" ;;
+  doctor) doctor ;;
+  *) usage; [[ -z "$command_name" ]] || exit 1 ;;
+esac

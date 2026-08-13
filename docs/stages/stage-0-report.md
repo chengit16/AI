@@ -42,7 +42,7 @@
 - 已建立 Monorepo 目录职责、Node/Python 版本约束、工作区配置、忽略规则和非敏感 `.env.example`。
 - `pnpm install --offline --frozen-lockfile`、`uv run --locked ruff check .` 和 `uv run --locked mypy .` 检查通过。
 - `git check-ignore` 已确认本地环境变量、密钥、虚拟环境、项目 Python 和验证产物不会进入仓库。
-- 提交：本节点提交完成后于 `P0-03` 回填。
+- 提交：`f7cecab`。
 
 ### P0-03 最小应用健康链路
 
@@ -53,7 +53,7 @@
 - 自动化验收：Vitest 1 项、pytest 3 项通过；ESLint、Ruff、mypy、TypeScript 和生产构建通过。
 - 浏览器验收：1440×900 与 390×844 视口无横向溢出；API 状态和刷新操作正常；最终控制台无错误或警告。
 - 已知限制：当前 Web 初始生产资源约 556 KB，其中 Ant Design vendor 约 474 KB；阶段 0 仅有一个轻量页面，不阻塞节点，后续按菜单路由实施页面级懒加载。
-- 提交：本节点提交完成后于 `P0-04` 回填。
+- 提交：`0a52b02`。
 
 ### P0-04 核心契约 V1
 
@@ -63,7 +63,21 @@
 - Golden Fixtures：全部使用明确的合成 UUID 和合成文本，可供当前 Python 与未来 Go 实现复用。
 - 自动化验收：9 项契约测试通过；有效样例、错误码唯一性、OpenAPI 实现一致性，以及缺失 `workspace_id`、非法策略决策、无效 `sequence_no` 三类反例均已覆盖。项目全部 pytest 共 12 项通过。
 - 已知限制：本节点只冻结接口和数据契约，不实现策略引擎、Outbox 发布器、SSE 存储或后置 AI 能力。
-- 提交：本节点提交完成后于 `P0-05` 回填。
+- 提交：`2cc739b`。
+
+### P0-05 本地基础设施与应用容器编排
+
+- 状态：通过。
+- 固定镜像与运行时：PostgreSQL 16 + pgvector、Redis 7.4、MinIO `RELEASE.2025-07-23T15-54-02Z`、Apache Tika `3.2.3.0-full`、Python `3.12.12-slim-bookworm`、Node.js `24.19.0-alpine` 和 Nginx `1.29.1-alpine`。
+- 编排结果：PostgreSQL、Redis、MinIO、Tika、API、Worker 和 Web 共七个容器全部达到 `healthy`，所有主机端口默认仅绑定 `127.0.0.1`。
+- 一键运行：`./platform start`、`status`、`doctor`、`logs`、`restart` 和 `stop` 已提供；首次启动、完整停止及二次启动均通过，`doctor` 对七项服务检查全部通过。
+- 依赖就绪：容器环境中的 API 就绪端点会检查 PostgreSQL、Redis、MinIO 和 Tika；任一依赖不可用时返回 HTTP 503 和 `degraded` 状态，单元测试覆盖该降级行为。
+- 持久化验收：在 PostgreSQL 写入合成标记 `p0-05-persistence`，执行 `./platform stop` 后确认 `.ai-platform/data/postgres`、`redis` 和 `objects` 目录保留，二次启动后标记仍可读取。
+- 页面验收：容器化 Web 在 1440×900 和 390×844 视口均显示六项 API 检查正常，无横向溢出，浏览器控制台无错误或警告。
+- 自动化验收：ESLint、TypeScript、Vitest、前端生产构建、Ruff、mypy、13 项 pytest、`docker compose config --quiet` 和 `git diff --check` 全部通过。
+- 安全与数据：`.env`、`.ai-platform/` 和 `AIPlatformBackups/` 均被 Git 忽略；验收仅使用合成标记，不包含真实个人、企业或供应商数据。
+- 已知限制：当前凭证为本地开发默认值，只允许本机开发使用；未执行 Linux 宿主机兼容验收、真实模型供应商验收和容量认证。
+- 提交：本节点提交完成后于 `P0-06` 回填。
 
 ## 4. 当前限制
 
