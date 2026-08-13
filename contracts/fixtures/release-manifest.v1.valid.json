@@ -1,5 +1,5 @@
 {
-  "compatibility_matrix_version": "p1a-01-v1",
+  "compatibility_matrix_version": "p1a-02-v1",
   "components": [
     {
       "name": "api",
@@ -51,20 +51,21 @@
       "reference": "pgvector/pgvector:pg16"
     },
     {
-      "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-      "name": "redis",
-      "platforms": [
-        "linux/arm64"
-      ],
-      "reference": "redis:7.4-alpine"
-    },
-    {
       "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
       "name": "tika",
       "platforms": [
         "linux/arm64"
       ],
       "reference": "apache/tika:3.2.3.0-full"
+    },
+    {
+      "digest": "sha256:918228e4ff7da6b3a4213cb18067f6e09d9f0503d0a08868699ba227cff71861",
+      "name": "valkey",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "valkey/valkey:8.1.5-alpine"
     },
     {
       "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
@@ -83,7 +84,7 @@
       "reference": "local/ai-platform-worker:0.1.0"
     }
   ],
-  "manifest_digest": "sha256:b767683afb9c38e8dc94799778795ee6e854e49a9ce4a12eca6e0bff278f3897",
+  "manifest_digest": "sha256:18a82b37d26fad45410fa62b3f8a39d8f96695a83905f24cad9db2c0054e6916",
   "release_version": "0.1.0",
   "runtimes": {
     "node": "24.19.0",

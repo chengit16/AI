@@ -1,6 +1,6 @@
 {
   "release_version": "0.1.0",
-  "compatibility_matrix_version": "p1a-01-v1",
+  "compatibility_matrix_version": "p1a-02-v1",
   "components": [
     {
       "name": "web",
@@ -45,16 +45,16 @@
       "platforms": ["linux/arm64"]
     },
     {
-      "name": "redis",
-      "reference": "redis:7.4-alpine",
-      "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-      "platforms": ["linux/arm64"]
-    },
-    {
       "name": "tika",
       "reference": "apache/tika:3.2.3.0-full",
       "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
       "platforms": ["linux/arm64"]
+    },
+    {
+      "name": "valkey",
+      "reference": "valkey/valkey:8.1.5-alpine",
+      "digest": "sha256:918228e4ff7da6b3a4213cb18067f6e09d9f0503d0a08868699ba227cff71861",
+      "platforms": ["linux/amd64", "linux/arm64"]
     },
     {
       "name": "web",

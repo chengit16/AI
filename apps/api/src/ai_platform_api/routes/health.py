@@ -34,7 +34,7 @@ def check_http(url: str, path: str) -> bool:
 def dependency_checks(settings: Settings) -> dict[str, bool]:
     checks: dict[str, Callable[[], bool]] = {
         "postgres": lambda: check_tcp(settings.database_url, 5432),
-        "redis": lambda: check_tcp(settings.redis_url, 6379),
+        "valkey": lambda: check_tcp(settings.valkey_url, 6379),
         "object_storage": lambda: check_http(settings.minio_endpoint, "/minio/health/live"),
         "document_parser": lambda: check_http(settings.tika_url, "/version"),
     }

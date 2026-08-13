@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "matrix_version": "p1a-01-v1",
+  "matrix_version": "p1a-02-v1",
   "manifest_schema_version": 1,
   "component_rules": [
     { "name": "api", "minimum_version": "0.0.0", "maximum_exclusive_version": "1.0.0" },
@@ -13,5 +13,5 @@
     { "name": "node", "version_prefix": "24.19." },
     { "name": "python", "version_prefix": "3.12." }
   ],
-  "required_images": ["api", "minio", "postgres", "redis", "tika", "web", "worker"]
+  "required_images": ["api", "minio", "postgres", "tika", "valkey", "web", "worker"]
 }

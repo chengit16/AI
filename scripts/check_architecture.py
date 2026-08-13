@@ -60,9 +60,9 @@ def violations_for_file(path: Path, root: Path) -> list[Violation]:
     business_module = business_module_for(relative_path)
 
     forbidden_prefixes = {
-        "domain": ("fastapi", "celery", "sqlalchemy", "redis", "pydantic"),
-        "application": ("fastapi", "celery", "sqlalchemy", "redis"),
-        "api": ("celery", "sqlalchemy", "redis"),
+        "domain": ("fastapi", "celery", "sqlalchemy", "redis", "valkey", "pydantic"),
+        "application": ("fastapi", "celery", "sqlalchemy", "redis", "valkey"),
+        "api": ("celery", "sqlalchemy", "redis", "valkey"),
         "infrastructure": ("fastapi", "celery"),
     }[layer]
     violations: list[Violation] = []

@@ -19,7 +19,7 @@
 | `../fixtures/release-manifest-input.v1.valid.json` | 全合成构建输入，用于验证生成器 |
 | `../fixtures/release-manifest.v1.valid.json` | 由合成输入生成的 Golden Manifest |
 
-阶段 0 关闭时默认组合仍包含 Redis 7.4；`P1A-02` 按 `ADR-001` 替换 Valkey 后，必须同步兼容矩阵和 Golden Manifest。历史阶段 0 报告不改写。
+当前默认组合固定 Valkey `8.1.5-alpine` 的多架构清单摘要，覆盖 `linux/amd64` 和 `linux/arm64`。阶段 0 使用 Redis 7.4 的历史结论只保留在阶段报告与 `ADR-001`，不进入当前发布组合。
 
 ## 3. 生成与漂移检查
 

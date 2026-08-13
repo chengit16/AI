@@ -37,7 +37,7 @@ Valkey 使用 BSD-3-Clause，并保持 Redis 协议兼容。需要重新执行�
 
 ## 决策
 
-采用方案 B。阶段 0 保留 Redis 7.4 的历史验证结论，不修改已完成节点；阶段 1A 以独立节点将默认镜像替换为固定补丁版本的 Valkey 8.x。应用侧继续通过缓存与唤醒 Adapter 使用 RESP 能力，不把供应商名暴露到领域接口。
+采用方案 B。阶段 0 保留 Redis 7.4 的历史验证结论，不修改已完成节点；`P1A-02` 将默认镜像替换为 Valkey `8.1.5-alpine@sha256:918228e4ff7da6b3a4213cb18067f6e09d9f0503d0a08868699ba227cff71861`，该清单包含 `linux/amd64` 和 `linux/arm64`。应用侧继续通过缓存与唤醒 Adapter 使用 RESP 能力，不把供应商名暴露到领域接口。
 
 替换节点只处理当前已使用能力，不同时引入集群、哨兵、托管服务或新的消息中间件。替换通过后，Redis 7.4 从默认本地运行组合和未来商业发布清单中移除。
 
@@ -74,9 +74,12 @@ Valkey 使用 BSD-3-Clause，并保持 Redis 协议兼容。需要重新执行�
 
 ## 后续事项
 
-- `P1A-02` 完成替换和兼容验收。
 - 阶段 1A 将 Valkey 版本、镜像摘要和许可证写入 `ReleaseManifest`。
 - 采用 Redis/Valkey 非通用模块或托管服务前重新评审兼容性与许可证。
+
+## 实施结果
+
+`P1A-02` 已完成替换：默认 Compose 不再包含 Redis 服务，Valkey 使用独立 `data/valkey` 目录，旧 `data/redis` 目录保留但不挂载。实际容器报告 `server_name=valkey`、`valkey_version=8.1.5`；合成旧缓存标记未被导入，新 Valkey 合成标记在容器重启后可由 AOF 恢复。API、Worker、SSE PostgreSQL 基线和七项平台诊断均通过。
 
 ## 关联内容
 

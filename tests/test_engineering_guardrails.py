@@ -17,6 +17,18 @@ def test_domain_cannot_import_fastapi(tmp_path: Path) -> None:
     assert "domain 层禁止依赖 fastapi" in violations[0].message
 
 
+def test_domain_cannot_import_valkey_client(tmp_path: Path) -> None:
+    root = tmp_path / "package"
+    path = root / "modules" / "workspace" / "domain" / "cache.py"
+    path.parent.mkdir(parents=True)
+    path.write_text("from valkey import Valkey\n", encoding="utf-8")
+
+    violations = violations_for_file(path, root)
+
+    assert len(violations) == 1
+    assert "domain 层禁止依赖 valkey" in violations[0].message
+
+
 def test_api_cannot_import_infrastructure(tmp_path: Path) -> None:
     root = tmp_path / "package"
     path = root / "modules" / "workspace" / "api" / "routes.py"

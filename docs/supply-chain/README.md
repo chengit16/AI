@@ -39,7 +39,8 @@ Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 39 个�
 | FastAPI / Starlette | 0.141.1 / 1.6.0 | MIT / BSD-3-Clause | 允许 | 保留许可证与版权声明 |
 | psycopg | 3.2.10 | LGPL-3.0 | 允许动态依赖 | 分发包保留许可证、修改说明和可替换边界，发布前复核 LGPL 义务 |
 | PostgreSQL / pgvector | 16 / 0.8.6 | PostgreSQL License | 允许 | 宽松许可证，可进入商业包 |
-| Redis | 7.4 | RSALv2 或 SSPLv1 | 仅允许当前本地验证 | 阶段 1A 替换为协议兼容的 Valkey 8.x；替换完成前不进入商业发布包 |
+| Redis | 7.4 | RSALv2 或 SSPLv1 | 只保留阶段 0 历史验证 | 已由 `P1A-02` 从默认组合移除，不进入商业发布包 |
+| Valkey | 8.1.5 | BSD-3-Clause | 允许 | 默认缓存、锁和任务唤醒依赖；固定多架构镜像摘要并保留许可证文本 |
 | MinIO Server | RELEASE.2025-07-23T15-54-02Z | AGPL-3.0 | 仅允许当前本地验证 | 分发或网络服务形态必须法律复核；首期优先抽象 S3 Adapter，并在商业发布前选择合规对象存储方案 |
 | Apache Tika | 3.2.3 | Apache-2.0 | 允许 | 保留 NOTICE 与许可证文本 |
 | Tesseract OCR | 5.5.0 | Apache-2.0 | 允许英文验证 | 中文 OCR 仍按阶段 1D 接入 PaddleOCR 或等效 Adapter，并重新检查模型和运行库许可证 |
@@ -50,7 +51,7 @@ Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 39 个�
 
 ## 4. 阶段 1A 必做项
 
-1. 将 Redis 7.4 替换为固定版本 Valkey 8.x，复跑缓存、Session、SSE 唤醒和容器恢复测试。
+1. 已由 `P1A-02` 将 Redis 7.4 替换为固定版本 Valkey 8.1.5；后续 Session、队列和 SSE 唤醒能力接入时继续复用已验证的 RESP 边界。
 2. 对 MinIO/S3 Adapter 做可替换边界验收，商业发布方案必须给出许可证和部署义务结论。
 3. 将 Python、Node、镜像、模型和前端静态资源合并到 `ReleaseManifest`，每个发布版本保留 SBOM、许可证、镜像摘要和模型 Revision。
 4. 接入镜像漏洞扫描和完整 Secret Scanner；扫描工具未配置时发布门禁失败，不能静默跳过。

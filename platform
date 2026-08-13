@@ -40,7 +40,7 @@ ensure_environment() {
   export AI_PLATFORM_ROOT="$root_path"
   mkdir -p \
     "$root_path/data/postgres" \
-    "$root_path/data/redis" \
+    "$root_path/data/valkey" \
     "$root_path/data/objects" \
     "$root_path/logs" \
     "$root_path/runtime"
@@ -103,7 +103,8 @@ start() {
   done
   compose config --quiet
   log "正在构建并启动本地服务"
-  compose up -d --build
+  # 基础设施改名后清理旧 Compose 孤儿容器，绑定的数据目录仍保留在宿主机。
+  compose up -d --build --remove-orphans
   wait_until_healthy
   log "平台已就绪: http://127.0.0.1:3000/status"
 }
@@ -154,10 +155,10 @@ doctor() {
     log "PostgreSQL: 失败"
     failed=1
   fi
-  if [[ "$(compose exec -T redis redis-cli ping)" == "PONG" ]]; then
-    log "Redis: 正常"
+  if [[ "$(compose exec -T valkey valkey-cli ping)" == "PONG" ]]; then
+    log "Valkey: 正常"
   else
-    log "Redis: 失败"
+    log "Valkey: 失败"
     failed=1
   fi
   if [[ "$(compose ps --services --filter status=running | grep -c '^worker$' || true)" == "1" ]]; then

@@ -5,7 +5,8 @@ x-python-environment: &python-environment
   AI_PLATFORM_VERSION: 0.0.0
   AI_PLATFORM_DEPENDENCY_CHECKS_ENABLED: "true"
   AI_PLATFORM_DATABASE_URL: postgresql+psycopg://ai_platform:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/ai_platform
-  AI_PLATFORM_REDIS_URL: redis://redis:6379/0
+  # Valkey 使用 RESP 协议，连接 URI 保留标准 redis:// Scheme 以兼容现有客户端生态。
+  AI_PLATFORM_VALKEY_URL: redis://valkey:6379/0
   AI_PLATFORM_MINIO_ENDPOINT: http://minio:9000
   AI_PLATFORM_TIKA_URL: http://tika:9998
   AI_PLATFORM_MODEL_PROVIDER: mock
@@ -29,15 +30,15 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  redis:
-    image: redis:7.4-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+  valkey:
+    image: valkey/valkey:8.1.5-alpine@sha256:918228e4ff7da6b3a4213cb18067f6e09d9f0503d0a08868699ba227cff71861
+    command: ["valkey-server", "--appendonly", "yes"]
     ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${VALKEY_PORT:-6379}:6379"
     volumes:
-      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/data/redis:/data
+      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/data/valkey:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -83,7 +84,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
       minio:
         condition: service_healthy
@@ -117,7 +118,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
       minio:
         condition: service_healthy
