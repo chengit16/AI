@@ -15,17 +15,25 @@ import { errorMessage } from "@/api/client";
 import { logoutCurrentSession } from "@/api/services/auth";
 import { PlatformMark } from "@/components/PlatformMark/PlatformMark";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher/WorkspaceSwitcher";
-import { pageRoutes, workspaceNavigation } from "@/config/resources";
+import { pageRoutes } from "@/config/resources";
+import { useWorkspaceMenuNavigation } from "@/hooks/useWorkspaceMenuNavigation";
 import { useSessionStore } from "@/store/session";
 import { useUiStore } from "@/store/ui";
 
 import styles from "./AppShell.module.css";
 
-function Navigation({ onNavigate }: { onNavigate?: () => void }) {
+function Navigation({
+  items,
+  onNavigate,
+}: {
+  items: ReturnType<typeof useWorkspaceMenuNavigation>["navigation"];
+  onNavigate?: () => void;
+}) {
   return (
     <nav className={styles.navigation} aria-label="平台主导航">
       <p className={styles.navigationLabel}>空间管理</p>
-      {workspaceNavigation.map(({ key, to, label, icon: Icon }) => (
+      {items.length === 0 && <span className={styles.navigationEmpty}>暂无可用页面</span>}
+      {items.map(({ key, to, label, icon: Icon }) => (
         <NavLink
           key={key}
           to={to}
@@ -48,6 +56,7 @@ export function AppShell() {
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
   const mobileOpen = useUiStore((state) => state.mobileNavigationOpen);
   const setMobileOpen = useUiStore((state) => state.setMobileNavigationOpen);
+  const { navigation } = useWorkspaceMenuNavigation();
   const clearSession = useSessionStore((state) => state.clear);
   const accountId = useSessionStore((state) => state.accountId);
   const logout = useMutation({
@@ -74,7 +83,7 @@ export function AppShell() {
         <div className={styles.brand}>
           <PlatformMark compact={collapsed} />
         </div>
-        <Navigation />
+        <Navigation items={navigation} />
         <Tooltip title={collapsed ? "展开侧栏" : "收起侧栏"} placement="right">
           <Button
             className={styles.collapseButton}
@@ -98,7 +107,7 @@ export function AppShell() {
           <div className={styles.topbarEnd}>
             <span className={styles.routeLabel}>
               <Building2 size={16} />
-              {workspaceNavigation.find((item) => location.pathname.startsWith(item.to))?.label ??
+              {navigation.find((item) => location.pathname.startsWith(item.to))?.label ??
                 "空间管理"}
             </span>
             <Dropdown
@@ -122,7 +131,7 @@ export function AppShell() {
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
       >
-        <Navigation onNavigate={() => setMobileOpen(false)} />
+        <Navigation items={navigation} onNavigate={() => setMobileOpen(false)} />
       </Drawer>
     </div>
   );

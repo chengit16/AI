@@ -45,6 +45,14 @@
   white-space: nowrap;
 }
 
+.navigationEmpty {
+  display: block;
+  margin: 12px;
+  color: #91a8a0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .navigationItem {
   min-height: 44px;
   display: flex;

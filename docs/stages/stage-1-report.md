@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1C-06` 待开始 |
+| 当前节点 | `P1D-01` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -255,7 +255,19 @@
 - 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、Revision `20260814_0014`、Valkey 和 Worker 八项诊断通过。全合成 HTTP 场景完成个人空间首版/二版发布及回滚，回滚生成第 3 条历史记录；企业空间独立发布；企业普通成员读取当前发布返回 `200`，历史列表和创建发布返回 `403 POLICY_DENIED`，伪造个人空间 Header 读取企业当前发布同样返回 `403 POLICY_DENIED`。
 - 环境说明：本地剩余磁盘不足默认 50 GB 启动门禁时，仅对本次小规模验收进程设置 `AI_PLATFORM_MIN_FREE_DISK_GB=40`；`.env.example` 与启动器默认 50 GB 基线未降低。该覆盖只证明功能可运行，不是容量、百万 Chunk 或完整并发认证。
 - 当前边界：本节点提供稳定的当前发布消费契约，但 React 仍未按发布快照生成导航、路由和角色裁剪；这些进入 `P1C-06`。未扩展 SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
-- 提交：本提交。
+- 提交：`925fa20`。
+
+### P1C-06 动态应用壳层
+
+- 状态：通过。
+- 动态导航来源：新增 `GET /workspaces/{workspace_id}/menu-releases/current` 和企业空间当前账号有效角色读取接口。存在已发布快照时，React 只消费快照中的已注册页面菜单，并依据当前角色的 `role_menus` 可见性裁剪；页面路由、组件和图标仍由本地受控 `ResourceRegistry` 映射，服务端快照不能注入任意路由、组件或代码。
+- 路由与状态：应用壳层、桌面侧栏、移动抽屉和顶部当前页面标签统一消费动态导航。刷新和深链在菜单加载完成后保持一致；当前路径未出现在有效导航时显示无权限状态；菜单接口或角色接口失败时显示加载失败状态；无发布快照的历史空间暂时回退静态注册表，保证首发前空间可用，但后端 PDP 仍独立执行授权。
+- 个人与企业边界：个人空间无需额外请求角色集合，沿用所有者的后端授权；企业空间读取当前账号有效角色后裁剪角色菜单。两类空间都只能读取自身当前发布，跨空间 Header 伪造继续由后端返回 `403 POLICY_DENIED`。菜单隐藏仅改善体验，不构成接口或数据安全边界。
+- 数据与契约：新增 Migration `20260814_0015`，为系统 `workspace_member` 角色补充 `authorization.effective_role.read` 的本人数据范围授权；`ReleaseManifest`、兼容矩阵、平台诊断和 Migration 往返期望同步推进至 `20260814_0015`。不修改已提交的 `0014` 历史 Migration。
+- 自动化验收：动态菜单纯函数和 React 应用闭环 `6/6`；前端 Prettier、Lint、TypeScript、生产构建通过；Python/Ruff/mypy 和全量 pytest `243/243` 通过；Migration 往返 `1/1`、P1C-05 PostgreSQL 回归 `1/1`；统一 `./scripts/verify` 全部通过。
+- 容器与浏览器验收：以当前工作树重建 API、Worker、Web 和 Migration 镜像，`platform doctor` 八项全部通过，数据库 Revision 为 `20260814_0015`。真实运行页面在桌面视口确认已发布企业空间显示动态菜单和页面内容；移动抽屉沿用同一导航数据源。当前未宣称 Linux 宿主机、百万 Chunk 或完整并发认证通过。
+- 当前边界：本节点不实现知识库、对象存储、解析 OCR、Embedding、真实模型供应商或问答链路；这些进入 `P1D` 和 `P1E`。未扩展 SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
+- 提交：待本节点独立提交。
 
 ## 4. 当前限制
 
@@ -266,4 +278,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-05`，当前进入 `P1C-06`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-06`，当前进入 `P1D-01`。

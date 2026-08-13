@@ -4,6 +4,8 @@ import { apiRequest } from "@/api/client";
 export type Workspace = components["schemas"]["WorkspaceSummaryResponse"];
 export type WorkspaceMember = components["schemas"]["WorkspaceMemberResponse"];
 type WorkspaceMemberView = components["schemas"]["WorkspaceMemberListResponse"]["items"][number];
+export type CurrentMenuRelease = components["schemas"]["CurrentMenuReleaseResponse"];
+export type EffectiveRoleSet = components["schemas"]["EffectiveRoleSetResponse"];
 
 function isWorkspaceMember(item: WorkspaceMemberView): item is WorkspaceMember {
   return (
@@ -56,5 +58,25 @@ export function disableWorkspaceMember(workspaceId: string, accountId: string) {
   return apiRequest<components["schemas"]["WorkspaceMembershipResponse"]>(
     `/api/v1/workspaces/${workspaceId}/members/${accountId}/disable`,
     { method: "POST" },
+  );
+}
+
+export async function getCurrentWorkspaceMenuRelease(
+  workspaceId: string,
+  signal?: AbortSignal,
+): Promise<CurrentMenuRelease> {
+  return apiRequest<CurrentMenuRelease>(`/api/v1/workspaces/${workspaceId}/menu-releases/current`, {
+    signal,
+  });
+}
+
+export async function getEffectiveWorkspaceRoles(
+  workspaceId: string,
+  accountId: string,
+  signal?: AbortSignal,
+): Promise<EffectiveRoleSet> {
+  return apiRequest<EffectiveRoleSet>(
+    `/api/v1/workspaces/${workspaceId}/roles/effective/${accountId}`,
+    { signal },
   );
 }

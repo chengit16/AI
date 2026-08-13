@@ -52,6 +52,7 @@ OWNER_PERMISSION_CODES = (
     "workspace.overview.access",
 )
 MEMBER_PERMISSION_CODES = (
+    "authorization.effective_role.read",
     "authorization.menu_release.read",
     "workspace.context.switch",
     "workspace.entitlement.read",

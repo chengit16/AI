@@ -2,10 +2,10 @@ import { Activity, LayoutDashboard, Network, UsersRound, type LucideIcon } from 
 
 import { resourceRegistry } from "@/config/resourceRegistry.generated";
 
-const pageById = new Map(
+export const pageById = new Map(
   resourceRegistry.page_resources.map((resource) => [resource.page_resource_id, resource]),
 );
-const iconByKey = {
+export const iconByKey = {
   activity: Activity,
   "layout-dashboard": LayoutDashboard,
   network: Network,
@@ -16,7 +16,7 @@ export const pageRoutes = Object.fromEntries(
   resourceRegistry.page_resources.map((resource) => [resource.component_key, resource.route]),
 ) as Record<(typeof resourceRegistry.page_resources)[number]["component_key"], string>;
 
-export const workspaceNavigation = resourceRegistry.menus
+export const staticWorkspaceNavigation = resourceRegistry.menus
   .filter((menu) => menu.status === "active" && menu.menu_type === "page" && menu.page_resource_id)
   .map((menu) => {
     const page = pageById.get(menu.page_resource_id!);
@@ -34,3 +34,6 @@ export const workspaceNavigation = resourceRegistry.menus
     };
   })
   .sort((left, right) => left.sortOrder - right.sortOrder);
+
+/** 未发布空间的兼容入口；首次发布后由 MenuRelease 快照接管。 */
+export const workspaceNavigation = staticWorkspaceNavigation;
