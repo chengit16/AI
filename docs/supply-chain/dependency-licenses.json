@@ -1,0 +1,600 @@
+{
+  "inventory_version": "p0-12-v1",
+  "node": [
+    {
+      "license": "MIT",
+      "name": "@ant-design/colors",
+      "version": "8.0.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@ant-design/cssinjs",
+      "version": "2.1.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@ant-design/cssinjs-utils",
+      "version": "2.1.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@ant-design/fast-color",
+      "version": "3.0.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@ant-design/icons",
+      "version": "6.3.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@ant-design/icons-svg",
+      "version": "4.5.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@ant-design/react-slick",
+      "version": "2.0.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@babel/runtime",
+      "version": "7.29.7"
+    },
+    {
+      "license": "MIT",
+      "name": "@babel/runtime",
+      "version": "8.0.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@emotion/hash",
+      "version": "0.8.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@emotion/unitless",
+      "version": "0.7.5"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/async-validator",
+      "version": "6.0.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/cascader",
+      "version": "1.22.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/checkbox",
+      "version": "2.0.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/collapse",
+      "version": "1.2.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/color-picker",
+      "version": "3.1.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/context",
+      "version": "2.0.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/dialog",
+      "version": "1.10.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/drawer",
+      "version": "1.4.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/dropdown",
+      "version": "1.0.3"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/form",
+      "version": "1.8.6"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/image",
+      "version": "1.10.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/input",
+      "version": "1.3.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/input-number",
+      "version": "1.6.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/listy",
+      "version": "1.2.3"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/mentions",
+      "version": "1.11.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/menu",
+      "version": "1.4.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/mini-decimal",
+      "version": "1.1.4"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/motion",
+      "version": "1.3.3"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/mutate-observer",
+      "version": "2.0.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/notification",
+      "version": "2.0.7"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/overflow",
+      "version": "1.0.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/pagination",
+      "version": "1.4.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/picker",
+      "version": "1.12.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/portal",
+      "version": "2.2.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/progress",
+      "version": "1.0.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/qrcode",
+      "version": "2.0.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/rate",
+      "version": "1.0.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/resize-observer",
+      "version": "1.1.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/segmented",
+      "version": "1.3.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/select",
+      "version": "1.10.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/slider",
+      "version": "1.1.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/steps",
+      "version": "1.2.2"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/switch",
+      "version": "1.0.3"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/table",
+      "version": "1.11.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/tabs",
+      "version": "1.12.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/tooltip",
+      "version": "1.5.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/tour",
+      "version": "2.4.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/tree",
+      "version": "1.4.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/tree-select",
+      "version": "1.16.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/trigger",
+      "version": "3.10.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/upload",
+      "version": "1.1.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/util",
+      "version": "1.12.0"
+    },
+    {
+      "license": "MIT",
+      "name": "@rc-component/virtual-list",
+      "version": "1.5.1"
+    },
+    {
+      "license": "MIT",
+      "name": "@tanstack/query-core",
+      "version": "5.101.4"
+    },
+    {
+      "license": "MIT",
+      "name": "@tanstack/react-query",
+      "version": "5.101.4"
+    },
+    {
+      "license": "MIT",
+      "name": "@types/react",
+      "version": "19.2.18"
+    },
+    {
+      "license": "MIT",
+      "name": "antd",
+      "version": "6.6.0"
+    },
+    {
+      "license": "MIT",
+      "name": "clsx",
+      "version": "2.1.1"
+    },
+    {
+      "license": "MIT",
+      "name": "compute-scroll-into-view",
+      "version": "3.1.1"
+    },
+    {
+      "license": "MIT",
+      "name": "cookie-es",
+      "version": "3.1.1"
+    },
+    {
+      "license": "MIT",
+      "name": "csstype",
+      "version": "3.2.3"
+    },
+    {
+      "license": "MIT",
+      "name": "dayjs",
+      "version": "1.11.21"
+    },
+    {
+      "license": "MIT",
+      "name": "is-mobile",
+      "version": "5.0.0"
+    },
+    {
+      "license": "MIT",
+      "name": "json2mq",
+      "version": "0.2.0"
+    },
+    {
+      "license": "ISC",
+      "name": "lucide-react",
+      "version": "1.31.0"
+    },
+    {
+      "license": "MIT",
+      "name": "react",
+      "version": "19.2.8"
+    },
+    {
+      "license": "MIT",
+      "name": "react-dom",
+      "version": "19.2.8"
+    },
+    {
+      "license": "MIT",
+      "name": "react-is",
+      "version": "19.2.8"
+    },
+    {
+      "license": "MIT",
+      "name": "react-router",
+      "version": "8.3.0"
+    },
+    {
+      "license": "MIT",
+      "name": "scheduler",
+      "version": "0.27.0"
+    },
+    {
+      "license": "MIT",
+      "name": "scroll-into-view-if-needed",
+      "version": "3.1.0"
+    },
+    {
+      "license": "MIT",
+      "name": "string-convert",
+      "version": "0.2.1"
+    },
+    {
+      "license": "MIT",
+      "name": "stylis",
+      "version": "4.4.0"
+    },
+    {
+      "license": "MIT",
+      "name": "throttle-debounce",
+      "version": "5.0.2"
+    },
+    {
+      "license": "MIT",
+      "name": "zustand",
+      "version": "5.0.14"
+    }
+  ],
+  "python": [
+    {
+      "direct": true,
+      "license": "MIT",
+      "name": "alembic",
+      "version": "1.16.5"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "annotated-doc",
+      "version": "0.0.5"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "annotated-types",
+      "version": "0.8.0"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "anyio",
+      "version": "4.14.2"
+    },
+    {
+      "direct": false,
+      "license": "MIT-0",
+      "name": "cffi",
+      "version": "2.1.1"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "charset-normalizer",
+      "version": "3.5.0"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "name": "click",
+      "version": "8.4.2"
+    },
+    {
+      "direct": false,
+      "license": "Apache-2.0 OR BSD-3-Clause",
+      "name": "cryptography",
+      "version": "50.0.0"
+    },
+    {
+      "direct": true,
+      "license": "MIT",
+      "name": "fastapi",
+      "version": "0.141.1"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "h11",
+      "version": "0.16.0"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "httptools",
+      "version": "0.8.0"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "name": "idna",
+      "version": "3.18"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "Mako",
+      "version": "1.4.1"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "name": "MarkupSafe",
+      "version": "3.0.3"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+      "name": "numpy",
+      "version": "2.5.2"
+    },
+    {
+      "direct": true,
+      "license": "MIT",
+      "name": "pdfplumber",
+      "version": "0.11.10"
+    },
+    {
+      "direct": true,
+      "license": "MIT",
+      "name": "pgvector",
+      "version": "0.4.1"
+    },
+    {
+      "direct": false,
+      "license": "MIT-CMU",
+      "name": "pillow",
+      "version": "12.3.0"
+    },
+    {
+      "direct": true,
+      "license": "GNU Lesser General Public v3 (LGPLv3)",
+      "name": "psycopg",
+      "version": "3.2.10"
+    },
+    {
+      "direct": false,
+      "license": "GNU Lesser General Public v3 (LGPLv3)",
+      "name": "psycopg-binary",
+      "version": "3.2.10"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "name": "pycparser",
+      "version": "3.0"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "pydantic",
+      "version": "2.13.4"
+    },
+    {
+      "direct": true,
+      "license": "MIT",
+      "name": "pydantic-settings",
+      "version": "2.11.0"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause, Apache-2.0, dependency licenses",
+      "name": "pypdfium2",
+      "version": "5.13.0"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "name": "python-dotenv",
+      "version": "1.2.2"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "PyYAML",
+      "version": "6.0.3"
+    },
+    {
+      "direct": true,
+      "license": "MIT",
+      "name": "SQLAlchemy",
+      "version": "2.0.44"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "name": "starlette",
+      "version": "1.6.0"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "typing-inspection",
+      "version": "0.4.4"
+    },
+    {
+      "direct": false,
+      "license": "Apache-2.0",
+      "name": "tzdata",
+      "version": "2026.3"
+    },
+    {
+      "direct": true,
+      "license": "BSD-3-Clause",
+      "name": "uvicorn",
+      "version": "0.37.0"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "uvloop",
+      "version": "0.22.1"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "watchfiles",
+      "version": "1.2.0"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "name": "websockets",
+      "version": "17.0.1"
+    }
+  ],
+  "sources": {
+    "node": "pnpm-lock.yaml 与 pnpm licenses list --prod",
+    "python": "uv.lock 与当前冻结 .venv 包元数据"
+  },
+  "summary": {
+    "node_packages": 76,
+    "python_packages": 34,
+    "unknown_python_licenses": []
+  }
+}

@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 | --- | --- |
 | 文档名称 | AI 智能平台 V2 架构设计与建设规划 |
-| 文档版本 | V2.7 |
-| 文档状态 | 阶段 0 已启动，按节点验收、文档同步和独立 Git 提交推进 |
+| 文档版本 | V2.8 |
+| 文档状态 | 阶段 0 节点验收完成，待关闭后启动阶段 1 |
 | 适用范围 | 个人版、企业版、本地验证、后续 SaaS 与私有化部署 |
 | 核心定位 | 以工作空间为隔离边界，以知识库为数据底座，以 Agent 为能力载体，以服务发布为产品出口 |
-| 本次调整 | 增加全阶段节点化交付规则：每个节点完成验收后必须同步进度与验证文档，并形成一次可追溯的独立 Git 提交 |
+| 本次调整 | 完成阶段 0 范围冻结；按 ADR-001 固定阶段 1A 的 Valkey 迁移，并将阶段 1 拆为可独立验收和提交的实施节点 |
 
 ## 2. 建设目标
 
@@ -1244,7 +1244,7 @@ backup-package/
 
 阶段 1 使用 PostgreSQL 保存 `Message`、`MessageEvent` 和 `StreamCursor`，不引入独立事件数据库。`MessageEvent` 和 `StreamCursor` 默认保留 24 小时；事件按 100～300 ms 合并后持久化，不按单个 Token 写库；`(conversation_id, sequence_no)` 建立唯一约束。
 
-单次最多回放 5,000 个事件或 10 MB，超过限制时返回最终 `Message` 快照。阶段 2 可使用 Redis Streams 或 NATS 处理跨实例实时转发，但 PostgreSQL 继续作为断点恢复的事实来源。
+单次最多回放 5,000 个事件或 10 MB，超过限制时返回最终 `Message` 快照。阶段 2 可使用 Valkey Streams 或 NATS 处理跨实例实时转发，但 PostgreSQL 继续作为断点恢复的事实来源。
 
 ### 17.6 API Key 加密与轮换
 
@@ -1294,7 +1294,7 @@ flowchart LR
     AI --> KDB["文档、对象与派生索引"]
 
     PY --> OUTBOX["Transactional Outbox"]
-    OUTBOX --> BUS["Redis Streams / NATS<br/>按阶段 2 评估"]
+    OUTBOX --> BUS["Valkey Streams / NATS<br/>按阶段 2 评估"]
     BUS --> EDGE
     BUS --> GR
 ```
@@ -1304,7 +1304,7 @@ Go 接入层负责连接和通用流量治理，不负责菜单、RBAC、ABAC、
 迁移顺序固定为：
 
 1. Go 接入层以反向代理和影子流量方式接入，所有业务仍由 Python 处理。
-2. 迁移请求追踪、限流、Open API Key 校验和 SSE 连接管理；浏览器 Session 保持为不透明凭证，由 Python 身份内省接口验证，Go 不直接依赖 Redis 中的 Session 私有存储格式。
+2. 迁移请求追踪、限流、Open API Key 校验和 SSE 连接管理；浏览器 Session 保持为不透明凭证，由 Python 身份内省接口验证，Go 不直接依赖 Valkey 中的 Session 私有存储格式。
 3. 迁移 `MessageEvent` 与 `StreamCursor` 写入权，PostgreSQL 继续作为断点恢复事实来源。
 4. 在模型网关接口稳定并有压测收益后，迁移模型流式代理；模型策略和凭证治理仍遵守统一模型配置。
 5. 仅当 `Run → Step → Attempt` 状态机稳定后，整体迁移 Agent Runtime 及其数据写入权。
@@ -1375,7 +1375,7 @@ SSE 事件信封固定如下，`event_id` 用于去重与 `Last-Event-ID`，`seq
 }
 ```
 
-事实数据变更和 Outbox 事件必须在同一数据库事务内提交。发布过程采用至少一次投递，消费者以 `event_id` 幂等；同一聚合需要顺序消费时使用 `aggregate_id + aggregate_version` 检测缺失、重复和乱序。事件字段只允许兼容性新增；删除、改名或改变语义必须发布新 `schema_version`。Redis 只用于首期唤醒与传输，不能代替 PostgreSQL 中的业务事实和 Outbox 状态。
+事实数据变更和 Outbox 事件必须在同一数据库事务内提交。发布过程采用至少一次投递，消费者以 `event_id` 幂等；同一聚合需要顺序消费时使用 `aggregate_id + aggregate_version` 检测缺失、重复和乱序。事件字段只允许兼容性新增；删除、改名或改变语义必须发布新 `schema_version`。Valkey 只用于首期唤醒与传输，不能代替 PostgreSQL 中的业务事实和 Outbox 状态。
 
 ### 17.11 工程目录与跨语言测试门禁
 
@@ -1527,6 +1527,7 @@ flowchart LR
 **建设内容**：
 
 - 建立模块化单体、独立 Worker、关系数据库、对象存储、缓存/消息队列和基础可观测设施。
+- 按 [`ADR-001`](./docs/decisions/ADR-001-replace-redis-with-valkey.md) 将阶段 0 的 Redis 7.4 替换为固定 Valkey 8.x，并保持 RESP Adapter 边界。
 - 建立 Docker Compose 多容器编排和 `./platform` 一键管理入口。
 - 建立统一错误码、幂等键、Trace、审计字段、配置管理和数据库迁移规范。
 - 固定 `workspace_id` 强制注入、`actor_id`、`permission_code`、资源 ID、版本 ID、事件 ID 和 `sequence_no` 规则。
@@ -2131,7 +2132,7 @@ SSE 运行基线：
 | 对象存储 | MinIO | 本地可运行，并兼容后续 S3 接口迁移 |
 | 向量检索 | PostgreSQL + pgvector 起步 | 减少本地依赖；若百万 Chunk、权限过滤或重建性能不达标，再评估 Qdrant/Milvus |
 | 关键词检索 | 应用层固定中文分词 + PostgreSQL Full Text Search 起步 | PostgreSQL 原生分词不直接承担中文切词；阶段 0 验证召回和排序效果，效果不足时再接 OpenSearch |
-| 缓存与任务分发 | Redis + PostgreSQL 任务事实状态 | Redis 只负责缓存、锁和任务唤醒，任务最终状态保存在数据库；阶段 2 再决定 NATS/RabbitMQ |
+| 缓存与任务分发 | Valkey + PostgreSQL 任务事实状态 | 阶段 1A 从 Redis 7.4 替换为 Valkey 8.x；Valkey 只负责缓存、锁和任务唤醒，任务最终状态保存在数据库；阶段 2 再决定 NATS/RabbitMQ |
 | OCR | PaddleOCR | 中文文档优先、本地可运行 |
 | 文档解析 | Apache Tika/专用解析器组合 | 统一格式识别，复杂 PDF 与 DOCX 使用专用解析器补充 |
 | Embedding | 阶段 0 先验证 BGE-M3；配置供应商 Embedding 后再做同集补充评估 | 兼顾中文、混合检索和可本地化能力，不要求提前提供供应商账号 |
@@ -2176,10 +2177,10 @@ GPT 中转的 `base_url`、API Key、模型 ID/别名、能力和数据政策均
 | Web 前端 | React 19、TypeScript、Vite、React Router、TanStack Query、Zustand、Ant Design | React Router 承载动态菜单路由，TanStack Query 管理服务端状态，Zustand 只保存会话和界面状态；页面路由和操作点从菜单发布快照生成，前端权限只负责体验，不能作为安全边界 |
 | 平台 API | Python 3.12、FastAPI、Pydantic 2 | 模块化单体；业务模块不能直接访问模型供应商、跨工作空间数据或其他模块私有表 |
 | 数据访问与迁移 | SQLAlchemy 2、Alembic、PostgreSQL 16 | 所有工作空间业务查询强制注入 `workspace_id`；Migration 只能向前演进并在升级前备份 |
-| 异步任务 | Celery + Redis，PostgreSQL 保存任务事实状态 | 采用至少一次投递语义；任务必须幂等，Redis 中的数据不能作为最终业务状态 |
+| 异步任务 | Celery + Valkey，PostgreSQL 保存任务事实状态 | 采用至少一次投递语义；任务必须幂等，Valkey 中的数据不能作为最终业务状态 |
 | OCR 与解析 | 独立 Python Ingestion Worker、PaddleOCR、独立 Tika 服务和专用解析器 | 大文件处理不能占用 API 进程；每个阶段记录版本、进度、错误和重试次数 |
 | 接口协议 | REST/JSON、OpenAPI 3.1、SSE | 管理与业务接口使用 REST；生成结果使用 SSE；首期不引入 GraphQL 和 WebSocket |
-| 浏览器登录 | 本地账号密码 + 服务端 Session + HttpOnly Cookie + CSRF 防护 | 密码使用 Argon2id；Session 存入 Redis；不把长期 JWT 放入浏览器本地存储 |
+| 浏览器登录 | 本地账号密码 + 服务端 Session + HttpOnly Cookie + CSRF 防护 | 密码使用 Argon2id；Session 存入 Valkey；不把长期 JWT 放入浏览器本地存储 |
 | Open API 鉴权 | 可撤销、可轮换、仅显示一次的工作空间 API Key | Key 只保存带独立标识的安全哈希，绑定权限范围、过期时间、调用配额和来源限制；模型供应商 Key 则使用 17.6 节的信封加密 |
 | 企业身份扩展 | 预留 `IdentityProvider` 接口 | OIDC、SAML、LDAP 和企业通讯录后置，不进入本地 MVP |
 | 可观测性 | 结构化日志、OpenTelemetry、Prometheus 指标 | Trace 贯穿 API、任务、检索和模型调用；本地默认轻量运行，完整看板在阶段 2 启用 |

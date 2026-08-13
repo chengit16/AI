@@ -40,6 +40,9 @@ git diff --cached --check
 log "检查仓库敏感文件与凭证模式"
 "${PYTHON[@]}" scripts/check_repository_policy.py
 
+log "检查 SBOM 与许可证清单"
+"${PYTHON[@]}" scripts/generate_supply_chain.py --check
+
 log "检查 Python 与 React 模块依赖"
 "${PYTHON[@]}" scripts/check_architecture.py
 node scripts/check-frontend-architecture.mjs

@@ -85,7 +85,7 @@ React 目标规则包括：
 - `.env.example` 只允许包含无权限的合成本地默认值。
 - 真实凭证一旦进入 Git 历史，应立即轮换，删除当前文件不能撤销泄漏。
 
-`P0-12` 继续负责依赖漏洞、许可证、SBOM 和完整安全扫描工具的选型与报告；未安装的工具不得在当前报告中标记为通过。
+`P0-12` 已建立 [`docs/supply-chain/`](../supply-chain/README.md) 供应链基线，并将 SBOM 与许可证产物漂移检查接入 `./scripts/verify`。Node 与 Python 生产依赖漏洞审计已执行；镜像扫描因本机 Docker Scout 未登录保持 `not_configured`。阶段 1A 继续负责镜像漏洞扫描、完整 Secret Scanner、`ReleaseManifest` 和发布级供应链归档，未安装或未配置的工具不得标记为通过。
 
 ## 6. 失败处理
 

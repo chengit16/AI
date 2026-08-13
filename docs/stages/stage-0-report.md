@@ -5,9 +5,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 阶段 | 阶段 0：需求基线与技术验证 |
-| 状态 | 进行中 |
+| 状态 | 节点验收完成，待阶段关闭提交与标签 |
 | 报告日期 | 2026-08-13 |
-| `core_functional` | `not_run` |
+| `core_functional` | `passed`，仅代表阶段 0 技术验证范围 |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
 | `capacity_certification` | `not_run` |
@@ -155,6 +155,20 @@
 - 预期声明：每条样本固定 `expected_security_result`、稳定 `expected_error_code`、HTTP 状态、允许暴露内容、禁止泄漏标记、`expected_scope`、`expected_field_mask`、模型到达限制、Run 创建限制和回放限制，供阶段 1D/1E 的确定性防护测试复用。
 - 自动化验收：`tests/test_p011_security_dataset.py` `6/6`；校验数据集版本和类别完整性、`synthetic=true`、`case_id` 唯一、禁止泄漏标记非空、错误码与契约目录 HTTP 状态一致、工作空间范围与恢复守卫存在，以及疑似真实凭证模式和非合成标识不存在。
 - 当前边界：本节点只建立版本化安全与评估数据，不实现 Prompt 防火墙、真实模型安全评测、LLM Grading、工具执行拦截或安全运营平台；阶段 1D/1E 按 Fixture 接入确定性防护，真实供应商配置后再做模型安全表现评估。
+- 提交：`2fef22d`。
+
+### P0-12 供应链检查、阶段报告与范围冻结
+
+- 状态：通过。
+- SBOM：Python 和 Node 生产依赖均生成 CycloneDX 1.5 产物；生成结果移除时间、随机 UUID、用户名和本机绝对路径，并通过锁文件漂移检查。Python 锁文件包含 39 个跨平台生产组件，当前 macOS 环境许可证清单覆盖实际安装的 34 个适用组件；Node 清单覆盖 76 个生产/可选组件。
+- 漏洞审计：首次 Python 审计发现 `pdfminer-six 20251107` 的 1 个和 `starlette 0.48.0` 的 6 个已知漏洞；升级 FastAPI、Starlette、pdfplumber 和 pdfminer-six 后，`pip-audit 2.9.0` 复查为 0。Node 生产依赖审计的严重、高危、中危和低危漏洞均为 0。
+- 镜像扫描：Docker Scout 1.24.0 已安装，但本机未登录，镜像 CVE 扫描保持 `not_configured`，不能描述为通过；阶段 1A 必须接入可用的镜像扫描门禁。
+- 许可证：Redis 7.4 只保留为阶段 0 本地验证依赖，阶段 1A 按 [`ADR-001`](../decisions/ADR-001-replace-redis-with-valkey.md) 独立替换为 Valkey 8.x；MinIO Server 在商业分发或网络服务前必须法律复核并保持 S3 Adapter 可替换边界；psycopg 发布前复核 LGPL 分发义务。
+- 自动化验收：供应链专项测试 `4/4`，覆盖 CycloneDX 版本、可复现元数据、许可证完整性和漂移识别；安全升级后的 API、契约、Worker 和解析专项测试 `33/33`；统一门禁 pytest `96/96`，Ruff、mypy、前端测试/构建、架构、契约和供应链重新生成无 Diff 全部通过。
+- 容器验收：API 与 Worker 镜像从冻结锁文件重建，镜像内确认 FastAPI `0.141.1`、Starlette `1.6.0`、pdfplumber `0.11.10` 和 pdfminer-six `20260107`；只重建两个应用容器后，`./platform doctor` 七项诊断全部通过，数据库和对象存储容器未重建。
+- 范围冻结：阶段 1 保留个人/企业空间、复杂组织、字段级 ABAC、自定义菜单及页面/接口统一权限、自定义工作流、多级审批、知识入库、RAG 引用和 SSE 断点续传；SaaS、Go 运行层、Channel Gateway、Durable Run、真实多源连接器、LLM Grading、多模态图片问答和 Agent 自动写操作不进入阶段 1。
+- 交付文档：[`docs/supply-chain/README.md`](../supply-chain/README.md)、[`docs/stages/stage-1-plan.md`](./stage-1-plan.md) 和 [`docs/stages/stage-1-report.md`](./stage-1-report.md)。
+- 当前边界：真实模型供应商、AI 回答质量、镜像 CVE 和容量认证仍分别保持 `not_configured` 或 `not_run`；这些状态不冒充通过，也不阻塞阶段 0 技术验证结论。
 - 提交：本节点提交完成后回填。
 
 ### P0-13 前端 UI/UX 设计基线
@@ -208,3 +222,9 @@
 - 当前开发机系统 Python 为 3.14.3，项目固定 Python 3.12，并由 uv 管理项目解释器，不能使用系统 Python 作为验收环境。
 - 未配置真实模型供应商，因此不能执行真实回答质量、真实模型成本和供应商兼容性结论。
 - 未准备容量压测机，容量认证保持 `not_run`，不影响阶段 0 的本地功能与契约验证。
+
+## 5. 阶段结论
+
+阶段 0 的 16 个必需节点均已完成实现与验收，核心契约、高风险技术路径、工程规范、安全数据集和供应链边界已经形成可复现证据。阶段 0 可以进入关闭流程，关闭提交只负责回填 `P0-12` SHA、同步阶段状态并创建 `stage-0-complete` 标签，不再混入功能实现。
+
+进入阶段 1 后按 [`阶段 1 实施计划`](./stage-1-plan.md) 从 `P1A-01` 开始。阶段 1 的本地功能验收不依赖真实企业客户和专用压测机；模拟企业数据必须继续使用版本化合成数据。

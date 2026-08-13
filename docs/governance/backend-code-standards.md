@@ -22,7 +22,7 @@
 | HTTP | FastAPI、Pydantic 2 | REST/JSON 管理与业务接口，OpenAPI 3.1 |
 | 数据 | PostgreSQL 16、SQLAlchemy 2 | 工作空间数据强制隔离，ORM 不作为跨模块契约 |
 | Migration | Alembic | 共享数据库只有一条 Schema 演进流水线 |
-| 异步任务 | Celery、Redis | PostgreSQL 保存事实状态，任务按至少一次投递设计 |
+| 异步任务 | Celery、Valkey | PostgreSQL 保存事实状态，任务按至少一次投递设计 |
 | 流式输出 | SSE | PostgreSQL 保存恢复事实，支持 `Last-Event-ID` |
 | 对象与解析 | MinIO、Tika、独立 Ingestion Worker | 大文件和解析任务不得占用 API 请求进程 |
 | 类型与质量 | mypy strict、Ruff | 禁止通过降低全局严格度绕过错误 |
@@ -92,9 +92,9 @@ infrastructure -> domain
 app -> api + application + infrastructure
 ```
 
-- `domain/` 不得导入 FastAPI、Celery、SQLAlchemy ORM、Redis Client 或供应商 SDK。
+- `domain/` 不得导入 FastAPI、Celery、SQLAlchemy ORM、Valkey Client 或供应商 SDK。
 - `application/` 可以依赖领域接口和事务接口，不依赖具体 Adapter。
-- `api/` 不直接访问 ORM、Redis、对象存储或模型供应商。
+- `api/` 不直接访问 ORM、Valkey、对象存储或模型供应商。
 - `infrastructure/` 可以依赖框架和 SDK，但不能反向决定领域规则。
 - `app/` 是依赖装配入口；具体 Adapter 的选择和生命周期在这里集中管理。
 - 跨业务模块不得导入对方的 `infrastructure/` 或私有实现。
@@ -274,7 +274,7 @@ Application 用例是业务事务和授权编排入口。推荐顺序如下：
 
 - Worker 消息只携带稳定 ID、版本、幂等键和必要上下文，不携带 ORM 对象、明文凭证或大段二进制内容。
 - 任务名称与载荷必须版本化，不使用 Python 模块路径作为长期协议。
-- PostgreSQL 保存任务事实状态、进度、尝试次数和最终结果；Redis 只负责队列、唤醒、锁或缓存。
+- PostgreSQL 保存任务事实状态、进度、尝试次数和最终结果；Valkey 只负责队列、唤醒、锁或缓存。
 - 任务按至少一次投递设计，处理器在发生重复、延迟和乱序时必须保持业务结果正确。
 - 消费者以 `event_id` 或明确业务幂等键记录处理结果；不能只依赖队列声称的唯一投递。
 - 同一聚合要求顺序时使用 `aggregate_id + aggregate_version` 检测缺失、重复和乱序。
@@ -348,7 +348,7 @@ Application 用例是业务事务和授权编排入口。推荐顺序如下：
 | --- | --- |
 | 单元测试 | 领域规则、状态转换、纯函数和错误分支 |
 | Application 测试 | 授权、事务编排、幂等和依赖交互 |
-| 集成测试 | PostgreSQL、Redis、对象存储、策略过滤和 Migration |
+| 集成测试 | PostgreSQL、Valkey、对象存储、策略过滤和 Migration |
 | 契约测试 | OpenAPI、SSE、事件、错误码和 Golden Fixtures |
 | 安全测试 | 跨工作空间、字段泄漏、直接 ID、SSRF 和凭证脱敏 |
 | 恢复测试 | Outbox 重投、Worker 重试、SSE 回放和备份升级 |
@@ -419,7 +419,7 @@ uv run --locked pytest
 - 使用菜单可见性、前端传入角色或资源 ID 存在性代替后端授权。
 - 将 ORM 对象放入 HTTP 响应、Celery 参数、缓存、SSE 或集成事件。
 - 在数据库事务中执行不可控模型调用、OCR、大文件上传或远程请求。
-- 将 Redis、进程内存或任务队列状态作为最终业务事实。
+- 将 Valkey、进程内存或任务队列状态作为最终业务事实。
 - 捕获 `Exception` 后静默忽略、返回成功或无限重试。
 - 用长期双写、第二套 Migration 或复制权限规则为未来 Go 做准备。
 - 为追求覆盖率编写只断言实现细节、没有业务风险价值的测试。
