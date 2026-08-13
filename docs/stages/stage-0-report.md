@@ -108,6 +108,20 @@
 - 容器验收：Worker 镜像使用 `uv sync --frozen` 成功重建，容器内可导入 pdfplumber `0.11.8` 和 `PdfDocumentParser`，Linux/ARM64 依赖可复现。
 - 安全与数据：样本内容、UUID、制度、人员和密级信息均为合成数据；未发送到外部服务，Tika 与 OCR 仅在本机容器运行。
 - 当前边界：本节点验证解析、OCR 和 Chunk 产物，不实现对象存储、正式 `IngestionJob` 状态持久化、队列重试、Embedding、关键词索引和发布切换；这些由阶段 1D 及后续节点完成。
+- 提交：`d89f8cc`。
+
+### P0-08 混合检索、重排、全文精读与引用链路
+
+- 状态：通过。
+- 索引基线：PostgreSQL `vector` Extension 版本为 `0.8.6`；`retrieval_chunks` 固定 1024 维 cosine 向量、`simple` 配置的 `tsvector` 关键词列、GIN 关键词索引和 HNSW 向量索引。中文关键词使用版本化 `cjk-bigram-v1` 单字与双字确定性分词，不依赖当前数据库没有安装的 `zhparser`。
+- 授权边界：所有关键词查询、向量查询、相邻 Chunk 精读和引用读取都接收 `AuthorizedSearchScope`，在 SQL 阶段同时过滤工作空间、活动索引版本、知识库、文档、部门、可见性、密级和启用状态；`content` 字段被 ABAC 掩码时直接拒绝。私有文档必须具有策略明确下发的文档集合，不能只凭同一工作空间放行。
+- 排序流程：每个通道候选数、RRF 常量、重排候选数和最终证据数均由 `RetrievalBudget` 设上限；RRF 按 Chunk 去重并稳定排序；只有关键词命中且向量分数达到阈值时进入 FastPass，其余候选交给可替换 `Reranker`。Embedding 维度、输出数量或 Reranker 分数数量不符合契约时默认失败，不返回不可信排序。
+- 全文精读与引用：精读只能读取同一授权文档版本的有界相邻 Chunk，按距中心证据的远近消耗 Chunk 和字符预算并保证中心证据存在；引用必须重新验证 Chunk 当前可见、索引版本有效、原文包含声明片段，并返回文档版本、索引版本、内容哈希和来源位置。
+- 真实模型：离线固定 `BAAI/bge-m3@5617a9f61b028005a4858fdac845db406aefb181`（MIT，1024 维）和 `BAAI/bge-reranker-v2-m3@953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`（Apache-2.0）。模型缓存约 4.3 GB，位于被 Git 忽略的 `.ai-platform/models/huggingface`，未上传任何数据或模型产物。
+- 模型实测：在 Apple M3 Pro、Torch `2.13.0` CPU 环境中，BGE-M3 对 1 条查询与 3 条合成证据加载约 1.35～2.31 秒、推理约 2.40～2.46 秒，正确证据 cosine 相似度 `0.858126` 并为 Top 1；Reranker 加载约 1.03～1.04 秒、推理约 2.36～2.37 秒，正确证据概率 `0.995468` 并为 Top 1。MPS 在当前 Torch 环境不可用，这些数据只证明小样本功能正确，不构成并发或容量认证。
+- 自动化验收：领域单元测试 `13/13`，真实 PostgreSQL 集成测试 `5/5`，全量 pytest `64/64`；覆盖 RRF 去重、FastPass、重排契约、字段掩码、精读预算、引用伪造、跨空间、知识库、文档、部门、密级、旧索引版本和停用 Chunk。`./scripts/verify`、前端生产构建、契约兼容、Ruff、mypy strict 和架构检查全部通过；新增 `RETRIEVAL_SCOPE_DENIED`、`RETRIEVAL_CONFIGURATION_ERROR` 和 `CITATION_INVALID` 稳定错误码。
+- 运行边界：Torch、Transformers 和本地模型只属于 `ai-validation` 依赖组和显式验证脚本，不进入默认门禁。API/Worker 镜像使用冻结锁文件重建成功，镜像内确认 `pgvector` 可用且不存在 Torch/Transformers。
+- 当前边界：本节点建立可实施的检索与引用技术基线，不实现正式知识库发布任务、生产 Embedding Worker、在线模型下载、查询改写、来源权威性评分、LLM Grading 或百万 Chunk 容量认证；这些分别按阶段 1D/1E、后置能力和条件容量认证建设。
 - 提交：本节点提交完成后回填。
 
 ### P0-13 前端 UI/UX 设计基线

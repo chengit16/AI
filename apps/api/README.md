@@ -26,3 +26,17 @@ uv run --locked alembic upgrade head
 AI_PLATFORM_TEST_DATABASE_URL='postgresql+psycopg://user:password@127.0.0.1:5432/database' \
   uv run --locked pytest tests/integration
 ```
+
+## 混合检索与模型验证
+
+P0-08 建立了权限约束的关键词检索、pgvector cosine 检索、RRF 合并、FastPass、可替换 Reranker、受控全文精读和引用校验基线。所有检索、精读和引用入口都必须接收由策略结果转换出的 `AuthorizedSearchScope`，并在 SQL 查询阶段应用工作空间、索引版本、知识库、文档、部门、可见性、密级和启用状态过滤。
+
+默认 API/Worker 运行环境只安装 `pgvector` 客户端，不安装 Torch、Transformers 或模型文件。真实模型验收属于显式的本地技术验证，先安装独立依赖组并准备被 Git 忽略的本地缓存：
+
+```bash
+uv sync --frozen --group dev --group ai-validation
+.venv/bin/python scripts/validate_bge_models.py \
+  --cache-dir .ai-platform/models/huggingface
+```
+
+脚本固定验证 `BAAI/bge-m3` 的 1024 维归一化向量和 `BAAI/bge-reranker-v2-m3` 的中文证据排序。该脚本不联网、不进入 `./scripts/verify`，输出只用于小规模功能验证，不代表容量认证或线上质量结论。

@@ -77,6 +77,9 @@ def test_error_codes_are_unique_and_stable() -> None:
         "POLICY_DENIED",
         "INGESTION_PARSE_FAILED",
         "INGESTION_PARSER_UNAVAILABLE",
+        "RETRIEVAL_SCOPE_DENIED",
+        "RETRIEVAL_CONFIGURATION_ERROR",
+        "CITATION_INVALID",
         "SSE_EVENT_EXPIRED",
         "INTERNAL_ERROR",
     }.issubset(codes)

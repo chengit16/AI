@@ -8,6 +8,7 @@ dependencies = [
     "alembic==1.16.5",
     "fastapi==0.116.2",
     "pdfplumber==0.11.8",
+    "pgvector==0.4.1",
     "psycopg[binary]==3.2.10",
     "pydantic-settings==2.11.0",
     "sqlalchemy==2.0.44",
@@ -15,6 +16,11 @@ dependencies = [
 ]
 
 [dependency-groups]
+ai-validation = [
+    "huggingface-hub==1.27.0",
+    "torch==2.13.0",
+    "transformers==5.15.0",
+]
 dev = [
   "httpx==0.28.1",
   "jsonschema[format]==4.25.1",
@@ -52,3 +58,8 @@ warn_unused_configs = true
 [[tool.mypy.overrides]]
 module = ["ai_platform_api.*", "ai_platform_worker.*"]
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# pgvector 0.4.1 尚未发布 PEP 561 标记，调用处仍由 SQLAlchemy 类型与集成测试约束。
+module = ["pgvector.*"]
+ignore_missing_imports = true
