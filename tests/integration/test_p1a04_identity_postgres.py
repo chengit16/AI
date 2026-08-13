@@ -20,6 +20,9 @@ from ai_platform_api.modules.identity.application.errors import (
     AuthenticationRequiredError,
     WorkspaceContextDeniedError,
 )
+from ai_platform_api.modules.identity.infrastructure.entitlements_sqlalchemy import (
+    SqlAlchemyEntitlementAccessReader,
+)
 from ai_platform_api.modules.identity.infrastructure.security import (
     Argon2idPasswordAdapter,
     Sha256SecretDigester,
@@ -33,6 +36,8 @@ from ai_platform_api.persistence.database import create_platform_engine, create_
 from ai_platform_api.persistence.tables import (
     accounts,
     open_api_keys,
+    workspace_entitlements,
+    workspace_feature_settings,
     workspace_memberships,
     workspaces,
 )
@@ -144,9 +149,35 @@ def identity_database() -> Iterator[IdentityHarness]:
                 version=1,
             )
         )
+        # 该夹具专门验证 API Key 生命周期，因此显式开启测试权益，避免依赖商业套餐默认值。
+        session.execute(
+            insert(workspace_entitlements).values(
+                workspace_id=WORKSPACE_ID,
+                plan_code="identity_test",
+                max_storage_bytes=0,
+                max_members=1,
+                max_knowledge_bases=0,
+                max_published_agents=0,
+                max_monthly_questions=0,
+                open_api_allowed=True,
+                public_publish_allowed=False,
+                created_at=now,
+                updated_at=now,
+                version=1,
+            )
+        )
+        session.execute(
+            insert(workspace_feature_settings).values(
+                workspace_id=WORKSPACE_ID,
+                open_api_enabled=True,
+                updated_at=now,
+                version=1,
+            )
+        )
 
     session_store = ValkeySessionStore(valkey_url)
     reader = SqlAlchemyIdentityReader(sessions)
+    entitlements = SqlAlchemyEntitlementAccessReader(sessions)
     digester = Sha256SecretDigester()
     harness = IdentityHarness(
         schema=schema,
@@ -159,11 +190,13 @@ def identity_database() -> Iterator[IdentityHarness]:
             passwords,
             digester,
             session_ttl_seconds=300,
+            entitlements=entitlements,
         ),
         api_keys=ApiKeyService(
             reader,
             SqlAlchemyIdentityUnitOfWork(sessions),
             digester,
+            entitlements,
         ),
         valkey_url=valkey_url,
     )

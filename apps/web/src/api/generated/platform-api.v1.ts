@@ -123,6 +123,40 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/entitlements": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /** Get Entitlement */
+    readonly get: operations["getWorkspaceEntitlement"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/entitlements/features/open-api": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Set Open Api Feature */
+    readonly post: operations["setWorkspaceOpenApiFeature"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/invitations": {
     readonly parameters: {
       readonly query?: never;
@@ -590,6 +624,31 @@ export type components = {
        */
       readonly scope_type: "workspace" | "department" | "member";
     };
+    /** EntitlementResponse */
+    readonly EntitlementResponse: {
+      /** Entitlement Version */
+      readonly entitlement_version: number;
+      /** Open Api Allowed */
+      readonly open_api_allowed: boolean;
+      /** Open Api Enabled */
+      readonly open_api_enabled: boolean;
+      /** Plan Code */
+      readonly plan_code: string;
+      /** Public Publish Allowed */
+      readonly public_publish_allowed: boolean;
+      /** Quotas */
+      readonly quotas: readonly components["schemas"]["QuotaResponse"][];
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+      /**
+       * Workspace Status
+       * @enum {string}
+       */
+      readonly workspace_status: "active" | "suspended" | "archived";
+    };
     /** ErrorResponse */
     readonly ErrorResponse: {
       /** Code */
@@ -675,6 +734,11 @@ export type components = {
       /** Parent Department Id */
       readonly parent_department_id?: string | null;
     };
+    /** OpenApiFeatureRequest */
+    readonly OpenApiFeatureRequest: {
+      /** Enabled */
+      readonly enabled: boolean;
+    };
     /** OrganizationStatusRequest */
     readonly OrganizationStatusRequest: {
       /** Active */
@@ -708,6 +772,23 @@ export type components = {
       readonly status: "active" | "disabled";
       /** Version */
       readonly version: number;
+    };
+    /** QuotaResponse */
+    readonly QuotaResponse: {
+      /** Limit Value */
+      readonly limit_value: number;
+      /**
+       * Metric
+       * @enum {string}
+       */
+      readonly metric:
+        "members" | "storage_bytes" | "knowledge_bases" | "published_agents" | "questions_monthly";
+      /** Period Key */
+      readonly period_key: string;
+      /** Remaining Value */
+      readonly remaining_value: number;
+      /** Used Value */
+      readonly used_value: number;
     };
     /** RegistrationRequest */
     readonly RegistrationRequest: {
@@ -1253,6 +1334,179 @@ export interface operations {
       };
       /** @description 请求未获授权 */
       readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getWorkspaceEntitlement: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["EntitlementResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly setWorkspaceOpenApiFeature: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["OpenApiFeatureRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["EntitlementResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
         headers: {
           readonly [name: string]: unknown;
         };

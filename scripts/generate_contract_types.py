@@ -6,6 +6,7 @@ import argparse
 import json
 import keyword
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -14,10 +15,12 @@ ROOT = Path(__file__).parents[1]
 OPENAPI = ROOT / "contracts" / "openapi" / "platform-api.v1.json"
 OPENAPI_TYPESCRIPT = ROOT / "node_modules" / ".bin" / "openapi-typescript"
 PRETTIER = ROOT / "apps" / "web" / "node_modules" / ".bin" / "prettier"
+PRETTIER_CONFIG = ROOT / "apps" / "web" / ".prettierrc.json"
 TYPESCRIPT_OUTPUT = ROOT / "apps" / "web" / "src" / "api" / "generated" / "platform-api.v1.ts"
 PYTHON_OUTPUT = (
     ROOT / "packages" / "contracts" / "src" / "ai_platform_contracts" / "platform_api_v1.py"
 )
+RUFF = Path(sys.executable).with_name("ruff")
 
 
 def load_openapi(path: Path = OPENAPI) -> dict[str, Any]:
@@ -105,7 +108,7 @@ def generate_python(document: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def generate_typescript(output: Path) -> None:
+def generate_typescript(output: Path, *, prettier_cwd: Path = ROOT) -> None:
     missing = [path.name for path in (OPENAPI_TYPESCRIPT, PRETTIER) if not path.is_file()]
     if missing:
         raise FileNotFoundError(
@@ -125,16 +128,30 @@ def generate_typescript(output: Path) -> None:
         check=True,
     )
     # 生成器原始缩进与项目 Prettier 规则不同，写入前统一格式化以避免提交后再产生漂移。
-    subprocess.run([str(PRETTIER), "--write", str(output)], cwd=ROOT, check=True)
+    subprocess.run(
+        [str(PRETTIER), "--config", str(PRETTIER_CONFIG), "--write", str(output)],
+        cwd=prettier_cwd,
+        check=True,
+    )
+
+
+def format_python(output: Path) -> None:
+    if not RUFF.is_file():
+        raise FileNotFoundError("缺少与当前 Python 环境配套的 Ruff，请先安装锁定依赖")  # noqa: RUF001
+    subprocess.run([str(RUFF), "format", str(output)], cwd=ROOT, check=True)
 
 
 def stale_outputs() -> list[Path]:
     with tempfile.TemporaryDirectory(prefix="ai-platform-contracts-") as directory:
         generated_typescript = Path(directory) / "platform-api.v1.ts"
-        generate_typescript(generated_typescript)
+        generated_python = Path(directory) / "platform_api_v1.py"
+        # 临时文件位于仓库外时 Prettier 无法自动发现配置，因此显式沿用仓库工作目录。
+        generate_typescript(generated_typescript, prettier_cwd=ROOT)
+        generated_python.write_text(generate_python(load_openapi()), encoding="utf-8")
+        format_python(generated_python)
         expected = {
             TYPESCRIPT_OUTPUT: generated_typescript.read_text(encoding="utf-8"),
-            PYTHON_OUTPUT: generate_python(load_openapi()),
+            PYTHON_OUTPUT: generated_python.read_text(encoding="utf-8"),
         }
     return [
         path
@@ -148,6 +165,7 @@ def write_outputs() -> None:
     PYTHON_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     generate_typescript(TYPESCRIPT_OUTPUT)
     PYTHON_OUTPUT.write_text(generate_python(load_openapi()), encoding="utf-8")
+    format_python(PYTHON_OUTPUT)
 
 
 def main() -> int:

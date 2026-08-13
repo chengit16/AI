@@ -9,7 +9,7 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
 )
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from ai_platform_api.modules.identity.domain.enterprise import (
     WorkspaceRecord,
     WorkspaceSummary,
 )
+from ai_platform_api.modules.identity.domain.entitlements import default_entitlement
 from ai_platform_api.modules.identity.domain.models import (
     MembershipStatus,
     WorkspaceStatus,
@@ -36,6 +37,8 @@ from ai_platform_api.persistence.tables import (
     membership_positions,
     role_bindings,
     roles,
+    workspace_entitlements,
+    workspace_feature_settings,
     workspace_invitations,
     workspace_memberships,
     workspaces,
@@ -74,6 +77,35 @@ class SqlAlchemyEnterpriseRepository:
                 )
             )
             self.add_membership(owner)
+            entitlement, feature_settings = default_entitlement(
+                workspace_id=workspace.workspace_id,
+                workspace_type="enterprise",
+                occurred_at=workspace.created_at,
+            )
+            self._session.execute(
+                insert(workspace_entitlements).values(
+                    workspace_id=entitlement.workspace_id,
+                    plan_code=entitlement.plan_code,
+                    max_storage_bytes=entitlement.max_storage_bytes,
+                    max_members=entitlement.max_members,
+                    max_knowledge_bases=entitlement.max_knowledge_bases,
+                    max_published_agents=entitlement.max_published_agents,
+                    max_monthly_questions=entitlement.max_monthly_questions,
+                    open_api_allowed=entitlement.open_api_allowed,
+                    public_publish_allowed=entitlement.public_publish_allowed,
+                    created_at=entitlement.created_at,
+                    updated_at=entitlement.updated_at,
+                    version=entitlement.version,
+                )
+            )
+            self._session.execute(
+                insert(workspace_feature_settings).values(
+                    workspace_id=feature_settings.workspace_id,
+                    open_api_enabled=feature_settings.open_api_enabled,
+                    updated_at=feature_settings.updated_at,
+                    version=feature_settings.version,
+                )
+            )
             system_roles, system_bindings = system_role_seed(
                 workspace_id=workspace.workspace_id,
                 owner_membership_id=owner.membership_id,
@@ -394,6 +426,22 @@ class SqlAlchemyEnterpriseRepository:
             )
             for row in rows
         )
+
+    def member_capacity_available(self, workspace_id: UUID) -> bool:
+        limit = self._session.scalar(
+            select(workspace_entitlements.c.max_members).where(
+                workspace_entitlements.c.workspace_id == workspace_id
+            )
+        )
+        active_members = self._session.scalar(
+            select(func.count())
+            .select_from(workspace_memberships)
+            .where(
+                workspace_memberships.c.workspace_id == workspace_id,
+                workspace_memberships.c.status == "active",
+            )
+        )
+        return limit is not None and int(active_members or 0) < limit
 
 
 class SqlAlchemyEnterpriseUnitOfWork:

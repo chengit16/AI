@@ -80,6 +80,17 @@ class EffectiveRoleSourceResponse(typing.TypedDict):
     scope_type: typing.Literal["workspace", "department", "member"]
 
 
+class EntitlementResponse(typing.TypedDict):
+    entitlement_version: int
+    open_api_allowed: bool
+    open_api_enabled: bool
+    plan_code: str
+    public_publish_allowed: bool
+    quotas: list[QuotaResponse]
+    workspace_id: str
+    workspace_status: typing.Literal["active", "suspended", "archived"]
+
+
 class ErrorResponse(typing.TypedDict):
     code: str
     message: str
@@ -126,6 +137,10 @@ class MoveDepartmentRequest(typing.TypedDict):
     parent_department_id: typing.NotRequired[str | None]
 
 
+class OpenApiFeatureRequest(typing.TypedDict):
+    enabled: bool
+
+
 class OrganizationStatusRequest(typing.TypedDict):
     active: bool
 
@@ -141,6 +156,16 @@ class PositionResponse(typing.TypedDict):
     position_id: str
     status: typing.Literal["active", "disabled"]
     version: int
+
+
+class QuotaResponse(typing.TypedDict):
+    limit_value: int
+    metric: typing.Literal[
+        "members", "storage_bytes", "knowledge_bases", "published_agents", "questions_monthly"
+    ]
+    period_key: str
+    remaining_value: int
+    used_value: int
 
 
 class RegistrationRequest(typing.TypedDict):

@@ -7,11 +7,16 @@ from ai_platform_api.modules.identity.application.authentication import (
     AuthenticationService,
 )
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
+from ai_platform_api.modules.identity.application.entitlements import EntitlementService
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
 from ai_platform_api.modules.identity.infrastructure.enterprise_sqlalchemy import (
     SqlAlchemyEnterpriseUnitOfWork,
+)
+from ai_platform_api.modules.identity.infrastructure.entitlements_sqlalchemy import (
+    SqlAlchemyEntitlementAccessReader,
+    SqlAlchemyEntitlementUnitOfWork,
 )
 from ai_platform_api.modules.identity.infrastructure.organization_sqlalchemy import (
     SqlAlchemyOrganizationUnitOfWork,
@@ -47,6 +52,7 @@ class ApplicationContainer:
     api_keys: ApiKeyService
     registration: RegistrationService
     enterprise_workspaces: EnterpriseWorkspaceService
+    entitlements: EntitlementService
     organization: OrganizationService
     roles: RoleService
     role_cache: ValkeyRoleResolutionCache
@@ -72,6 +78,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     sessions = ValkeySessionStore(settings.valkey_url)
     role_cache = ValkeyRoleResolutionCache(settings.valkey_url)
     reader = SqlAlchemyIdentityReader(database.sessions)
+    entitlement_access = SqlAlchemyEntitlementAccessReader(database.sessions)
     digester = Sha256SecretDigester()
     passwords = Argon2idPasswordAdapter()
     try:
@@ -85,11 +92,13 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 passwords=passwords,
                 secrets_digester=digester,
                 session_ttl_seconds=settings.session_ttl_seconds,
+                entitlements=entitlement_access,
             ),
             api_keys=ApiKeyService(
                 repository=reader,
                 unit_of_work=SqlAlchemyIdentityUnitOfWork(database.sessions),
                 secrets_digester=digester,
+                entitlements=entitlement_access,
             ),
             registration=RegistrationService(
                 repository=reader,
@@ -98,6 +107,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             enterprise_workspaces=EnterpriseWorkspaceService(
                 unit_of_work=SqlAlchemyEnterpriseUnitOfWork(database.sessions),
+            ),
+            entitlements=EntitlementService(
+                unit_of_work=SqlAlchemyEntitlementUnitOfWork(database.sessions),
             ),
             organization=OrganizationService(
                 unit_of_work=SqlAlchemyOrganizationUnitOfWork(database.sessions),

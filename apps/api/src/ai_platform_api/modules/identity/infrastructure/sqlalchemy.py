@@ -15,6 +15,7 @@ from sqlalchemy.engine import CursorResult, RowMapping
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ai_platform_api.modules.identity.domain.entitlements import default_entitlement
 from ai_platform_api.modules.identity.domain.models import (
     AccountCredential,
     AccountStatus,
@@ -34,6 +35,8 @@ from ai_platform_api.persistence.tables import (
     open_api_keys,
     role_bindings,
     roles,
+    workspace_entitlements,
+    workspace_feature_settings,
     workspace_memberships,
     workspaces,
 )
@@ -255,6 +258,35 @@ class SqlAlchemyRegistrationWriter:
                 created_at=registration.occurred_at,
                 updated_at=registration.occurred_at,
                 version=1,
+            )
+        )
+        entitlement, feature_settings = default_entitlement(
+            workspace_id=registration.personal_workspace_id,
+            workspace_type="personal",
+            occurred_at=registration.occurred_at,
+        )
+        self._session.execute(
+            insert(workspace_entitlements).values(
+                workspace_id=entitlement.workspace_id,
+                plan_code=entitlement.plan_code,
+                max_storage_bytes=entitlement.max_storage_bytes,
+                max_members=entitlement.max_members,
+                max_knowledge_bases=entitlement.max_knowledge_bases,
+                max_published_agents=entitlement.max_published_agents,
+                max_monthly_questions=entitlement.max_monthly_questions,
+                open_api_allowed=entitlement.open_api_allowed,
+                public_publish_allowed=entitlement.public_publish_allowed,
+                created_at=entitlement.created_at,
+                updated_at=entitlement.updated_at,
+                version=entitlement.version,
+            )
+        )
+        self._session.execute(
+            insert(workspace_feature_settings).values(
+                workspace_id=feature_settings.workspace_id,
+                open_api_enabled=feature_settings.open_api_enabled,
+                updated_at=feature_settings.updated_at,
+                version=feature_settings.version,
             )
         )
         system_roles, system_bindings = system_role_seed(

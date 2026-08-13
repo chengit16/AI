@@ -1,6 +1,7 @@
 from ai_platform_backend.integration import persistence as integration_tables
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Column,
@@ -471,6 +472,112 @@ Index(
     role_bindings.c.workspace_id,
     role_bindings.c.membership_id,
     role_bindings.c.status,
+)
+
+workspace_entitlements = Table(
+    "workspace_entitlements",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("plan_code", String(64), nullable=False),
+    Column("max_storage_bytes", BigInteger, nullable=False),
+    Column("max_members", Integer, nullable=False),
+    Column("max_knowledge_bases", Integer, nullable=False),
+    Column("max_published_agents", Integer, nullable=False),
+    Column("max_monthly_questions", Integer, nullable=False),
+    Column("open_api_allowed", Boolean, nullable=False),
+    Column("public_publish_allowed", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workspace_entitlements_workspace",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("plan_code ~ '^[a-z][a-z0-9_]{2,63}$'", name="ck_entitlements_plan_code"),
+    CheckConstraint("max_storage_bytes >= 0", name="ck_entitlements_storage"),
+    CheckConstraint("max_members >= 1", name="ck_entitlements_members"),
+    CheckConstraint("max_knowledge_bases >= 0", name="ck_entitlements_knowledge_bases"),
+    CheckConstraint("max_published_agents >= 0", name="ck_entitlements_agents"),
+    CheckConstraint("max_monthly_questions >= 0", name="ck_entitlements_questions"),
+    CheckConstraint("version >= 1", name="ck_entitlements_version"),
+)
+
+workspace_feature_settings = Table(
+    "workspace_feature_settings",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("open_api_enabled", Boolean, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workspace_feature_settings_workspace",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("version >= 1", name="ck_workspace_feature_settings_version"),
+)
+
+workspace_usage_counters = Table(
+    "workspace_usage_counters",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("metric", String(64), primary_key=True),
+    Column("period_key", String(16), primary_key=True),
+    Column("used_value", BigInteger, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workspace_usage_counters_workspace",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "metric IN ('storage_bytes', 'knowledge_bases', 'published_agents', 'questions_monthly')",
+        name="ck_workspace_usage_counters_metric",
+    ),
+    CheckConstraint("used_value >= 0", name="ck_workspace_usage_counters_value"),
+    CheckConstraint("version >= 1", name="ck_workspace_usage_counters_version"),
+)
+
+workspace_usage_records = Table(
+    "workspace_usage_records",
+    metadata,
+    Column("usage_record_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("metric", String(64), nullable=False),
+    Column("period_key", String(16), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("delta_value", BigInteger, nullable=False),
+    Column("resulting_value", BigInteger, nullable=False),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_workspace_usage_records_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workspace_usage_records_workspace",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "metric IN ('storage_bytes', 'knowledge_bases', 'published_agents', 'questions_monthly')",
+        name="ck_workspace_usage_records_metric",
+    ),
+    CheckConstraint("delta_value <> 0", name="ck_workspace_usage_records_delta"),
+    CheckConstraint("resulting_value >= 0", name="ck_workspace_usage_records_result"),
+)
+Index(
+    "ix_workspace_usage_records_period",
+    workspace_usage_records.c.workspace_id,
+    workspace_usage_records.c.metric,
+    workspace_usage_records.c.period_key,
+    workspace_usage_records.c.occurred_at,
 )
 
 open_api_keys = Table(

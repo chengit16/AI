@@ -79,7 +79,7 @@ check_runtime() {
 }
 
 check_resources() {
-  local cpu_count memory_bytes free_kb
+  local cpu_count memory_bytes free_kb min_free_disk_gb
   if [[ "$(uname -s)" == "Darwin" ]]; then
     cpu_count="$(sysctl -n hw.logicalcpu)"
     memory_bytes="$(sysctl -n hw.memsize)"
@@ -88,10 +88,12 @@ check_resources() {
     memory_bytes="$(awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo)"
   fi
   free_kb="$(df -Pk "$PROJECT_DIR" | awk 'NR == 2 {print $4}')"
+  min_free_disk_gb="${AI_PLATFORM_MIN_FREE_DISK_GB:-50}"
+  [[ "$min_free_disk_gb" =~ ^[1-9][0-9]*$ ]] || fail "AI_PLATFORM_MIN_FREE_DISK_GB 必须是正整数"
   log "主机资源: ${cpu_count} 核 CPU，$((memory_bytes / 1024 / 1024 / 1024)) GB 内存，$((free_kb / 1024 / 1024)) GB 可用磁盘"
   (( cpu_count >= 8 )) || log "警告: CPU 少于建议的 8 核，功能可运行但处理速度可能较慢"
   (( memory_bytes >= 16 * 1024 * 1024 * 1024 )) || log "警告: 内存少于建议的 16 GB，请限制本地数据集规模"
-  (( free_kb >= 50 * 1024 * 1024 )) || fail "可用磁盘少于 50 GB，不能安全启动本地数据服务"
+  (( free_kb >= min_free_disk_gb * 1024 * 1024 )) || fail "可用磁盘少于 ${min_free_disk_gb} GB，不能安全启动本地数据服务"
 }
 
 check_port() {
@@ -190,10 +192,10 @@ doctor() {
       'SELECT version_num FROM public.alembic_version' 2>/dev/null || true
   )"
   database_revision="$(printf '%s' "$database_revision" | tr -d '[:space:]')"
-  if [[ "$database_revision" == "20260814_0009" ]]; then
+  if [[ "$database_revision" == "20260814_0010" ]]; then
     log "数据库 Revision: 正常 ($database_revision)"
   else
-    log "数据库 Revision: 失败 (期望 20260814_0009，实际 ${database_revision:-unknown})"
+    log "数据库 Revision: 失败 (期望 20260814_0010，实际 ${database_revision:-unknown})"
     failed=1
   fi
   if [[ "$(compose exec -T valkey valkey-cli ping)" == "PONG" ]]; then

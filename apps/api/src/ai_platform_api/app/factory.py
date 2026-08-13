@@ -12,6 +12,7 @@ from ai_platform_api.app.trace_middleware import TraceContextMiddleware
 from ai_platform_api.common.api_errors import ErrorResponse
 from ai_platform_api.config import Settings, get_settings
 from ai_platform_api.modules.identity.api.enterprise_routes import router as workspace_router
+from ai_platform_api.modules.identity.api.entitlement_routes import router as entitlement_router
 from ai_platform_api.modules.identity.api.organization_routes import router as organization_router
 from ai_platform_api.modules.identity.api.role_routes import router as role_router
 from ai_platform_api.modules.identity.api.routes import router as identity_router
@@ -49,6 +50,7 @@ def create_app(
     application.state.authentication_service = dependencies.authentication
     application.state.registration_service = dependencies.registration
     application.state.enterprise_workspace_service = dependencies.enterprise_workspaces
+    application.state.entitlement_service = dependencies.entitlements
     application.state.organization_service = dependencies.organization
     application.state.role_service = dependencies.roles
     application.dependency_overrides[get_settings] = lambda: resolved_settings
@@ -57,6 +59,7 @@ def create_app(
     application.include_router(health_router, prefix="/api/v1")
     application.include_router(identity_router, prefix="/api/v1")
     application.include_router(workspace_router, prefix="/api/v1")
+    application.include_router(entitlement_router, prefix="/api/v1")
     application.include_router(organization_router, prefix="/api/v1")
     application.include_router(role_router, prefix="/api/v1")
     return application

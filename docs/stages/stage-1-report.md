@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1B-05` 待开始 |
+| 当前节点 | `P1B-06` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -164,6 +164,19 @@
 - 自动化验收：角色领域和 HTTP 专项 `4/4`，真实 PostgreSQL/Valkey 专项 `3/3`，既有身份、企业、组织与 Migration 集成回归 `14/14`。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `191/191` 均通过；随机隔离 Schema 的 `base → head → base → head` 结构一致。
 - 容器与 HTTP 验收：API、Worker、Web 和 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0009`、Valkey 和 Worker 八项诊断通过。使用全新合成双账号完成真实 HTTP 闭环：注册 `201/201`、登录 `200/200`、企业与邀请 `201/201`、接受 `200`、根/子部门 `201/201`、成员归属 `200`、角色/部门绑定 `201/201`、所有者和成员有效角色读取 `200/200`、普通成员治理 `403 POLICY_DENIED`、撤销和重新计算 `200/200`；角色版本由 `4` 推进至 `5`，自定义角色即时消失。
 - 当前边界：本节点不定义权限码、菜单页面权限、接口绑定、字段级 ABAC、套餐配额或审批；这些继续按 `P1B-05`、`P1C` 及后续节点实施。Valkey 只承担性能优化，任何缓存损坏或丢失都可从 PostgreSQL 重建。
+- 提交：`9ab81e2`。
+
+### P1B-05 套餐配额与空间状态
+
+- 状态：通过。
+- 版本化权益：个人和企业共用 `WorkspaceEntitlement`、功能设置、用量计数器与幂等用量记录。默认本地个人套餐为 5 GB、1 成员、5 知识库、3 个已发布 Agent、月问答 2000 且不允许 Open API；模拟企业套餐为 100 GB、100 成员、50 知识库、20 个已发布 Agent、月问答 20000 且允许所有者配置 Open API。上述额度只用于功能验收，不代表商业价格或本地物理容量承诺。
+- 原子配额：知识库、存储、已发布 Agent 使用 lifetime 计数，问答按 UTC 月份隔离。可信业务模块通过单一 `consume` 用例在工作空间行锁事务中完成上限检查、计数更新、幂等记录、审计与 Outbox；相同幂等键和参数返回原结果，参数冲突稳定拒绝，超额、负结果、停用空间均不产生部分写入。
+- 成员与 Open API：接受邀请前在已锁定空间事务内检查活跃成员数，达到套餐上限返回 `QUOTA_EXCEEDED`。个人空间启用 Open API 返回 `ENTITLEMENT_DENIED`；企业普通成员可读取套餐但不能治理，所有者变更开关推进 `entitlement_version`。API Key 签发和每次认证都重新读取权益，关闭后已签发 Key 立即失效，浏览器 Session 不受该开关影响。
+- 数据与契约：新增 `workspace_entitlements`、`workspace_feature_settings`、`workspace_usage_counters` 和 `workspace_usage_records`，Revision 推进到 `20260814_0010`；Migration 为既有个人与企业空间补齐默认权益。套餐 OpenAPI、三个稳定错误码、React/Python 生成类型、ReleaseManifest、兼容矩阵和本地 Revision 诊断同步推进；生成器现在对 Python 与 TypeScript 产物分别执行固定 Ruff/Prettier 配置，重复生成无漂移。
+- 本地资源门禁：`AI_PLATFORM_MIN_FREE_DISK_GB` 可在项目启动环境中配置，默认仍为 50 GB。本次当前机器约 48 GB 可用磁盘，仅以进程级 40 GB 覆盖执行小规模功能验收；不把该结果描述为容量认证，也不降低仓库默认安全基线。
+- 自动化验收：真实 PostgreSQL/Valkey、Migration 与身份回归专项 `8/8`，权益 Application 拆分后的专项 `5/5`。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `197/197` 均通过；随机隔离 Schema 的 `base → head → base → head` 结构一致。
+- 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0010`、Valkey 和 Worker 八项诊断通过。使用全新合成双账号完成真实 HTTP 闭环：注册 `201/201`、登录 `200/200`、个人套餐读取 `200`、个人启用 Open API `403 ENTITLEMENT_DENIED`、企业创建/邀请/接受 `201/201/200`、普通成员读取 `200` 且治理 `403 POLICY_DENIED`、所有者读取和启用 `200/200`，权益版本由 `1` 推进至 `2`。
+- 当前边界：本节点不实现商业定价、购买订阅、SaaS 计费、普通 HTTP 用量写入、知识库/Agent/问答业务模块或页面；后续模块必须复用当前原子配额入口。套餐管理页面进入 `P1B-06`，菜单权限、字段级 ABAC 与审批继续按 `P1C` 及后续节点实施。
 - 提交：本提交。
 
 ## 4. 当前限制
@@ -175,4 +188,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1B-04`，当前进入 `P1B-05`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1B-05`，当前进入 `P1B-06`。

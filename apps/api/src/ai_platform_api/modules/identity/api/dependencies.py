@@ -7,6 +7,7 @@ from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.modules.identity.application.authentication import AuthenticationService
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
+from ai_platform_api.modules.identity.application.entitlements import EntitlementService
 from ai_platform_api.modules.identity.application.errors import (
     AuthenticationRequiredError,
     WorkspaceRequiredError,
@@ -36,6 +37,13 @@ def enterprise_workspace_service(request: Request) -> EnterpriseWorkspaceService
     service = getattr(request.app.state, "enterprise_workspace_service", None)
     if not isinstance(service, EnterpriseWorkspaceService):
         raise RuntimeError("企业空间服务尚未完成装配")
+    return service
+
+
+def entitlement_service(request: Request) -> EntitlementService:
+    service = getattr(request.app.state, "entitlement_service", None)
+    if not isinstance(service, EntitlementService):
+        raise RuntimeError("工作空间权益服务尚未完成装配")
     return service
 
 

@@ -17,9 +17,11 @@ from ai_platform_api.modules.identity.application.authentication import (
     AuthenticationService,
 )
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
+from ai_platform_api.modules.identity.application.entitlements import EntitlementService
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
+from ai_platform_api.modules.identity.domain.entitlements import OpenApiEntitlement
 from ai_platform_api.modules.identity.domain.models import (
     AccountCredential,
     ApiKeyWriter,
@@ -131,6 +133,12 @@ class MemoryUnitOfWork:
         return None
 
 
+class MemoryEntitlementAccess:
+    def get_open_api_entitlement(self, workspace_id: UUID) -> OpenApiEntitlement | None:
+        assert workspace_id == WORKSPACE_ID
+        return OpenApiEntitlement(True, True)
+
+
 class ClosingDatabase:
     def close(self) -> None:
         return None
@@ -166,14 +174,16 @@ def identity_client() -> tuple[TestClient, ApiKeyService, MemorySessions]:
     identity = MemoryIdentity(passwords.hash("synthetic-password-123"))
     sessions = MemorySessions()
     digester = Sha256SecretDigester()
+    entitlements = MemoryEntitlementAccess()
     authentication = AuthenticationService(
         identity,
         sessions,
         passwords,
         digester,
         settings.session_ttl_seconds,
+        entitlements,
     )
-    api_keys = ApiKeyService(identity, MemoryUnitOfWork(identity), digester)
+    api_keys = ApiKeyService(identity, MemoryUnitOfWork(identity), digester, entitlements)
     container = ApplicationContainer(
         settings=settings,
         database=cast(PlatformDatabase, ClosingDatabase()),
@@ -182,6 +192,7 @@ def identity_client() -> tuple[TestClient, ApiKeyService, MemorySessions]:
         api_keys=api_keys,
         registration=StubRegistrationService(),
         enterprise_workspaces=cast("EnterpriseWorkspaceService", object()),
+        entitlements=cast("EntitlementService", object()),
         organization=cast("OrganizationService", object()),
         roles=cast("RoleService", object()),
         role_cache=cast("ValkeyRoleResolutionCache", sessions),

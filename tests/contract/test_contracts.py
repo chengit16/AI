@@ -142,6 +142,9 @@ def test_error_codes_are_unique_and_stable() -> None:
         "SSE_EVENT_EXPIRED",
         "ORGANIZATION_CONFLICT",
         "ROLE_CONFLICT",
+        "ENTITLEMENT_DENIED",
+        "QUOTA_EXCEEDED",
+        "ENTITLEMENT_CONFLICT",
         "INTERNAL_ERROR",
     }.issubset(codes)
     assert all(code == code.upper() for code in codes)
@@ -318,4 +321,38 @@ def test_role_openapi_covers_role_binding_and_effective_resolution() -> None:
         "membership_id",
         "role_version",
         "roles",
+    ]
+
+
+def test_entitlement_openapi_covers_quota_and_feature_governance() -> None:
+    baseline = load_json(CONTRACTS / "openapi/platform-api.v1.json")
+    paths = baseline["paths"]
+    prefix = "/api/v1/workspaces/{workspace_id}/entitlements"
+
+    assert paths[prefix]["get"]["operationId"] == "getWorkspaceEntitlement"
+    assert paths[f"{prefix}/features/open-api"]["post"]["operationId"] == (
+        "setWorkspaceOpenApiFeature"
+    )
+    for path, method in ((prefix, "get"), (f"{prefix}/features/open-api", "post")):
+        assert paths[path][method]["responses"]["500"]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ErrorResponse"
+        }
+
+    schemas = baseline["components"]["schemas"]
+    assert schemas["EntitlementResponse"]["required"] == [
+        "workspace_id",
+        "workspace_status",
+        "plan_code",
+        "entitlement_version",
+        "open_api_allowed",
+        "open_api_enabled",
+        "public_publish_allowed",
+        "quotas",
+    ]
+    assert schemas["QuotaResponse"]["properties"]["metric"]["enum"] == [
+        "members",
+        "storage_bytes",
+        "knowledge_bases",
+        "published_agents",
+        "questions_monthly",
     ]

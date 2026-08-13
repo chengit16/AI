@@ -1590,6 +1590,308 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/entitlements": {
+      "get": {
+        "tags": [
+          "工作空间套餐"
+        ],
+        "summary": "Get Entitlement",
+        "operationId": "getWorkspaceEntitlement",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/entitlements/features/open-api": {
+      "post": {
+        "tags": [
+          "工作空间套餐"
+        ],
+        "summary": "Set Open Api Feature",
+        "operationId": "setWorkspaceOpenApiFeature",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenApiFeatureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/organization/departments": {
       "post": {
         "tags": [
@@ -4380,6 +4682,64 @@
         ],
         "title": "EffectiveRoleSourceResponse"
       },
+      "EntitlementResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "workspace_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "archived"
+            ],
+            "title": "Workspace Status"
+          },
+          "plan_code": {
+            "type": "string",
+            "title": "Plan Code"
+          },
+          "entitlement_version": {
+            "type": "integer",
+            "title": "Entitlement Version"
+          },
+          "open_api_allowed": {
+            "type": "boolean",
+            "title": "Open Api Allowed"
+          },
+          "open_api_enabled": {
+            "type": "boolean",
+            "title": "Open Api Enabled"
+          },
+          "public_publish_allowed": {
+            "type": "boolean",
+            "title": "Public Publish Allowed"
+          },
+          "quotas": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaResponse"
+            },
+            "type": "array",
+            "title": "Quotas"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "workspace_status",
+          "plan_code",
+          "entitlement_version",
+          "open_api_allowed",
+          "open_api_enabled",
+          "public_publish_allowed",
+          "quotas"
+        ],
+        "title": "EntitlementResponse"
+      },
       "ErrorResponse": {
         "properties": {
           "code": {
@@ -4608,6 +4968,20 @@
         "type": "object",
         "title": "MoveDepartmentRequest"
       },
+      "OpenApiFeatureRequest": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "OpenApiFeatureRequest"
+      },
       "OrganizationStatusRequest": {
         "properties": {
           "active": {
@@ -4683,6 +5057,47 @@
           "version"
         ],
         "title": "PositionResponse"
+      },
+      "QuotaResponse": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "members",
+              "storage_bytes",
+              "knowledge_bases",
+              "published_agents",
+              "questions_monthly"
+            ],
+            "title": "Metric"
+          },
+          "period_key": {
+            "type": "string",
+            "title": "Period Key"
+          },
+          "used_value": {
+            "type": "integer",
+            "title": "Used Value"
+          },
+          "limit_value": {
+            "type": "integer",
+            "title": "Limit Value"
+          },
+          "remaining_value": {
+            "type": "integer",
+            "title": "Remaining Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "metric",
+          "period_key",
+          "used_value",
+          "limit_value",
+          "remaining_value"
+        ],
+        "title": "QuotaResponse"
       },
       "RegistrationRequest": {
         "properties": {

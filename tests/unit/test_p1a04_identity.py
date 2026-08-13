@@ -20,6 +20,7 @@ from ai_platform_api.modules.identity.application.errors import (
     InvalidCredentialsError,
     WorkspaceContextDeniedError,
 )
+from ai_platform_api.modules.identity.domain.entitlements import OpenApiEntitlement
 from ai_platform_api.modules.identity.domain.models import (
     AccountCredential,
     ApiKeyWriter,
@@ -154,6 +155,15 @@ class MemoryUnitOfWork:
         self.committed = True
 
 
+class MemoryEntitlementAccess:
+    def __init__(self, *, active: bool = True) -> None:
+        self.active = active
+
+    def get_open_api_entitlement(self, workspace_id: UUID) -> OpenApiEntitlement | None:
+        assert workspace_id == WORKSPACE_ID
+        return OpenApiEntitlement(self.active, self.active)
+
+
 def authentication_fixture() -> tuple[
     AuthenticationService,
     MemoryIdentity,
@@ -169,6 +179,7 @@ def authentication_fixture() -> tuple[
         passwords=passwords,
         secrets_digester=Sha256SecretDigester(),
         session_ttl_seconds=43_200,
+        entitlements=MemoryEntitlementAccess(),
     )
     return service, identity, sessions, passwords
 
@@ -266,7 +277,12 @@ def test_open_api_key_is_one_time_secret_with_scoped_actor() -> None:
     auth, identity, _, _ = authentication_fixture()
     writer = MemoryApiKeyWriter(identity)
     unit_of_work = MemoryUnitOfWork(writer)
-    api_keys = ApiKeyService(identity, unit_of_work, Sha256SecretDigester())
+    api_keys = ApiKeyService(
+        identity,
+        unit_of_work,
+        Sha256SecretDigester(),
+        MemoryEntitlementAccess(),
+    )
     browser_context = RequestContext.trusted(
         actor_id=ACCOUNT_ID,
         user_id=ACCOUNT_ID,
@@ -322,6 +338,7 @@ def test_api_key_rejects_empty_or_malformed_scope() -> None:
         identity,
         MemoryUnitOfWork(MemoryApiKeyWriter(identity)),
         Sha256SecretDigester(),
+        MemoryEntitlementAccess(),
     )
     context = RequestContext.trusted(
         actor_id=ACCOUNT_ID,

@@ -7,6 +7,9 @@ from uuid import UUID, uuid4
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
+from ai_platform_api.modules.identity.application.entitlement_errors import (
+    EntitlementFeatureDeniedError,
+)
 from ai_platform_api.modules.identity.application.errors import (
     ApiKeyConfigurationError,
     ApiKeyInvalidError,
@@ -16,6 +19,7 @@ from ai_platform_api.modules.identity.application.errors import (
     InvalidCredentialsError,
     WorkspaceContextDeniedError,
 )
+from ai_platform_api.modules.identity.domain.entitlements import EntitlementAccessReader
 from ai_platform_api.modules.identity.domain.models import (
     BrowserSession,
     IdentityReader,
@@ -38,12 +42,14 @@ class AuthenticationService:
         passwords: PasswordVerifier,
         secrets_digester: SecretDigester,
         session_ttl_seconds: int,
+        entitlements: EntitlementAccessReader,
     ) -> None:
         self._repository = repository
         self._sessions = sessions
         self._passwords = passwords
         self._secrets = secrets_digester
         self._session_ttl_seconds = session_ttl_seconds
+        self._entitlements = entitlements
 
     def login(self, login_name: str, password: str) -> tuple[str, str, UUID]:
         account = self._repository.get_account_by_login(login_name.strip().casefold())
@@ -126,6 +132,9 @@ class AuthenticationService:
         if account is None or account.status != "active":
             raise ApiKeyInvalidError
         self._require_workspace_access(account.account_id, workspace_id)
+        open_api = self._entitlements.get_open_api_entitlement(workspace_id)
+        if open_api is None or not open_api.active:
+            raise ApiKeyInvalidError
         return RequestContext.trusted(
             actor_id=api_key.actor_id,
             user_id=account.account_id,
@@ -161,10 +170,12 @@ class ApiKeyService:
         repository: IdentityReader,
         unit_of_work: IdentityUnitOfWork,
         secrets_digester: SecretDigester,
+        entitlements: EntitlementAccessReader,
     ) -> None:
         self._repository = repository
         self._unit_of_work = unit_of_work
         self._secrets = secrets_digester
+        self._entitlements = entitlements
 
     def issue(
         self,
@@ -177,6 +188,9 @@ class ApiKeyService:
         if context.user_id is None:
             raise AuthenticationRequiredError
         self._require_workspace_access(context.user_id, context.workspace_id)
+        open_api = self._entitlements.get_open_api_entitlement(context.workspace_id)
+        if open_api is None or not open_api.active:
+            raise EntitlementFeatureDeniedError
         normalized_name = name.strip()
         normalized_scopes = tuple(sorted(set(scopes)))
         now = datetime.now(UTC)

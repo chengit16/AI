@@ -7,6 +7,7 @@ from ai_platform_backend.integration.domain import AuditRecord, IntegrationEvent
 
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.identity.application.entitlement_errors import QuotaExceededError
 from ai_platform_api.modules.identity.domain.enterprise import (
     EnterpriseRepository,
     EnterpriseUnitOfWork,
@@ -202,6 +203,8 @@ class EnterpriseWorkspaceService:
                     account_id,
                     for_update=True,
                 )
+                if not unit_of_work.enterprise.member_capacity_available(invitation.workspace_id):
+                    raise QuotaExceededError
                 if membership is None:
                     membership = WorkspaceMembership(
                         membership_id=uuid4(),

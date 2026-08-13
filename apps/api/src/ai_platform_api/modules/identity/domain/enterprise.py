@@ -161,6 +161,8 @@ class EnterpriseRepository(Protocol):
 
     def list_members(self, workspace_id: UUID) -> tuple[WorkspaceMemberSummary, ...]: ...
 
+    def member_capacity_available(self, workspace_id: UUID) -> bool: ...
+
 
 class EnterpriseUnitOfWork(Protocol):
     @property

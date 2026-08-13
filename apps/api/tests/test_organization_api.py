@@ -14,6 +14,7 @@ from ai_platform_api.modules.identity.application.authentication import (
     AuthenticationService,
 )
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
+from ai_platform_api.modules.identity.application.entitlements import EntitlementService
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
@@ -281,6 +282,7 @@ def organization_client() -> TestClient:
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),
         enterprise_workspaces=cast("EnterpriseWorkspaceService", object()),
+        entitlements=cast("EntitlementService", object()),
         organization=StubOrganizationService(),
         roles=cast("RoleService", object()),
         role_cache=cast("ValkeyRoleResolutionCache", closing),

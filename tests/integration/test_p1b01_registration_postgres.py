@@ -14,6 +14,9 @@ from ai_platform_api.modules.identity.application.errors import (
     WorkspaceContextDeniedError,
 )
 from ai_platform_api.modules.identity.application.registration import RegistrationService
+from ai_platform_api.modules.identity.infrastructure.entitlements_sqlalchemy import (
+    SqlAlchemyEntitlementAccessReader,
+)
 from ai_platform_api.modules.identity.infrastructure.security import (
     Argon2idPasswordAdapter,
     Sha256SecretDigester,
@@ -74,6 +77,7 @@ def registration_database() -> Iterator[RegistrationHarness]:
     engine = create_platform_engine(database_url, schema)
     sessions = create_session_factory(engine)
     reader = SqlAlchemyIdentityReader(sessions)
+    entitlements = SqlAlchemyEntitlementAccessReader(sessions)
     passwords = Argon2idPasswordAdapter()
     session_store = ValkeySessionStore(valkey_url)
     registration = RegistrationService(
@@ -87,6 +91,7 @@ def registration_database() -> Iterator[RegistrationHarness]:
         passwords=passwords,
         secrets_digester=Sha256SecretDigester(),
         session_ttl_seconds=300,
+        entitlements=entitlements,
     )
     try:
         yield RegistrationHarness(schema, engine, registration, authentication)

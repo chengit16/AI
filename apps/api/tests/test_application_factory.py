@@ -12,6 +12,7 @@ from ai_platform_api.modules.identity.application.authentication import (
     AuthenticationService,
 )
 from ai_platform_api.modules.identity.application.enterprise import EnterpriseWorkspaceService
+from ai_platform_api.modules.identity.application.entitlements import EntitlementService
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
@@ -59,6 +60,7 @@ def application_container(settings: Settings) -> tuple[ApplicationContainer, Clo
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),
         enterprise_workspaces=cast("EnterpriseWorkspaceService", object()),
+        entitlements=cast("EntitlementService", object()),
         organization=cast("OrganizationService", object()),
         roles=cast("RoleService", object()),
         role_cache=cast("ValkeyRoleResolutionCache", role_cache),
@@ -222,7 +224,7 @@ def test_startup_rejects_incompatible_release_combination(tmp_path: Path) -> Non
     )
     incompatible = tmp_path / "incompatible.json"
     incompatible.write_text(
-        manifest.replace('"schema_revision": "20260814_0009"', '"schema_revision": "unknown"'),
+        manifest.replace('"schema_revision": "20260814_0010"', '"schema_revision": "unknown"'),
         encoding="utf-8",
     )
 
