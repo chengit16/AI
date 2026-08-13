@@ -23,7 +23,9 @@ pnpm verify
 | 检查 | 实现 | 当前能力 |
 | --- | --- | --- |
 | Git Diff | `git diff --check`、`git diff --cached --check` | 同时检查未暂存与已暂存改动，阻止空白错误和冲突标记进入节点提交 |
-| 仓库安全 | `scripts/check_repository_policy.py` | 检查跟踪/待跟踪文件中的敏感后缀、私钥头和常见真实令牌模式 |
+| 仓库安全 | `scripts/check_repository_policy.py` | 检查跟踪/待跟踪文件及完整 Git 历史中的敏感后缀、私钥头和常见真实令牌模式，定位时不输出凭证正文 |
+| 契约生成 | `scripts/generate_contract_types.py --check` | 固定生成 React TypeScript 与 Python `TypedDict` 消费类型，拒绝生成产物漂移 |
+| 供应链状态 | `scripts/check_release_readiness.py` | 开发门禁校验本地可执行项；正式发布门禁额外要求镜像扫描和 Linux 验收证据 |
 | Python 架构 | `scripts/check_architecture.py` | 正式领域分层目录出现后自动检查 Domain、Application、API 与 Infrastructure 依赖方向 |
 | React 架构 | `scripts/check-frontend-architecture.mjs` | 解析静态 Import、再导出和字符串动态 Import，阻止公共层反向依赖页面等违规关系 |
 | 契约漂移 | `tests/contract/test_contracts.py` | FastAPI 完整 OpenAPI 输出必须与仓库基线一致；JSON Schema 和 Golden Fixtures 必须有效 |
@@ -54,7 +56,7 @@ AI_PLATFORM_CONTRACT_BASE_REF=origin/main ./scripts/verify
 - 收紧原先允许的附加属性或改变字段语义。
 - 删除稳定错误码。
 
-阶段 1A 必须固定 OpenAPI/JSON Schema 生成器及版本，并生成 React 与 Python 消费类型。生成产物必须可重复，重新生成后不得产生未提交 Diff；未来 Go 复用同一契约和 Golden Fixtures。
+阶段 1A 已在独立工具链固定 `openapi-typescript 7.13.0`、其支持的 TypeScript `5.9.3` 和仓库 Python 生成器 `p1a-06-v1`，并生成 React 与 Python 消费类型；React 应用继续使用 TypeScript `6.0.2`。生成产物必须可重复，重新生成后不得产生未提交 Diff；未来 Go 复用同一契约和 Golden Fixtures。
 
 ## 4. 模块依赖门禁
 
@@ -78,14 +80,15 @@ React 目标规则包括：
 
 ## 5. 仓库安全边界
 
-仓库扫描是最小本地防线，不是完整 Secret Scanner 或 SAST：
+仓库 Secret Scanner 是发布前的凭证泄漏防线，不替代 SAST：
 
 - 阻止 `.env`、私钥、证书密钥和平台主密钥等高风险文件被跟踪。
 - 检查私钥头和常见令牌格式，不打印命中的密钥正文。
 - `.env.example` 只允许包含无权限的合成本地默认值。
+- 扫描所有可达 Git Blob，能够发现已从工作树删除但仍留在历史中的凭证；只报告 Blob 短 ID 和路径，不输出命中正文。
 - 真实凭证一旦进入 Git 历史，应立即轮换，删除当前文件不能撤销泄漏。
 
-`P0-12` 已建立 [`docs/supply-chain/`](../supply-chain/README.md) 供应链基线，并将 SBOM 与许可证产物漂移检查接入 `./scripts/verify`。Node 与 Python 生产依赖漏洞审计已执行；镜像扫描因本机 Docker Scout 未登录保持 `not_configured`。阶段 1A 继续负责镜像漏洞扫描、完整 Secret Scanner、`ReleaseManifest` 和发布级供应链归档，未安装或未配置的工具不得标记为通过。
+`P1A-06` 已把状态清单接入 `./scripts/verify`。本地开发门禁要求契约生成、完整 Secret Scanner、SBOM、许可证和 `ReleaseManifest` 全部通过；正式发布还要求可信镜像扫描证据和 Linux 验收证据。镜像扫描当前因未获外发镜像元数据授权保持 `not_configured`，Linux 保持 `not_run`，因此正式发布门禁会明确失败，但不阻断后续本地功能节点。
 
 ## 6. 失败处理
 
@@ -106,5 +109,18 @@ React 目标规则包括：
 5. 依赖漏洞、Secret Scanner、许可证和 SBOM 检查。
 6. 失败日志不得输出凭证、Cookie、用户正文和受 ABAC 保护字段。
 7. 主分支保护只允许全部必需检查通过后合并。
+
+正式发布候选还需执行：
+
+```bash
+.venv/bin/python -m scripts.check_release_readiness --require release --check
+.venv/bin/python scripts/create_release_bundle.py \
+  --manifest artifacts/release/release-manifest.json \
+  --readiness artifacts/release/readiness.json \
+  --output artifacts/release/bundle
+```
+
+归档命令只接受 `release_status=passed` 的状态清单，并为 Manifest、SBOM、许可证、跨语言契约
+类型和状态清单生成 `SHA256SUMS`。状态清单本身不能代替原始扫描报告；正式构建流水线需保存两类证据。
 
 具体 CI 提供商、配置文件与分支保护在仓库远端确定后实施；当前统一脚本已经固定其本地接口。

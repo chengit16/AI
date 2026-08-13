@@ -1,4 +1,4 @@
-# 阶段 0 供应链与许可证基线
+# 供应链、许可证与发布门禁
 
 ## 1. 产物范围
 
@@ -8,6 +8,7 @@
 - `node-production.cdx.json`：由 `pnpm-lock.yaml`、冻结安装图和包清单生成的 Web 生产依赖 CycloneDX 1.5 SBOM。
 - `dependency-licenses.json`：Python 与 Node 生产依赖许可证清单。
 - 本文档：镜像、模型、解析器和关键组件的许可证决策、漏洞扫描结果与发布边界。
+- `local-readiness.v1.json`：本地可复现门禁状态；明确区分开发可继续与正式发布是否允许。
 
 生成产物不写入本机绝对路径、用户名、随机 UUID 或生成时间。执行以下命令可重新生成或检查漂移：
 
@@ -30,7 +31,31 @@ Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 55 个�
 
 镜像扫描没有执行，不能描述为通过。阶段 1A 在可用的镜像扫描环境中接入 Trivy、Grype 或已认证的 Docker Scout，并把严重与高危漏洞设为合并门禁。
 
-## 3. 关键组件与模型许可证决策
+当前已安装 Docker Scout 1.24.0，但扫描可能向外部发送镜像组件与漏洞元数据，未取得明确授权前
+不执行。状态保持 `not_configured`，正式发布门禁因此为 `blocked`。Linux 宿主机验收未执行，状态
+保持 `not_run`。这两个状态不阻断本地功能开发，但禁止创建正式发布供应链归档。
+
+## 3. 发布门禁与证据
+
+```bash
+# 本地开发门禁：本地可执行检查必须全部通过
+.venv/bin/python -m scripts.check_release_readiness --require development --check
+
+# 正式发布门禁：镜像扫描与 Linux 验收也必须具备可信通过证据
+.venv/bin/python -m scripts.check_release_readiness --require release --check
+```
+
+当前状态：契约生成、当前文件 Secret Scanner、完整 Git 历史 Secret Scanner、SBOM、许可证和
+`ReleaseManifest` 门禁通过；镜像扫描为 `not_configured`，Linux 验收为 `not_run`，所以
+`development_status=passed`、`release_status=blocked`。未配置项不允许静默跳过或人工改写为通过。
+
+正式流水线必须在 `artifacts/security/` 提供原始证据。镜像证据需包含支持的扫描器、版本、镜像
+摘要，以及每个镜像严重和高危漏洞均为 0；Linux 证据需明确 `os=linux` 并至少完成
+`verify` 与 `platform_doctor`。归档命令校验发布状态后复制 `ReleaseManifest`、状态清单、SBOM、
+许可证和跨语言类型，并生成稳定 `SHA256SUMS`。`artifacts/` 被 Git 忽略，真实发布证据由发布系统
+保管，不提交仓库。
+
+## 4. 关键组件与模型许可证决策
 
 | 组件 | 当前固定版本 | 许可证 | 当前本地验证 | 商业发布边界 |
 | --- | --- | --- | --- | --- |
@@ -50,10 +75,10 @@ Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 55 个�
 
 该表是工程合规基线，不替代正式法律意见。任何许可证不明确、发生变化或包含未复核权重来源的组件，只能保留在技术验证环境，不能进入商业发布包。
 
-## 4. 阶段 1A 必做项
+## 5. 后续发布必做项
 
 1. 已由 `P1A-02` 将 Redis 7.4 替换为固定版本 Valkey 8.1.5；后续 Session、队列和 SSE 唤醒能力接入时继续复用已验证的 RESP 边界。
 2. 对 MinIO/S3 Adapter 做可替换边界验收，商业发布方案必须给出许可证和部署义务结论。
-3. 将 Python、Node、镜像、模型和前端静态资源合并到 `ReleaseManifest`，每个发布版本保留 SBOM、许可证、镜像摘要和模型 Revision。
-4. 接入镜像漏洞扫描和完整 Secret Scanner；扫描工具未配置时发布门禁失败，不能静默跳过。
-5. 评估 Starlette 的 `httpx2` 测试客户端迁移，消除当前 `httpx` 兼容弃用警告。
+3. 在真实发布构建中向 `ReleaseManifest` 注入 Python、Node、镜像、模型和前端静态资源摘要；每个发布版本保留 SBOM、许可证、镜像摘要和模型 Revision。
+4. 在获得镜像元数据外发授权或选择完全本地的扫描器后生成真实镜像扫描证据；未配置时正式发布门禁继续失败。
+5. 已固定 `httpx2 2.10.0` 供 Starlette `TestClient` 使用并消除弃用警告；常规业务 HTTP 客户端仍保持独立依赖边界。

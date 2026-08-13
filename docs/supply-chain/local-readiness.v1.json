@@ -1,0 +1,55 @@
+{
+  "checks": {
+    "contract_types": {
+      "detail": "跨语言契约生成产物可复现",
+      "required_for_development": true,
+      "required_for_release": true,
+      "status": "passed"
+    },
+    "image_vulnerability_scan": {
+      "detail": "未提供已验证证据: artifacts/security/image-scan.v1.json",
+      "required_for_development": false,
+      "required_for_release": true,
+      "status": "not_configured"
+    },
+    "linux_host_validation": {
+      "detail": "未提供已验证证据: artifacts/security/linux-validation.v1.json",
+      "required_for_development": false,
+      "required_for_release": true,
+      "status": "not_run"
+    },
+    "release_manifest": {
+      "detail": "ReleaseManifest Schema、兼容矩阵与生成漂移由统一门禁校验",
+      "required_for_development": true,
+      "required_for_release": true,
+      "status": "passed"
+    },
+    "repository_current_secrets": {
+      "detail": "当前文件未发现高风险凭证",
+      "required_for_development": true,
+      "required_for_release": true,
+      "status": "passed"
+    },
+    "repository_history_secrets": {
+      "detail": "完整 Git 历史未发现高风险凭证",
+      "required_for_development": true,
+      "required_for_release": true,
+      "status": "passed"
+    },
+    "supply_chain_inventory": {
+      "detail": "SBOM 与许可证清单可复现",
+      "required_for_development": true,
+      "required_for_release": true,
+      "status": "passed"
+    }
+  },
+  "development_status": "passed",
+  "generator_versions": {
+    "openapi_typescript": "7.13.0",
+    "python_contract_generator": "p1a-06-v1",
+    "release_bundle": "p1a-06-v1",
+    "repository_secret_scanner": "p1a-06-v1"
+  },
+  "release_status": "blocked",
+  "schema_version": 1
+}

@@ -40,6 +40,9 @@ git diff --cached --check
 log "检查仓库敏感文件与凭证模式"
 "${PYTHON[@]}" scripts/check_repository_policy.py
 
+log "检查 React 与 Python 契约消费类型"
+"${PYTHON[@]}" scripts/generate_contract_types.py --check
+
 log "检查 SBOM 与许可证清单"
 "${PYTHON[@]}" scripts/generate_supply_chain.py --check
 
@@ -48,6 +51,9 @@ log "检查 ReleaseManifest 生成漂移"
   --inputs contracts/fixtures/release-manifest-input.v1.valid.json \
   --output contracts/fixtures/release-manifest.v1.valid.json \
   --check
+
+log "检查开发级供应链门禁状态"
+"${PYTHON[@]}" -m scripts.check_release_readiness --require development --check
 
 log "检查 Python 与 React 模块依赖"
 "${PYTHON[@]}" scripts/check_architecture.py

@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1A-06` 待开始 |
+| 当前节点 | `P1B-01` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -101,12 +101,25 @@
 - 当前边界：本节点只建立通用可靠运行链和示例投影，不实现业务任务管理页面、人工死信恢复、业务告警或分布式 Trace 后端；发布级扫描、Secret Scanner 和制品归档进入 `P1A-06`。
 - 提交：本提交。
 
+### P1A-06 供应链与本地门禁
+
+- 状态：通过。
+- 跨语言契约：在仓库根工具链隔离固定 `openapi-typescript 7.13.0` 和其支持的 TypeScript `5.9.3`，React 应用继续使用 TypeScript `6.0.2`；从同一 OpenAPI 可复现生成 React `readonly` 类型与 Python `TypedDict`，仓库生成器和 `./scripts/verify` 检查生成漂移，前后端不得维护分叉类型。
+- Secret Scanner：覆盖跟踪、待跟踪文件和所有可达 Git Blob，检测敏感文件、私钥与常见平台令牌；历史命中只报告 Blob 短 ID 和路径，不输出凭证正文。合成临时 Git 仓库证明删除后的凭证仍会被发现。
+- 状态门禁：`local-readiness.v1.json` 把本地开发与正式发布分开。契约生成、当前文件/历史 Secret Scanner、SBOM、许可证和 `ReleaseManifest` 为本地必需项并通过；镜像扫描为 `not_configured`，Linux 验收为 `not_run`，因此 `development_status=passed`、`release_status=blocked`。正式发布检查返回非零，未配置项没有静默通过。
+- 发布归档：新增受门禁保护的归档命令；只有 `release_status=passed` 才能归档真实 `ReleaseManifest`、门禁状态、Python/Node SBOM、许可证与跨语言契约类型，并生成稳定 `SHA256SUMS`。真实扫描证据位于忽略的 `artifacts/`，不把本地状态 Fixture 冒充发布制品。
+- 测试客户端：固定 `httpx2 2.10.0` 及锁定依赖，Starlette `TestClient` 不再回退到弃用的 `httpx` 兼容层；身份、契约和 Worker 相关测试 `45/45` 通过且没有原弃用警告。
+- 自动化验收：工程与供应链专项 `20/20`；统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试/生产构建、Ruff、mypy strict、架构、契约兼容、契约生成、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest 均通过。正式发布门禁按预期以状态 1 拒绝当前未配置组合。
+- 容器验收：现有冻结镜像组合未改变运行时功能；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项诊断全部通过。
+- 当前边界：Docker Scout 1.24.0 已安装，但未获镜像组件和漏洞元数据外发授权，未执行扫描；正式流水线需授权 Scout 或使用完全本地的 Trivy/Grype。Linux 验收等待可用宿主机。两者不阻断 `P1B` 本地功能实施，也不得描述为正式发布通过。
+- 提交：本提交。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机兼容和生产容量结论。
 - 当前没有真实企业客户，阶段 1 使用固定的合成企业空间完成产品与安全验收。
-- 镜像扫描工具尚未完成认证或本地可用配置，阶段 1A 必须如实补齐或保持失败状态。
+- 镜像扫描未获外发授权，状态为 `not_configured`；正式发布门禁已明确失败，不影响后续本地 MVP 功能节点。
 
 ## 5. 阶段结论
 
