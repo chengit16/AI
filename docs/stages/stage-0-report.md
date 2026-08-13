@@ -55,6 +55,16 @@
 - 已知限制：当前 Web 初始生产资源约 556 KB，其中 Ant Design vendor 约 474 KB；阶段 0 仅有一个轻量页面，不阻塞节点，后续按菜单路由实施页面级懒加载。
 - 提交：本节点提交完成后于 `P0-04` 回填。
 
+### P0-04 核心契约 V1
+
+- 状态：通过。
+- 固定内容：OpenAPI 3.1、核心身份、`AgentRelease`、`MessagePart`、SSE `MessageEvent`、Transactional Outbox 集成事件、策略请求/结果、错误码目录，以及 `DataSource`、`RelevanceGrader`、`MultimodalModelRouter` 扩展点。
+- 兼容原则：同一主版本只允许兼容性新增；关键标识不得改名；SSE 与集成事件允许旧消费者忽略未知可选字段。
+- Golden Fixtures：全部使用明确的合成 UUID 和合成文本，可供当前 Python 与未来 Go 实现复用。
+- 自动化验收：9 项契约测试通过；有效样例、错误码唯一性、OpenAPI 实现一致性，以及缺失 `workspace_id`、非法策略决策、无效 `sequence_no` 三类反例均已覆盖。项目全部 pytest 共 12 项通过。
+- 已知限制：本节点只冻结接口和数据契约，不实现策略引擎、Outbox 发布器、SSE 存储或后置 AI 能力。
+- 提交：本节点提交完成后于 `P0-05` 回填。
+
 ## 4. 当前限制
 
 - 当前开发机系统 Python 为 3.14.3，项目固定 Python 3.12，并由 uv 管理项目解释器，不能使用系统 Python 作为验收环境。

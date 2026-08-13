@@ -1,0 +1,108 @@
+import json
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+from ai_platform_api.main import app
+from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+ROOT = Path(__file__).parents[2]
+CONTRACTS = ROOT / "contracts"
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise TypeError(f"契约文件顶层必须是对象: {path}")
+    return cast(dict[str, Any], document)
+
+
+def assert_valid(schema_path: str, fixture_path: str) -> None:
+    schema = load_json(CONTRACTS / schema_path)
+    fixture = load_json(CONTRACTS / fixture_path)
+    Draft202012Validator.check_schema(schema)
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(fixture)
+
+
+def validator(schema_path: str) -> Draft202012Validator:
+    schema = load_json(CONTRACTS / schema_path)
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema, format_checker=FormatChecker())
+
+
+def test_core_domain_contract_fixture() -> None:
+    assert_valid(
+        "domain/core-contracts.v1.schema.json",
+        "fixtures/core-contracts.v1.valid.json",
+    )
+
+
+def test_policy_contract_fixture() -> None:
+    assert_valid(
+        "policy/decision.v1.schema.json",
+        "fixtures/policy-decision.v1.valid.json",
+    )
+
+
+def test_sse_contract_fixture() -> None:
+    assert_valid(
+        "sse/message-event.v1.schema.json",
+        "fixtures/message-event.v1.valid.json",
+    )
+
+
+def test_integration_event_contract_fixture() -> None:
+    assert_valid(
+        "events/integration-event.v1.schema.json",
+        "fixtures/integration-event.v1.valid.json",
+    )
+
+
+def test_error_codes_are_unique_and_stable() -> None:
+    catalog = load_json(CONTRACTS / "errors/catalog.v1.json")
+    validator("errors/catalog.v1.schema.json").validate(catalog)
+    codes = [entry["code"] for entry in catalog["errors"]]
+
+    assert catalog["schema_version"] == 1
+    assert len(codes) == len(set(codes))
+    assert {"POLICY_DENIED", "SSE_EVENT_EXPIRED", "INTERNAL_ERROR"}.issubset(codes)
+    assert all(code == code.upper() for code in codes)
+
+
+def test_core_contract_rejects_missing_workspace() -> None:
+    fixture = load_json(CONTRACTS / "fixtures/core-contracts.v1.valid.json")
+    del fixture["identity_context"]["workspace_id"]
+
+    with pytest.raises(ValidationError):
+        validator("domain/core-contracts.v1.schema.json").validate(fixture)
+
+
+def test_policy_contract_rejects_unknown_decision() -> None:
+    fixture = load_json(CONTRACTS / "fixtures/policy-decision.v1.valid.json")
+    fixture["response"]["decision"] = "bypass"
+
+    with pytest.raises(ValidationError):
+        validator("policy/decision.v1.schema.json").validate(fixture)
+
+
+def test_sse_contract_rejects_non_positive_sequence() -> None:
+    fixture = load_json(CONTRACTS / "fixtures/message-event.v1.valid.json")
+    fixture["sequence_no"] = 0
+
+    with pytest.raises(ValidationError):
+        validator("sse/message-event.v1.schema.json").validate(fixture)
+
+
+def test_openapi_baseline_matches_fastapi_implementation() -> None:
+    baseline = load_json(CONTRACTS / "openapi/platform-api.v1.json")
+    generated = app.openapi()
+
+    assert baseline["openapi"] == "3.1.0"
+    assert generated["openapi"] == baseline["openapi"]
+    assert generated["info"] == baseline["info"]
+    assert set(generated["paths"]) == set(baseline["paths"])
+    generated_health = generated["components"]["schemas"]["HealthResponse"]
+    baseline_health = baseline["components"]["schemas"]["HealthResponse"]
+    assert generated_health == baseline_health
+    for path, path_item in baseline["paths"].items():
+        assert generated["paths"][path]["get"]["operationId"] == path_item["get"]["operationId"]

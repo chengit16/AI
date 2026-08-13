@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/policy/decision.v1.schema.json",
+  "title": "策略请求与决策结果 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request", "response"],
+  "properties": {
+    "request": { "$ref": "#/$defs/request" },
+    "response": { "$ref": "#/$defs/response" }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "permission_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["schema_version", "actor_id", "workspace_id", "permission_code", "resource", "context"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "actor_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "resource": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["type", "id", "attributes"],
+          "properties": {
+            "type": { "type": "string", "minLength": 1 },
+            "id": { "$ref": "#/$defs/uuid" },
+            "attributes": { "type": "object" }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["department_ids", "risk_level", "request_id", "trace_id"],
+          "properties": {
+            "department_ids": { "type": "array", "items": { "$ref": "#/$defs/uuid" }, "uniqueItems": true },
+            "risk_level": { "enum": ["low", "normal", "high", "critical"] },
+            "request_id": { "$ref": "#/$defs/uuid" },
+            "trace_id": { "type": "string", "minLength": 16, "maxLength": 64 }
+          }
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["schema_version", "decision", "permission_code", "workspace_id", "resource_scope", "field_mask", "policy_version", "cache_ttl_seconds", "decision_id"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "decision": { "enum": ["allow", "deny", "approval_required"] },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "resource_scope": { "type": "object" },
+        "field_mask": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "policy_version": { "type": "integer", "minimum": 1 },
+        "cache_ttl_seconds": { "type": "integer", "minimum": 0, "maximum": 300 },
+        "decision_id": { "$ref": "#/$defs/uuid" }
+      }
+    }
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/domain/core-contracts.v1.schema.json",
+  "title": "AI 智能平台核心领域契约 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "identity_context",
+    "agent_release",
+    "message_part",
+    "data_source",
+    "relevance_grader",
+    "multimodal_model_router"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "identity_context": { "$ref": "#/$defs/identity_context" },
+    "agent_release": { "$ref": "#/$defs/agent_release" },
+    "message_part": { "$ref": "#/$defs/message_part" },
+    "data_source": { "$ref": "#/$defs/data_source" },
+    "relevance_grader": { "$ref": "#/$defs/relevance_grader" },
+    "multimodal_model_router": { "$ref": "#/$defs/multimodal_model_router" }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "identity_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_id", "actor_id", "request_id", "trace_id"],
+      "properties": {
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "actor_id": { "$ref": "#/$defs/uuid" },
+        "user_id": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "request_id": { "$ref": "#/$defs/uuid" },
+        "trace_id": { "type": "string", "minLength": 16, "maxLength": 64 },
+        "permission_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+        }
+      }
+    },
+    "agent_release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_id", "agent_id", "workspace_id", "version", "status", "config_hash", "released_at"],
+      "properties": {
+        "release_id": { "$ref": "#/$defs/uuid" },
+        "agent_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "version": { "type": "integer", "minimum": 1 },
+        "status": { "const": "released" },
+        "config_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "released_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "message_part": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["part_id", "type", "text"],
+          "properties": {
+            "part_id": { "$ref": "#/$defs/uuid" },
+            "type": { "const": "text" },
+            "text": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["part_id", "type", "object_ref"],
+          "properties": {
+            "part_id": { "$ref": "#/$defs/uuid" },
+            "type": { "const": "image_ref" },
+            "object_ref": { "type": "string", "minLength": 1 },
+            "media_type": { "type": "string", "pattern": "^image/" }
+          }
+        }
+      ]
+    },
+    "data_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interface_version", "capabilities"],
+      "properties": {
+        "interface_version": { "const": 1 },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["search", "get_document", "get_metadata", "check_permission", "get_source_policy"] }
+        }
+      }
+    },
+    "relevance_grader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interface_version", "enabled"],
+      "properties": {
+        "interface_version": { "const": 1 },
+        "enabled": { "const": false },
+        "score_min": { "type": "number", "const": 0 },
+        "score_max": { "type": "number", "const": 1 }
+      }
+    },
+    "multimodal_model_router": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interface_version", "enabled", "accepted_parts"],
+      "properties": {
+        "interface_version": { "const": 1 },
+        "enabled": { "const": false },
+        "accepted_parts": {
+          "type": "array",
+          "items": { "enum": ["text", "image_ref"] },
+          "contains": { "const": "text" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/errors/catalog.v1.schema.json",
+  "title": "稳定错误码目录 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "errors"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "http_status", "message", "retryable"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+          "http_status": { "type": "integer", "minimum": 400, "maximum": 599 },
+          "message": { "type": "string", "minLength": 1 },
+          "retryable": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

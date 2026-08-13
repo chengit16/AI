@@ -1383,12 +1383,12 @@ SSE 事件信封固定如下，`event_id` 用于去重与 `Last-Event-ID`，`seq
 
 ```text
 apps/
-└── web/                       # React 前端
+├── web/                       # React 前端
+├── api/                       # Python 业务 API、接入和策略中心
+└── worker/                    # Python Agent 与文档处理 Worker
 
-services/
-├── platform-api/              # Python 业务 API、接入和策略中心
-├── agent-worker/              # Python Agent Runtime
-└── ingestion-worker/          # Python AI 与文档处理
+packages/
+└── contracts/                 # 共享契约的工程消费说明与后续生成代码
 
 contracts/
 ├── openapi/                   # 公开与内部 HTTP 契约
@@ -1407,6 +1407,8 @@ tests/
 ├── security/
 └── performance/
 ```
+
+可机器校验的事实契约统一放在仓库根目录 `contracts/`，`packages/contracts/` 只承载前端、Python 和未来 Go 的生成代码或消费封装，不能维护另一份分叉 Schema。随着解析和 Agent Runtime 出现独立扩缩容需求，可以在 `apps/worker/` 下按进程入口拆分；达到服务拆分条件后再迁移为独立服务目录，数据写入权和契约不随目录改名而改变。
 
 达到迁移条件时再增加 `services/edge-gateway/` 和 `services/agent-runtime-go/`，不提前创建空目录或空项目。`./platform`、Docker Compose、日志字段、健康检查和 Trace 约定不得依赖具体语言。
 

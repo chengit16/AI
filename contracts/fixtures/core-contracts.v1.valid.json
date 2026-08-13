@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "identity_context": {
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "actor_id": "22222222-2222-4222-8222-222222222222",
+    "user_id": "33333333-3333-4333-8333-333333333333",
+    "request_id": "44444444-4444-4444-8444-444444444444",
+    "trace_id": "0123456789abcdef0123456789abcdef",
+    "permission_code": "knowledge.document.read"
+  },
+  "agent_release": {
+    "release_id": "55555555-5555-4555-8555-555555555555",
+    "agent_id": "66666666-6666-4666-8666-666666666666",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "version": 1,
+    "status": "released",
+    "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "released_at": "2026-08-13T08:00:00Z"
+  },
+  "message_part": {
+    "part_id": "77777777-7777-4777-8777-777777777777",
+    "type": "text",
+    "text": "合成测试消息"
+  },
+  "data_source": {
+    "interface_version": 1,
+    "capabilities": ["search", "get_document", "get_metadata", "check_permission", "get_source_policy"]
+  },
+  "relevance_grader": { "interface_version": 1, "enabled": false, "score_min": 0, "score_max": 1 },
+  "multimodal_model_router": { "interface_version": 1, "enabled": false, "accepted_parts": ["text", "image_ref"] }
+}

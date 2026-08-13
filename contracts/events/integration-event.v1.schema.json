@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/events/integration-event.v1.schema.json",
+  "title": "Transactional Outbox 集成事件 V1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["event_id", "event_type", "schema_version", "workspace_id", "aggregate_id", "aggregate_version", "occurred_at", "trace_id", "payload"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$" },
+    "schema_version": { "const": 1 },
+    "workspace_id": { "type": "string", "format": "uuid" },
+    "aggregate_id": { "type": "string", "format": "uuid" },
+    "aggregate_version": { "type": "integer", "minimum": 1 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "trace_id": { "type": "string", "minLength": 16, "maxLength": 64 },
+    "payload": { "type": "object" }
+  }
+}

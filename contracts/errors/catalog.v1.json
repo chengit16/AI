@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "errors": [
+    { "code": "VALIDATION_ERROR", "http_status": 422, "message": "请求参数不符合接口约定", "retryable": false },
+    { "code": "AUTH_REQUIRED", "http_status": 401, "message": "需要有效的登录或接口凭证", "retryable": false },
+    { "code": "WORKSPACE_REQUIRED", "http_status": 400, "message": "请求缺少有效的工作空间上下文", "retryable": false },
+    { "code": "POLICY_DENIED", "http_status": 403, "message": "当前操作未获授权", "retryable": false },
+    { "code": "POLICY_UNAVAILABLE", "http_status": 503, "message": "权限策略暂时不可用，操作已默认拒绝", "retryable": true },
+    { "code": "RESOURCE_NOT_FOUND", "http_status": 404, "message": "请求的资源不存在或不可见", "retryable": false },
+    { "code": "IDEMPOTENCY_CONFLICT", "http_status": 409, "message": "幂等键已用于不同的请求", "retryable": false },
+    { "code": "CONVERSATION_BUSY", "http_status": 409, "message": "当前会话已有进行中的生成任务", "retryable": true },
+    { "code": "SSE_EVENT_EXPIRED", "http_status": 410, "message": "请求恢复的流式事件已超过保留期", "retryable": false },
+    { "code": "SSE_REPLAY_LIMIT_EXCEEDED", "http_status": 409, "message": "待回放事件超过上限，请读取最终消息快照", "retryable": false },
+    { "code": "INTERNAL_ERROR", "http_status": 500, "message": "平台处理请求时发生内部错误", "retryable": true }
+  ]
+}

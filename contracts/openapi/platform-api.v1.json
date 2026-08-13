@@ -1,0 +1,55 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI 智能平台 API",
+    "version": "0.0.0",
+    "summary": "个人空间与企业空间共用的平台服务接口"
+  },
+  "paths": {
+    "/api/v1/health/live": {
+      "get": {
+        "operationId": "getLiveness",
+        "tags": ["系统健康"],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "tags": ["系统健康"],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["service", "status", "version", "environment", "checks"],
+        "properties": {
+          "service": { "type": "string", "title": "Service" },
+          "status": { "type": "string", "enum": ["ok", "degraded"], "title": "Status" },
+          "version": { "type": "string", "title": "Version" },
+          "environment": { "type": "string", "title": "Environment" },
+          "checks": {
+            "type": "object",
+            "additionalProperties": { "type": "string", "enum": ["ok", "degraded"] },
+            "title": "Checks"
+          }
+        },
+        "title": "HealthResponse"
+      }
+    }
+  }
+}
