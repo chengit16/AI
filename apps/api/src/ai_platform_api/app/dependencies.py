@@ -1,7 +1,10 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.authorization.application.resources import load_resource_registry
+from ai_platform_api.modules.authorization.domain.resources import ResourceRegistry
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
@@ -48,6 +51,7 @@ class ApplicationContainer:
     settings: Settings
     database: PlatformDatabase
     errors: ErrorCatalog
+    resource_registry: ResourceRegistry
     authentication: AuthenticationService
     api_keys: ApiKeyService
     registration: RegistrationService
@@ -86,6 +90,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             settings=settings,
             database=database,
             errors=ErrorCatalog.load(settings.error_catalog_path),
+            resource_registry=load_resource_registry(Path(settings.resource_registry_path)),
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,

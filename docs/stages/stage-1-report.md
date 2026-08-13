@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1C-01` 待开始 |
+| 当前节点 | `P1C-02` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -190,6 +190,18 @@
 - 自动化验收：UoW 并发专项 `6/6`，Identity、Organization 与并发回归组合 `17/17`。统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试 `2/2`/生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `204/204` 均通过。Ant Design 公共块约 `305.59 KB gzip`，业务路由块约 `1～9 KB gzip`；公共块警告记录为后续性能观察项，不在本地 MVP 阶段更换既定组件技术栈。
 - 容器与浏览器验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0010`、Valkey 和 Worker 八项诊断通过。使用全合成账号完成注册登录、个人空间读取、创建并自动切换企业空间、套餐读取、Open API 开关、部门和岗位创建、成员邀请与接受；普通企业成员访问成员及组织治理均稳定显示无权限状态。
 - 当前边界：本节点使用静态注册菜单承载所有现有页面，不提前实现菜单草稿、动态发布、页面与接口统一权限码或字段级 ABAC；这些继续按 `P1C` 实施。页面不新增 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`6a7f2f6`。
+
+### P1C-01 统一权限资源模型
+
+- 状态：通过。
+- 领域语言：新增根级 `CONTEXT.md`，固定 Permission、`permission_code`、`PageResource`、`ApiResource`、Menu、`ResourceRegistry` 和 `MenuRelease` 的边界。菜单只负责导航体验，Permission 才是后端授权语义；页面可见 Permission 与页面内创建、读取、停用等业务接口 Permission 相互独立，不能因能进入页面而自动获得写权限。
+- 版本化注册表：新增 `ResourceRegistry V1` JSON Schema 和冻结注册表，显式登记 28 项 Permission、5 个页面资源、31 个 API 资源和 5 个系统菜单。登录、注册、健康等公共或仅认证入口也具有明确 `access_level`，不能通过不登记来绕过审计；当前所有 OpenAPI 操作均按 HTTP Method、路径和 `operation_id` 一一覆盖。
+- 发布前校验：纯领域校验器一次聚合 Schema/Registry 版本、重复 ID/Key/路由/操作、非法 `permission_code`、非法组件/布局/路由、公共资源错误绑定权限、授权资源缺少或引用停用权限、悬空菜单父节点/页面/权限、菜单循环、启用菜单引用停用页面以及未绑定授权页面/Permission。生成器同步核对 OpenAPI 全覆盖并生成 React 只读消费产物，任何漂移进入 `./scripts/verify` 后失败。
+- 前后端消费：API 进程启动时从 `Settings.resource_registry_path` 装载并验证同一注册表，API 镜像显式包含版本化契约；React 的路由路径、菜单名称、排序、图标键和页面 Permission 改为消费生成产物。页面组件仍通过本地受控 `component_key` 映射懒加载，注册表不能执行任意组件或任意路由。
+- 自动化验收：注册表领域与反例 `4/4`，注册表加契约专项 `24/24`，API 启动与应用组合 `51/51`；统一 `./scripts/verify` 通过，前端格式/Lint/TypeScript/测试 `3/3`/生产构建、Ruff、mypy strict、架构、OpenAPI 覆盖、契约兼容与漂移、Secret Scanner、SBOM、许可证、Manifest 和全量 pytest `209/209` 均通过。
+- 容器与浏览器验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260814_0010`、Valkey 和 Worker 八项诊断通过。真实浏览器确认注册表生成的空间总览、成员管理、组织架构和运行状态四个菜单全部可见并可导航，普通成员无权限状态保持，页面无横向溢出且控制台无错误。
+- 当前边界：本节点建立平台注册和发布前结构门禁，不把冻结注册表冒充工作空间 `MenuRelease`，不实现角色到 Permission 的实际授权、数据范围计算、页面/接口动态绑定、菜单草稿发布或字段级 ABAC；这些分别进入 `P1C-02` 至 `P1C-05`。注册表当前随代码发布，尚不允许管理员录入任意页面、组件、路由或接口。
 - 提交：本提交。
 
 ## 4. 当前限制
@@ -201,4 +213,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1B-06`，当前进入 `P1C-01`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-01`，当前进入 `P1C-02`。

@@ -9,6 +9,7 @@ from ai_platform_api.app.factory import create_app
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.authorization.application.resources import load_resource_registry
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
@@ -278,6 +279,9 @@ def organization_client() -> TestClient:
         settings=settings,
         database=cast(PlatformDatabase, closing),
         errors=ErrorCatalog.load(ROOT / "contracts/errors/catalog.v1.json"),
+        resource_registry=load_resource_registry(
+            ROOT / "contracts/authorization/resource-registry.v1.json"
+        ),
         authentication=StubAuthenticationService(),
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),

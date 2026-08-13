@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/authorization/resource-registry.v1.schema.json",
+  "title": "统一权限资源注册表 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_version",
+    "permissions",
+    "page_resources",
+    "api_resources",
+    "menus"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "registry_version": { "type": "integer", "minimum": 1 },
+    "permissions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/permission" }
+    },
+    "page_resources": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/page_resource" }
+    },
+    "api_resources": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/api_resource" }
+    },
+    "menus": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/menu" }
+    }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "registry_key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "permission_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "resource_type", "action", "scope", "status"],
+      "properties": {
+        "code": { "$ref": "#/$defs/permission_code" },
+        "resource_type": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "action": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "scope": { "enum": ["platform", "account", "workspace", "resource", "field"] },
+        "status": { "enum": ["active", "disabled"] }
+      }
+    },
+    "page_resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "page_resource_id",
+        "page_key",
+        "route",
+        "component_key",
+        "layout_key",
+        "access_level",
+        "permission_code",
+        "resource_version",
+        "status"
+      ],
+      "properties": {
+        "page_resource_id": { "$ref": "#/$defs/uuid" },
+        "page_key": { "$ref": "#/$defs/registry_key" },
+        "route": { "type": "string", "pattern": "^/" },
+        "component_key": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$" },
+        "layout_key": { "$ref": "#/$defs/registry_key" },
+        "access_level": { "enum": ["public", "authenticated", "authorized"] },
+        "permission_code": {
+          "oneOf": [{ "$ref": "#/$defs/permission_code" }, { "type": "null" }]
+        },
+        "resource_version": { "type": "integer", "minimum": 1 },
+        "status": { "enum": ["active", "disabled"] }
+      }
+    },
+    "api_resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api_resource_id",
+        "api_key",
+        "operation_id",
+        "method",
+        "path_pattern",
+        "access_level",
+        "permission_code",
+        "risk_level",
+        "status"
+      ],
+      "properties": {
+        "api_resource_id": { "$ref": "#/$defs/uuid" },
+        "api_key": { "$ref": "#/$defs/registry_key" },
+        "operation_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "method": { "enum": ["DELETE", "GET", "PATCH", "POST", "PUT"] },
+        "path_pattern": { "type": "string", "pattern": "^/api/v1/" },
+        "access_level": { "enum": ["public", "authenticated", "authorized"] },
+        "permission_code": {
+          "oneOf": [{ "$ref": "#/$defs/permission_code" }, { "type": "null" }]
+        },
+        "risk_level": { "enum": ["low", "normal", "high", "critical"] },
+        "status": { "enum": ["active", "disabled"] }
+      }
+    },
+    "menu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "menu_id",
+        "menu_key",
+        "parent_menu_key",
+        "name",
+        "menu_type",
+        "page_resource_id",
+        "permission_code",
+        "icon_key",
+        "sort_order",
+        "source",
+        "status"
+      ],
+      "properties": {
+        "menu_id": { "$ref": "#/$defs/uuid" },
+        "menu_key": { "$ref": "#/$defs/registry_key" },
+        "parent_menu_key": {
+          "oneOf": [{ "$ref": "#/$defs/registry_key" }, { "type": "null" }]
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "menu_type": { "enum": ["directory", "page", "action"] },
+        "page_resource_id": {
+          "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "permission_code": {
+          "oneOf": [{ "$ref": "#/$defs/permission_code" }, { "type": "null" }]
+        },
+        "icon_key": {
+          "oneOf": [{ "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, { "type": "null" }]
+        },
+        "sort_order": { "type": "integer", "minimum": 0 },
+        "source": { "enum": ["system", "workspace"] },
+        "status": { "enum": ["active", "disabled"] }
+      }
+    }
+  }
+}

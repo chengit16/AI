@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     error_catalog_path: str = "contracts/errors/catalog.v1.json"
     release_manifest_path: str = "contracts/fixtures/release-manifest.v1.valid.json"
     compatibility_matrix_path: str = "contracts/release/compatibility-matrix.v1.json"
+    resource_registry_path: str = "contracts/authorization/resource-registry.v1.json"
     master_key_path: str = ".ai-platform/secrets/master.key"
     database_url: str = "postgresql+psycopg://ai_platform@127.0.0.1:5432/ai_platform"
     valkey_url: str = "redis://127.0.0.1:6379/0"

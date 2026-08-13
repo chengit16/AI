@@ -2,16 +2,12 @@ import { useMutation } from "@tanstack/react-query";
 import { App, Button, Drawer, Dropdown, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 import {
-  Activity,
   Building2,
   ChevronsLeft,
   ChevronsRight,
   CircleUserRound,
-  LayoutDashboard,
   LogOut,
   Menu,
-  Network,
-  UsersRound,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
@@ -19,25 +15,19 @@ import { errorMessage } from "@/api/client";
 import { logoutCurrentSession } from "@/api/services/auth";
 import { PlatformMark } from "@/components/PlatformMark/PlatformMark";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher/WorkspaceSwitcher";
+import { pageRoutes, workspaceNavigation } from "@/config/resources";
 import { useSessionStore } from "@/store/session";
 import { useUiStore } from "@/store/ui";
 
 import styles from "./AppShell.module.css";
 
-const navigation = [
-  { to: "/workspace/overview", label: "空间总览", icon: LayoutDashboard },
-  { to: "/workspace/members", label: "成员管理", icon: UsersRound },
-  { to: "/workspace/organization", label: "组织架构", icon: Network },
-  { to: "/status", label: "运行状态", icon: Activity },
-];
-
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className={styles.navigation} aria-label="平台主导航">
       <p className={styles.navigationLabel}>空间管理</p>
-      {navigation.map(({ to, label, icon: Icon }) => (
+      {workspaceNavigation.map(({ key, to, label, icon: Icon }) => (
         <NavLink
-          key={to}
+          key={key}
           to={to}
           className={({ isActive }) => `${styles.navigationItem} ${isActive ? styles.active : ""}`}
           onClick={onNavigate}
@@ -64,7 +54,7 @@ export function AppShell() {
     mutationFn: logoutCurrentSession,
     onSettled: () => {
       clearSession();
-      navigate("/login", { replace: true });
+      navigate(pageRoutes.LoginPage, { replace: true });
     },
     onError: (error) => void message.error(errorMessage(error)),
   });
@@ -108,7 +98,7 @@ export function AppShell() {
           <div className={styles.topbarEnd}>
             <span className={styles.routeLabel}>
               <Building2 size={16} />
-              {navigation.find((item) => location.pathname.startsWith(item.to))?.label ??
+              {workspaceNavigation.find((item) => location.pathname.startsWith(item.to))?.label ??
                 "空间管理"}
             </span>
             <Dropdown

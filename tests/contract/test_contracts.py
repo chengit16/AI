@@ -69,6 +69,13 @@ def test_policy_contract_fixture() -> None:
     )
 
 
+def test_authorization_resource_registry_contract() -> None:
+    assert_valid(
+        "authorization/resource-registry.v1.schema.json",
+        "authorization/resource-registry.v1.json",
+    )
+
+
 def test_sse_contract_fixture() -> None:
     assert_valid(
         "sse/message-event.v1.schema.json",

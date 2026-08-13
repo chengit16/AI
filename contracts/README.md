@@ -7,6 +7,7 @@
 | `openapi/` | OpenAPI 3.1 HTTP 接口契约 |
 | `domain/` | 核心标识、消息和后置扩展接口的数据契约 |
 | `policy/` | 跨进程策略请求与决策结果契约 |
+| `authorization/` | Permission、页面、接口和系统菜单的版本化资源注册表 |
 | `sse/` | SSE 消息事件信封契约 |
 | `events/` | Transactional Outbox 集成事件与内部签名任务信封契约 |
 | `errors/` | 稳定错误码目录 |

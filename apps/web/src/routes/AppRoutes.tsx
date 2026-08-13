@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { Skeleton } from "antd";
 
 import { AppShell } from "@/app/AppShell";
+import { pageRoutes } from "@/config/resources";
 import { useSessionStore } from "@/store/session";
 
 const LoginPage = lazy(() => import("@/pages/auth/login"));
@@ -25,16 +26,19 @@ export function AppRoutes() {
   return (
     <Suspense fallback={<Skeleton active paragraph={{ rows: 10 }} />}>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path={pageRoutes.LoginPage} element={<LoginPage />} />
         <Route element={<RequireSession />}>
           <Route element={<AppShell />}>
-            <Route path="/workspace/overview" element={<WorkspaceOverviewPage />} />
-            <Route path="/workspace/members" element={<WorkspaceMembersPage />} />
-            <Route path="/workspace/organization" element={<WorkspaceOrganizationPage />} />
-            <Route path="/status" element={<StatusPage />} />
+            <Route path={pageRoutes.WorkspaceOverviewPage} element={<WorkspaceOverviewPage />} />
+            <Route path={pageRoutes.WorkspaceMembersPage} element={<WorkspaceMembersPage />} />
+            <Route
+              path={pageRoutes.WorkspaceOrganizationPage}
+              element={<WorkspaceOrganizationPage />}
+            />
+            <Route path={pageRoutes.StatusPage} element={<StatusPage />} />
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/workspace/overview" replace />} />
+        <Route path="*" element={<Navigate to={pageRoutes.WorkspaceOverviewPage} replace />} />
       </Routes>
     </Suspense>
   );

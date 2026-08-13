@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "@/app/App";
+import { pageRoutes, workspaceNavigation } from "@/config/resources";
 import { useSessionStore } from "@/store/session";
 
 function renderApp(path: string) {
@@ -28,10 +29,19 @@ describe("平台路由与运行状态", () => {
   });
 
   it("未登录访问业务页面时进入登录页", async () => {
-    renderApp("/workspace/overview");
+    renderApp(pageRoutes.WorkspaceOverviewPage);
 
     expect(await screen.findByRole("heading", { name: "进入平台" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
+  });
+
+  it("现有业务导航全部来自权限资源注册表", () => {
+    expect(workspaceNavigation.map((item) => [item.label, item.to, item.permissionCode])).toEqual([
+      ["空间总览", "/workspace/overview", "workspace.overview.access"],
+      ["成员管理", "/workspace/members", "workspace.members.access"],
+      ["组织架构", "/workspace/organization", "organization.structure.access"],
+      ["运行状态", "/status", "system.runtime.access"],
+    ]);
   });
 
   it("展示后端返回的健康状态", async () => {
@@ -68,7 +78,7 @@ describe("平台路由与运行状态", () => {
       );
     });
 
-    renderApp("/status");
+    renderApp(pageRoutes.StatusPage);
 
     expect(await screen.findByText("基础服务运行正常")).toBeInTheDocument();
     expect(screen.getByText("平台 API")).toBeInTheDocument();

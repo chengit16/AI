@@ -7,6 +7,7 @@ from ai_platform_api.app.dependencies import ApplicationContainer
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.app.factory import create_app
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.authorization.application.resources import load_resource_registry
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
@@ -56,6 +57,9 @@ def application_container(settings: Settings) -> tuple[ApplicationContainer, Clo
         settings=settings,
         database=cast(PlatformDatabase, database),
         errors=ErrorCatalog.load(ROOT / "contracts/errors/catalog.v1.json"),
+        resource_registry=load_resource_registry(
+            ROOT / "contracts/authorization/resource-registry.v1.json"
+        ),
         authentication=cast("AuthenticationService", object()),
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),
