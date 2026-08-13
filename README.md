@@ -9,6 +9,7 @@
 - [项目进度看板](./docs/project-progress.md)：阶段、节点状态、验收证据和 Git 提交索引。
 - [交付与 Git 管理规范](./docs/governance/delivery-and-git.md)：节点完成定义、提交规则和文档更新要求。
 - [阶段 0 实施计划](./docs/stages/stage-0-plan.md)：阶段 0 的建设顺序、节点交付物和完成门禁。
+- [前端 UI/UX 设计基线](./docs/design/ui-ux-baseline.md)：布局、动态菜单、响应式、可访问性和阶段 1 优化清单。
 
 ## 当前原则
 
