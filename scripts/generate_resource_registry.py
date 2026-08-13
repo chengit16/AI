@@ -74,6 +74,7 @@ def generated_typescript() -> str:
         f"export const resourceRegistry = {serialized} as const;\n\n"
         "export type PageResource = (typeof resourceRegistry.page_resources)[number];\n"
         "export type MenuResource = (typeof resourceRegistry.menus)[number];\n"
+        "export type MenuApiBinding = (typeof resourceRegistry.menu_api_bindings)[number];\n"
     )
 
 

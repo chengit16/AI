@@ -9,9 +9,15 @@ from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.config import Settings
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
+from ai_platform_api.modules.authorization.application.menus import MenuConfigurationService
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.grants import RolePermissionGrant
+from ai_platform_api.modules.authorization.domain.menus import (
+    MenuConfiguration,
+    RoleMenuVisibility,
+    WorkspaceMenuOverride,
+)
 from ai_platform_api.modules.authorization.domain.policy import (
     DataScopeType,
     PolicyDecision,
@@ -41,6 +47,8 @@ ACCOUNT_ID = UUID("10000000-0000-4000-8000-000000000098")
 WORKSPACE_ID = UUID("20000000-0000-4000-8000-000000000098")
 ROLE_ID = UUID("70000000-0000-4000-8000-000000000098")
 DEPARTMENT_ID = UUID("50000000-0000-4000-8000-000000000098")
+DIRECTORY_ID = UUID("82000000-0000-4000-8000-000000000001")
+OVERVIEW_ID = UUID("82000000-0000-4000-8000-000000000002")
 
 
 class ClosingDependency:
@@ -130,6 +138,70 @@ class StubRolePermissionService(RolePermissionService):
         )
 
 
+class StubMenuConfigurationService(MenuConfigurationService):
+    def __init__(self) -> None:
+        pass
+
+    def get_workspace(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+    ) -> MenuConfiguration:
+        assert context.workspace_id == workspace_id
+        return self._configuration()
+
+    def replace_workspace(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        entries: tuple[tuple[UUID, UUID | None, str, str | None, int, bool], ...],
+    ) -> MenuConfiguration:
+        assert context.workspace_id == workspace_id
+        assert entries[0][:2] == (OVERVIEW_ID, DIRECTORY_ID)
+        return self._configuration()
+
+    def get_role(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        role_id: UUID,
+    ) -> tuple[RoleMenuVisibility, ...]:
+        assert context.workspace_id == workspace_id and role_id == ROLE_ID
+        return (RoleMenuVisibility(workspace_id, role_id, OVERVIEW_ID, False),)
+
+    def replace_role(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        role_id: UUID,
+        entries: tuple[tuple[UUID, bool], ...],
+    ) -> tuple[RoleMenuVisibility, ...]:
+        assert entries == ((OVERVIEW_ID, False),)
+        return self.get_role(context, workspace_id=workspace_id, role_id=role_id)
+
+    @staticmethod
+    def _configuration() -> MenuConfiguration:
+        return MenuConfiguration(
+            WORKSPACE_ID,
+            2,
+            (
+                WorkspaceMenuOverride(
+                    WORKSPACE_ID,
+                    OVERVIEW_ID,
+                    DIRECTORY_ID,
+                    "合成工作台",
+                    "panel-top",
+                    10,
+                    True,
+                ),
+            ),
+        )
+
+
 class DenyPolicy:
     def decide(self, request: PolicyRequest) -> PolicyDecision:
         return PolicyDecision(
@@ -157,6 +229,7 @@ def authorization_client(policy: PolicyDecisionPoint) -> TestClient:
         ),
         policy=policy,
         role_permissions=StubRolePermissionService(),
+        menu_configuration=StubMenuConfigurationService(),
         authentication=StubAuthenticationService(),
         api_keys=cast("ApiKeyService", object()),
         registration=cast("RegistrationService", object()),
@@ -212,3 +285,54 @@ def test_role_permission_routes_share_registered_permission_codes() -> None:
     assert listed.status_code == 200
     assert replaced.status_code == 200
     assert listed.json() == replaced.json()
+
+
+def test_menu_routes_share_registered_permission_codes() -> None:
+    client = authorization_client(AllowRegisteredPolicy())
+    headers = {
+        "X-Workspace-ID": str(WORKSPACE_ID),
+        "X-CSRF-Token": "synthetic-authorization-csrf",
+    }
+    menu_path = f"/api/v1/workspaces/{WORKSPACE_ID}/menus"
+    role_path = f"/api/v1/workspaces/{WORKSPACE_ID}/roles/{ROLE_ID}/menus"
+    with client:
+        menu_get = client.get(menu_path, headers={"X-Workspace-ID": str(WORKSPACE_ID)})
+        menu_put = client.put(
+            menu_path,
+            headers=headers,
+            json={
+                "items": [
+                    {
+                        "menu_id": str(OVERVIEW_ID),
+                        "parent_menu_id": str(DIRECTORY_ID),
+                        "name": "合成工作台",
+                        "icon_key": "panel-top",
+                        "sort_order": 10,
+                        "visible": True,
+                    }
+                ]
+            },
+        )
+        role_get = client.get(role_path, headers={"X-Workspace-ID": str(WORKSPACE_ID)})
+        role_put = client.put(
+            role_path,
+            headers=headers,
+            json={"items": [{"menu_id": str(OVERVIEW_ID), "visible": False}]},
+        )
+
+    assert menu_get.status_code == menu_put.status_code == 200
+    assert role_get.status_code == role_put.status_code == 200
+    assert menu_get.json() == menu_put.json()
+    assert role_get.json() == role_put.json()
+
+
+def test_hidden_role_menu_does_not_bypass_backend_policy() -> None:
+    client = authorization_client(cast("PolicyDecisionPoint", DenyPolicy()))
+    with client:
+        response = client.get(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/roles/{ROLE_ID}/menus",
+            headers={"X-Workspace-ID": str(WORKSPACE_ID)},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "POLICY_DENIED"

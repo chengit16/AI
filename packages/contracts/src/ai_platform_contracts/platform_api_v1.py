@@ -180,8 +180,16 @@ class RegistrationResponse(typing.TypedDict):
     personal_workspace_id: str
 
 
+class ReplaceRoleMenuVisibilityRequest(typing.TypedDict):
+    items: list[RoleMenuVisibilityEntry]
+
+
 class ReplaceRolePermissionsRequest(typing.TypedDict):
     items: list[RolePermissionEntry]
+
+
+class ReplaceWorkspaceMenuConfigurationRequest(typing.TypedDict):
+    items: list[WorkspaceMenuOverrideEntry]
 
 
 class RoleBindingResponse(typing.TypedDict):
@@ -196,6 +204,16 @@ class RoleBindingResponse(typing.TypedDict):
 
 class RoleListResponse(typing.TypedDict):
     items: list[RoleResponse]
+
+
+class RoleMenuVisibilityEntry(typing.TypedDict):
+    menu_id: str
+    visible: bool
+
+
+class RoleMenuVisibilityResponse(typing.TypedDict):
+    items: list[RoleMenuVisibilityEntry]
+    role_id: str
 
 
 class RolePermissionEntry(typing.TypedDict):
@@ -259,6 +277,22 @@ class WorkspaceMembershipResponse(typing.TypedDict):
     account_id: str
     membership_type: typing.Literal["owner", "member"]
     status: typing.Literal["active", "disabled", "left"]
+
+
+class WorkspaceMenuConfigurationResponse(typing.TypedDict):
+    items: list[WorkspaceMenuOverrideEntry]
+    menu_version: int
+    workspace_id: str
+
+
+class WorkspaceMenuOverrideEntry(typing.TypedDict):
+    icon_key: typing.NotRequired[str | None]
+    menu_id: str
+    name: str
+    parent_menu_id: typing.NotRequired[str | None]
+    sort_order: int
+    version: typing.NotRequired[int]
+    visible: bool
 
 
 class WorkspaceSummaryResponse(typing.TypedDict):

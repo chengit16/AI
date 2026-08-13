@@ -43,3 +43,49 @@ class RolePermissionListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     items: list[RolePermissionEntry]
+
+
+class WorkspaceMenuOverrideEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    menu_id: UUID
+    parent_menu_id: UUID | None = None
+    name: str = Field(min_length=1, max_length=80)
+    icon_key: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9-]*$")
+    sort_order: int = Field(ge=0)
+    visible: bool
+    version: int = Field(default=1, ge=1)
+
+
+class ReplaceWorkspaceMenuConfigurationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[WorkspaceMenuOverrideEntry] = Field(max_length=500)
+
+
+class WorkspaceMenuConfigurationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workspace_id: UUID
+    menu_version: int = Field(ge=1)
+    items: list[WorkspaceMenuOverrideEntry]
+
+
+class RoleMenuVisibilityEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    menu_id: UUID
+    visible: bool
+
+
+class ReplaceRoleMenuVisibilityRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[RoleMenuVisibilityEntry] = Field(max_length=500)
+
+
+class RoleMenuVisibilityResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role_id: UUID
+    items: list[RoleMenuVisibilityEntry]

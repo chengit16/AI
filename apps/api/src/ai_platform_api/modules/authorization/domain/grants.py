@@ -15,6 +15,8 @@ OWNER_PERMISSION_CODES = (
     "authorization.binding.create",
     "authorization.binding.revoke",
     "authorization.effective_role.read",
+    "authorization.menu.manage",
+    "authorization.menu.read",
     "authorization.role.create",
     "authorization.role.read",
     "authorization.role.status",

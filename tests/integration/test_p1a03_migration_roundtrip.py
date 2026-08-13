@@ -91,7 +91,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260814_0012"
+    assert current_revision(connection, schema) == "20260814_0013"
     assert business_tables(connection, schema) == {
         "accounts",
         "audit_records",
@@ -107,12 +107,15 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "role_permission_grants",
         "roles",
         "resource_projections",
+        "registered_menu_api_bindings",
         "retrieval_chunks",
         "stream_events",
         "stream_runs",
+        "role_menus",
         "workspace_entitlements",
         "workspace_feature_settings",
         "workspace_memberships",
+        "workspace_menu_overrides",
         "workspace_invitations",
         "workspace_resources",
         "workspace_usage_counters",
@@ -129,5 +132,5 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260814_0012"
+    assert current_revision(connection, schema) == "20260814_0013"
     assert schema_snapshot(connection, schema) == first_head

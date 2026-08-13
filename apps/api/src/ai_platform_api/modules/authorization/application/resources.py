@@ -10,6 +10,8 @@ from ai_platform_api.modules.authorization.domain.resources import (
     ApiResource,
     HttpMethod,
     Menu,
+    MenuActionType,
+    MenuApiBinding,
     MenuSource,
     MenuType,
     PageAccessLevel,
@@ -149,6 +151,28 @@ def resource_registry_from_dict(document: dict[str, object]) -> ResourceRegistry
         for index, value in enumerate(_array(document, "menus", "registry"))
         for location, item in [(f"menus[{index}]", _object(value, f"menus[{index}]"))]
     )
+    menu_api_bindings = tuple(
+        MenuApiBinding(
+            menu_id=_uuid(item, "menu_id", location),
+            api_resource_id=_uuid(item, "api_resource_id", location),
+            action_type=cast(
+                MenuActionType,
+                _literal(
+                    item,
+                    "action_type",
+                    location,
+                    ("query", "mutation", "publish", "approve"),
+                ),
+            ),
+        )
+        for index, value in enumerate(_array(document, "menu_api_bindings", "registry"))
+        for location, item in [
+            (
+                f"menu_api_bindings[{index}]",
+                _object(value, f"menu_api_bindings[{index}]"),
+            )
+        ]
+    )
     registry = ResourceRegistry(
         schema_version=_integer(document, "schema_version", "registry"),
         registry_version=_integer(document, "registry_version", "registry"),
@@ -156,6 +180,7 @@ def resource_registry_from_dict(document: dict[str, object]) -> ResourceRegistry
         page_resources=pages,
         api_resources=apis,
         menus=menus,
+        menu_api_bindings=menu_api_bindings,
     )
     registry.assert_valid()
     return registry

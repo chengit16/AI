@@ -8,6 +8,7 @@ import pytest
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
 from ai_platform_api.modules.authorization.domain.resources import (
     Menu,
+    MenuApiBinding,
     ResourceRegistry,
     ResourceRegistryInvalidError,
 )
@@ -26,10 +27,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert len(resource_registry.permissions) == 30
+    assert resource_registry.registry_version == 2
+    assert len(resource_registry.permissions) == 32
     assert len(resource_registry.page_resources) == 5
-    assert len(resource_registry.api_resources) == 33
-    assert len(resource_registry.menus) == 5
+    assert len(resource_registry.api_resources) == 37
+    assert len(resource_registry.menus) == 35
+    assert len(resource_registry.menu_api_bindings) == 30
     assert registry_openapi_violations() == ()
 
 
@@ -119,3 +122,29 @@ def test_registry_rejects_active_resources_that_reference_disabled_entries() -> 
     assert any("authorized 资源不能引用停用权限" in item for item in violations)
     assert any("启用菜单不能引用停用权限" in item for item in violations)
     assert any("启用菜单不能引用停用页面" in item for item in violations)
+
+
+def test_registry_rejects_menu_api_permission_mismatch_and_unbound_api() -> None:
+    valid = registry()
+    mismatched = replace(
+        valid.menu_api_bindings[0],
+        api_resource_id=valid.api_resources[13].api_resource_id,
+    )
+    invalid = replace(
+        valid,
+        menu_api_bindings=(
+            mismatched,
+            *valid.menu_api_bindings[1:-1],
+            MenuApiBinding(
+                valid.menu_api_bindings[-1].menu_id,
+                UUID("81000000-0000-4000-8000-000000000099"),
+                "mutation",
+            ),
+        ),
+    )
+
+    violations = invalid.violations()
+
+    assert any("动作菜单与接口必须使用同一 permission_code" in item for item in violations)
+    assert any("api_resource_id 指向未注册接口" in item for item in violations)
+    assert any("授权接口未绑定任何动作菜单" in item for item in violations)

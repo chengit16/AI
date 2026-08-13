@@ -8,11 +8,15 @@ from ai_platform_api.modules.authorization.application.field_registry import (
 )
 from ai_platform_api.modules.authorization.application.fields import FieldProjectionService
 from ai_platform_api.modules.authorization.application.grants import RolePermissionService
+from ai_platform_api.modules.authorization.application.menus import MenuConfigurationService
 from ai_platform_api.modules.authorization.application.policy import RbacPolicyDecisionPoint
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
 from ai_platform_api.modules.authorization.domain.fields import FieldPolicyRegistry
 from ai_platform_api.modules.authorization.domain.policy import PolicyDecisionPoint
 from ai_platform_api.modules.authorization.domain.resources import ResourceRegistry
+from ai_platform_api.modules.authorization.infrastructure.menu_sqlalchemy import (
+    SqlAlchemyMenuConfigurationUnitOfWork,
+)
 from ai_platform_api.modules.authorization.infrastructure.sqlalchemy import (
     SqlAlchemyPolicyGrantRepository,
     SqlAlchemyRolePermissionUnitOfWork,
@@ -76,6 +80,7 @@ class ApplicationContainer:
     role_cache: ValkeyRoleResolutionCache
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
+    menu_configuration: MenuConfigurationService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -108,6 +113,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     resource_registry = load_resource_registry(Path(settings.resource_registry_path))
     field_registry = load_field_policy_registry(Path(settings.field_policy_registry_path))
     policy_reader = SqlAlchemyPolicyGrantRepository(database.sessions)
+    menu_configuration = MenuConfigurationService(
+        resource_registry,
+        SqlAlchemyMenuConfigurationUnitOfWork(database.sessions),
+    )
     try:
         return ApplicationContainer(
             settings=settings,
@@ -122,6 +131,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 SqlAlchemyRolePermissionUnitOfWork(database.sessions),
                 field_registry,
             ),
+            menu_configuration=menu_configuration,
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,

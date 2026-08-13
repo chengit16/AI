@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1C-04` 待开始 |
+| 当前节点 | `P1C-05` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -230,6 +230,19 @@
 - 当前边界：字段注册表已为 `KnowledgeBase`、`Document`、`Chunk`、`WorkflowInstance` 和 `Approval` 固定字段语义，但正式实体与管理入口分别在 `P1D`、`P1E` 和 `P1F` 建设。当前不扩展任意脚本 ABAC、SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
 - 提交：本提交。
 
+### P1C-04 菜单页面接口统一绑定
+
+- 状态：通过。
+- 注册资源绑定：`ResourceRegistry` 推进至版本 2，冻结 32 项 Permission、5 个页面、37 个 OpenAPI 操作、35 个目录/页面/动作菜单和 30 个 `MenuApiBinding`。全部授权接口必须绑定平台注册动作菜单，动作菜单与接口使用同一 `permission_code`；GET 只接受 `query`，写接口接受受控动作类型。重复、悬空、停用、未绑定和权限码不一致均在发布前失败。
+- 工作空间配置：新增 `WorkspaceMenuOverride` 和整体替换接口，个人与企业空间所有者都可调整已注册菜单的父目录、名称、图标、排序和可见性。最终合并树执行循环和父子类型校验；请求只接受 UUID、展示属性和布尔值，不能提交任意路由、组件、页面或接口地址。
+- 角色菜单：新增 `RoleMenuVisibility` 和角色整体替换接口，角色可以独立隐藏目录、页面或动作入口。菜单可见性只改善前端体验，所有四个菜单管理接口和既有业务接口仍按 `operation_id`、注册 Permission、有效角色、数据范围和字段策略经过后端 PDP，直接 URL 或 API 调用不能借菜单状态绕过授权。
+- 数据与事务：数据库新增静态 `registered_menu_api_bindings` 镜像、`workspace_menu_overrides`、`role_menus` 与 `workspaces.menu_version`，Revision 推进至 `20260814_0013`。配置替换、菜单版本、审计和 Outbox 同事务提交；静态契约与数据库镜像漂移时管理接口失败关闭。Migration `base → head → base → head` 保持结构一致，回滚会清理本节点系统授权种子。
+- 契约与生成：OpenAPI 增加工作空间菜单读取/替换和角色菜单读取/替换；React/Python 生成类型、资源注册表 Schema、React 只读注册表、ReleaseManifest、兼容矩阵、容器诊断 Revision 和契约兼容门禁同步更新。新增 `menu_api_bindings` 保持 Schema 向后兼容可选，但当前版本化注册表领域校验要求完整集合。
+- 自动化验收：资源注册表绑定反例、个人/企业配置、未知资源、循环、跨空间、角色可见性、静态镜像漂移、API 策略绕过和真实 PostgreSQL 持久化通过。统一 `./scripts/verify` 通过，React 测试 `3/3` 与生产构建、Ruff、mypy strict、架构、契约兼容与漂移、Secret Scanner、SBOM、许可证和全量 pytest `234/234` 均通过。
+- 容器与 HTTP 验收：API、Worker、Web 与 Migration 镜像从当前工作树重建；Web、API、MinIO、Tika、PostgreSQL、Revision `20260814_0013`、Valkey 和 Worker 八项诊断通过。真实合成账号分别将个人和企业菜单版本推进至 2，企业所有者角色动作菜单设为不可见；伪造个人空间 Header 读取企业菜单返回 `403 POLICY_DENIED`。
+- 当前边界：本节点只建立可配置覆盖层和角色可见性事实，不生成草稿、不可变发布快照、审批或回滚版本；这些进入 `P1C-05`。React 仍消费现有静态应用壳层，动态路由生成和按当前角色裁剪进入 `P1C-06`。未扩展 SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
+- 提交：本提交。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -239,4 +252,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-03`，当前进入 `P1C-04`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-04`，当前进入 `P1C-05`。

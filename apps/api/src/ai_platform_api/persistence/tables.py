@@ -59,6 +59,7 @@ workspaces = Table(
     Column("owner_account_id", UUID(as_uuid=True), nullable=True),
     Column("entitlement_version", Integer, nullable=False),
     Column("role_version", Integer, nullable=False, server_default="1"),
+    Column("menu_version", Integer, nullable=False, server_default="1"),
     Column("status", String(32), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
@@ -73,6 +74,7 @@ workspaces = Table(
     CheckConstraint("entitlement_version >= 1", name="ck_workspaces_entitlement_version"),
     CheckConstraint("role_version >= 1", name="ck_workspaces_role_version"),
     CheckConstraint("version >= 1", name="ck_workspaces_version"),
+    CheckConstraint("menu_version >= 1", name="ck_workspaces_menu_version"),
     ForeignKeyConstraint(
         ["owner_account_id"],
         [f"{SCHEMA_TOKEN}.accounts.account_id"],
@@ -512,6 +514,61 @@ role_permission_grants = Table(
         "AND cardinality(department_ids) = 0)",
         name="ck_role_permission_grants_targets",
     ),
+)
+
+registered_menu_api_bindings = Table(
+    "registered_menu_api_bindings",
+    metadata,
+    Column("menu_id", UUID(as_uuid=True), primary_key=True),
+    Column("api_resource_id", UUID(as_uuid=True), primary_key=True),
+    Column("action_type", String(32), nullable=False),
+    CheckConstraint(
+        "action_type IN ('query', 'mutation', 'publish', 'approve')",
+        name="ck_registered_menu_api_bindings_action",
+    ),
+)
+
+workspace_menu_overrides = Table(
+    "workspace_menu_overrides",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("menu_id", UUID(as_uuid=True), primary_key=True),
+    Column("parent_menu_id", UUID(as_uuid=True), nullable=True),
+    Column("name", String(80), nullable=False),
+    Column("icon_key", String(80), nullable=True),
+    Column("sort_order", Integer, nullable=False),
+    Column("visible", Boolean, nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workspace_menu_overrides_workspace",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("sort_order >= 0", name="ck_workspace_menu_overrides_sort"),
+    CheckConstraint("version >= 1", name="ck_workspace_menu_overrides_version"),
+)
+
+role_menus = Table(
+    "role_menus",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("role_id", UUID(as_uuid=True), primary_key=True),
+    Column("menu_id", UUID(as_uuid=True), primary_key=True),
+    Column("visible", Boolean, nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "role_id"],
+        [f"{SCHEMA_TOKEN}.roles.workspace_id", f"{SCHEMA_TOKEN}.roles.role_id"],
+        name="fk_role_menus_role",
+        ondelete="CASCADE",
+    ),
+)
+
+Index(
+    "ix_role_menus_lookup",
+    role_menus.c.workspace_id,
+    role_menus.c.role_id,
+    role_menus.c.visible,
 )
 Index(
     "ix_role_permission_grants_lookup",

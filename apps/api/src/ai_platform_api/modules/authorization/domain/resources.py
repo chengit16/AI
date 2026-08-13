@@ -14,6 +14,7 @@ MenuType = Literal["directory", "page", "action"]
 MenuSource = Literal["system", "workspace"]
 HttpMethod = Literal["DELETE", "GET", "PATCH", "POST", "PUT"]
 RiskLevel = Literal["low", "normal", "high", "critical"]
+MenuActionType = Literal["query", "mutation", "publish", "approve"]
 
 PERMISSION_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$")
 REGISTRY_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
@@ -71,6 +72,13 @@ class Menu:
 
 
 @dataclass(frozen=True)
+class MenuApiBinding:
+    menu_id: UUID
+    api_resource_id: UUID
+    action_type: MenuActionType
+
+
+@dataclass(frozen=True)
 class ResourceRegistry:
     schema_version: int
     registry_version: int
@@ -78,6 +86,7 @@ class ResourceRegistry:
     page_resources: tuple[PageResource, ...]
     api_resources: tuple[ApiResource, ...]
     menus: tuple[Menu, ...]
+    menu_api_bindings: tuple[MenuApiBinding, ...]
 
     def violations(self) -> tuple[str, ...]:
         violations: list[str] = []
@@ -110,7 +119,7 @@ class ResourceRegistry:
             "page_resources.route",
             violations,
         )
-        _unique_index(
+        api_by_id = _unique_index(
             self.api_resources,
             lambda item: item.api_resource_id,
             "api_resources.api_resource_id",
@@ -198,6 +207,16 @@ class ResourceRegistry:
                     violations.append(f"{location}: 菜单不能以自身为父节点")
                 elif menu.parent_menu_key not in menu_by_key:
                     violations.append(f"{location}: parent_menu_key 指向未注册菜单")
+                elif (
+                    menu.menu_type == "page"
+                    and menu_by_key[menu.parent_menu_key].menu_type != "directory"
+                ):
+                    violations.append(f"{location}: 页面菜单只能放在目录下")
+                elif (
+                    menu.menu_type == "action"
+                    and menu_by_key[menu.parent_menu_key].menu_type != "page"
+                ):
+                    violations.append(f"{location}: 动作菜单只能放在页面下")
             if not menu.name.strip():
                 violations.append(f"{location}: name 不能为空")
             if menu.sort_order < 0:
@@ -223,6 +242,8 @@ class ResourceRegistry:
                     violations.append(f"{location}: 页面菜单必须绑定 permission_code")
             elif menu.page_resource_id is not None:
                 violations.append(f"{location}: 动作菜单不能直接绑定页面")
+            elif menu.menu_type == "action" and menu.parent_menu_key is None:
+                violations.append(f"{location}: 动作菜单必须绑定所属页面")
             if menu.permission_code is not None:
                 referenced_permissions.add(menu.permission_code)
                 if menu.permission_code not in permission_by_code:
@@ -234,6 +255,55 @@ class ResourceRegistry:
                     violations.append(f"{location}: 启用菜单不能引用停用权限")
 
         _append_menu_cycle_violations(menu_by_key, violations)
+
+        referenced_action_menus: set[UUID] = set()
+        referenced_authorized_apis: set[UUID] = set()
+        seen_bindings: set[tuple[UUID, UUID]] = set()
+        for binding in self.menu_api_bindings:
+            location = f"menu_api_bindings[{binding.menu_id}:{binding.api_resource_id}]"
+            binding_key = (binding.menu_id, binding.api_resource_id)
+            if binding_key in seen_bindings:
+                violations.append(f"{location}: 菜单接口绑定重复")
+            seen_bindings.add(binding_key)
+            bound_menu = next(
+                (item for item in self.menus if item.menu_id == binding.menu_id),
+                None,
+            )
+            bound_api = api_by_id.get(binding.api_resource_id)
+            if bound_menu is None or bound_menu.menu_type != "action":
+                violations.append(f"{location}: 必须引用已注册动作菜单")
+            else:
+                referenced_action_menus.add(bound_menu.menu_id)
+            if bound_api is None:
+                violations.append(f"{location}: api_resource_id 指向未注册接口")
+            elif bound_api.access_level != "authorized":
+                violations.append(f"{location}: 只允许绑定后端授权接口")
+            else:
+                referenced_authorized_apis.add(bound_api.api_resource_id)
+            if bound_menu is not None and bound_api is not None:
+                if bound_menu.status != "active" or bound_api.status != "active":
+                    violations.append(f"{location}: 启用绑定不能引用停用资源")
+                if bound_menu.permission_code != bound_api.permission_code:
+                    violations.append(f"{location}: 动作菜单与接口必须使用同一 permission_code")
+                if binding.action_type == "query" and bound_api.method != "GET":
+                    violations.append(f"{location}: query 绑定只能引用 GET 接口")
+                if binding.action_type != "query" and bound_api.method == "GET":
+                    violations.append(f"{location}: GET 接口只能使用 query 绑定")
+
+        for menu in self.menus:
+            if (
+                menu.status == "active"
+                and menu.menu_type == "action"
+                and menu.menu_id not in referenced_action_menus
+            ):
+                violations.append(f"menus[{menu.menu_key}]: 动作菜单未绑定任何接口")
+        for api in self.api_resources:
+            if (
+                api.status == "active"
+                and api.access_level == "authorized"
+                and api.api_resource_id not in referenced_authorized_apis
+            ):
+                violations.append(f"api_resources[{api.api_key}]: 授权接口未绑定任何动作菜单")
 
         for page in self.page_resources:
             if (

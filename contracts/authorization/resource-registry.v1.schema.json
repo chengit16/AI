@@ -30,6 +30,10 @@
     "menus": {
       "type": "array",
       "items": { "$ref": "#/$defs/menu" }
+    },
+    "menu_api_bindings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/menu_api_binding" }
     }
   },
   "$defs": {
@@ -146,6 +150,16 @@
         "sort_order": { "type": "integer", "minimum": 0 },
         "source": { "enum": ["system", "workspace"] },
         "status": { "enum": ["active", "disabled"] }
+      }
+    },
+    "menu_api_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["menu_id", "api_resource_id", "action_type"],
+      "properties": {
+        "menu_id": { "$ref": "#/$defs/uuid" },
+        "api_resource_id": { "$ref": "#/$defs/uuid" },
+        "action_type": { "enum": ["query", "mutation", "publish", "approve"] }
       }
     }
   }
