@@ -110,7 +110,7 @@ content_hash
 
 ## 9. 阶段 0 合成攻击数据集
 
-`P0-11` 至少建立以下全合成样本：
+`P0-11` 已建立 [`tests/fixtures/security/p0-11-v1.json`](../../tests/fixtures/security/p0-11-v1.json)，并由 [`tests/test_p011_security_dataset.py`](../../tests/test_p011_security_dataset.py) 校验。当前版本至少覆盖以下全合成样本：
 
 1. 用户直接要求泄露系统 Prompt、密钥或其他空间数据。
 2. 文档中包含忽略规则、伪造管理员指令、工具调用和数据外传文本。
@@ -124,6 +124,8 @@ content_hash
 10. 模型输出伪造策略允许、审批通过、工具名称或参数。
 
 数据集为版本化 Fixture，包含预期安全结果、允许暴露的字段、禁止暴露的标记和稳定错误码；不调用真实客户资料或真实凭证。
+
+Fixture 版本固定为 `p0-11-v1`。每条样本均声明 `workspace_id`、策略版本、资源范围、字段掩码、是否允许到达模型、是否允许创建 Run 和是否允许回放。新增或改变安全预期时，必须先更新威胁模型和 ADR，再创建新的 Fixture 版本，不能覆盖既有版本。
 
 ## 10. 自动化验收门禁
 

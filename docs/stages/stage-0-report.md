@@ -145,6 +145,16 @@
 - 默认预算：事件保留 `24 小时`，单次最多回放 `5,000` 条或 `10 MB`，均由 `StreamPolicy` 配置并在 SQL 查询后和应用层字节估算双重限制；超限返回 `SSE_REPLAY_LIMIT_EXCEEDED`，过期返回 `SSE_EVENT_EXPIRED`。
 - 自动化验收：领域单元测试 `7/7`，真实 PostgreSQL 集成测试 `6/6`；覆盖严格序号、Last-Event-ID、最终快照、同会话活动 Run 唯一约束、结束后新 Run、事件幂等、跨工作空间游标、未知游标、事件过期和事件/字节回放上限。
 - 当前边界：本节点不接入真实 HTTP SSE Router、Redis 唤醒、跨实例连接路由、心跳调度、事件清理 Worker、完整 Message/Conversation 业务表和容量认证；这些在阶段 1/2 的会话运行层和可靠性建设中接入，当前 PostgreSQL Store 已为接口预留。
+- 提交：`fe67659`。
+
+### P0-11 合成安全评估、越权与恢复 Fixture
+
+- 状态：通过。
+- 数据集：新增 `tests/fixtures/security/p0-11-v1.json` 和中文使用说明，全部使用合成工作空间、文档、Chunk、事件、策略版本和敏感标记，不包含真实个人资料、企业资料、API Key 或供应商密钥。
+- 覆盖范围：直接/间接 Prompt Injection、跨工作空间召回、撤权/删除/旧版本/旧索引引用、字段级泄漏、引用 ID 与 quote 伪造、Unicode/Base64/分隔符混淆、查询改写与全文精读越权、SSE 重复生成与回放预算、模型输出授权越权共十类样本；引用伪造和混淆绕过包含多条变体。
+- 预期声明：每条样本固定 `expected_security_result`、稳定 `expected_error_code`、HTTP 状态、允许暴露内容、禁止泄漏标记、`expected_scope`、`expected_field_mask`、模型到达限制、Run 创建限制和回放限制，供阶段 1D/1E 的确定性防护测试复用。
+- 自动化验收：`tests/test_p011_security_dataset.py` `6/6`；校验数据集版本和类别完整性、`synthetic=true`、`case_id` 唯一、禁止泄漏标记非空、错误码与契约目录 HTTP 状态一致、工作空间范围与恢复守卫存在，以及疑似真实凭证模式和非合成标识不存在。
+- 当前边界：本节点只建立版本化安全与评估数据，不实现 Prompt 防火墙、真实模型安全评测、LLM Grading、工具执行拦截或安全运营平台；阶段 1D/1E 按 Fixture 接入确定性防护，真实供应商配置后再做模型安全表现评估。
 - 提交：本节点提交完成后回填。
 
 ### P0-13 前端 UI/UX 设计基线
