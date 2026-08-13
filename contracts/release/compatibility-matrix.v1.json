@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "matrix_version": "p1a-01-v1",
+  "manifest_schema_version": 1,
+  "component_rules": [
+    { "name": "api", "minimum_version": "0.0.0", "maximum_exclusive_version": "1.0.0" },
+    { "name": "contracts", "minimum_version": "1.0.0", "maximum_exclusive_version": "2.0.0" },
+    { "name": "web", "minimum_version": "0.0.0", "maximum_exclusive_version": "1.0.0" },
+    { "name": "worker", "minimum_version": "0.0.0", "maximum_exclusive_version": "1.0.0" }
+  ],
+  "database_revisions": ["20260813_0003"],
+  "runtime_rules": [
+    { "name": "node", "version_prefix": "24.19." },
+    { "name": "python", "version_prefix": "3.12." }
+  ],
+  "required_images": ["api", "minio", "postgres", "redis", "tika", "web", "worker"]
+}

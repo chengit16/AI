@@ -8,6 +8,8 @@
     { "code": "POLICY_UNAVAILABLE", "http_status": 503, "message": "权限策略暂时不可用，操作已默认拒绝", "retryable": true },
     { "code": "RESOURCE_NOT_FOUND", "http_status": 404, "message": "请求的资源不存在或不可见", "retryable": false },
     { "code": "IDEMPOTENCY_CONFLICT", "http_status": 409, "message": "幂等键已用于不同的请求", "retryable": false },
+    { "code": "RELEASE_MANIFEST_INVALID", "http_status": 422, "message": "发布清单格式、摘要或构建元数据无效", "retryable": false },
+    { "code": "RELEASE_COMBINATION_INCOMPATIBLE", "http_status": 409, "message": "Web、API、Worker、契约、数据库或镜像组合不兼容", "retryable": false },
     { "code": "INGESTION_EMPTY_FILE", "http_status": 422, "message": "上传的文档内容为空", "retryable": false },
     { "code": "INGESTION_FILE_TOO_LARGE", "http_status": 413, "message": "文档超过当前配置的大小限制", "retryable": false },
     { "code": "INGESTION_UNSUPPORTED_FORMAT", "http_status": 415, "message": "当前不支持该文档格式", "retryable": false },

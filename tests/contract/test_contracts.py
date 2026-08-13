@@ -4,7 +4,10 @@ from typing import Any, cast
 
 import pytest
 from ai_platform_api.main import app
+from ai_platform_api.modules.release.application.manifest import ReleaseManifestService
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+from scripts.generate_release_manifest import parse_inputs
 
 ROOT = Path(__file__).parents[2]
 CONTRACTS = ROOT / "contracts"
@@ -58,6 +61,27 @@ def test_integration_event_contract_fixture() -> None:
     )
 
 
+def test_release_compatibility_matrix_contract() -> None:
+    assert_valid(
+        "release/compatibility-matrix.v1.schema.json",
+        "release/compatibility-matrix.v1.json",
+    )
+
+
+def test_generated_release_manifest_contract() -> None:
+    build_inputs = load_json(CONTRACTS / "fixtures/release-manifest-input.v1.valid.json")
+    manifest = ReleaseManifestService().build(parse_inputs(build_inputs))
+
+    validator("release/release-manifest.v1.schema.json").validate(manifest.to_dict())
+
+
+def test_frozen_release_manifest_contract() -> None:
+    assert_valid(
+        "release/release-manifest.v1.schema.json",
+        "fixtures/release-manifest.v1.valid.json",
+    )
+
+
 def test_integration_event_rejects_invalid_traceparent() -> None:
     fixture = load_json(CONTRACTS / "fixtures/integration-event.v1.valid.json")
     fixture["traceparent"] = "invalid"
@@ -75,6 +99,8 @@ def test_error_codes_are_unique_and_stable() -> None:
     assert len(codes) == len(set(codes))
     assert {
         "POLICY_DENIED",
+        "RELEASE_MANIFEST_INVALID",
+        "RELEASE_COMBINATION_INCOMPATIBLE",
         "INGESTION_PARSE_FAILED",
         "INGESTION_PARSER_UNAVAILABLE",
         "RETRIEVAL_SCOPE_DENIED",

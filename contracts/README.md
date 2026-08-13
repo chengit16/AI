@@ -10,6 +10,7 @@
 | `sse/` | SSE 消息事件信封契约 |
 | `events/` | Transactional Outbox 集成事件信封契约 |
 | `errors/` | 稳定错误码目录 |
+| `release/` | `ReleaseManifest`、兼容矩阵及运行组合规则 |
 | `fixtures/` | Python 和未来 Go 实现共用的 Golden Fixtures |
 
 ## 2. 版本规则
@@ -35,5 +36,7 @@ uv run pytest tests/contract
 ```
 
 测试会校验全部 JSON Schema、Golden Fixtures、错误码唯一性、OpenAPI 3.1 基线以及 FastAPI 实现的路由和响应字段。
+
+`ReleaseManifest` 由构建系统提供镜像与源码摘要后生成，生成器不会从可变标签推断不可变摘要。仓库内清单 Fixture 只使用合成摘要验证契约和兼容逻辑，不代表可发布镜像。
 
 节点最终验收通过 `./scripts/verify` 执行完整 OpenAPI 漂移和相对 Git 基线的同主版本兼容检查。未来 CI 使用 `AI_PLATFORM_CONTRACT_BASE_REF` 指向目标分支 Merge Base；破坏性变更必须发布新主版本并提供迁移与回滚方案。

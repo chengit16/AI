@@ -16,6 +16,10 @@
   "properties": {
     "schema_version": { "const": 1 },
     "identity_context": { "$ref": "#/$defs/identity_context" },
+    "account": { "$ref": "#/$defs/account" },
+    "workspace": { "$ref": "#/$defs/workspace" },
+    "conversation": { "$ref": "#/$defs/conversation" },
+    "message": { "$ref": "#/$defs/message" },
     "agent_release": { "$ref": "#/$defs/agent_release" },
     "message_part": { "$ref": "#/$defs/message_part" },
     "data_source": { "$ref": "#/$defs/data_source" },
@@ -24,6 +28,18 @@
   },
   "$defs": {
     "uuid": { "type": "string", "format": "uuid" },
+    "resource_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_at", "created_by_actor_id", "updated_at", "updated_by_actor_id", "version"],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
     "identity_context": {
       "type": "object",
       "additionalProperties": false,
@@ -39,6 +55,65 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
         }
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["account_id", "status", "display_name", "auth_version", "audit"],
+      "properties": {
+        "account_id": { "$ref": "#/$defs/uuid" },
+        "status": { "enum": ["active", "disabled"] },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "auth_version": { "type": "integer", "minimum": 1 },
+        "audit": { "$ref": "#/$defs/resource_audit" }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_id", "workspace_type", "status", "name", "owner_account_id", "entitlement_version", "audit"],
+      "properties": {
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "workspace_type": { "enum": ["personal", "enterprise"] },
+        "status": { "enum": ["active", "suspended", "archived"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "owner_account_id": {
+          "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "entitlement_version": { "type": "integer", "minimum": 1 },
+        "audit": { "$ref": "#/$defs/resource_audit" }
+      }
+    },
+    "conversation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["conversation_id", "workspace_id", "created_by_actor_id", "status", "audit"],
+      "properties": {
+        "conversation_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "created_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "status": { "enum": ["active", "archived"] },
+        "audit": { "$ref": "#/$defs/resource_audit" }
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message_id", "workspace_id", "conversation_id", "role", "status", "parts", "audit"],
+      "properties": {
+        "message_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "conversation_id": { "$ref": "#/$defs/uuid" },
+        "role": { "enum": ["system", "user", "assistant", "tool"] },
+        "status": { "enum": ["streaming", "completed", "failed"] },
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/message_part" }
+        },
+        "audit": { "$ref": "#/$defs/resource_audit" }
       }
     },
     "agent_release": {
