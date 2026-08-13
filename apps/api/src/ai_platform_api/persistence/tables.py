@@ -115,6 +115,66 @@ Index(
     retrieval_chunks.c.knowledge_base_id,
     retrieval_chunks.c.document_id,
 )
+
+stream_runs = Table(
+    "stream_runs",
+    metadata,
+    Column("run_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("conversation_id", UUID(as_uuid=True), nullable=False),
+    Column("message_id", UUID(as_uuid=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("last_sequence_no", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("final_payload", JSONB, nullable=True),
+    CheckConstraint(
+        "status IN ('active', 'completed', 'failed', 'cancelled')",
+        name="ck_stream_runs_status",
+    ),
+    CheckConstraint("last_sequence_no >= 0", name="ck_stream_runs_sequence_no"),
+)
+Index(
+    "ix_stream_runs_workspace_conversation",
+    stream_runs.c.workspace_id,
+    stream_runs.c.conversation_id,
+)
+Index(
+    "uq_stream_runs_active_conversation",
+    stream_runs.c.conversation_id,
+    unique=True,
+    postgresql_where=stream_runs.c.status == "active",
+)
+
+stream_events = Table(
+    "stream_events",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("conversation_id", UUID(as_uuid=True), nullable=False),
+    Column("message_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("event_type", String(64), nullable=False),
+    Column("sequence_no", Integer, nullable=False),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("payload", JSONB, nullable=False),
+    UniqueConstraint("run_id", "sequence_no", name="uq_stream_events_run_sequence"),
+    CheckConstraint("sequence_no >= 1", name="ck_stream_events_sequence_no"),
+)
+Index(
+    "ix_stream_events_workspace_run_sequence",
+    stream_events.c.workspace_id,
+    stream_events.c.run_id,
+    stream_events.c.sequence_no,
+)
+Index(
+    "ix_stream_events_expires_at",
+    stream_events.c.expires_at,
+)
 Index(
     "ix_retrieval_chunks_document_sequence",
     retrieval_chunks.c.workspace_id,

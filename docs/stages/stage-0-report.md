@@ -122,7 +122,7 @@
 - 自动化验收：领域单元测试 `13/13`，真实 PostgreSQL 集成测试 `5/5`，全量 pytest `64/64`；覆盖 RRF 去重、FastPass、重排契约、字段掩码、精读预算、引用伪造、跨空间、知识库、文档、部门、密级、旧索引版本和停用 Chunk。`./scripts/verify`、前端生产构建、契约兼容、Ruff、mypy strict 和架构检查全部通过；新增 `RETRIEVAL_SCOPE_DENIED`、`RETRIEVAL_CONFIGURATION_ERROR` 和 `CITATION_INVALID` 稳定错误码。
 - 运行边界：Torch、Transformers 和本地模型只属于 `ai-validation` 依赖组和显式验证脚本，不进入默认门禁。API/Worker 镜像使用冻结锁文件重建成功，镜像内确认 `pgvector` 可用且不存在 Torch/Transformers。
 - 当前边界：本节点建立可实施的检索与引用技术基线，不实现正式知识库发布任务、生产 Embedding Worker、在线模型下载、查询改写、来源权威性评分、LLM Grading 或百万 Chunk 容量认证；这些分别按阶段 1D/1E、后置能力和条件容量认证建设。
-- 提交：本节点提交完成后回填。
+- 提交：`a02c1ae`。
 
 ### P0-09 Mock 模型网关、主备路由、降级与计量
 
@@ -134,6 +134,17 @@
 - 可观测性：每次尝试记录调用 ID、路由、Provider、模型、Trace ID/Traceparent、尝试序号、状态、耗时、失败分类、Provider Request ID、Token Usage 和估算成本；Provider 原始响应和密钥不进入日志或错误对象。
 - 自动化验收：Mock 故障矩阵单元测试 `9/9`；覆盖成功计量、超时有限重试后备援、内容策略禁止旁路、输入预算、私有数据边界、缺少 Provider、能力不匹配、熔断和恢复探测。契约新增 `MODEL_REQUEST_REJECTED`、`MODEL_DATA_BOUNDARY_DENIED`、`MODEL_ROUTE_UNAVAILABLE` 和 `MODEL_GATEWAY_UNAVAILABLE`。
 - 当前边界：本节点不接入 GPT 中转自定义 URL/Key、通义千问、DeepSeek 或其他真实供应商，不实现在线能力探测、密钥加密存储、供应商管理菜单、流式 Provider Adapter 和真实成本结算；这些在阶段 1 模型配置与真实供应商联调时建设。
+- 提交：`b63f96f`。
+
+### P0-10 SSE 事件持久化、断点回放与并发控制
+
+- 状态：通过。
+- 事实模型：新增 `stream_runs` 和 `stream_events`。`stream_runs` 保存工作空间、会话、消息、Run 状态、最后序号、过期时间和最终快照；`stream_events` 保存事件 ID、事件类型、会话/消息/Run、严格递增序号、发生时间、过期时间、Trace、Traceparent 和 JSON Payload。SSE 连接只传输已提交事实，不把内存增量当作恢复依据。
+- 并发与顺序：`stream_runs` 对同一 `conversation_id` 的 `active` 状态建立 PostgreSQL 部分唯一索引；追加事件时对 Run 行加锁后递增序号，避免并发 `max(sequence_no)+1` 竞态。同一 `event_id` 重试返回原事件，不推进序号；已结束 Run 禁止继续写入。
+- 回放流程：客户端提供 `Last-Event-ID` 时只回放该事件之后的同一 Run 事件；事件 ID 不存在、工作空间不匹配、Run 不存在或游标已过期时默认失败，不猜测起点。没有未确认事件但存在最终消息快照时返回 `snapshot_required`，重连不会创建新 Run 或重复启动模型生成。
+- 默认预算：事件保留 `24 小时`，单次最多回放 `5,000` 条或 `10 MB`，均由 `StreamPolicy` 配置并在 SQL 查询后和应用层字节估算双重限制；超限返回 `SSE_REPLAY_LIMIT_EXCEEDED`，过期返回 `SSE_EVENT_EXPIRED`。
+- 自动化验收：领域单元测试 `7/7`，真实 PostgreSQL 集成测试 `6/6`；覆盖严格序号、Last-Event-ID、最终快照、同会话活动 Run 唯一约束、结束后新 Run、事件幂等、跨工作空间游标、未知游标、事件过期和事件/字节回放上限。
+- 当前边界：本节点不接入真实 HTTP SSE Router、Redis 唤醒、跨实例连接路由、心跳调度、事件清理 Worker、完整 Message/Conversation 业务表和容量认证；这些在阶段 1/2 的会话运行层和可靠性建设中接入，当前 PostgreSQL Store 已为接口预留。
 - 提交：本节点提交完成后回填。
 
 ### P0-13 前端 UI/UX 设计基线
