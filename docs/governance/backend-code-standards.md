@@ -372,6 +372,8 @@ uv run --locked mypy .
 uv run --locked pytest
 ```
 
+节点最终验收统一执行 `./scripts/verify`；上述命令用于 Python 开发过程中的快速反馈。正式领域分层目录创建后，Python 架构检查会自动验证 Domain、Application、API 与 Infrastructure 的依赖方向。
+
 影响契约、数据库、权限、Worker 或 SSE 时，必须追加对应的契约、集成、安全或恢复测试，不能仅执行现有快速测试后宣告完成。
 
 ## 23. 注释与文档

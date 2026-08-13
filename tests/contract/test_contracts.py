@@ -98,9 +98,4 @@ def test_openapi_baseline_matches_fastapi_implementation() -> None:
     generated = app.openapi()
 
     assert baseline["openapi"] == "3.1.0"
-    assert generated["openapi"] == baseline["openapi"]
-    assert generated["info"] == baseline["info"]
-    assert generated["paths"] == baseline["paths"]
-    generated_health = generated["components"]["schemas"]["HealthResponse"]
-    baseline_health = baseline["components"]["schemas"]["HealthResponse"]
-    assert generated_health == baseline_health
+    assert generated == baseline

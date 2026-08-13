@@ -12,6 +12,9 @@
 - [前端 UI/UX 设计基线](./docs/design/ui-ux-baseline.md)：布局、动态菜单、响应式、可访问性和阶段 1 优化清单。
 - [Web 前端代码规范](./docs/governance/frontend-code-standards.md)：React、目录、状态、接口、样式、测试和质量门禁。
 - [后端代码规范](./docs/governance/backend-code-standards.md)：Python 模块、权限、事务、数据、Worker、SSE、测试和未来 Go 边界。
+- [工程规则自动执行基线](./docs/governance/engineering-guardrails.md)：统一验证、模块依赖、契约兼容和仓库安全检查。
+- [架构决策管理规范](./docs/governance/architecture-decisions.md)：ADR 触发条件、评审和演进规则。
+- [AI 与 RAG 安全威胁模型](./docs/security/ai-rag-threat-model.md)：提示注入、知识投毒、跨空间召回、引用和数据外泄防护。
 
 ## 当前原则
 

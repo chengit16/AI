@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+log() {
+  printf '\n[verify] %s\n' "$1"
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || {
+    printf '[verify] 缺少命令: %s\n' "$1" >&2
+    exit 1
+  }
+}
+
+require_command git
+require_command node
+require_command pnpm
+
+if [[ -x "$PROJECT_DIR/.venv/bin/python" && -x "$PROJECT_DIR/.venv/bin/ruff" ]]; then
+  PYTHON=("$PROJECT_DIR/.venv/bin/python")
+  RUFF=("$PROJECT_DIR/.venv/bin/ruff")
+  MYPY=("$PROJECT_DIR/.venv/bin/mypy")
+  PYTEST=("$PROJECT_DIR/.venv/bin/pytest")
+else
+  require_command uv
+  PYTHON=(uv run --locked python)
+  RUFF=(uv run --locked ruff)
+  MYPY=(uv run --locked mypy)
+  PYTEST=(uv run --locked pytest)
+fi
+
+log "检查 Git Diff 格式"
+git diff --check
+git diff --cached --check
+
+log "检查仓库敏感文件与凭证模式"
+"${PYTHON[@]}" scripts/check_repository_policy.py
+
+log "检查 Python 与 React 模块依赖"
+"${PYTHON[@]}" scripts/check_architecture.py
+node scripts/check-frontend-architecture.mjs
+node --test scripts/check-frontend-architecture.test.mjs
+
+log "检查契约兼容性"
+"${PYTHON[@]}" scripts/check_contract_compatibility.py "${AI_PLATFORM_CONTRACT_BASE_REF:-HEAD}"
+
+log "检查 Web 前端"
+pnpm --filter @ai-platform/web format
+pnpm --filter @ai-platform/web lint
+pnpm --filter @ai-platform/web typecheck
+pnpm --filter @ai-platform/web test
+pnpm --filter @ai-platform/web build
+
+log "检查 Python 后端与共享契约"
+"${RUFF[@]}" format --check .
+"${RUFF[@]}" check .
+"${MYPY[@]}" .
+"${PYTEST[@]}"
+
+printf '\n[verify] 全部检查通过\n'

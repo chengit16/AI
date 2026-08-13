@@ -1467,7 +1467,7 @@ tests/
 6. 验证主备模型路由、超时、熔断、降级和 Token 计量。
 7. 使用 Mock Adapter 验证完整模型网关流程；管理员在平台录入真实中转或国内供应商后，再由能力探测验证 Chat Completions/Responses、流式输出、结构化输出、工具调用、Usage、错误和请求 ID。
 8. 验证 SSE 的 `event_id`、`Last-Event-ID`、事件回放和同会话并发控制方案。
-9. 建立最小评估数据集、越权访问样本、字段泄漏样本和失败恢复样本。
+9. 建立最小评估数据集、越权访问、字段泄漏、失败恢复、直接/间接 Prompt Injection、知识库投毒、引用伪造和数据外泄合成样本。
 10. 固定 OpenAPI 3.1、SSE Schema、集成事件 Schema、稳定错误码、跨语言数据类型、数据写入责任表和策略决策接口。
 11. 建立契约兼容、Outbox 幂等、Trace 传播和策略越权测试，但不创建或部署 Go 工程。
 12. 复核当前项目不建设的能力以及后置能力的启动条件，新增范围必须执行 19.2 节的变更规则。
@@ -1534,6 +1534,8 @@ flowchart LR
 - 建立 OpenAPI、SSE、集成事件和错误码契约目录，并由契约生成或校验数据模型。
 - 建立 Transactional Outbox、至少一次投递、消费者幂等和 W3C Trace 上下文传播基线。
 - 搭建持续集成、单元测试、集成测试、契约测试和安全扫描基线。
+- 建立统一 `./scripts/verify` 门禁，将模块依赖、完整契约漂移、同主版本破坏性变更和仓库敏感文件检查接入本地与 CI；固定契约生成器后要求重新生成无 Diff。
+- 建立 `ReleaseManifest`，记录 Web、API、Worker、契约、数据库 Schema、镜像和最低兼容版本；启动和升级时拒绝不兼容组合。
 
 **完成门禁**：macOS 和 Ubuntu 基线环境可以一键启动、停止和健康检查；请求链路可追踪；所有业务数据模板均包含 `workspace_id` 和审计字段；核心契约有兼容性测试；Outbox 重试不会造成业务副作用重复；任何模块不能越过已声明的数据写入权。
 
@@ -1579,6 +1581,7 @@ flowchart LR
 - 建立基础任务进度、有限重试、失败原因和人工重新执行。
 - 建立模型网关、主备模型、超时、熔断、降级、Token 和成本计量。
 - 建立平台级模型供应商管理页面，支持自定义 `base_url`、凭证录入、模型 ID/别名、连接测试、能力自动探测、数据政策登记和审核状态。
+- 建立不可变 `AiRuntimeConfigVersion`，版本化 Prompt、模型路由、切片、Embedding、索引、Reranker、检索预算、来源排序和安全检查配置，并使运行、引用和 Trace 可追溯到具体版本。
 - 固定 `DataSource`、`RelevanceGrader` 和 `MultimodalModelRouter` 接口，但不接入具体后置能力。
 
 **完成门禁**：授权文档可稳定入库并生成可切换索引；失败任务可定位和重试；模型调用不能绕过模型网关；派生索引可追溯到事实数据版本；供应商配置和密钥可安全保存，能力探测结果可追溯，未审核数据政策的供应商只能接收合成数据。
@@ -1598,6 +1601,7 @@ flowchart LR
 - 为系统知识助手生成平台维护、用户不可编辑的最小 `AgentRelease` 和 `ServiceRoute`，Runtime 始终执行不可变快照。
 - `MessageEvent` 持久化、SSE 心跳、`event_id`、`Last-Event-ID`、同会话并发锁和保留期内事件回放。
 - 问答级 Token、成本、延迟、检索决策、引用和用户反馈记录。
+- 按 AI/RAG 威胁模型隔离系统指令、用户输入和不可信文档证据，防止直接/间接 Prompt Injection、知识投毒、跨空间召回、字段泄漏、引用伪造和数据外泄。
 
 **完成门禁**：答案可追溯到有效 `DocumentVersion`、`Chunk` 和系统 `AgentRelease`；检索严格受预算和权限约束；断线重连不会重复创建生成任务；保留期内可按 `Last-Event-ID` 补发事件。
 
@@ -2194,6 +2198,12 @@ Web 前端以 `digitizing` React 项目的成熟工程规则作为参考，但�
 ### 21.15 后端代码规范
 
 Python 后端按业务领域和数据写入权组织深模块，以较小稳定接口隐藏权限、事务、数据库和外部协议复杂性。FastAPI Router 只负责协议适配，Application 用例负责授权和事务，Domain 保存核心规则，Infrastructure 提供 SQLAlchemy、对象存储和模型供应商 Adapter；简单功能不机械套用完整分层。平台统一执行可信 `RequestContext`、工作空间强制隔离、策略中心默认拒绝、业务数据与 Outbox 同事务、Worker 至少一次投递与幂等、SSE 持久化恢复和语言无关契约。完整规范见 [`docs/governance/backend-code-standards.md`](./docs/governance/backend-code-standards.md)。
+
+### 21.16 工程门禁、架构决策与 AI 安全基线
+
+本地开发与未来 CI 统一使用 `./scripts/verify`，执行前后端格式、Lint、类型、测试、构建，以及模块依赖、完整 OpenAPI 漂移、同主版本明显破坏性变更和仓库敏感文件检查。当前不新增在线依赖，阶段 1A 固定契约生成器并要求生成产物可重复且无未提交 Diff；依赖漏洞、许可证和 SBOM 继续由 `P0-12` 交付。工程门禁见 [`docs/governance/engineering-guardrails.md`](./docs/governance/engineering-guardrails.md)，关键方案使用 [`docs/governance/architecture-decisions.md`](./docs/governance/architecture-decisions.md) 和 ADR 模板治理。
+
+知识入库与 RAG 将文档、网页、用户输入、模型输出和工具结果视为不同层级的不可信数据。关键授权、字段掩码、供应商数据政策、引用验证和未来工具执行均由确定性后端逻辑复核，不能依赖模型自行拒绝。阶段 0 建立合成攻击数据集，阶段 1D/1E 实现并验收直接/间接 Prompt Injection、知识库投毒、跨空间召回、字段泄漏、引用伪造和数据外泄防护。完整威胁模型见 [`docs/security/ai-rag-threat-model.md`](./docs/security/ai-rag-threat-model.md)。
 
 平台账号、工作空间成员和模型供应商账号是三个不同概念：浏览器登录只识别平台 `Account`，成员权限由 `WorkspaceMembership` 决定，模型凭证只属于平台或工作空间配置，三者不得共用凭证或生命周期。
 

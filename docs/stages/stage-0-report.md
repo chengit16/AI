@@ -110,6 +110,19 @@
 - 强制入口：根目录 `AGENTS.md`、API/Worker README 和项目 README 均已链接本规范，后续对 `apps/api`、`apps/worker` 和 Python 后端模块的新增修改必须执行。
 - 交付文档：[`docs/governance/backend-code-standards.md`](../governance/backend-code-standards.md)。
 - 验证内容：文档链接与路径、`git diff --check`、Ruff 格式与 Lint、mypy strict 和完整 pytest。
+- 提交：`92a7f83`。
+
+### P0-16 工程规则自动执行与 AI 安全基线
+
+- 状态：通过。
+- 统一入口：新增 `./scripts/verify` 和 `pnpm verify`，本地与未来 CI 复用同一检查顺序，不维护两套行为不同的门禁。
+- 自动检查：实现 Python/React 模块依赖检查、FastAPI 完整 OpenAPI 漂移检查、相对 Git 基线的契约文件/路径/操作/响应/属性/类型/枚举/必填字段兼容检查，以及跟踪/待跟踪文件的敏感路径和常见凭证模式检查。
+- 检查器测试：Python 反例覆盖 Domain 导入 FastAPI、API 直连 Infrastructure、契约删除枚举值、新增必填字段和私钥模式；Node `3/3` 覆盖允许页面使用 API、禁止公共组件静态/动态依赖页面。
+- 决策治理：新增 ADR 模板和触发规则，关键框架、模块接口、数据写入权、协议主版本、安全边界、部署方式和跨语言迁移必须保留决策、指标与回滚依据。
+- AI/RAG 安全：固定直接/间接 Prompt Injection、知识库投毒、跨空间召回、字段泄漏、引用伪造、数据外泄、资源耗尽和状态污染威胁；`P0-11` 负责合成攻击数据集，阶段 1D/1E 实现确定性后端防护。
+- 阶段 1 预留：1A 建立 `ReleaseManifest`、契约生成无 Diff 和 CI 必需检查；1D 建立不可变 `AiRuntimeConfigVersion`，版本化 Prompt、模型路由、切片、索引、检索与安全配置。
+- 当前边界：本节点不选择 CI 提供商，不联网新增契约生成或扫描依赖；依赖漏洞、许可证、SBOM 和完整 Secret Scanner 仍由 `P0-12`/阶段 1A 交付，不标记为已通过。
+- 验证内容：`./scripts/verify` 明确以状态码 0 完成；Web Vitest `1/1`、Node 架构测试 `3/3`、pytest `18/18`，前端生产构建、Ruff、mypy、完整 OpenAPI 漂移、契约兼容、模块依赖、敏感文件和 Git Diff 检查全部通过。
 - 提交：本节点提交完成后回填。
 
 ## 4. 当前限制

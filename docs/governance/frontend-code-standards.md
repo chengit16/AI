@@ -308,6 +308,8 @@ pnpm --filter @ai-platform/web test
 pnpm --filter @ai-platform/web build
 ```
 
+节点最终验收统一执行 `./scripts/verify`；上述命令用于前端开发过程中的快速反馈。正式分层目录创建后，React 模块依赖检查会解析静态 Import、再导出和字符串动态 Import，禁止公共层反向依赖页面等违规关系。
+
 涉及实际页面交互时，按 UI/UX 基线补充浏览器桌面和移动视口验收。
 
 ## 17. Git 与质量门禁

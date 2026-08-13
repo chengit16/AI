@@ -17,6 +17,7 @@
     "test": "pnpm -r --if-present test",
     "test:python": "uv run --locked pytest",
     "typecheck:python": "uv run --locked mypy .",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "verify": "./scripts/verify"
   }
 }

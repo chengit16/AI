@@ -25,7 +25,7 @@ package = false
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers --import-mode=importlib"
-pythonpath = ["apps/api/src", "apps/worker/src"]
+pythonpath = [".", "apps/api/src", "apps/worker/src"]
 testpaths = ["tests", "apps/api/tests", "apps/worker/tests"]
 
 [tool.ruff]
