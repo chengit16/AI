@@ -10,6 +10,7 @@ node_modules/
 .pnpm-store/
 dist/
 coverage/
+*.tsbuildinfo
 
 # Python 虚拟环境、缓存与构建产物
 .venv/

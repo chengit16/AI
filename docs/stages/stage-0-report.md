@@ -44,6 +44,17 @@
 - `git check-ignore` 已确认本地环境变量、密钥、虚拟环境、项目 Python 和验证产物不会进入仓库。
 - 提交：本节点提交完成后于 `P0-03` 回填。
 
+### P0-03 最小应用健康链路
+
+- 状态：通过。
+- Web：React 19、TypeScript、Vite、React Router、TanStack Query、Zustand 和 Ant Design 运行中心。
+- API：FastAPI 存活与就绪端点，OpenAPI 3.1 文档入口。
+- Worker：独立健康状态模型和命令入口。
+- 自动化验收：Vitest 1 项、pytest 3 项通过；ESLint、Ruff、mypy、TypeScript 和生产构建通过。
+- 浏览器验收：1440×900 与 390×844 视口无横向溢出；API 状态和刷新操作正常；最终控制台无错误或警告。
+- 已知限制：当前 Web 初始生产资源约 556 KB，其中 Ant Design vendor 约 474 KB；阶段 0 仅有一个轻量页面，不阻塞节点，后续按菜单路由实施页面级懒加载。
+- 提交：本节点提交完成后于 `P0-04` 回填。
+
 ## 4. 当前限制
 
 - 当前开发机系统 Python 为 3.14.3，项目固定 Python 3.12，并由 uv 管理项目解释器，不能使用系统 Python 作为验收环境。

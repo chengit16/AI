@@ -4,10 +4,15 @@ version = "0.0.0"
 description = "AI 智能平台 Python 工程与质量工具入口"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "fastapi==0.116.2",
+    "pydantic-settings==2.11.0",
+    "uvicorn[standard]==0.37.0",
+]
 
 [dependency-groups]
 dev = [
+  "httpx==0.28.1",
   "mypy==1.18.2",
   "pytest==8.4.2",
   "ruff==0.13.3",
@@ -17,7 +22,8 @@ dev = [
 package = false
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-config --strict-markers"
+addopts = "-ra --strict-config --strict-markers --import-mode=importlib"
+pythonpath = ["apps/api/src", "apps/worker/src"]
 testpaths = ["tests", "apps/api/tests", "apps/worker/tests"]
 
 [tool.ruff]
@@ -26,6 +32,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF002", "RUF003"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -35,3 +42,7 @@ indent-style = "space"
 python_version = "3.12"
 strict = true
 warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["ai_platform_api.*", "ai_platform_worker.*"]
+disallow_untyped_defs = true

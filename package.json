@@ -13,7 +13,10 @@
     "dev": "pnpm -r --parallel --if-present dev",
     "format": "pnpm -r --if-present format",
     "lint": "pnpm -r --if-present lint",
+    "lint:python": "uv run --locked ruff check .",
     "test": "pnpm -r --if-present test",
+    "test:python": "uv run --locked pytest",
+    "typecheck:python": "uv run --locked mypy .",
     "typecheck": "pnpm -r --if-present typecheck"
   }
 }
