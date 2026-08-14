@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1E-03` 重排精读与引用验证待开始 |
+| 当前节点 | `P1E-04` RAG 安全防护待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -491,6 +491,19 @@
 - 当前边界：本节点不实现 Reranker、FastPass、来源排序、受控全文精读、引用验证、SSE 问答输出或模型调用；这些按 `P1E-03`～`P1E-05` 进入。仍不引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：`9de3e2e`。
 
+### P1E-03 重排精读与引用验证
+
+- 状态：通过。
+- 确定性重排与来源排序：新增本地 `deterministic-lexical-reranker-v1`，按查询词覆盖率和完整短语命中计算可复现分数；`source-priority-v1` 综合相关性、来源权威性和时效性。FastPass 只跳过重排，不跳过当前授权、受控精读和引用验证，后续可替换真实 Reranker 而不改变证据边界。
+- 当前版本复核：精读前同时复核文档当前发布版本、索引发布指针、Chunk Hash、来源状态和当前 PDP 决策。文档撤权、旧版本、Hash 漂移、跨空间或缺少授权均失败关闭；已签发证据在来源撤权后再次读取同样拒绝，避免把历史快照当成当前授权。
+- 受控精读：候选数、文档数、Chunk 数、字符数、Token 估算、引用长度和总耗时均有硬上限；候选快照不保存正文，只有通过授权复核的有限上下文和引用进入不可变证据集。预算耗尽、没有证据或比较证据不足时降级为可解释的不确定结果，不返回宽松的部分答案。
+- 证据与冲突：新增不可变 `retrieval_evidence_sets` 和 `retrieval_evidence_items`，通过数据库触发器拒绝更新与删除。首期对同标题来源中的数字/期限和否定语义差异进行确定性冲突标记；引用始终绑定文档、版本、Chunk、Hash 和来源位置，伪造引用、基础事实冲突与证据不足均失败关闭或降级。
+- 运行装配：新增授权复核、证据处理和重排 Adapter，Revision `20260815_0028` 已接入应用启动和 ReleaseManifest/兼容矩阵；不新增模型供应商调用，不实现 SSE 问答输出，下一节点继续处理 Prompt Injection、投毒、泄漏和外发防护。
+- 自动验收：P1E-03 单元专项 `7/7`，PostgreSQL 当前证据/撤权/不可变快照专项 `1/1`，P1E-02 与 P1E-03 PostgreSQL 联合回归 `2/2`，Migration 往返 `3/3`；统一 `./scripts/verify` 通过，React `21/21`、Python `337/337`、Ruff、mypy strict（364 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建全部通过。
+- 容器与环境：`./platform restart` 完成 API、Worker、Web、Migration 和基础设施重建，启动器等待七项服务健康并输出平台就绪，Migration Revision 目标为 `20260815_0028`。本终端随后执行 `./platform doctor` 时因沙箱无法访问 Docker Engine 返回 `Docker Engine 未运行`，因此八项诊断保持未单独计入通过，不影响已完成的代码门禁和本地 PostgreSQL 集成验收。
+- 当前边界：本节点不实现 Prompt Injection/投毒安全策略、SSE 传输、问答页面或真实模型调用；不引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。真实供应商质量、Linux 和容量认证继续保持 `not_configured`/`not_run`。
+- 提交：`f188278`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -500,4 +513,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-02`，当前进入 `P1E-03`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-03`，当前进入 `P1E-04`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。`./platform doctor` 的 Docker Engine 访问限制已如实记录，未被计入阶段通过结论。
