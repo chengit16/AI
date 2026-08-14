@@ -564,7 +564,7 @@
 - 自动验收：执行器单元和 PostgreSQL 专项覆盖六类节点、条件选支与跳过路径、重复认领、逐节点 PDP、知识与模型有界上下文、预算调用前拦截、失败 Step/Attempt 收敛、终态审计与 Outbox、审批等待及数据库终态保护。统一 `./scripts/verify` 全部通过，包括 React `28/28`、Python `383/383`、Ruff、mypy strict（397 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建。
 - 数据库与 HTTP：Migration `base → head → base → head` 通过；`./platform restart` 后平台就绪，`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260815_0032`、Valkey 和 Worker 八项诊断通过。使用全合成个人账号完成注册、登录、创建分支工作流、发布、创建 Run 和读取终态的真实认证 HTTP 闭环，最终状态为 `succeeded`、结果为 `manual: 1800`，执行 3 个活动节点且模型与检索调用均为 0。
 - 当前边界：本节点不实现审批链、审批通过后的恢复、异常动作或页面；工作流页面入口继续停用到 `P1F-05`。真实模型供应商仍为 `not_configured`，模型节点功能门禁使用合成 Adapter 和既有 Mock 模型网关验证，不扩展 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
-- 提交：待回填。
+- 提交：`4ed4b96`。
 
 ## 4. 当前限制
 
