@@ -203,6 +203,9 @@ def _resource_reference(
                 "role_id",
                 "binding_id",
                 "invitation_id",
+                "document_version_id",
+                "document_id",
+                "knowledge_base_id",
             )
             if (value := values.get(key)) is not None
         ),
@@ -211,7 +214,15 @@ def _resource_reference(
     trusted_id = resource_id if isinstance(resource_id, UUID) else UUID(str(resource_id))
     attributes: dict[str, object] = {
         key: value
-        for key in ("account_id", "department_id", "position_id", "role_id")
+        for key in (
+            "account_id",
+            "department_id",
+            "position_id",
+            "role_id",
+            "knowledge_base_id",
+            "document_id",
+            "document_version_id",
+        )
         if (value := values.get(key)) is not None
     }
     attributes["risk_level"] = api_resource.risk_level

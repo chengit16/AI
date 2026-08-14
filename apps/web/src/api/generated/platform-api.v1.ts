@@ -174,6 +174,125 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/knowledge-bases": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Create Knowledge Base */
+    readonly post: operations["createKnowledgeBase"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    readonly post?: never;
+    /** Delete Knowledge Base */
+    readonly delete: operations["deleteKnowledgeBase"];
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Create Document */
+    readonly post: operations["createKnowledgeDocument"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    readonly post?: never;
+    /** Delete Document */
+    readonly delete: operations["deleteKnowledgeDocument"];
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Create Document Version */
+    readonly post: operations["createKnowledgeDocumentVersion"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/{document_version_id}/publish": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Publish Document Version */
+    readonly post: operations["publishKnowledgeDocumentVersion"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/{document_version_id}/ready": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Mark Document Version Ready */
+    readonly post: operations["markKnowledgeDocumentVersionReady"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/leave": {
     readonly parameters: {
       readonly query?: never;
@@ -670,8 +789,79 @@ export type components = {
       /** Parent Department Id */
       readonly parent_department_id?: string | null;
     };
+    /** CreateDocumentRequest */
+    readonly CreateDocumentRequest: {
+      /** Captured At */
+      readonly captured_at?: string | null;
+      /** Department Ids */
+      readonly department_ids?: readonly string[] | null;
+      /** External Source Id */
+      readonly external_source_id?: string | null;
+      /** Original Object Key */
+      readonly original_object_key?: string | null;
+      /** Permission Labels */
+      readonly permission_labels?: readonly string[];
+      /** Security Level */
+      readonly security_level?: ("PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED") | null;
+      /**
+       * Source Kind
+       * @enum {string}
+       */
+      readonly source_kind: "manual" | "upload" | "web" | "data_source";
+      /** Source Name */
+      readonly source_name: string;
+      /** Source Path */
+      readonly source_path?: string | null;
+      /** Source Url */
+      readonly source_url?: string | null;
+      /** Title */
+      readonly title: string;
+      /** Visibility */
+      readonly visibility?: ("private" | "workspace" | "departments") | null;
+    };
+    /** CreateDocumentVersionRequest */
+    readonly CreateDocumentVersionRequest: {
+      /** Captured At */
+      readonly captured_at?: string | null;
+      /** External Source Id */
+      readonly external_source_id?: string | null;
+      /** Original Object Key */
+      readonly original_object_key?: string | null;
+      /**
+       * Source Kind
+       * @enum {string}
+       */
+      readonly source_kind: "manual" | "upload" | "web" | "data_source";
+      /** Source Name */
+      readonly source_name: string;
+      /** Source Path */
+      readonly source_path?: string | null;
+      /** Source Url */
+      readonly source_url?: string | null;
+    };
     /** CreateEnterpriseWorkspaceRequest */
     readonly CreateEnterpriseWorkspaceRequest: {
+      /** Name */
+      readonly name: string;
+    };
+    /** CreateKnowledgeBaseRequest */
+    readonly CreateKnowledgeBaseRequest: {
+      /**
+       * Default Security Level
+       * @default INTERNAL
+       * @enum {string}
+       */
+      readonly default_security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+      /**
+       * Default Visibility
+       * @default private
+       * @enum {string}
+       */
+      readonly default_visibility: "private" | "workspace" | "departments";
+      /** Department Ids */
+      readonly department_ids?: readonly string[];
+      /** Description */
+      readonly description?: string | null;
       /** Name */
       readonly name: string;
     };
@@ -741,6 +931,138 @@ export type components = {
       readonly status: "active" | "disabled";
       /** Version */
       readonly version: number;
+    };
+    /** DocumentCreatedResponse */
+    readonly DocumentCreatedResponse: {
+      readonly document: components["schemas"]["DocumentResponse"];
+      readonly document_version: components["schemas"]["DocumentVersionResponse"];
+      readonly source: components["schemas"]["DocumentSourceResponse"];
+    };
+    /** DocumentResponse */
+    readonly DocumentResponse: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Created By Account Id
+       * Format: uuid
+       */
+      readonly created_by_account_id: string;
+      /** Deleted At */
+      readonly deleted_at: string | null;
+      /** Department Ids */
+      readonly department_ids: readonly string[];
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      readonly document_id: string;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      readonly knowledge_base_id: string;
+      /** Permission Labels */
+      readonly permission_labels: readonly string[];
+      /**
+       * Security Level
+       * @enum {string}
+       */
+      readonly security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "deleted";
+      /** Title */
+      readonly title: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+      /**
+       * Visibility
+       * @enum {string}
+       */
+      readonly visibility: "private" | "workspace" | "departments";
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /** DocumentSourceResponse */
+    readonly DocumentSourceResponse: {
+      /** Captured At */
+      readonly captured_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Source Id
+       * Format: uuid
+       */
+      readonly source_id: string;
+      /**
+       * Source Kind
+       * @enum {string}
+       */
+      readonly source_kind: "manual" | "upload" | "web" | "data_source";
+      /** Source Name */
+      readonly source_name: string;
+    };
+    /** DocumentVersionCreatedResponse */
+    readonly DocumentVersionCreatedResponse: {
+      readonly document_version: components["schemas"]["DocumentVersionResponse"];
+      readonly source: components["schemas"]["DocumentSourceResponse"];
+    };
+    /** DocumentVersionResponse */
+    readonly DocumentVersionResponse: {
+      /** Content Hash */
+      readonly content_hash: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Created By Account Id
+       * Format: uuid
+       */
+      readonly created_by_account_id: string;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      readonly document_id: string;
+      /**
+       * Document Version Id
+       * Format: uuid
+       */
+      readonly document_version_id: string;
+      /** Published At */
+      readonly published_at: string | null;
+      /** Record Version */
+      readonly record_version: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "draft" | "ready" | "published" | "superseded";
+      /** Version Number */
+      readonly version_number: number;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
     };
     /** EffectiveRoleResponse */
     readonly EffectiveRoleResponse: {
@@ -850,6 +1172,59 @@ export type components = {
       /** Login Name */
       readonly login_name: string;
     };
+    /** KnowledgeBaseResponse */
+    readonly KnowledgeBaseResponse: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Created By Account Id
+       * Format: uuid
+       */
+      readonly created_by_account_id: string;
+      /**
+       * Default Security Level
+       * @enum {string}
+       */
+      readonly default_security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+      /**
+       * Default Visibility
+       * @enum {string}
+       */
+      readonly default_visibility: "private" | "workspace" | "departments";
+      /** Deleted At */
+      readonly deleted_at: string | null;
+      /** Department Ids */
+      readonly department_ids: readonly string[];
+      /** Description */
+      readonly description: string | null;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      readonly knowledge_base_id: string;
+      /** Name */
+      readonly name: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "deleted";
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
     /** LoginRequest */
     readonly LoginRequest: {
       /** Login Name */
@@ -876,6 +1251,11 @@ export type components = {
     readonly LogoutResponse: {
       /** Logged Out */
       readonly logged_out: boolean;
+    };
+    /** MarkDocumentVersionReadyRequest */
+    readonly MarkDocumentVersionReadyRequest: {
+      /** Content Hash */
+      readonly content_hash: string;
     };
     /** MemberOrganizationResponse */
     readonly MemberOrganizationResponse: {
@@ -2004,6 +2384,648 @@ export interface operations {
         };
         content: {
           readonly "application/json": components["schemas"]["WorkspaceInvitationResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createKnowledgeBase: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateKnowledgeBaseRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["KnowledgeBaseResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly deleteKnowledgeBase: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly knowledge_base_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["KnowledgeBaseResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createKnowledgeDocument: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly knowledge_base_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateDocumentRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["DocumentCreatedResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly deleteKnowledgeDocument: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly document_id: string;
+        readonly knowledge_base_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["DocumentResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createKnowledgeDocumentVersion: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly document_id: string;
+        readonly knowledge_base_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateDocumentVersionRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["DocumentVersionCreatedResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly publishKnowledgeDocumentVersion: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly document_id: string;
+        readonly document_version_id: string;
+        readonly knowledge_base_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["DocumentVersionResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly markKnowledgeDocumentVersionReady: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly document_id: string;
+        readonly document_version_id: string;
+        readonly knowledge_base_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["MarkDocumentVersionReadyRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["DocumentVersionResponse"];
         };
       };
       /** @description 请求上下文无效 */

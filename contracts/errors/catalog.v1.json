@@ -11,6 +11,7 @@
     { "code": "ENTITLEMENT_DENIED", "http_status": 403, "message": "当前套餐未启用该功能", "retryable": false },
     { "code": "QUOTA_EXCEEDED", "http_status": 409, "message": "当前用量已达到套餐上限", "retryable": false },
     { "code": "ENTITLEMENT_CONFLICT", "http_status": 409, "message": "套餐、功能开关或用量状态已发生变化", "retryable": true },
+    { "code": "KNOWLEDGE_CONFLICT", "http_status": 409, "message": "知识库、文档或文档版本状态不允许当前操作", "retryable": false },
     { "code": "CSRF_INVALID", "http_status": 403, "message": "请求缺少有效的 CSRF 凭证", "retryable": false },
     { "code": "WORKSPACE_REQUIRED", "http_status": 400, "message": "请求缺少有效的工作空间上下文", "retryable": false },
     { "code": "POLICY_DENIED", "http_status": 403, "message": "当前操作未获授权", "retryable": false },

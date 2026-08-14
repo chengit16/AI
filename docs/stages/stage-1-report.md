@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1D-01` 待开始 |
+| 当前节点 | `P1D-02` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -267,6 +267,20 @@
 - 自动化验收：动态菜单纯函数和 React 应用闭环 `6/6`；前端 Prettier、Lint、TypeScript、生产构建通过；Python/Ruff/mypy 和全量 pytest `243/243` 通过；Migration 往返 `1/1`、P1C-05 PostgreSQL 回归 `1/1`；统一 `./scripts/verify` 全部通过。
 - 容器与浏览器验收：以当前工作树重建 API、Worker、Web 和 Migration 镜像，`platform doctor` 八项全部通过，数据库 Revision 为 `20260814_0015`。真实运行页面在桌面视口确认已发布企业空间显示动态菜单和页面内容；移动抽屉沿用同一导航数据源。当前未宣称 Linux 宿主机、百万 Chunk 或完整并发认证通过。
 - 当前边界：本节点不实现知识库、对象存储、解析 OCR、Embedding、真实模型供应商或问答链路；这些进入 `P1D` 和 `P1E`。未扩展 SaaS、Go 运行层、真实连接器、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
+- 提交：`45a5c32`。
+
+### P1D-01 知识与文档事实模型
+
+- 状态：通过。
+- 领域事实：新增 `KnowledgeBase`、`Document`、不可变 `DocumentVersion`、`DocumentSource` 和 `DocumentPublication`。来源类型固定为 `manual`、`upload`、`web` 和 `data_source`；`data_source` 只冻结未来连接器的来源事实，不接入真实连接器。文档与知识库采用软删除，仍有活跃文档的知识库不能删除。
+- 版本与发布：文档版本按 `draft → ready → published → superseded` 单向转换，已进入只读状态的版本不能改写。每个文档只有一个当前发布指针；发布新版本时，在同一事务中将旧当前版本转为 `superseded` 并原子切换指针，失败不会暴露半发布状态。
+- 隔离与治理：五张业务表均以工作空间复合外键约束实体关系，Repository 查询继续携带 `workspace_id`。个人与企业空间均由所有者治理写操作；普通企业成员即使直接调用接口也返回 `403 POLICY_DENIED`。知识库支持部门范围事实，为后续检索阶段的工作空间和部门过滤提供稳定输入。
+- 权限与数据安全：`ResourceRegistry` 推进至版本 4，覆盖 45 项 Permission、51 个 API、49 个菜单和 44 个菜单接口绑定。七个知识写接口全部经过统一 PDP；响应执行字段投影，不回显对象键、来源路径或 URL，避免对象定位信息提前进入 API、日志和后续模型上下文。
+- 配额与事务：知识库创建和删除复用身份模块公开的原子用量能力，不直接写入权益私有表。创建时用量从 0 增至 1，删除时回到 0；配额校验、业务事实、审计记录和 Outbox 事件在共享事务中提交，失败或重放不会产生双重计数和部分写入。
+- 数据与契约：新增 Migration `20260814_0016` 及 `knowledge_bases`、`documents`、`document_versions`、`document_sources`、`document_publications` 五张表。OpenAPI 新增七个知识路径和对应 Schema，React/Python 生成类型、错误目录、ReleaseManifest、兼容矩阵、Migration 往返期望与平台诊断 Revision 同步更新。
+- 自动化验收：知识领域、权限、契约、配额和真实 PostgreSQL/Valkey 专项通过。统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python 全量 pytest `259/259`、Ruff、mypy strict、架构、契约兼容与生成漂移、供应链门禁均通过；Migration `base → head → base → head` 和知识/权益真实基础设施回归 `6/6` 通过。
+- 容器与 HTTP 验收：以当前工作树重建 API、Worker、Web 和 Migration 镜像，`platform doctor` 八项全部通过，数据库 Revision 为 `20260814_0016`。全合成 HTTP 闭环完成个人知识创建、文档版本发布、来源敏感字段保护、知识库用量 `1 → 0`；企业所有者可创建，普通成员写入稳定返回 `403 POLICY_DENIED`。
+- 当前边界：本节点只建立来源、版本和发布事实，不上传真实对象、不执行病毒扫描、解析、OCR、Embedding 或索引。对象上传和安全校验进入 `P1D-02`；真实多源连接器保持后置。未扩展 SaaS、Go 运行层、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -278,4 +292,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1C-06`，当前进入 `P1D-01`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-01`，当前进入 `P1D-02`。

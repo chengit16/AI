@@ -36,6 +36,7 @@ from ai_platform_api.modules.identity.infrastructure.enterprise_sqlalchemy impor
 )
 from ai_platform_api.modules.identity.infrastructure.entitlements_sqlalchemy import (
     SqlAlchemyEntitlementAccessReader,
+    SqlAlchemyEntitlementRepository,
     SqlAlchemyEntitlementUnitOfWork,
 )
 from ai_platform_api.modules.identity.infrastructure.organization_sqlalchemy import (
@@ -56,6 +57,10 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityReader,
     SqlAlchemyIdentityUnitOfWork,
     SqlAlchemyRegistrationUnitOfWork,
+)
+from ai_platform_api.modules.knowledge.application.facts import KnowledgeFactService
+from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
+    SqlAlchemyKnowledgeUnitOfWork,
 )
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
 from ai_platform_api.persistence.database import PlatformDatabase
@@ -83,6 +88,7 @@ class ApplicationContainer:
     sessions: ValkeySessionStore
     menu_configuration: MenuConfigurationService | None = None
     menu_releases: MenuReleaseService | None = None
+    knowledge_facts: KnowledgeFactService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -139,6 +145,12 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             menu_configuration=menu_configuration,
             menu_releases=menu_releases,
+            knowledge_facts=KnowledgeFactService(
+                SqlAlchemyKnowledgeUnitOfWork(
+                    database.sessions,
+                    SqlAlchemyEntitlementRepository,
+                ),
+            ),
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,

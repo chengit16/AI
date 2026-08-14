@@ -26,7 +26,44 @@ class CreateDepartmentRequest(typing.TypedDict):
     parent_department_id: typing.NotRequired[str | None]
 
 
+class CreateDocumentRequest(typing.TypedDict):
+    captured_at: typing.NotRequired[str | None]
+    department_ids: typing.NotRequired[list[str] | None]
+    external_source_id: typing.NotRequired[str | None]
+    original_object_key: typing.NotRequired[str | None]
+    permission_labels: typing.NotRequired[list[str]]
+    security_level: typing.NotRequired[
+        typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"] | None
+    ]
+    source_kind: typing.Literal["manual", "upload", "web", "data_source"]
+    source_name: str
+    source_path: typing.NotRequired[str | None]
+    source_url: typing.NotRequired[str | None]
+    title: str
+    visibility: typing.NotRequired[typing.Literal["private", "workspace", "departments"] | None]
+
+
+class CreateDocumentVersionRequest(typing.TypedDict):
+    captured_at: typing.NotRequired[str | None]
+    external_source_id: typing.NotRequired[str | None]
+    original_object_key: typing.NotRequired[str | None]
+    source_kind: typing.Literal["manual", "upload", "web", "data_source"]
+    source_name: str
+    source_path: typing.NotRequired[str | None]
+    source_url: typing.NotRequired[str | None]
+
+
 class CreateEnterpriseWorkspaceRequest(typing.TypedDict):
+    name: str
+
+
+class CreateKnowledgeBaseRequest(typing.TypedDict):
+    default_security_level: typing.NotRequired[
+        typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    ]
+    default_visibility: typing.NotRequired[typing.Literal["private", "workspace", "departments"]]
+    department_ids: typing.NotRequired[list[str]]
+    description: typing.NotRequired[str | None]
     name: str
 
 
@@ -64,6 +101,55 @@ class DepartmentResponse(typing.TypedDict):
     parent_department_id: str | None
     status: typing.Literal["active", "disabled"]
     version: int
+
+
+class DocumentCreatedResponse(typing.TypedDict):
+    document: DocumentResponse
+    document_version: DocumentVersionResponse
+    source: DocumentSourceResponse
+
+
+class DocumentResponse(typing.TypedDict):
+    created_at: str
+    created_by_account_id: str
+    deleted_at: str | None
+    department_ids: list[str]
+    document_id: str
+    knowledge_base_id: str
+    permission_labels: list[str]
+    security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    status: typing.Literal["active", "deleted"]
+    title: str
+    updated_at: str
+    version: int
+    visibility: typing.Literal["private", "workspace", "departments"]
+    workspace_id: str
+
+
+class DocumentSourceResponse(typing.TypedDict):
+    captured_at: str | None
+    created_at: str
+    source_id: str
+    source_kind: typing.Literal["manual", "upload", "web", "data_source"]
+    source_name: str
+
+
+class DocumentVersionCreatedResponse(typing.TypedDict):
+    document_version: DocumentVersionResponse
+    source: DocumentSourceResponse
+
+
+class DocumentVersionResponse(typing.TypedDict):
+    content_hash: str | None
+    created_at: str
+    created_by_account_id: str
+    document_id: str
+    document_version_id: str
+    published_at: str | None
+    record_version: int
+    status: typing.Literal["draft", "ready", "published", "superseded"]
+    version_number: int
+    workspace_id: str
 
 
 class EffectiveRoleResponse(typing.TypedDict):
@@ -116,6 +202,22 @@ class InviteWorkspaceMemberRequest(typing.TypedDict):
     login_name: str
 
 
+class KnowledgeBaseResponse(typing.TypedDict):
+    created_at: str
+    created_by_account_id: str
+    default_security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    default_visibility: typing.Literal["private", "workspace", "departments"]
+    deleted_at: str | None
+    department_ids: list[str]
+    description: str | None
+    knowledge_base_id: str
+    name: str
+    status: typing.Literal["active", "deleted"]
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
 class LoginRequest(typing.TypedDict):
     login_name: str
     password: str
@@ -129,6 +231,10 @@ class LoginResponse(typing.TypedDict):
 
 class LogoutResponse(typing.TypedDict):
     logged_out: bool
+
+
+class MarkDocumentVersionReadyRequest(typing.TypedDict):
+    content_hash: str
 
 
 class MemberOrganizationResponse(typing.TypedDict):

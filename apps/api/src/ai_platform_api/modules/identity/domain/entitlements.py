@@ -120,11 +120,36 @@ class EntitlementWriteConflictError(Exception):
     """权益、功能开关或用量幂等记录发生并发冲突。"""
 
 
-class EntitlementRepository(Protocol):
+class UsageRepository(Protocol):
+    """供业务模块在自身事务内原子维护套餐用量的最小公开接口。"""
+
     def get_workspace(
         self, workspace_id: UUID, *, for_update: bool = False
     ) -> WorkspaceRecord | None: ...
 
+    def get_entitlement(
+        self, workspace_id: UUID, *, for_update: bool = False
+    ) -> WorkspaceEntitlement | None: ...
+
+    def get_usage_record(self, workspace_id: UUID, idempotency_key: str) -> UsageRecord | None: ...
+
+    def get_usage_counter(
+        self,
+        workspace_id: UUID,
+        metric: UsageMetric,
+        period_key: str,
+        *,
+        for_update: bool = False,
+    ) -> UsageCounter | None: ...
+
+    def save_usage_counter(
+        self, counter: UsageCounter, *, expected_version: int | None
+    ) -> None: ...
+
+    def add_usage_record(self, record: UsageRecord) -> None: ...
+
+
+class EntitlementRepository(UsageRepository, Protocol):
     def get_membership(
         self,
         workspace_id: UUID,
@@ -132,10 +157,6 @@ class EntitlementRepository(Protocol):
         *,
         for_update: bool = False,
     ) -> WorkspaceMembership | None: ...
-
-    def get_entitlement(
-        self, workspace_id: UUID, *, for_update: bool = False
-    ) -> WorkspaceEntitlement | None: ...
 
     def get_feature_settings(
         self, workspace_id: UUID, *, for_update: bool = False
@@ -147,29 +168,12 @@ class EntitlementRepository(Protocol):
 
     def list_usage_counters(self, workspace_id: UUID) -> tuple[UsageCounter, ...]: ...
 
-    def get_usage_counter(
-        self,
-        workspace_id: UUID,
-        metric: UsageMetric,
-        period_key: str,
-        *,
-        for_update: bool = False,
-    ) -> UsageCounter | None: ...
-
-    def get_usage_record(self, workspace_id: UUID, idempotency_key: str) -> UsageRecord | None: ...
-
     def set_open_api_enabled(
         self,
         settings: WorkspaceFeatureSettings,
         *,
         expected_version: int,
     ) -> None: ...
-
-    def save_usage_counter(
-        self, counter: UsageCounter, *, expected_version: int | None
-    ) -> None: ...
-
-    def add_usage_record(self, record: UsageRecord) -> None: ...
 
     def bump_entitlement_version(self, workspace_id: UUID) -> int: ...
 

@@ -656,6 +656,261 @@ workspace_menu_publications = Table(
         name="fk_workspace_menu_publications_release",
     ),
 )
+
+knowledge_bases = Table(
+    "knowledge_bases",
+    metadata,
+    Column("knowledge_base_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("description", String(1000), nullable=True),
+    Column("default_visibility", String(32), nullable=False),
+    Column("department_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
+    Column("default_security_level", String(32), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "knowledge_base_id",
+        name="uq_knowledge_bases_workspace_base",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_knowledge_bases_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_knowledge_bases_creator",
+    ),
+    CheckConstraint(
+        "default_visibility IN ('private', 'workspace', 'departments')",
+        name="ck_knowledge_bases_visibility",
+    ),
+    CheckConstraint(
+        "(default_visibility = 'departments' AND cardinality(department_ids) > 0) "
+        "OR (default_visibility <> 'departments' AND cardinality(department_ids) = 0)",
+        name="ck_knowledge_bases_department_scope",
+    ),
+    CheckConstraint(
+        "default_security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
+        name="ck_knowledge_bases_security_level",
+    ),
+    CheckConstraint("status IN ('active', 'deleted')", name="ck_knowledge_bases_status"),
+    CheckConstraint(
+        "(status = 'deleted' AND deleted_at IS NOT NULL) "
+        "OR (status = 'active' AND deleted_at IS NULL)",
+        name="ck_knowledge_bases_deleted_at",
+    ),
+    CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 120", name="ck_knowledge_bases_name"),
+    CheckConstraint("version >= 1", name="ck_knowledge_bases_version"),
+)
+Index(
+    "uq_knowledge_bases_active_name",
+    knowledge_bases.c.workspace_id,
+    func.lower(knowledge_bases.c.name),
+    unique=True,
+    postgresql_where=knowledge_bases.c.status == "active",
+)
+
+documents = Table(
+    "documents",
+    metadata,
+    Column("document_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", UUID(as_uuid=True), nullable=False),
+    Column("title", String(255), nullable=False),
+    Column("visibility", String(32), nullable=False),
+    Column("department_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
+    Column("security_level", String(32), nullable=False),
+    Column("permission_labels", ARRAY(String(80)), nullable=False, server_default="{}"),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("workspace_id", "document_id", name="uq_documents_workspace_document"),
+    ForeignKeyConstraint(
+        ["workspace_id", "knowledge_base_id"],
+        [
+            f"{SCHEMA_TOKEN}.knowledge_bases.workspace_id",
+            f"{SCHEMA_TOKEN}.knowledge_bases.knowledge_base_id",
+        ],
+        name="fk_documents_knowledge_base",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_documents_creator",
+    ),
+    CheckConstraint(
+        "visibility IN ('private', 'workspace', 'departments')",
+        name="ck_documents_visibility",
+    ),
+    CheckConstraint(
+        "(visibility = 'departments' AND cardinality(department_ids) > 0) "
+        "OR (visibility <> 'departments' AND cardinality(department_ids) = 0)",
+        name="ck_documents_department_scope",
+    ),
+    CheckConstraint(
+        "security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
+        name="ck_documents_security_level",
+    ),
+    CheckConstraint("status IN ('active', 'deleted')", name="ck_documents_status"),
+    CheckConstraint(
+        "(status = 'deleted' AND deleted_at IS NOT NULL) "
+        "OR (status = 'active' AND deleted_at IS NULL)",
+        name="ck_documents_deleted_at",
+    ),
+    CheckConstraint("char_length(btrim(title)) BETWEEN 1 AND 255", name="ck_documents_title"),
+    CheckConstraint("version >= 1", name="ck_documents_version"),
+)
+Index(
+    "ix_documents_workspace_base_status",
+    documents.c.workspace_id,
+    documents.c.knowledge_base_id,
+    documents.c.status,
+)
+
+document_versions = Table(
+    "document_versions",
+    metadata,
+    Column("document_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("document_id", UUID(as_uuid=True), nullable=False),
+    Column("version_number", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("content_hash", String(64), nullable=True),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=True),
+    Column("record_version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "document_id",
+        "version_number",
+        name="uq_document_versions_number",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "document_version_id",
+        name="uq_document_versions_workspace_version",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "document_id",
+        "document_version_id",
+        name="uq_document_versions_document_version",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id"],
+        [f"{SCHEMA_TOKEN}.documents.workspace_id", f"{SCHEMA_TOKEN}.documents.document_id"],
+        name="fk_document_versions_document",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_document_versions_creator",
+    ),
+    CheckConstraint(
+        "status IN ('draft', 'ready', 'published', 'superseded')",
+        name="ck_document_versions_status",
+    ),
+    CheckConstraint(
+        "(status IN ('published', 'superseded') AND published_at IS NOT NULL) "
+        "OR (status IN ('draft', 'ready') AND published_at IS NULL)",
+        name="ck_document_versions_published_at",
+    ),
+    CheckConstraint(
+        "(status = 'draft' AND content_hash IS NULL) "
+        "OR (status <> 'draft' AND content_hash ~ '^[0-9a-f]{64}$')",
+        name="ck_document_versions_content_hash",
+    ),
+    CheckConstraint("version_number >= 1", name="ck_document_versions_number"),
+    CheckConstraint("record_version >= 1", name="ck_document_versions_record_version"),
+)
+Index(
+    "ix_document_versions_workspace_document_status",
+    document_versions.c.workspace_id,
+    document_versions.c.document_id,
+    document_versions.c.status,
+)
+
+document_sources = Table(
+    "document_sources",
+    metadata,
+    Column("source_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("document_version_id", UUID(as_uuid=True), nullable=False),
+    Column("source_kind", String(32), nullable=False),
+    Column("source_name", String(255), nullable=False),
+    Column("original_object_key", String(1024), nullable=True),
+    Column("source_path", String(2048), nullable=True),
+    Column("source_url", String(2048), nullable=True),
+    Column("external_source_id", String(512), nullable=True),
+    Column("captured_at", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "document_version_id",
+        name="uq_document_sources_version",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_version_id"],
+        [
+            f"{SCHEMA_TOKEN}.document_versions.workspace_id",
+            f"{SCHEMA_TOKEN}.document_versions.document_version_id",
+        ],
+        name="fk_document_sources_version",
+    ),
+    CheckConstraint(
+        "source_kind IN ('manual', 'upload', 'web', 'data_source')",
+        name="ck_document_sources_kind",
+    ),
+    CheckConstraint(
+        "(source_kind = 'manual' AND original_object_key IS NULL AND source_path IS NULL "
+        "AND source_url IS NULL AND external_source_id IS NULL) OR "
+        "(source_kind = 'upload' AND original_object_key IS NOT NULL AND source_url IS NULL) OR "
+        "(source_kind = 'web' AND source_url IS NOT NULL AND original_object_key IS NULL) OR "
+        "(source_kind = 'data_source' AND external_source_id IS NOT NULL)",
+        name="ck_document_sources_locator",
+    ),
+    CheckConstraint(
+        "char_length(btrim(source_name)) BETWEEN 1 AND 255",
+        name="ck_document_sources_name",
+    ),
+)
+
+document_publications = Table(
+    "document_publications",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("document_id", UUID(as_uuid=True), primary_key=True),
+    Column("current_document_version_id", UUID(as_uuid=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id"],
+        [f"{SCHEMA_TOKEN}.documents.workspace_id", f"{SCHEMA_TOKEN}.documents.document_id"],
+        name="fk_document_publications_document",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id", "current_document_version_id"],
+        [
+            f"{SCHEMA_TOKEN}.document_versions.workspace_id",
+            f"{SCHEMA_TOKEN}.document_versions.document_id",
+            f"{SCHEMA_TOKEN}.document_versions.document_version_id",
+        ],
+        name="fk_document_publications_version",
+    ),
+)
 Index(
     "ix_role_permission_grants_lookup",
     role_permission_grants.c.workspace_id,

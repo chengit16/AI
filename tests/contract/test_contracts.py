@@ -370,3 +370,40 @@ def test_entitlement_openapi_covers_quota_and_feature_governance() -> None:
         "published_agents",
         "questions_monthly",
     ]
+
+
+def test_knowledge_openapi_covers_fact_and_publication_lifecycle() -> None:
+    baseline = load_json(CONTRACTS / "openapi/platform-api.v1.json")
+    paths = baseline["paths"]
+    prefix = "/api/v1/workspaces/{workspace_id}/knowledge-bases"
+    expected_operations = {
+        prefix: {"post": "createKnowledgeBase"},
+        f"{prefix}/{{knowledge_base_id}}": {"delete": "deleteKnowledgeBase"},
+        f"{prefix}/{{knowledge_base_id}}/documents": {"post": "createKnowledgeDocument"},
+        f"{prefix}/{{knowledge_base_id}}/documents/{{document_id}}": {
+            "delete": "deleteKnowledgeDocument"
+        },
+        f"{prefix}/{{knowledge_base_id}}/documents/{{document_id}}/versions": {
+            "post": "createKnowledgeDocumentVersion"
+        },
+        f"{prefix}/{{knowledge_base_id}}/documents/{{document_id}}/versions/"
+        "{document_version_id}/ready": {"post": "markKnowledgeDocumentVersionReady"},
+        f"{prefix}/{{knowledge_base_id}}/documents/{{document_id}}/versions/"
+        "{document_version_id}/publish": {"post": "publishKnowledgeDocumentVersion"},
+    }
+    for path, operations in expected_operations.items():
+        for method, operation_id in operations.items():
+            assert paths[path][method]["operationId"] == operation_id
+            assert paths[path][method]["responses"]["500"]["content"]["application/json"][
+                "schema"
+            ] == {"$ref": "#/components/schemas/ErrorResponse"}
+
+    schemas = baseline["components"]["schemas"]
+    assert "original_object_key" not in schemas["DocumentSourceResponse"]["properties"]
+    assert "source_url" not in schemas["DocumentSourceResponse"]["properties"]
+    assert schemas["DocumentVersionResponse"]["properties"]["status"]["enum"] == [
+        "draft",
+        "ready",
+        "published",
+        "superseded",
+    ]
