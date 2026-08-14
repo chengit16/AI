@@ -11,6 +11,15 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).parent
 GENERATED = ROOT / "generated"
+P0_FILE_NAMES = (
+    "synthetic-handbook.md",
+    "synthetic-ocr.png",
+    "synthetic-pdf-table.pdf",
+    "synthetic-policy.txt",
+    "synthetic-scan.pdf",
+    "synthetic-table.docx",
+    "synthetic-text.pdf",
+)
 
 GLYPHS = {
     " ": ("00000",) * 7,
@@ -223,7 +232,9 @@ def main() -> None:
     (GENERATED / "synthetic-scan.pdf").write_bytes(scanned_pdf(width, height, pixels))
 
     entries = []
-    for path in sorted(GENERATED.iterdir()):
+    # P1D-03 中文 OCR 有独立 Manifest，避免后续样本扩展改变已冻结的 P0-07 数据集。
+    for file_name in P0_FILE_NAMES:
+        path = GENERATED / file_name
         content = path.read_bytes()
         entries.append(
             {

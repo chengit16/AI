@@ -25,6 +25,10 @@ celery_app.conf.update(
         "dispatch-outbox": {
             "task": "platform.outbox.dispatch.v1",
             "schedule": settings.outbox_dispatch_interval_seconds,
-        }
+        },
+        "process-ingestion-jobs": {
+            "task": "platform.ingestion.process.v1",
+            "schedule": settings.ingestion_dispatch_interval_seconds,
+        },
     },
 )

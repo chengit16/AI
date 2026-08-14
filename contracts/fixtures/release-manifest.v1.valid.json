@@ -23,7 +23,7 @@
     }
   ],
   "database": {
-    "schema_revision": "20260814_0017"
+    "schema_revision": "20260814_0019"
   },
   "images": [
     {
@@ -56,7 +56,7 @@
       "platforms": [
         "linux/arm64"
       ],
-      "reference": "apache/tika:3.2.3.0-full"
+      "reference": "ai-platform-tika:3.2.3-chi-sim"
     },
     {
       "digest": "sha256:918228e4ff7da6b3a4213cb18067f6e09d9f0503d0a08868699ba227cff71861",
@@ -84,7 +84,7 @@
       "reference": "local/ai-platform-worker:0.1.0"
     }
   ],
-  "manifest_digest": "sha256:e495538f9406c9876c74b06e4ff3cea0de4bc62b98eb153835ff7659cf0ece48",
+  "manifest_digest": "sha256:c2aaceeb2792826fb9449e22351f677b156ee848ee23d1ea9601390f37c75350",
   "release_version": "0.1.0",
   "runtimes": {
     "node": "24.19.0",

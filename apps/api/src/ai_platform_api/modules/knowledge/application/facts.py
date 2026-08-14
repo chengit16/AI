@@ -4,6 +4,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from ai_platform_backend.ingestion.domain import IngestionJob
 from ai_platform_backend.integration.domain import AuditRecord
 
 from ai_platform_api.common.errors import PlatformError
@@ -63,8 +64,16 @@ class KnowledgeQuotaExceededError(PlatformError):
 class KnowledgeFactService:
     """在一个事务内维护知识事实、审计和 Outbox，不处理对象内容或索引。"""
 
-    def __init__(self, unit_of_work: KnowledgeUnitOfWork) -> None:
+    def __init__(
+        self,
+        unit_of_work: KnowledgeUnitOfWork,
+        *,
+        ingestion_max_attempts: int = 3,
+    ) -> None:
+        if ingestion_max_attempts < 1:
+            raise ValueError("入库任务最大尝试次数必须为正数")
         self._unit_of_work = unit_of_work
+        self._ingestion_max_attempts = ingestion_max_attempts
 
     def require_upload_target(
         self,
@@ -264,6 +273,7 @@ class KnowledgeFactService:
                 )
                 unit_of_work.knowledge.add_document(document)
                 unit_of_work.knowledge.add_document_version(version, source)
+                self._add_ingestion_job(unit_of_work, context, document, version, source, now)
                 if upload_size_bytes is not None:
                     usage = consume_usage(
                         unit_of_work.usage,
@@ -383,6 +393,7 @@ class KnowledgeFactService:
                 version.assert_valid()
                 source.assert_valid()
                 unit_of_work.knowledge.add_document_version(version, source)
+                self._add_ingestion_job(unit_of_work, context, document, version, source, now)
                 if upload_size_bytes is not None:
                     usage = consume_usage(
                         unit_of_work.usage,
@@ -417,6 +428,47 @@ class KnowledgeFactService:
         except KnowledgeWriteConflictError as error:
             raise KnowledgeConflictError from error
         return version, source
+
+    def _add_ingestion_job(
+        self,
+        unit_of_work: KnowledgeUnitOfWork,
+        context: RequestContext,
+        document: Document,
+        version: DocumentVersion,
+        source: DocumentSource,
+        now: datetime,
+    ) -> None:
+        if source.source_kind != "upload":
+            return
+        if (
+            source.original_object_key is None
+            or source.media_type is None
+            or source.content_hash is None
+        ):
+            raise KnowledgeValidationError
+        job = IngestionJob(
+            ingestion_job_id=uuid4(),
+            workspace_id=context.workspace_id,
+            knowledge_base_id=document.knowledge_base_id,
+            document_id=document.document_id,
+            document_version_id=version.document_version_id,
+            source_id=source.source_id,
+            source_name=source.source_name,
+            source_object_key=source.original_object_key,
+            source_media_type=source.media_type,
+            source_content_hash=source.content_hash,
+            status="queued",
+            attempt_count=0,
+            max_attempts=self._ingestion_max_attempts,
+            available_at=now,
+            requested_by_actor_id=context.actor_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            created_at=now,
+            updated_at=now,
+        )
+        job.assert_valid()
+        unit_of_work.knowledge.add_ingestion_job(job)
 
     def mark_document_version_ready(
         self,

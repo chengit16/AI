@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Any, TypedDict, cast
 from uuid import UUID
 
 import pytest
@@ -16,7 +16,10 @@ from ai_platform_worker.modules.ingestion.domain.documents import (
 )
 from ai_platform_worker.modules.ingestion.infrastructure.parsers import DefaultParserRouter
 from ai_platform_worker.modules.ingestion.infrastructure.pdf import PdfDocumentParser
-from ai_platform_worker.modules.ingestion.infrastructure.tika import TikaDocumentParser
+from ai_platform_worker.modules.ingestion.infrastructure.tika import (
+    TikaChineseOcrAdapter,
+    TikaDocumentParser,
+)
 
 ROOT = Path(__file__).parents[2]
 FIXTURES = ROOT / "tests/fixtures/ingestion"
@@ -153,6 +156,31 @@ def test_tika_image_ocr_extracts_expected_text(service: IngestDocument) -> None:
     assert "TEST POLICY" in combined_content(result)
     assert any(block.block_type == "ocr" for block in result.parsed_document.blocks)
     assert all(chunk.ocr_used is True for chunk in result.chunks)
+
+
+def test_chinese_ocr_adapter_uses_fixed_synthetic_fixture() -> None:
+    manifest = cast(
+        dict[str, Any],
+        json.loads((FIXTURES / "p1d03-manifest.json").read_text(encoding="utf-8")),
+    )
+    entry = cast(dict[str, Any], manifest["files"][0])
+    content = (GENERATED / cast(str, entry["file"])).read_bytes()
+
+    document = TikaChineseOcrAdapter(TIKA_URL, timeout_seconds=30).parse(
+        content=content,
+        file_name=cast(str, entry["file"]),
+        declared_media_type="image/png",
+    )
+
+    recognized = "".join(block.text for block in document.blocks).replace(" ", "")
+    assert manifest["dataset_version"] == "p1d-03-v1"
+    assert entry["synthetic"] is True
+    assert entry["size_bytes"] == len(content)
+    assert entry["sha256"] == hashlib.sha256(content).hexdigest()
+    assert cast(str, entry["expected_text"]) in recognized
+    assert document.used_ocr is True
+    assert document.metadata["ai-platform:ocr-language"] == "chi_sim+eng"
+    assert "tesseract-chi-sim" in document.parser_name
 
 
 def test_tika_scanned_pdf_runs_ocr_and_keeps_page_source(service: IngestDocument) -> None:

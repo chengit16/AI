@@ -52,6 +52,7 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
 
     assert "platform.outbox.dispatch.v1" in celery_app.tasks
     assert "platform.integration.consume.v1" in celery_app.tasks
+    assert "platform.ingestion.process.v1" in celery_app.tasks
     assert celery_app.conf.task_serializer == "json"
     assert celery_app.conf.accept_content == ["json"]
     assert celery_app.conf.result_backend is None
@@ -60,6 +61,9 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
     assert celery_app.conf.worker_prefetch_multiplier == 1
     assert celery_app.conf.beat_schedule["dispatch-outbox"]["task"] == (
         "platform.outbox.dispatch.v1"
+    )
+    assert celery_app.conf.beat_schedule["process-ingestion-jobs"]["task"] == (
+        "platform.ingestion.process.v1"
     )
 
 
@@ -74,6 +78,6 @@ def test_runtime_files_fix_shared_paths_and_health_checks() -> None:
     assert "PYTHONPATH=/app/apps/worker/src:/app/packages/backend/src" in worker_dockerfile
     assert 'CMD ["uv", "run", "--no-sync", "celery"' in worker_dockerfile
     assert "SELECT version_num FROM public.alembic_version" in platform_script
-    assert 'database_revision" == "20260814_0017"' in platform_script
+    assert 'database_revision" == "20260814_0019"' in platform_script
     assert "AI_PLATFORM_MIN_FREE_DISK_GB:-50" in platform_script
     assert 'inspect ping --destination "celery@$HOSTNAME" --timeout 3' in platform_script

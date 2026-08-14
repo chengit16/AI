@@ -8,7 +8,12 @@ IngestionErrorCode = Literal[
     "INGESTION_PARSE_FAILED",
     "INGESTION_EMPTY_CONTENT",
     "INGESTION_PAGE_LIMIT_EXCEEDED",
+    "INGESTION_SOURCE_CHANGED",
+    "INGESTION_SOURCE_UNAVAILABLE",
+    "INGESTION_ARTIFACT_UNAVAILABLE",
 ]
+
+IngestionFailureStage = Literal["source", "parse", "ocr", "artifact", "worker"]
 
 
 class IngestionError(Exception):
@@ -20,7 +25,9 @@ class IngestionError(Exception):
         message: str,
         *,
         retryable: bool,
+        stage: IngestionFailureStage = "parse",
     ) -> None:
         super().__init__(message)
         self.code = code
         self.retryable = retryable
+        self.stage = stage

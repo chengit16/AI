@@ -141,6 +141,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             database.sessions,
             SqlAlchemyEntitlementRepository,
         ),
+        ingestion_max_attempts=settings.ingestion_max_attempts,
     )
     object_storage = MinioObjectStorage(
         endpoint=settings.minio_endpoint,

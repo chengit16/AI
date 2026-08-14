@@ -136,9 +136,16 @@ def parse_xhtml(payload: bytes, fallback_media_type: str) -> ParsedDocument:
 
 
 class TikaDocumentParser:
-    def __init__(self, base_url: str, *, timeout_seconds: float = 30) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        timeout_seconds: float = 30,
+        ocr_language: str | None = None,
+    ) -> None:
         self._endpoint = f"{base_url.rstrip('/')}/tika"
         self._timeout_seconds = timeout_seconds
+        self._ocr_language = ocr_language
 
     def parse(
         self,
@@ -148,15 +155,20 @@ class TikaDocumentParser:
         declared_media_type: str | None,
     ) -> ParsedDocument:
         safe_file_name = Path(file_name).name.replace('"', "")
+        headers = {
+            "Accept": "text/html",
+            "Content-Type": declared_media_type or "application/octet-stream",
+            "Content-Disposition": f'attachment; filename="{safe_file_name}"',
+        }
+        if self._ocr_language is not None:
+            # 语言选择只在 Tika Adapter 边缘传递，任务层不依赖 Tesseract 专有参数。
+            headers["X-Tika-OCRLanguage"] = self._ocr_language
+            headers["X-Tika-PDFOcrStrategy"] = "auto"
         request = Request(
             self._endpoint,
             data=content,
             method="PUT",
-            headers={
-                "Accept": "text/html",
-                "Content-Type": declared_media_type or "application/octet-stream",
-                "Content-Disposition": f'attachment; filename="{safe_file_name}"',
-            },
+            headers=headers,
         )
         try:
             with urlopen(request, timeout=self._timeout_seconds) as response:
@@ -179,3 +191,50 @@ class TikaDocumentParser:
                 retryable=True,
             ) from error
         return parse_xhtml(payload, declared_media_type or response_media_type)
+
+
+class TikaChineseOcrAdapter:
+    """通过 Tika 隔离 Tesseract 中文语言参数，便于后续替换为 PaddleOCR。"""
+
+    def __init__(self, base_url: str, *, timeout_seconds: float = 30) -> None:
+        self._parser = TikaDocumentParser(
+            base_url,
+            timeout_seconds=timeout_seconds,
+            ocr_language="chi_sim+eng",
+        )
+
+    def parse(
+        self,
+        *,
+        content: bytes,
+        file_name: str,
+        declared_media_type: str | None,
+    ) -> ParsedDocument:
+        try:
+            document = self._parser.parse(
+                content=content,
+                file_name=file_name,
+                declared_media_type=declared_media_type,
+            )
+        except IngestionError as error:
+            raise IngestionError(
+                error.code,
+                str(error),
+                retryable=error.retryable,
+                stage="ocr",
+            ) from error
+        metadata = dict(document.metadata)
+        metadata["ai-platform:ocr-language"] = "chi_sim+eng"
+        parser_name = (
+            f"{document.parser_name}+tesseract-chi-sim"
+            if document.used_ocr
+            else document.parser_name
+        )
+        return ParsedDocument(
+            media_type=document.media_type,
+            parser_name=parser_name,
+            page_count=document.page_count,
+            used_ocr=document.used_ocr,
+            blocks=document.blocks,
+            metadata=metadata,
+        )

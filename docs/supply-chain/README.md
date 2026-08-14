@@ -69,7 +69,8 @@ Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 55 个�
 | Valkey | 8.1.5 | BSD-3-Clause | 允许 | 默认缓存、锁和任务唤醒依赖；固定多架构镜像摘要并保留许可证文本 |
 | MinIO Server | RELEASE.2025-07-23T15-54-02Z | AGPL-3.0 | 仅允许当前本地验证 | 分发或网络服务形态必须法律复核；首期优先抽象 S3 Adapter，并在商业发布前选择合规对象存储方案 |
 | Apache Tika | 3.2.3 | Apache-2.0 | 允许 | 保留 NOTICE 与许可证文本 |
-| Tesseract OCR | 5.5.0 | Apache-2.0 | 允许英文验证 | 中文 OCR 仍按阶段 1D 接入 PaddleOCR 或等效 Adapter，并重新检查模型和运行库许可证 |
+| Tesseract OCR + `chi_sim` | 5.5.0 / 4.1.0-2 | Apache-2.0 | 允许本地中英文验证 | 运行引擎来自固定 Tika 基础镜像，简体中文语言数据固定 Debian 包版本；经 `ChineseOcrAdapter` 调用，后续可替换 PaddleOCR，发布前归档包级许可证清单 |
+| Noto CJK 字体 | 20240730 | SIL Open Font License 1.1 | 允许生成全合成中文 OCR 样本 | 只封装在独立 Tika 镜像；分发时保留 OFL 文本、版权和保留字体名声明 |
 | BAAI/bge-m3 | 5617a9f61b028005a4858fdac845db406aefb181 | MIT | 允许离线验证 | 模型卡、Revision 和许可证随发布清单固定 |
 | BAAI/bge-reranker-v2-m3 | 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e | Apache-2.0 | 允许离线验证 | 模型卡、Revision、NOTICE 和许可证随发布清单固定 |
 

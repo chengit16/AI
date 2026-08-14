@@ -68,6 +68,13 @@ class IngestionRequest:
 
 
 @dataclass(frozen=True)
+class ParseRequest:
+    file_name: str
+    declared_media_type: str | None
+    limits: IngestionLimits
+
+
+@dataclass(frozen=True)
 class ChunkSourcePosition:
     page_number: int | None
     line_start: int | None
@@ -102,6 +109,18 @@ class IngestionResult:
 
 
 class DocumentParser(Protocol):
+    def parse(
+        self,
+        *,
+        content: bytes,
+        file_name: str,
+        declared_media_type: str | None,
+    ) -> ParsedDocument: ...
+
+
+class ChineseOcrAdapter(Protocol):
+    """将中文图片或扫描文档转换为带来源位置的结构化正文。"""
+
     def parse(
         self,
         *,

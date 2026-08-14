@@ -1,0 +1,14 @@
+{
+  "dataset_version": "p1d-03-v1",
+  "files": [
+    {
+      "file": "synthetic-chinese-ocr.png",
+      "sha256": "9517158a3467cf453ecaf930169fc43e3bef701ea9d2dfa341a43aa1db7d3db3",
+      "size_bytes": 1908,
+      "synthetic": true,
+      "expected_text": "中国",
+      "renderer_image": "ai-platform-tika:3.2.3-chi-sim",
+      "font": "Noto Sans CJK SC"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ from types import TracebackType
 from typing import Literal, Protocol
 from uuid import UUID
 
+from ai_platform_backend.ingestion.domain import IngestionJob
 from ai_platform_backend.integration.domain import AuditWriter
 
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
@@ -268,6 +269,8 @@ class KnowledgeRepository(Protocol):
     def next_document_version_number(self, workspace_id: UUID, document_id: UUID) -> int: ...
 
     def add_document_version(self, version: DocumentVersion, source: DocumentSource) -> None: ...
+
+    def add_ingestion_job(self, ingestion_job: IngestionJob) -> None: ...
 
     def get_document_version(
         self,

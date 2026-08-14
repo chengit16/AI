@@ -192,10 +192,10 @@ doctor() {
       'SELECT version_num FROM public.alembic_version' 2>/dev/null || true
   )"
   database_revision="$(printf '%s' "$database_revision" | tr -d '[:space:]')"
-  if [[ "$database_revision" == "20260814_0017" ]]; then
+  if [[ "$database_revision" == "20260814_0019" ]]; then
     log "数据库 Revision: 正常 ($database_revision)"
   else
-    log "数据库 Revision: 失败 (期望 20260814_0017，实际 ${database_revision:-unknown})"
+    log "数据库 Revision: 失败 (期望 20260814_0019，实际 ${database_revision:-unknown})"
     failed=1
   fi
   if [[ "$(compose exec -T valkey valkey-cli ping)" == "PONG" ]]; then

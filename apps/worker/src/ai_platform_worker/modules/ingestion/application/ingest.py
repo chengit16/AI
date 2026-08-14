@@ -2,17 +2,18 @@ from ai_platform_worker.modules.ingestion.application.chunking import Structural
 from ai_platform_worker.modules.ingestion.domain.documents import (
     IngestionRequest,
     IngestionResult,
+    ParsedDocument,
+    ParseRequest,
     ParserRouter,
 )
 from ai_platform_worker.modules.ingestion.domain.errors import IngestionError
 
 
-class IngestDocument:
-    def __init__(self, parser_router: ParserRouter, chunker: StructuralChunker) -> None:
+class ParseDocument:
+    def __init__(self, parser_router: ParserRouter) -> None:
         self._parser_router = parser_router
-        self._chunker = chunker
 
-    def execute(self, request: IngestionRequest, content: bytes) -> IngestionResult:
+    def execute(self, request: ParseRequest, content: bytes) -> ParsedDocument:
         if not content:
             raise IngestionError(
                 "INGESTION_EMPTY_FILE",
@@ -45,6 +46,23 @@ class IngestDocument:
                 retryable=False,
             )
 
+        return parsed_document
+
+
+class IngestDocument:
+    def __init__(self, parser_router: ParserRouter, chunker: StructuralChunker) -> None:
+        self._parser = ParseDocument(parser_router)
+        self._chunker = chunker
+
+    def execute(self, request: IngestionRequest, content: bytes) -> IngestionResult:
+        parsed_document = self._parser.execute(
+            ParseRequest(
+                file_name=request.file_name,
+                declared_media_type=request.declared_media_type,
+                limits=request.limits,
+            ),
+            content,
+        )
         chunks = self._chunker.chunk(parsed_document, request.identity, request.limits)
         if not chunks:
             raise IngestionError(

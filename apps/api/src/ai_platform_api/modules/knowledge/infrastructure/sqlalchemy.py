@@ -7,6 +7,7 @@ from types import TracebackType
 from typing import Any, cast
 from uuid import UUID
 
+from ai_platform_backend.ingestion.domain import IngestionJob
 from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
@@ -34,6 +35,7 @@ from ai_platform_api.persistence.tables import (
     document_sources,
     document_versions,
     documents,
+    ingestion_jobs,
     knowledge_bases,
     workspace_memberships,
 )
@@ -168,6 +170,9 @@ class SqlAlchemyKnowledgeRepository:
     def add_document_version(self, version: DocumentVersion, source: DocumentSource) -> None:
         self._session.execute(insert(document_versions).values(**_version_values(version)))
         self._session.execute(insert(document_sources).values(**_source_values(source)))
+
+    def add_ingestion_job(self, ingestion_job: IngestionJob) -> None:
+        self._session.execute(insert(ingestion_jobs).values(**_ingestion_job_values(ingestion_job)))
 
     def get_document_version(
         self,
@@ -406,6 +411,43 @@ def _version_values(value: DocumentVersion) -> dict[str, object]:
         "created_at": value.created_at,
         "published_at": value.published_at,
         "record_version": value.record_version,
+    }
+
+
+def _ingestion_job_values(value: IngestionJob) -> dict[str, object]:
+    return {
+        "ingestion_job_id": value.ingestion_job_id,
+        "workspace_id": value.workspace_id,
+        "knowledge_base_id": value.knowledge_base_id,
+        "document_id": value.document_id,
+        "document_version_id": value.document_version_id,
+        "source_id": value.source_id,
+        "source_name": value.source_name,
+        "source_object_key": value.source_object_key,
+        "source_media_type": value.source_media_type,
+        "source_content_hash": value.source_content_hash,
+        "status": value.status,
+        "attempt_count": value.attempt_count,
+        "max_attempts": value.max_attempts,
+        "available_at": value.available_at,
+        "claimed_by": value.claimed_by,
+        "claim_until": value.claim_until,
+        "requested_by_actor_id": value.requested_by_actor_id,
+        "trace_id": value.trace_id,
+        "traceparent": value.traceparent,
+        "started_at": value.started_at,
+        "completed_at": value.completed_at,
+        "failure_stage": value.failure_stage,
+        "error_code": value.error_code,
+        "error_message": value.error_message,
+        "artifact_object_key": value.artifact_object_key,
+        "parsed_content_hash": value.parsed_content_hash,
+        "parser_name": value.parser_name,
+        "ocr_used": value.ocr_used,
+        "page_count": value.page_count,
+        "block_count": value.block_count,
+        "created_at": value.created_at,
+        "updated_at": value.updated_at,
     }
 
 

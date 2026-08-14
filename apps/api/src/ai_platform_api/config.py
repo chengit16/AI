@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     minio_secret_key: SecretStr = SecretStr("local-development-only")
     minio_bucket: str = "ai-platform-documents"
     upload_max_file_size_bytes: int = 20 * 1024 * 1024
+    ingestion_max_attempts: int = 3
     tika_url: str = "http://127.0.0.1:9998"
     session_ttl_seconds: int = 43_200
     session_cookie_secure: bool = False
@@ -42,6 +43,8 @@ class Settings(BaseSettings):
             raise ValueError("非本地环境必须启用 Secure Session Cookie")
         if not 1024 * 1024 <= self.upload_max_file_size_bytes <= 100 * 1024 * 1024:
             raise ValueError("上传大小上限必须位于 1 MiB 到 100 MiB 之间")
+        if not 1 <= self.ingestion_max_attempts <= 10:
+            raise ValueError("入库任务最大尝试次数必须位于 1 到 10 之间")
         return self
 
 

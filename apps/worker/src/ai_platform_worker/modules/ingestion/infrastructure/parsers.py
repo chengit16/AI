@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 from ai_platform_worker.modules.ingestion.domain.documents import (
+    ChineseOcrAdapter,
     DocumentParser,
     ParsedBlock,
     ParsedDocument,
@@ -10,7 +11,7 @@ from ai_platform_worker.modules.ingestion.domain.documents import (
 from ai_platform_worker.modules.ingestion.domain.errors import IngestionError
 
 HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$")
-TIKA_EXTENSIONS = {".pdf", ".docx", ".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
 
 
 def decode_utf8(content: bytes) -> str:
@@ -127,9 +128,11 @@ class DefaultParserRouter:
         self,
         tika_parser: DocumentParser,
         pdf_parser: DocumentParser | None = None,
+        ocr_adapter: ChineseOcrAdapter | None = None,
     ) -> None:
         self._tika_parser = tika_parser
         self._pdf_parser = pdf_parser or tika_parser
+        self._ocr_adapter = ocr_adapter or tika_parser
         self._plain_text_parser = PlainTextParser()
         self._markdown_parser = MarkdownParser()
 
@@ -141,7 +144,9 @@ class DefaultParserRouter:
             return self._markdown_parser
         if extension == ".pdf":
             return self._pdf_parser
-        if extension in TIKA_EXTENSIONS:
+        if extension in IMAGE_EXTENSIONS:
+            return self._ocr_adapter
+        if extension == ".docx":
             return self._tika_parser
         raise IngestionError(
             "INGESTION_UNSUPPORTED_FORMAT",

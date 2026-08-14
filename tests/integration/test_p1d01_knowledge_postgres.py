@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -45,15 +45,20 @@ from ai_platform_api.persistence.tables import (
     document_sources,
     document_versions,
     documents,
+    ingestion_jobs,
     knowledge_bases,
     outbox_events,
     workspace_entitlements,
     workspace_usage_counters,
 )
+from ai_platform_worker.modules.ingestion.infrastructure.jobs_sqlalchemy import (
+    SqlAlchemyIngestionJobStore,
+)
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
 
 ROOT = Path(__file__).parents[2]
 DEFAULT_DATABASE_URL = (
@@ -75,6 +80,7 @@ class RegisteredAccount:
 @dataclass(frozen=True)
 class KnowledgeHarness:
     engine: Engine
+    sessions: sessionmaker[Session]
     registration: RegistrationService
     enterprise: EnterpriseWorkspaceService
     organization: OrganizationService
@@ -105,6 +111,7 @@ def knowledge_database() -> Iterator[KnowledgeHarness]:
     try:
         yield KnowledgeHarness(
             engine=engine,
+            sessions=sessions,
             registration=RegistrationService(
                 reader,
                 SqlAlchemyRegistrationUnitOfWork(sessions),
@@ -205,7 +212,9 @@ def test_personal_fact_lifecycle_publication_and_transaction_records(
         title="合成制度文档",
         source_kind="upload",
         source_name="synthetic-policy.pdf",
-        original_object_key="synthetic-only/policy.pdf",
+        original_object_key=(
+            f"workspaces/{owner.personal_workspace_id}/uploads/00000000000000000000000000000001.pdf"
+        ),
         upload_media_type="application/pdf",
         upload_size_bytes=1024,
         upload_content_hash=CONTENT_HASH_1,
@@ -240,7 +249,10 @@ def test_personal_fact_lifecycle_publication_and_transaction_records(
         document_version_id=second_version_id,
     )
 
-    assert source.original_object_key == "synthetic-only/policy.pdf"
+    expected_object_key = (
+        f"workspaces/{owner.personal_workspace_id}/uploads/00000000000000000000000000000001.pdf"
+    )
+    assert source.original_object_key == expected_object_key
     assert first_published.status == second_published.status == "published"
     with knowledge_database.engine.connect() as connection:
         stored_versions = [
@@ -274,7 +286,29 @@ def test_personal_fact_lifecycle_publication_and_transaction_records(
                     document_sources.c.source_id == source.source_id
                 )
             )
-            == "synthetic-only/policy.pdf"
+            == expected_object_key
+        )
+        stored_job = connection.execute(
+            select(
+                ingestion_jobs.c.workspace_id,
+                ingestion_jobs.c.document_version_id,
+                ingestion_jobs.c.source_id,
+                ingestion_jobs.c.status,
+                ingestion_jobs.c.attempt_count,
+                ingestion_jobs.c.max_attempts,
+                ingestion_jobs.c.source_object_key,
+                ingestion_jobs.c.traceparent,
+            ).where(ingestion_jobs.c.document_version_id == first_version.document_version_id)
+        ).one()
+        assert tuple(stored_job) == (
+            owner.personal_workspace_id,
+            first_version.document_version_id,
+            source.source_id,
+            "queued",
+            0,
+            3,
+            expected_object_key,
+            owner_context.trace.traceparent,
         )
         assert (
             connection.scalar(
@@ -316,6 +350,106 @@ def test_personal_fact_lifecycle_publication_and_transaction_records(
             owner_context,
             knowledge_base_id=knowledge_base.knowledge_base_id,
         )
+    knowledge_database.knowledge.delete_document(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        document_id=document.document_id,
+    )
+    deleted_base = knowledge_database.knowledge.delete_knowledge_base(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+    )
+    assert deleted_base.status == "deleted"
+    with knowledge_database.engine.connect() as connection:
+        assert (
+            connection.scalar(
+                select(workspace_usage_counters.c.used_value).where(
+                    workspace_usage_counters.c.workspace_id == owner.personal_workspace_id,
+                    workspace_usage_counters.c.metric == "knowledge_bases",
+                    workspace_usage_counters.c.period_key == "lifetime",
+                )
+            )
+            == 0
+        )
+
+
+def test_ingestion_job_lease_and_retry_are_bounded(
+    knowledge_database: KnowledgeHarness,
+) -> None:
+    owner = register(knowledge_database, identity="ingestion-retry-owner")
+    owner_context = context(owner)
+    knowledge_base = knowledge_database.knowledge.create_knowledge_base(
+        owner_context,
+        name="合成重试知识库",
+        default_visibility="workspace",
+    )
+    document, version, _ = knowledge_database.knowledge.create_document(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        title="合成重试文档",
+        source_kind="upload",
+        source_name="synthetic.txt",
+        original_object_key=(
+            f"workspaces/{owner.personal_workspace_id}/uploads/00000000000000000000000000000002.txt"
+        ),
+        upload_media_type="text/plain",
+        upload_size_bytes=32,
+        upload_content_hash=CONTENT_HASH_1,
+        upload_scan_status="clean",
+        upload_scanner_version="synthetic-scanner-v1",
+        upload_scanned_at=NOW,
+    )
+    store = SqlAlchemyIngestionJobStore(knowledge_database.sessions)
+    current = datetime.now(UTC) + timedelta(seconds=1)
+    with knowledge_database.engine.begin() as connection:
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.document_version_id != version.document_version_id)
+            .values(available_at=current + timedelta(days=1))
+        )
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.document_version_id == version.document_version_id)
+            .values(available_at=datetime(2026, 1, 1, tzinfo=UTC))
+        )
+
+    for attempt in range(1, 4):
+        claimed = store.claim_next(
+            worker_id="synthetic-worker",
+            now=current,
+            lease_seconds=30,
+        )
+        assert claimed is not None
+        assert claimed.document_id == document.document_id
+        assert claimed.document_version_id == version.document_version_id
+        assert claimed.attempt_count == attempt
+        status = store.mark_failed(
+            claimed,
+            stage="parse",
+            error_code="INGESTION_PARSER_UNAVAILABLE",
+            error_message="合成解析服务不可用",
+            retryable=True,
+            failed_at=current,
+            next_attempt_at=current + timedelta(seconds=5),
+        )
+        assert status == ("failed" if attempt == 3 else "retry_wait")
+        current += timedelta(seconds=5)
+
+    with knowledge_database.engine.connect() as connection:
+        stored = connection.execute(
+            select(
+                ingestion_jobs.c.status,
+                ingestion_jobs.c.attempt_count,
+                ingestion_jobs.c.failure_stage,
+                ingestion_jobs.c.error_code,
+                ingestion_jobs.c.completed_at,
+            ).where(ingestion_jobs.c.document_version_id == version.document_version_id)
+        ).one()
+    assert stored.status == "failed"
+    assert stored.attempt_count == 3
+    assert stored.failure_stage == "parse"
+    assert stored.error_code == "INGESTION_PARSER_UNAVAILABLE"
+    assert stored.completed_at is not None
     knowledge_database.knowledge.delete_document(
         owner_context,
         knowledge_base_id=knowledge_base.knowledge_base_id,

@@ -1,3 +1,4 @@
+from ai_platform_backend.ingestion import persistence as ingestion_tables
 from ai_platform_backend.integration import persistence as integration_tables
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
@@ -868,6 +869,12 @@ document_sources = Table(
         "document_version_id",
         name="uq_document_sources_version",
     ),
+    UniqueConstraint(
+        "workspace_id",
+        "document_version_id",
+        "source_id",
+        name="uq_document_sources_workspace_version_source",
+    ),
     ForeignKeyConstraint(
         ["workspace_id", "document_version_id"],
         [
@@ -902,6 +909,9 @@ document_sources = Table(
         name="ck_document_sources_upload_security",
     ),
 )
+
+# API 与 Worker 使用同一张入库任务表；复制到主 Metadata 后，Alembic 自动比较仍能看到完整外键。
+ingestion_jobs = ingestion_tables.ingestion_jobs.to_metadata(metadata)
 
 document_publications = Table(
     "document_publications",

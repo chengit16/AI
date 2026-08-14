@@ -23,7 +23,7 @@
       "source_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     }
   ],
-  "database": { "schema_revision": "20260814_0017" },
+  "database": { "schema_revision": "20260814_0019" },
   "runtimes": { "node": "24.19.0", "python": "3.12.12" },
   "images": [
     {
@@ -46,7 +46,7 @@
     },
     {
       "name": "tika",
-      "reference": "apache/tika:3.2.3.0-full",
+      "reference": "ai-platform-tika:3.2.3-chi-sim",
       "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
       "platforms": ["linux/arm64"]
     },

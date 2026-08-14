@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1D-03` 待开始 |
+| 当前节点 | `P1D-04` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -295,6 +295,19 @@
 - 自动化验收：上传检查、恶意样本、跨空间对象键、扫描不可用、授权前置、事务失败补偿、真实 MinIO put/get/delete、契约、资源注册和 Migration 往返专项通过。统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `269/269`、Ruff、mypy strict、架构、契约兼容、生成漂移和供应链门禁均通过。
 - 容器与 HTTP 验收：以当前工作树重建 API、Worker、Web 和 Migration 镜像，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0017`。全合成个人空间上传 58 字节 Markdown 后存储用量 `0 → 58`，响应不含对象定位信息；伪造 PDF 返回 `415 UPLOAD_TYPE_MISMATCH`，用量保持 58。
 - 当前边界：本节点不创建 `IngestionJob`，不执行 Tika 解析、中文 OCR、Chunk、Embedding 或索引。确定性扫描器是可替换的本地安全基线，不宣称等同完整商业恶意文件检测；独立扫描引擎可在部署时替换。上述入库任务和解析进入 `P1D-03`，未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
+- 提交：`8715f6b`。
+
+### P1D-03 入库任务、解析与中文 OCR
+
+- 状态：通过。
+- 任务事实与一致性：受控上传在保存 `DocumentSource` 的同一 PostgreSQL 事务中创建 `IngestionJob`，避免对象和文档事实已存在但任务丢失。新增 Migration `20260814_0018` 建立任务表，`20260814_0019` 以确定性任务 ID 幂等回填 `P1D-02` 已有的 clean 上传；本地三个旧上传均已对应任务。
+- 状态机与并发：任务按 `queued → running → retry_wait → succeeded/failed` 转换。Worker 使用行锁、`SKIP LOCKED` 和短租约并发认领；可重试失败执行有界指数退避，默认最多三次，最后一次执行崩溃后由过期租约收敛为终止失败。任务保存失败阶段、稳定错误码和脱敏消息，不将堆栈或对象键泄漏给用户。
+- 解析与对象边界：对象读取、Tika/OCR 和产物写入均在数据库事务外执行。Worker 读取来源后重新计算 SHA-256，摘要与上传安全事实不一致时不可重试地失败。确定性 JSON 产物写入 `workspaces/{workspace_id}/parsed/{version_id}/{job_id}.json`，产物不包含来源对象键。
+- 中文 OCR：新增独立 `ChineseOcrAdapter`，当前由 `TikaChineseOcrAdapter` 以 Tesseract `chi_sim+eng` 实现。自定义 Tika 镜像固定 Apache Tika 基础镜像摘要、`tesseract-ocr-chi-sim` 和 Noto CJK 版本；固定字体、画布和“中国”文字生成全合成 PNG，真实 Tika 闭环验证 `ocr_used=true`、Parser 包含 `tesseract-chi-sim` 且识别结果稳定。Adapter 后续可替换 PaddleOCR，不改写任务状态机。
+- 职责边界：正式 `ParseDocument` 从 Chunk 流程拆出，本节点只产生可追溯的解析 Block Artifact，不把“解析成功”误表达为“索引可用”。权限元数据 Chunk、Embedding、关键词索引和原子索引版本切换进入 `P1D-04`。
+- 自动化验收：统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `276/276`，Ruff、mypy strict、架构、契约兼容与生成漂移、供应链门禁均通过；Migration 回填与 `base → head → base → head` 往返 `2/2` 通过。
+- 容器与真实闭环：重建 API、Worker、Web、Migration 和自定义 Tika 镜像后，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0019`，Worker 注册 `platform.outbox.dispatch.v1`、`platform.integration.consume.v1` 和 `platform.ingestion.process.v1`。Markdown 上传第一次执行产生两个 Block；中文 PNG 第一次执行完成 OCR，两类产物均不含 `source_object_key`。
+- 当前边界：本节点不增加任务查询页面或手动重试 API，它们属于 `P1D-07`；不执行 Chunk、Embedding 或索引切换。未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -306,4 +319,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-02`，当前进入 `P1D-03`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-03`，当前进入 `P1D-04`。

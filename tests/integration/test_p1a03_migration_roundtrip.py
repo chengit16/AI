@@ -1,7 +1,7 @@
 import os
 from collections.abc import Iterator
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from alembic import command
@@ -33,6 +33,8 @@ def migration_database() -> Iterator[tuple[Config, Connection, str]]:
         try:
             yield config, connection, schema
         finally:
+            # 测试断言或迁移失败后连接可能处于 aborted 状态，必须先回滚才能清理临时 Schema。
+            connection.rollback()
             connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
             connection.commit()
     engine.dispose()
@@ -91,7 +93,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260814_0017"
+    assert current_revision(connection, schema) == "20260814_0019"
     assert business_tables(connection, schema) == {
         "accounts",
         "audit_records",
@@ -102,6 +104,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "document_sources",
         "document_versions",
         "documents",
+        "ingestion_jobs",
         "knowledge_bases",
         "membership_departments",
         "membership_positions",
@@ -139,5 +142,111 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260814_0017"
+    assert current_revision(connection, schema) == "20260814_0019"
     assert schema_snapshot(connection, schema) == first_head
+
+
+def test_existing_clean_upload_is_backfilled_as_queued_ingestion_job(
+    migration_database: tuple[Config, Connection, str],
+) -> None:
+    config, connection, schema = migration_database
+    command.upgrade(config, "20260814_0017")
+    connection.commit()
+    content_hash = "1" * 64
+
+    # Schema 名称由测试生成且只含字母、数字和下划线；固定合成事实模拟 P1D-02 升级现场。
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".accounts (
+              account_id, login_name, display_name, password_hash, status, auth_version,
+              created_at, created_by_actor_id, updated_at, updated_by_actor_id, version
+            ) VALUES (
+              '10000000-0000-4000-8000-000000000319', 'synthetic.backfill@example.com',
+              '合成回填用户', 'synthetic-password-hash', 'active', 1,
+              '2026-08-14T00:00:00Z', '10000000-0000-4000-8000-000000000319',
+              '2026-08-14T00:00:00Z', '10000000-0000-4000-8000-000000000319', 1
+            );
+            INSERT INTO "{schema}".workspaces (
+              workspace_id, workspace_type, name, owner_account_id, entitlement_version,
+              role_version, menu_version, status, created_at, created_by_actor_id,
+              updated_at, updated_by_actor_id, version
+            ) VALUES (
+              '20000000-0000-4000-8000-000000000319', 'personal', '合成回填空间',
+              '10000000-0000-4000-8000-000000000319', 1, 1, 1, 'active',
+              '2026-08-14T00:00:00Z', '10000000-0000-4000-8000-000000000319',
+              '2026-08-14T00:00:00Z', '10000000-0000-4000-8000-000000000319', 1
+            );
+            INSERT INTO "{schema}".knowledge_bases (
+              knowledge_base_id, workspace_id, name, description, default_visibility,
+              department_ids, default_security_level, status, created_by_account_id,
+              created_at, updated_at, deleted_at, version
+            ) VALUES (
+              '30000000-0000-4000-8000-000000000319',
+              '20000000-0000-4000-8000-000000000319', '合成回填知识库', NULL,
+              'workspace', '{{}}', 'INTERNAL', 'active',
+              '10000000-0000-4000-8000-000000000319',
+              '2026-08-14T00:00:00Z', '2026-08-14T00:00:00Z', NULL, 1
+            );
+            INSERT INTO "{schema}".documents (
+              document_id, workspace_id, knowledge_base_id, title, visibility,
+              department_ids, security_level, permission_labels, status,
+              created_by_account_id, created_at, updated_at, deleted_at, version
+            ) VALUES (
+              '40000000-0000-4000-8000-000000000319',
+              '20000000-0000-4000-8000-000000000319',
+              '30000000-0000-4000-8000-000000000319', '合成回填文档',
+              'workspace', '{{}}', 'INTERNAL', '{{}}', 'active',
+              '10000000-0000-4000-8000-000000000319',
+              '2026-08-14T00:00:00Z', '2026-08-14T00:00:00Z', NULL, 1
+            );
+            INSERT INTO "{schema}".document_versions (
+              document_version_id, workspace_id, document_id, version_number, status,
+              content_hash, created_by_account_id, created_at, published_at, record_version
+            ) VALUES (
+              '41000000-0000-4000-8000-000000000319',
+              '20000000-0000-4000-8000-000000000319',
+              '40000000-0000-4000-8000-000000000319', 1, 'draft', NULL,
+              '10000000-0000-4000-8000-000000000319',
+              '2026-08-14T00:00:00Z', NULL, 1
+            );
+            INSERT INTO "{schema}".document_sources (
+              source_id, workspace_id, document_version_id, source_kind, source_name,
+              original_object_key, source_path, source_url, external_source_id, captured_at,
+              created_at, media_type, size_bytes, content_hash, scan_status,
+              scanner_version, scanned_at
+            ) VALUES (
+              '42000000-0000-4000-8000-000000000319',
+              '20000000-0000-4000-8000-000000000319',
+              '41000000-0000-4000-8000-000000000319', 'upload', 'synthetic.txt',
+              'workspaces/20000000-0000-4000-8000-000000000319/uploads/synthetic.txt',
+              NULL, NULL, NULL, NULL, '2026-08-14T00:00:00Z', 'text/plain', 32,
+              '{content_hash}', 'clean', 'synthetic-scanner-v1', '2026-08-14T00:00:00Z'
+            );
+            """
+        )
+    )
+    connection.commit()
+
+    command.upgrade(config, "head")
+    connection.commit()
+
+    stored = connection.execute(
+        text(
+            f"""
+            SELECT ingestion_job_id, status, attempt_count, max_attempts,
+                   requested_by_actor_id, length(trace_id), length(traceparent)
+              FROM "{schema}".ingestion_jobs
+             WHERE document_version_id = '41000000-0000-4000-8000-000000000319'
+            """
+        )
+    ).one()
+    assert tuple(stored) == (
+        UUID("42000000-0000-4000-8000-000000000319"),
+        "queued",
+        0,
+        3,
+        UUID("10000000-0000-4000-8000-000000000319"),
+        32,
+        55,
+    )
