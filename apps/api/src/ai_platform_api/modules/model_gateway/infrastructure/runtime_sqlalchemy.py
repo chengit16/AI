@@ -265,20 +265,15 @@ class SqlAlchemyRuntimeConfigurationUnitOfWork(RuntimeConfigurationUnitOfWork):
 
 
 class SqlAlchemyRuntimeConfigurationReader:
-    """读取当前运行快照和供应商凭据，并校验快照绑定的配置版本。"""
+    """按冻结标识读取运行快照，配置发布指针变化不会影响在途 Run。"""
 
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
 
-    def current(self) -> AiRuntimeConfigVersion | None:
+    def get(self, runtime_config_version_id: UUID) -> AiRuntimeConfigVersion | None:
         with self._session_factory() as session:
             repository = SqlAlchemyRuntimeConfigurationRepository(session)
-            publication = repository.get_current_publication()
-            return (
-                repository.get_configuration(publication.runtime_config_version_id)
-                if publication is not None
-                else None
-            )
+            return repository.get_configuration(runtime_config_version_id)
 
 
 class SqlAlchemyRuntimeInvocationStore:

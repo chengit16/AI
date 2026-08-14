@@ -8,6 +8,7 @@ from ai_platform_backend.safety import RagSafetyGate
 
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.assistant.application.runner import AssistantRunExecutor
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
 from ai_platform_api.modules.assistant.infrastructure.sqlalchemy import (
     SqlAlchemyAssistantUnitOfWork,
@@ -81,6 +82,9 @@ from ai_platform_api.modules.knowledge.infrastructure.upload_security import (
 from ai_platform_api.modules.model_gateway.application.configurations import (
     ModelProviderConfigurationService,
 )
+from ai_platform_api.modules.model_gateway.application.context import (
+    AuthorizedModelContextBuilder,
+)
 from ai_platform_api.modules.model_gateway.application.runtime_configurations import (
     AiRuntimeConfigurationService,
 )
@@ -114,6 +118,11 @@ from ai_platform_api.modules.retrieval.infrastructure.planning_sqlalchemy import
 from ai_platform_api.modules.retrieval.infrastructure.reranking import (
     DeterministicLexicalReranker,
 )
+from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
+from ai_platform_api.modules.streaming.domain.models import StreamPolicy
+from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
+    SqlAlchemyStreamUnitOfWork,
+)
 from ai_platform_api.persistence.database import PlatformDatabase
 
 
@@ -146,6 +155,8 @@ class ApplicationContainer:
     ai_runtime_configurations: AiRuntimeConfigurationService | None = None
     model_runtime: RuntimeModelGatewayService | None = None
     assistant_conversations: AssistantConversationService | None = None
+    assistant_run_executor: AssistantRunExecutor | None = None
+    streaming: TransactionalStreamService | None = None
     retrieval_planning: BoundedRetrievalPlanningService | None = None
     retrieval_evidence: RetrievalEvidenceService | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
@@ -185,6 +196,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     # 2. 从冻结注册表装配授权与领域服务，所有服务共享同一数据库 SessionFactory。
     resource_registry = load_resource_registry(Path(settings.resource_registry_path))
     field_registry = load_field_policy_registry(Path(settings.field_policy_registry_path))
+    field_projection = FieldProjectionService(field_registry)
     rag_safety = RagSafetyGate()
     policy_reader = SqlAlchemyPolicyGrantRepository(database.sessions)
     menu_configuration = MenuConfigurationService(
@@ -245,6 +257,32 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         field_registry,
         DeterministicLexicalReranker(),
     )
+    runtime_reader = SqlAlchemyRuntimeConfigurationReader(database.sessions)
+    model_runtime = RuntimeModelGatewayService(
+        runtime_reader,
+        SqlAlchemyRuntimeInvocationStore(database.sessions),
+        model_provider_configurations,
+        OpenAiCompatibleRuntimeProviderFactory(provider_url_policy),
+        rag_safety,
+    )
+    streaming = TransactionalStreamService(
+        SqlAlchemyStreamUnitOfWork(database.sessions),
+        StreamPolicy(
+            retention_seconds=settings.stream_retention_seconds,
+            replay_limit_events=settings.stream_replay_limit_events,
+            replay_limit_bytes=settings.stream_replay_limit_bytes,
+        ),
+    )
+    assistant_run_executor = AssistantRunExecutor(
+        assistant_conversations,
+        retrieval_planning,
+        retrieval_evidence,
+        runtime_reader,
+        model_runtime,
+        AuthorizedModelContextBuilder(field_projection, rag_safety),
+        streaming,
+        delta_batch_characters=settings.stream_delta_batch_characters,
+    )
     # 3. 容器接管全部资源；构造中途失败时按依赖逆序关闭，避免泄漏连接和缓存客户端。
     try:
         return ApplicationContainer(
@@ -253,7 +291,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             errors=ErrorCatalog.load(settings.error_catalog_path),
             resource_registry=resource_registry,
             field_policy_registry=field_registry,
-            field_projection=FieldProjectionService(field_registry),
+            field_projection=field_projection,
             policy=policy,
             role_permissions=RolePermissionService(
                 resource_registry,
@@ -272,14 +310,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             model_provider_configurations=model_provider_configurations,
             ai_runtime_configurations=ai_runtime_configurations,
-            model_runtime=RuntimeModelGatewayService(
-                SqlAlchemyRuntimeConfigurationReader(database.sessions),
-                SqlAlchemyRuntimeInvocationStore(database.sessions),
-                model_provider_configurations,
-                OpenAiCompatibleRuntimeProviderFactory(provider_url_policy),
-                rag_safety,
-            ),
+            model_runtime=model_runtime,
             assistant_conversations=assistant_conversations,
+            assistant_run_executor=assistant_run_executor,
+            streaming=streaming,
             retrieval_planning=retrieval_planning,
             retrieval_evidence=retrieval_evidence,
             rag_safety=rag_safety,

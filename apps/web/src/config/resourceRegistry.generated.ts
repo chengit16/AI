@@ -1,7 +1,7 @@
 // 由 scripts/generate_resource_registry.py 自动生成, 请勿手工修改。
 export const resourceRegistry = {
   schema_version: 1,
-  registry_version: 9,
+  registry_version: 10,
   permissions: [
     {
       code: "workspace.overview.access",
@@ -1276,6 +1276,18 @@ export const resourceRegistry = {
       risk_level: "normal",
       status: "active",
     },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000074",
+      api_key: "assistant.run.stream",
+      operation_id: "streamAssistantRunEvents",
+      method: "GET",
+      path_pattern:
+        "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/runs/{run_id}/events",
+      access_level: "authorized",
+      permission_code: "assistant.conversation.read",
+      risk_level: "normal",
+      status: "active",
+    },
   ],
   menus: [
     {
@@ -2532,6 +2544,11 @@ export const resourceRegistry = {
       menu_id: "82000000-0000-4000-8000-000000000165",
       api_resource_id: "81000000-0000-4000-8000-000000000073",
       action_type: "mutation",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000164",
+      api_resource_id: "81000000-0000-4000-8000-000000000074",
+      action_type: "query",
     },
   ],
 } as const;

@@ -25,6 +25,7 @@ from ai_platform_api.modules.assistant.domain.models import (
     AgentRelease,
     AssistantRepository,
     AssistantRun,
+    AssistantRunStatus,
     AssistantUnitOfWork,
     AssistantWriteConflictError,
     Conversation,
@@ -313,7 +314,39 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         message_row = self._session.execute(
             select(messages).where(messages.c.message_id == run_row.user_message_id)
         ).one()
-        return MessageSubmission(self._message(message_row), _run(run_row))
+        assistant_row = (
+            self._session.execute(
+                select(messages).where(messages.c.message_id == run_row.assistant_message_id)
+            ).one()
+            if run_row.assistant_message_id is not None
+            else None
+        )
+        return MessageSubmission(
+            self._message(message_row),
+            self._message(assistant_row) if assistant_row is not None else None,
+            _run(run_row),
+        )
+
+    def get_run(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID | None,
+        run_id: UUID,
+        account_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> AssistantRun | None:
+        statement = select(assistant_runs).where(
+            assistant_runs.c.workspace_id == workspace_id,
+            assistant_runs.c.run_id == run_id,
+            assistant_runs.c.requested_by_account_id == account_id,
+        )
+        if conversation_id is not None:
+            statement = statement.where(assistant_runs.c.conversation_id == conversation_id)
+        if for_update:
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
+        return _run(row) if row is not None else None
 
     def has_active_run(self, workspace_id: UUID, conversation_id: UUID) -> bool:
         return bool(
@@ -330,39 +363,14 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
 
     def add_submission(self, submission: MessageSubmission) -> None:
         message = submission.message
+        assistant_message = submission.assistant_message
         run = submission.run
+        if assistant_message is None:
+            raise AssistantWriteConflictError("write")
         try:
-            # 1. 先写消息头和全部不可变 Part，Run 外键只能引用完整的用户输入事实。
-            self._session.execute(
-                insert(messages).values(
-                    message_id=message.message_id,
-                    workspace_id=message.workspace_id,
-                    conversation_id=message.conversation_id,
-                    role=message.role,
-                    status=message.status,
-                    created_by_account_id=message.created_by_account_id,
-                    created_at=message.created_at,
-                    updated_at=message.updated_at,
-                    version=message.version,
-                )
-            )
-            self._session.execute(
-                insert(message_parts),
-                [
-                    {
-                        "part_id": part.part_id,
-                        "workspace_id": message.workspace_id,
-                        "message_id": part.message_id,
-                        "sequence_no": part.sequence_no,
-                        "part_type": part.part_type,
-                        "text_content": part.text,
-                        "object_ref": None,
-                        "media_type": None,
-                        "created_at": part.created_at,
-                    }
-                    for part in message.parts
-                ],
-            )
+            # 1. 同时写用户输入和空的助手流式消息，SSE 从一开始即可绑定稳定 message_id。
+            self._insert_message(message)
+            self._insert_message(assistant_message)
             # 2. 最后写入冻结发布与运行配置的排队 Run；任一步冲突都由外层事务整体回滚。
             self._session.execute(
                 insert(assistant_runs).values(
@@ -393,6 +401,102 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                 else "idempotency"
             )
             raise AssistantWriteConflictError(reason) from error
+
+    def add_assistant_message(self, message: Message) -> None:
+        """只为升级前缺失占位消息的 Run 补建助手消息。"""
+
+        try:
+            self._insert_message(message)
+        except IntegrityError as error:
+            raise AssistantWriteConflictError("write") from error
+
+    def transition_run(
+        self,
+        run: AssistantRun,
+        *,
+        expected_status: AssistantRunStatus,
+    ) -> bool:
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(assistant_runs)
+                .where(
+                    assistant_runs.c.run_id == run.run_id,
+                    assistant_runs.c.workspace_id == run.workspace_id,
+                    assistant_runs.c.requested_by_account_id == run.requested_by_account_id,
+                    assistant_runs.c.status == expected_status,
+                )
+                .values(
+                    assistant_message_id=run.assistant_message_id,
+                    status=run.status,
+                    updated_at=run.updated_at,
+                    completed_at=run.completed_at,
+                    error_code=run.error_code,
+                )
+            ),
+        )
+        return result.rowcount == 1
+
+    def finish_assistant_message(self, message: Message) -> bool:
+        """在消息仍为 streaming 时追加一次终态 Part，失败消息保持无正文。"""
+
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(messages)
+                .where(
+                    messages.c.message_id == message.message_id,
+                    messages.c.workspace_id == message.workspace_id,
+                    messages.c.status == "streaming",
+                )
+                .values(
+                    status=message.status,
+                    updated_at=message.updated_at,
+                    version=message.version,
+                )
+            ),
+        )
+        if result.rowcount != 1:
+            return False
+        if message.parts:
+            self._insert_parts(message)
+        return True
+
+    def _insert_message(self, message: Message) -> None:
+        self._session.execute(
+            insert(messages).values(
+                message_id=message.message_id,
+                workspace_id=message.workspace_id,
+                conversation_id=message.conversation_id,
+                role=message.role,
+                status=message.status,
+                created_by_account_id=message.created_by_account_id,
+                created_at=message.created_at,
+                updated_at=message.updated_at,
+                version=message.version,
+            )
+        )
+        if message.parts:
+            self._insert_parts(message)
+
+    def _insert_parts(self, message: Message) -> None:
+        self._session.execute(
+            insert(message_parts),
+            [
+                {
+                    "part_id": part.part_id,
+                    "workspace_id": message.workspace_id,
+                    "message_id": part.message_id,
+                    "sequence_no": part.sequence_no,
+                    "part_type": part.part_type,
+                    "text_content": part.text,
+                    "object_ref": None,
+                    "media_type": None,
+                    "created_at": part.created_at,
+                }
+                for part in message.parts
+            ],
+        )
 
     def _message(self, row: Row[Any]) -> Message:
         part_rows = self._session.execute(

@@ -1,12 +1,16 @@
 """实现严格序号、同会话并发约束和保留期回放的 PostgreSQL Store。"""
 
+from __future__ import annotations
+
+from contextvars import ContextVar
 from datetime import datetime, timedelta
+from types import TracebackType
 from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import RowMapping, insert, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from ai_platform_api.modules.streaming.domain.errors import (
     ConversationBusyError,
@@ -23,8 +27,11 @@ from ai_platform_api.modules.streaming.domain.models import (
     StreamReplay,
     StreamRun,
     StreamStore,
+    StreamUnitOfWork,
 )
 from ai_platform_api.persistence.tables import stream_events, stream_runs
+
+SessionFactory = sessionmaker[Session]
 
 
 def stream_run_from_row(row: RowMapping) -> StreamRun:
@@ -262,3 +269,47 @@ class SqlAlchemyStreamStore(StreamStore):
             final_run=run,
             snapshot_required=not events and run.final_payload is not None,
         )
+
+
+class SqlAlchemyStreamUnitOfWork(StreamUnitOfWork):
+    """为每次流写入或轮询创建独立 Session，避免跨等待周期占用连接。"""
+
+    def __init__(self, session_factory: SessionFactory) -> None:
+        self._session_factory = session_factory
+        self._state: ContextVar[tuple[Session, SqlAlchemyStreamStore] | None] = ContextVar(
+            "stream_unit_of_work",
+            default=None,
+        )
+
+    def __enter__(self) -> SqlAlchemyStreamUnitOfWork:
+        if self._state.get() is not None:
+            raise RuntimeError("Stream Unit of Work 不允许重复进入")
+        session = self._session_factory()
+        self._state.set((session, SqlAlchemyStreamStore(session)))
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        state = self._state.get()
+        if state is not None:
+            if exc_type is not None:
+                state[0].rollback()
+            state[0].close()
+            self._state.set(None)
+
+    @property
+    def streams(self) -> SqlAlchemyStreamStore:
+        state = self._state.get()
+        if state is None:
+            raise RuntimeError("Stream Unit of Work 尚未进入事务范围")
+        return state[1]
+
+    def commit(self) -> None:
+        state = self._state.get()
+        if state is None:
+            raise RuntimeError("Stream Unit of Work 尚未进入事务范围")
+        state[0].commit()

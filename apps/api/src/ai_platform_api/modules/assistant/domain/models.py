@@ -117,6 +117,7 @@ class MessageSubmission:
     """聚合幂等消息创建返回所需的用户消息与排队 Run。"""
 
     message: Message
+    assistant_message: Message | None
     run: AssistantRun
 
 
@@ -172,9 +173,30 @@ class AssistantRepository(Protocol):
         idempotency_key: str,
     ) -> MessageSubmission | None: ...
 
+    def get_run(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID | None,
+        run_id: UUID,
+        account_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> AssistantRun | None: ...
+
     def has_active_run(self, workspace_id: UUID, conversation_id: UUID) -> bool: ...
 
     def add_submission(self, submission: MessageSubmission) -> None: ...
+
+    def add_assistant_message(self, message: Message) -> None: ...
+
+    def transition_run(
+        self,
+        run: AssistantRun,
+        *,
+        expected_status: AssistantRunStatus,
+    ) -> bool: ...
+
+    def finish_assistant_message(self, message: Message) -> bool: ...
 
 
 class AssistantUnitOfWork(Protocol):

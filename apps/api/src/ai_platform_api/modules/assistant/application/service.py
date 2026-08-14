@@ -228,6 +228,123 @@ class AssistantConversationService:
                 raise AssistantConversationBusyError from error
             raise AssistantIdempotencyConflictError from error
 
+    def get_run_for_stream(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        run_id: UUID,
+    ) -> AssistantRun:
+        """只向会话创建者返回目标 Run，供 SSE 在响应开始前完成授权。"""
+
+        account_id = _browser_account(context)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            _owned_conversation(unit_of_work, context, conversation_id, account_id)
+            run = unit_of_work.assistant.get_run(
+                context.workspace_id,
+                conversation_id,
+                run_id,
+                account_id,
+            )
+            if run is None:
+                raise AssistantNotFoundError
+            return run
+
+    def claim_run(self, context: RequestContext, *, run_id: UUID) -> AssistantRun | None:
+        """仅把当前账号的 queued Run 认领一次；重复后台任务直接退出。"""
+
+        account_id = _browser_account(context)
+        now = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            run = _owned_run(unit_of_work, context, run_id, account_id, for_update=True)
+            if run.status != "queued":
+                return None
+            # 历史排队记录可能尚无助手消息；新请求已在提交事务中创建占位消息。
+            if run.assistant_message_id is None:
+                assistant_message = _new_assistant_message(run, account_id, now)
+                unit_of_work.assistant.add_assistant_message(assistant_message)
+                run = replace(run, assistant_message_id=assistant_message.message_id)
+            running = replace(run, status="running", updated_at=now)
+            if not unit_of_work.assistant.transition_run(running, expected_status="queued"):
+                return None
+            unit_of_work.commit()
+            return running
+
+    def complete_run(
+        self,
+        context: RequestContext,
+        *,
+        run_id: UUID,
+        text: str,
+    ) -> AssistantRun:
+        """原子保存助手正文并结束运行，重复或越序完成一律失败关闭。"""
+
+        normalized_text = text.strip()
+        if not normalized_text or len(normalized_text) > 200_000:
+            raise AssistantValidationError
+        account_id = _browser_account(context)
+        now = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            run = _owned_run(unit_of_work, context, run_id, account_id, for_update=True)
+            if run.status != "running" or run.assistant_message_id is None:
+                raise AssistantConversationBusyError
+            message = _finished_assistant_message(
+                run,
+                account_id,
+                normalized_text,
+                now,
+                "completed",
+            )
+            if not unit_of_work.assistant.finish_assistant_message(message):
+                raise AssistantConversationBusyError
+            completed = replace(
+                run,
+                status="completed",
+                updated_at=now,
+                completed_at=now,
+                error_code=None,
+            )
+            if not unit_of_work.assistant.transition_run(completed, expected_status="running"):
+                raise AssistantConversationBusyError
+            _record_run_finished(unit_of_work, context, completed, "completed", now)
+            unit_of_work.commit()
+            return completed
+
+    def fail_run(
+        self,
+        context: RequestContext,
+        *,
+        run_id: UUID,
+        error_code: str,
+    ) -> AssistantRun:
+        """只保存脱敏错误码并结束运行，不把异常详情写入消息或事件。"""
+
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", error_code):
+            raise AssistantValidationError
+        account_id = _browser_account(context)
+        now = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            run = _owned_run(unit_of_work, context, run_id, account_id, for_update=True)
+            if run.status != "running" or run.assistant_message_id is None:
+                raise AssistantConversationBusyError
+            message = _finished_assistant_message(run, account_id, "", now, "failed")
+            if not unit_of_work.assistant.finish_assistant_message(message):
+                raise AssistantConversationBusyError
+            failed = replace(
+                run,
+                status="failed",
+                updated_at=now,
+                completed_at=now,
+                error_code=error_code,
+            )
+            if not unit_of_work.assistant.transition_run(failed, expected_status="running"):
+                raise AssistantConversationBusyError
+            _record_run_finished(unit_of_work, context, failed, "failed", now)
+            unit_of_work.commit()
+            return failed
+
 
 def _browser_account(context: RequestContext) -> UUID:
     if (
@@ -272,6 +389,26 @@ def _owned_conversation(
     if conversation is None:
         raise AssistantNotFoundError
     return conversation
+
+
+def _owned_run(
+    unit_of_work: AssistantUnitOfWork,
+    context: RequestContext,
+    run_id: UUID,
+    account_id: UUID,
+    *,
+    for_update: bool,
+) -> AssistantRun:
+    run = unit_of_work.assistant.get_run(
+        context.workspace_id,
+        None,
+        run_id,
+        account_id,
+        for_update=for_update,
+    )
+    if run is None:
+        raise AssistantNotFoundError
+    return run
 
 
 def _normalize_title(title: str | None) -> str | None:
@@ -326,6 +463,7 @@ def _new_submission(
     now: datetime,
 ) -> MessageSubmission:
     message_id = uuid4()
+    assistant_message_id = uuid4()
     message = Message(
         message_id=message_id,
         workspace_id=context.workspace_id,
@@ -346,7 +484,7 @@ def _new_submission(
         workspace_id=context.workspace_id,
         conversation_id=conversation_id,
         user_message_id=message_id,
-        assistant_message_id=None,
+        assistant_message_id=assistant_message_id,
         agent_release_id=release.release_id,
         runtime_config_version_id=release.runtime_config_version_id,
         requested_by_account_id=account_id,
@@ -360,7 +498,69 @@ def _new_submission(
         completed_at=None,
         error_code=None,
     )
-    return MessageSubmission(message, run)
+    assistant_message = Message(
+        message_id=assistant_message_id,
+        workspace_id=context.workspace_id,
+        conversation_id=conversation_id,
+        role="assistant",
+        status="streaming",
+        parts=(),
+        created_by_account_id=account_id,
+        created_at=now,
+        updated_at=now,
+        version=1,
+    )
+    return MessageSubmission(message, assistant_message, run)
+
+
+def _new_assistant_message(
+    run: AssistantRun,
+    account_id: UUID,
+    now: datetime,
+) -> Message:
+    """为升级前遗留的排队 Run 补建流式消息，不改写用户输入事实。"""
+
+    return Message(
+        message_id=uuid4(),
+        workspace_id=run.workspace_id,
+        conversation_id=run.conversation_id,
+        role="assistant",
+        status="streaming",
+        parts=(),
+        created_by_account_id=account_id,
+        created_at=now,
+        updated_at=now,
+        version=1,
+    )
+
+
+def _finished_assistant_message(
+    run: AssistantRun,
+    account_id: UUID,
+    text: str,
+    now: datetime,
+    status: Literal["completed", "failed"],
+) -> Message:
+    """构造助手终态消息；失败消息不保存供应商正文或内部异常。"""
+
+    assert run.assistant_message_id is not None
+    parts = (
+        (MessagePart(uuid4(), run.assistant_message_id, 1, "text", text, now),)
+        if status == "completed"
+        else ()
+    )
+    return Message(
+        message_id=run.assistant_message_id,
+        workspace_id=run.workspace_id,
+        conversation_id=run.conversation_id,
+        role="assistant",
+        status=status,
+        parts=parts,
+        created_by_account_id=account_id,
+        created_at=run.created_at,
+        updated_at=now,
+        version=2,
+    )
 
 
 def _record_conversation_event(
@@ -458,5 +658,56 @@ def _record_run_queued(
                 "agent_release_id": str(run.agent_release_id),
                 "runtime_config_version_id": str(run.runtime_config_version_id),
             },
+        )
+    )
+
+
+def _record_run_finished(
+    unit_of_work: AssistantUnitOfWork,
+    context: RequestContext,
+    run: AssistantRun,
+    outcome: Literal["completed", "failed"],
+    occurred_at: datetime,
+) -> None:
+    """用脱敏终态记录审计和 Outbox，模型正文只保存在助手消息中。"""
+
+    attributes: dict[str, object] = {
+        "conversation_id": str(run.conversation_id),
+        "assistant_message_id": str(run.assistant_message_id),
+        "status": run.status,
+    }
+    if run.error_code is not None:
+        attributes["error_code"] = run.error_code
+    unit_of_work.audit.add(
+        AuditRecord(
+            audit_id=uuid4(),
+            workspace_id=context.workspace_id,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            action=f"assistant.run.{outcome}",
+            resource_type="assistant_run",
+            resource_id=run.run_id,
+            outcome="succeeded" if outcome == "completed" else "failed",
+            occurred_at=occurred_at,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            attributes=attributes,
+        )
+    )
+    unit_of_work.outbox.add(
+        IntegrationEvent(
+            event_id=uuid4(),
+            event_type=f"assistant.run.{outcome}",
+            workspace_id=context.workspace_id,
+            aggregate_id=run.run_id,
+            aggregate_version=2,
+            occurred_at=occurred_at,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            request_id=context.request_id,
+            payload=attributes,
         )
     )

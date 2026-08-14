@@ -58,7 +58,9 @@ class FixedConfigurationReader:
     def __init__(self, configuration: AiRuntimeConfigVersion) -> None:
         self.configuration = configuration
 
-    def current(self) -> AiRuntimeConfigVersion:
+    def get(self, runtime_config_version_id: UUID) -> AiRuntimeConfigVersion | None:
+        if runtime_config_version_id != self.configuration.runtime_config_version_id:
+            return None
         return self.configuration
 
 
@@ -217,7 +219,7 @@ def test_runtime_gateway_persists_version_attempts_usage_cost_and_credential_ver
     backup = MockProvider(str(BACKUP_ID), response_prefix="备用模型")
     runtime, store = service({str(PRIMARY_ID): primary, str(BACKUP_ID): backup})
 
-    result = runtime.invoke(request())
+    result = runtime.invoke(request(), runtime_config_version_id=CONFIG_ID)
 
     assert result.runtime_config_version_id == CONFIG_ID
     assert result.provider_id == str(BACKUP_ID)
@@ -237,9 +239,9 @@ def test_invocation_id_is_reserved_before_provider_call() -> None:
     backup = MockProvider(str(BACKUP_ID))
     runtime, _ = service({str(PRIMARY_ID): primary, str(BACKUP_ID): backup})
 
-    runtime.invoke(request(invocation_id))
+    runtime.invoke(request(invocation_id), runtime_config_version_id=CONFIG_ID)
     with pytest.raises(ModelInvocationConflictError):
-        runtime.invoke(request(invocation_id))
+        runtime.invoke(request(invocation_id), runtime_config_version_id=CONFIG_ID)
     assert len(primary.calls) == 1
 
 
@@ -253,7 +255,7 @@ def test_all_policy_denied_routes_fail_closed_and_persist_attempts() -> None:
     )
 
     with pytest.raises(ModelDataBoundaryDeniedError):
-        runtime.invoke(request())
+        runtime.invoke(request(), runtime_config_version_id=CONFIG_ID)
     assert store.outcomes[0].status == "failed"
     assert store.outcomes[0].error_code == "MODEL_DATA_BOUNDARY_DENIED"
     assert [attempt.failure_kind for attempt in store.outcomes[0].attempts] == [
@@ -271,9 +273,9 @@ def test_shared_circuit_skips_provider_on_next_invocation() -> None:
     )
 
     with pytest.raises(ModelGatewayUnavailableError):
-        runtime.invoke(request())
+        runtime.invoke(request(), runtime_config_version_id=CONFIG_ID)
     with pytest.raises(ModelGatewayUnavailableError):
-        runtime.invoke(request())
+        runtime.invoke(request(), runtime_config_version_id=CONFIG_ID)
     assert len(primary.calls) == 1
     assert len(backup.calls) == 1
     assert [attempt.status for attempt in store.outcomes[1].attempts] == [
@@ -294,7 +296,7 @@ def test_model_output_cannot_publish_authorization_decision() -> None:
     )
 
     with pytest.raises(ModelContextSafetyDeniedError):
-        runtime.invoke(request())
+        runtime.invoke(request(), runtime_config_version_id=CONFIG_ID)
     assert store.outcomes[0].status == "rejected"
     assert store.outcomes[0].error_code == "POLICY_DENIED"
     assert store.outcomes[0].result is None

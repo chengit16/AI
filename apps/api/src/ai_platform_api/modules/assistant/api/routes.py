@@ -1,12 +1,18 @@
-"""映射私有会话、不可变消息与助手运行排队 HTTP 协议。"""
+"""映射私有会话、不可变消息、后台运行与可恢复 HTTP SSE 协议。"""
 
+import json
+import time
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import Annotated
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
-from fastapi import APIRouter, Depends, Header, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, status
+from fastapi.responses import StreamingResponse
 
 from ai_platform_api.common.api_errors import error_responses
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.config import Settings, get_settings
 from ai_platform_api.modules.assistant.api.schemas import (
     AssistantRunResponse,
     ConversationListResponse,
@@ -19,6 +25,7 @@ from ai_platform_api.modules.assistant.api.schemas import (
     UserMessageCreatedResponse,
 )
 from ai_platform_api.modules.assistant.application.errors import AssistantDeniedError
+from ai_platform_api.modules.assistant.application.runner import AssistantRunExecutor
 from ai_platform_api.modules.assistant.application.service import (
     AssistantConversationService,
     AssistantRun,
@@ -26,6 +33,12 @@ from ai_platform_api.modules.assistant.application.service import (
     Message,
 )
 from ai_platform_api.modules.identity.api.dependencies import trusted_request_context
+from ai_platform_api.modules.streaming.application.service import (
+    StreamEvent,
+    StreamReplay,
+    StreamRunNotFoundError,
+    TransactionalStreamService,
+)
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/conversations", tags=["助手会话"])
 
@@ -36,6 +49,24 @@ def assistant_conversation_service(request: Request) -> AssistantConversationSer
     service = getattr(request.app.state, "assistant_conversation_service", None)
     if not isinstance(service, AssistantConversationService):
         raise RuntimeError("助手会话服务尚未完成装配")
+    return service
+
+
+def assistant_run_executor(request: Request) -> AssistantRunExecutor:
+    """从应用容器解析后台问答执行器，Router 不直接编排检索或模型调用。"""
+
+    executor = getattr(request.app.state, "assistant_run_executor", None)
+    if not isinstance(executor, AssistantRunExecutor):
+        raise RuntimeError("助手运行执行器尚未完成装配")
+    return executor
+
+
+def streaming_service(request: Request) -> TransactionalStreamService:
+    """从应用容器解析事务化流服务，SSE 生成器不会持有长期 Session。"""
+
+    service = getattr(request.app.state, "streaming_service", None)
+    if not isinstance(service, TransactionalStreamService):
+        raise RuntimeError("流式事件服务尚未完成装配")
     return service
 
 
@@ -117,14 +148,16 @@ def create_user_message(
     workspace_id: UUID,
     conversation_id: UUID,
     body: CreateUserMessageRequest,
+    background_tasks: BackgroundTasks,
     idempotency_key: Annotated[
         str,
         Header(alias="Idempotency-Key", min_length=8, max_length=128),
     ],
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[AssistantConversationService, Depends(assistant_conversation_service)],
+    executor: Annotated[AssistantRunExecutor, Depends(assistant_run_executor)],
 ) -> UserMessageCreatedResponse:
-    """幂等创建用户消息并返回冻结版本后的 queued Run。"""
+    """幂等创建用户消息并调度一次本地后台运行，重复调度由数据库状态拒绝。"""
 
     _require_workspace_path(context, workspace_id)
     submission = service.create_user_message(
@@ -133,9 +166,64 @@ def create_user_message(
         texts=tuple(part.text for part in body.parts),
         idempotency_key=idempotency_key,
     )
+    background_tasks.add_task(executor.execute, context, submission.run.run_id)
     return UserMessageCreatedResponse(
         message=_message(submission.message),
         run=_run(submission.run),
+    )
+
+
+@router.get(
+    "/{conversation_id}/runs/{run_id}/events",
+    operation_id="streamAssistantRunEvents",
+    response_class=StreamingResponse,
+    responses={
+        **error_responses(400, 401, 403, 404, 409, 410, 422, 500),
+        200: {
+            "description": "按严格序号返回可恢复的助手运行事件",
+            "content": {"text/event-stream": {"schema": {"type": "string"}}},
+        },
+    },
+)
+def stream_run_events(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    run_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    conversations: Annotated[
+        AssistantConversationService,
+        Depends(assistant_conversation_service),
+    ],
+    streams: Annotated[TransactionalStreamService, Depends(streaming_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    last_event_id: Annotated[UUID | None, Header(alias="Last-Event-ID")] = None,
+) -> StreamingResponse:
+    """授权后回放游标后的事件；重连路径只读取事实，不重新触发模型生成。"""
+
+    _require_workspace_path(context, workspace_id)
+    run = conversations.get_run_for_stream(
+        context,
+        conversation_id=conversation_id,
+        run_id=run_id,
+    )
+    initial_replay = _initial_replay(streams, workspace_id, run, last_event_id)
+    return StreamingResponse(
+        _stream_frames(
+            conversations,
+            streams,
+            context,
+            run,
+            last_event_id,
+            initial_replay,
+            heartbeat_seconds=settings.stream_heartbeat_seconds,
+            poll_interval_ms=settings.stream_poll_interval_ms,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
@@ -214,3 +302,123 @@ def _run(value: AssistantRun) -> AssistantRunResponse:
 def _require_workspace_path(context: RequestContext, workspace_id: UUID) -> None:
     if context.workspace_id != workspace_id:
         raise AssistantDeniedError
+
+
+def _initial_replay(
+    streams: TransactionalStreamService,
+    workspace_id: UUID,
+    run: AssistantRun,
+    last_event_id: UUID | None,
+) -> StreamReplay | None:
+    """在响应头发送前校验已有游标；尚未启动的 queued Run 允许等待首个事件。"""
+
+    try:
+        return streams.replay(
+            workspace_id,
+            run.run_id,
+            last_event_id,
+            now=datetime.now(UTC),
+        )
+    except StreamRunNotFoundError:
+        if last_event_id is not None or run.status not in {"queued", "running"}:
+            raise
+        return None
+
+
+def _stream_frames(
+    conversations: AssistantConversationService,
+    streams: TransactionalStreamService,
+    context: RequestContext,
+    run: AssistantRun,
+    last_event_id: UUID | None,
+    initial_replay: StreamReplay | None,
+    *,
+    heartbeat_seconds: int,
+    poll_interval_ms: int,
+) -> Iterator[str]:
+    """轮询短事务回放并产生 SSE 帧，等待期间不占用数据库连接。"""
+
+    replay = initial_replay
+    cursor = last_event_id
+    next_heartbeat = time.monotonic() + heartbeat_seconds
+    while True:
+        # 1. 每轮只在实际查询期间持有 Session；Run 未启动时复核助手终态后继续等待。
+        if replay is None:
+            try:
+                replay = streams.replay(
+                    context.workspace_id,
+                    run.run_id,
+                    cursor,
+                    now=datetime.now(UTC),
+                )
+            except StreamRunNotFoundError:
+                current = conversations.get_run_for_stream(
+                    context,
+                    conversation_id=run.conversation_id,
+                    run_id=run.run_id,
+                )
+                if current.status not in {"queued", "running"}:
+                    return
+
+        # 2. 按数据库序号输出完整协议事件；只在持久化事件后推进回放游标。
+        if replay is not None:
+            for event in replay.events:
+                yield _event_frame(event)
+                cursor = event.event_id
+            if replay.final_run.status != "active":
+                if replay.snapshot_required:
+                    yield _snapshot_frame(run, replay)
+                return
+            replay = None
+
+        # 3. 心跳只使用 SSE 注释帧，不写库、不占序号，也不改变 Last-Event-ID。
+        now = time.monotonic()
+        if now >= next_heartbeat:
+            yield ": heartbeat\n\n"
+            next_heartbeat = now + heartbeat_seconds
+        time.sleep(poll_interval_ms / 1_000)
+
+
+def _snapshot_frame(run: AssistantRun, replay: StreamReplay) -> str:
+    """生成不推进 SSE 游标的恢复快照，客户端后续仍携带最后一个持久化事件 ID。"""
+
+    stream_run = replay.final_run
+    snapshot = StreamEvent(
+        event_id=uuid5(
+            NAMESPACE_URL,
+            f"assistant-stream-snapshot:{stream_run.run_id}:{stream_run.last_sequence_no}",
+        ),
+        event_type="message.snapshot",
+        workspace_id=stream_run.workspace_id,
+        conversation_id=stream_run.conversation_id,
+        message_id=stream_run.message_id,
+        run_id=stream_run.run_id,
+        sequence_no=max(1, stream_run.last_sequence_no),
+        occurred_at=datetime.now(UTC),
+        expires_at=stream_run.expires_at,
+        trace_id=run.trace_id,
+        traceparent=run.traceparent,
+        payload=stream_run.final_payload or {"status": stream_run.status},
+    )
+    # 快照不是持久化事件，省略 SSE id 行，避免浏览器把派生 ID 当作下次回放游标。
+    return _event_frame(snapshot, include_sse_id=False)
+
+
+def _event_frame(event: StreamEvent, *, include_sse_id: bool = True) -> str:
+    envelope = {
+        "event_id": str(event.event_id),
+        "event_type": event.event_type,
+        "schema_version": 1,
+        "workspace_id": str(event.workspace_id),
+        "conversation_id": str(event.conversation_id),
+        "message_id": str(event.message_id),
+        "run_id": str(event.run_id),
+        "sequence_no": event.sequence_no,
+        "occurred_at": event.occurred_at.isoformat(),
+        "expires_at": event.expires_at.isoformat(),
+        "trace_id": event.trace_id,
+        "payload": event.payload,
+    }
+    data = json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))
+    event_line = f"event: {event.event_type}\ndata: {data}\n\n"
+    return f"id: {event.event_id}\n{event_line}" if include_sse_id else event_line

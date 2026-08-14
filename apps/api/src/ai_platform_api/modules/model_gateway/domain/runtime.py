@@ -172,9 +172,9 @@ class RuntimeConfigurationUnitOfWork(Protocol):
 
 
 class RuntimeConfigurationReader(Protocol):
-    """向调用路径提供当前发布配置和关联供应商凭据。"""
+    """按 Run 冻结标识读取不可变运行配置，禁止调用时漂移到当前发布。"""
 
-    def current(self) -> AiRuntimeConfigVersion | None: ...
+    def get(self, runtime_config_version_id: UUID) -> AiRuntimeConfigVersion | None: ...
 
 
 class RuntimeInvocationStore(Protocol):

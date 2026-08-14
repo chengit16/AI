@@ -1,7 +1,10 @@
 """定义 SSE Run、持久化事件、回放结果和存储端口。"""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
+from types import TracebackType
 from typing import Literal, Protocol
 from uuid import UUID
 
@@ -129,3 +132,21 @@ class StreamStore(Protocol):
         now: datetime,
         policy: StreamPolicy,
     ) -> StreamReplay: ...
+
+
+class StreamUnitOfWork(Protocol):
+    """为单次流事件操作提供短事务，禁止 SSE 长连接长期持有 Session。"""
+
+    @property
+    def streams(self) -> StreamStore: ...
+
+    def __enter__(self) -> StreamUnitOfWork: ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+
+    def commit(self) -> None: ...

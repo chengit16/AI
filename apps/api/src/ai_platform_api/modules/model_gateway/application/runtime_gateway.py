@@ -99,7 +99,7 @@ class _GovernedProvider:
 
 
 class RuntimeModelGatewayService:
-    """以当前不可变配置执行模型调用，并在返回前固化版本、用量和尝试事实。"""
+    """以 Run 冻结的不可变配置执行模型调用，并固化版本、用量和尝试事实。"""
 
     def __init__(
         self,
@@ -117,11 +117,16 @@ class RuntimeModelGatewayService:
         # 首期本地单 API 进程共享熔断状态；多实例共享状态在容量阶段按实测再引入。
         self._circuit_states: dict[str, CircuitState] = {}
 
-    def invoke(self, request: ModelRequest) -> ModelResult:
-        """读取当前发布配置和短暂凭据后调用模型，并持久化最终调用结果。"""
+    def invoke(
+        self,
+        request: ModelRequest,
+        *,
+        runtime_config_version_id: UUID,
+    ) -> ModelResult:
+        """读取指定冻结配置和短暂凭据后调用模型，并持久化最终调用结果。"""
 
-        # 1. 固定本次调用使用的发布配置，并先预留调用记录防止进程失败后无迹可查。
-        configuration = self._configurations.current()
+        # 1. 只读取 Run 已冻结的配置；排队后切换当前发布不能改变本次生成行为。
+        configuration = self._configurations.get(runtime_config_version_id)
         if configuration is None:
             raise AiRuntimeConfigNotActiveError
         self._invocations.reserve(request, configuration.runtime_config_version_id)

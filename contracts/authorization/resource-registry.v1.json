@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 9,
+  "registry_version": 10,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -209,7 +209,8 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000070", "api_key": "assistant.conversation.list", "operation_id": "listAssistantConversations", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations", "access_level": "authorized", "permission_code": "assistant.conversation.read", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000071", "api_key": "assistant.message.list", "operation_id": "listAssistantMessages", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages", "access_level": "authorized", "permission_code": "assistant.conversation.read", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000072", "api_key": "assistant.message.create", "operation_id": "createAssistantUserMessage", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages", "access_level": "authorized", "permission_code": "assistant.message.create", "risk_level": "normal", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000073", "api_key": "assistant.conversation.archive", "operation_id": "archiveAssistantConversation", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/archive", "access_level": "authorized", "permission_code": "assistant.conversation.archive", "risk_level": "normal", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000073", "api_key": "assistant.conversation.archive", "operation_id": "archiveAssistantConversation", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/archive", "access_level": "authorized", "permission_code": "assistant.conversation.archive", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000074", "api_key": "assistant.run.stream", "operation_id": "streamAssistantRunEvents", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/runs/{run_id}/events", "access_level": "authorized", "permission_code": "assistant.conversation.read", "risk_level": "normal", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -350,6 +351,7 @@
     { "menu_id": "82000000-0000-4000-8000-000000000164", "api_resource_id": "81000000-0000-4000-8000-000000000070", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000164", "api_resource_id": "81000000-0000-4000-8000-000000000071", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000166", "api_resource_id": "81000000-0000-4000-8000-000000000072", "action_type": "mutation" },
-    { "menu_id": "82000000-0000-4000-8000-000000000165", "api_resource_id": "81000000-0000-4000-8000-000000000073", "action_type": "mutation" }
+    { "menu_id": "82000000-0000-4000-8000-000000000165", "api_resource_id": "81000000-0000-4000-8000-000000000073", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000164", "api_resource_id": "81000000-0000-4000-8000-000000000074", "action_type": "query" }
   ]
 }

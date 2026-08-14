@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     tika_url: str = "http://127.0.0.1:9998"
     model_provider_allowed_hosts: tuple[str, ...] = ()
     model_provider_probe_timeout_seconds: int = 10
+    stream_retention_seconds: int = 24 * 60 * 60
+    stream_replay_limit_events: int = 5_000
+    stream_replay_limit_bytes: int = 10 * 1024 * 1024
+    stream_heartbeat_seconds: int = 15
+    stream_poll_interval_ms: int = 250
+    stream_delta_batch_characters: int = 512
     session_ttl_seconds: int = 43_200
     session_cookie_secure: bool = False
 
@@ -51,6 +57,18 @@ class Settings(BaseSettings):
             raise ValueError("入库任务最大尝试次数必须位于 1 到 10 之间")
         if not 1 <= self.model_provider_probe_timeout_seconds <= 30:
             raise ValueError("模型供应商探测超时必须位于 1 秒到 30 秒之间")
+        if not 60 <= self.stream_retention_seconds <= 7 * 24 * 60 * 60:
+            raise ValueError("SSE 事件保留期必须位于 1 分钟到 7 天之间")
+        if not 1 <= self.stream_replay_limit_events <= 20_000:
+            raise ValueError("SSE 单次回放事件数必须位于 1 到 20000 之间")
+        if not 1_024 <= self.stream_replay_limit_bytes <= 50 * 1_024 * 1_024:
+            raise ValueError("SSE 单次回放字节数必须位于 1 KiB 到 50 MiB 之间")
+        if not 1 <= self.stream_heartbeat_seconds <= 60:
+            raise ValueError("SSE 心跳间隔必须位于 1 到 60 秒之间")
+        if not 50 <= self.stream_poll_interval_ms <= 5_000:
+            raise ValueError("SSE 数据库轮询间隔必须位于 50 到 5000 毫秒之间")
+        if not 64 <= self.stream_delta_batch_characters <= 4_096:
+            raise ValueError("SSE 增量批次字符数必须位于 64 到 4096 之间")
         normalized_hosts = tuple(
             host.strip().casefold().rstrip(".") for host in self.model_provider_allowed_hosts
         )

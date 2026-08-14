@@ -289,6 +289,20 @@ def test_runtime_config_publication_gateway_usage_and_immutability_are_persisten
         ).generation
         == 1
     )
+    second = runtime_database.configurations.create(
+        context,
+        display_name="合成运行配置 V2",
+        system_prompt_template="你是只使用授权证据的合成助手。当前发布为 V2。",
+        components=components(),
+        policy=gateway_policy(),
+        routes=routes,
+    )
+    assert (
+        runtime_database.configurations.activate(
+            context, second.runtime_config_version_id
+        ).generation
+        == 2
+    )
 
     primary = MockProvider(str(primary_id), outcomes=["timeout", "timeout"])
     backup = MockProvider(str(backup_id), response_prefix="合成备用模型")
@@ -311,11 +325,11 @@ def test_runtime_config_publication_gateway_usage_and_immutability_are_persisten
         external_data_allowed=True,
         security_level="INTERNAL",
     )
-    result = gateway.invoke(request)
+    result = gateway.invoke(request, runtime_config_version_id=first.runtime_config_version_id)
     assert result.provider_id == str(backup_id)
     assert result.runtime_config_version_id == first.runtime_config_version_id
     with pytest.raises(ModelInvocationConflictError):
-        gateway.invoke(request)
+        gateway.invoke(request, runtime_config_version_id=first.runtime_config_version_id)
 
     with runtime_database.sessions() as session:
         invocation = session.execute(
@@ -333,7 +347,7 @@ def test_runtime_config_publication_gateway_usage_and_immutability_are_persisten
         assert invocation.estimated_cost_microunits > 0
         assert [item.failure_kind for item in attempts] == ["timeout", "timeout", None]
         assert [item.credential_version for item in attempts] == [1, 1, 1]
-        assert session.scalar(select(func.count()).select_from(ai_runtime_model_routes)) == 2
+        assert session.scalar(select(func.count()).select_from(ai_runtime_model_routes)) == 4
 
     # 不可变触发器必须阻止维护代码直接覆盖历史名称或路由价格。
     with pytest.raises(DBAPIError), runtime_database.sessions.begin() as session:
@@ -346,20 +360,6 @@ def test_runtime_config_publication_gateway_usage_and_immutability_are_persisten
             .values(display_name="被篡改")
         )
 
-    second = runtime_database.configurations.create(
-        context,
-        display_name="合成运行配置 V2",
-        system_prompt_template="你是只使用授权证据的合成助手。",
-        components=components(),
-        policy=gateway_policy(),
-        routes=routes,
-    )
-    assert (
-        runtime_database.configurations.activate(
-            context, second.runtime_config_version_id
-        ).generation
-        == 2
-    )
     assert (
         runtime_database.configurations.activate(
             context, first.runtime_config_version_id

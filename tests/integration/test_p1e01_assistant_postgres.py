@@ -29,6 +29,11 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityReader,
     SqlAlchemyRegistrationUnitOfWork,
 )
+from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
+from ai_platform_api.modules.streaming.domain.models import StreamPolicy
+from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
+    SqlAlchemyStreamUnitOfWork,
+)
 from ai_platform_api.persistence.database import create_platform_engine, create_session_factory
 from ai_platform_api.persistence.tables import (
     agent_publications,
@@ -221,6 +226,9 @@ def test_message_run_freezes_release_and_runtime_config(
     assert repeated == first
     assert first.run.status == "queued"
     assert first.run.runtime_config_version_id == first_runtime_id
+    assert first.assistant_message is not None
+    assert first.assistant_message.message_id == first.run.assistant_message_id
+    assert first.assistant_message.status == "streaming"
     assert [part.sequence_no for part in first.message.parts] == [1, 2]
     assert [part.text for part in first.message.parts] == ["合成问题第一段", "合成问题第二段"]
 
@@ -239,6 +247,44 @@ def test_message_run_freezes_release_and_runtime_config(
             idempotency_key="synthetic-message-0002",
         )
 
+    # Run 只允许认领一次；完成事务必须同步落下助手正文和 Run 终态。
+    streamed = assistant_database.assistant.get_run_for_stream(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        run_id=first.run.run_id,
+    )
+    claimed = assistant_database.assistant.claim_run(owner_context, run_id=first.run.run_id)
+    assert streamed.assistant_message_id == first.assistant_message.message_id
+    assert claimed is not None and claimed.status == "running"
+    assert assistant_database.assistant.claim_run(owner_context, run_id=first.run.run_id) is None
+
+    completed = assistant_database.assistant.complete_run(
+        owner_context,
+        run_id=first.run.run_id,
+        text="  只依据合成证据生成的最终答案。  ",
+    )
+    completed_messages = assistant_database.assistant.list_messages(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        limit=100,
+    )
+    completed_message = next(
+        message
+        for message in completed_messages
+        if message.message_id == first.assistant_message.message_id
+    )
+    assert completed.status == "completed"
+    assert completed_message.status == "completed"
+    assert tuple(part.text for part in completed_message.parts) == (
+        "只依据合成证据生成的最终答案。",
+    )
+    with pytest.raises(AssistantConversationBusyError):
+        assistant_database.assistant.complete_run(
+            owner_context,
+            run_id=first.run.run_id,
+            text="不允许重复完成",
+        )
+
     # 发布 V2 后新会话生成新 AgentRelease，首个 Run 仍固定指向 V1。
     second_runtime_id = publish_runtime_config(assistant_database, owner.account_id, version=2)
     second_conversation = assistant_database.assistant.create_conversation(
@@ -253,6 +299,29 @@ def test_message_run_freezes_release_and_runtime_config(
     )
     assert second.run.runtime_config_version_id == second_runtime_id
     assert second.run.agent_release_id != first.run.agent_release_id
+    assert second.assistant_message is not None
+    assert (
+        assistant_database.assistant.claim_run(owner_context, run_id=second.run.run_id) is not None
+    )
+    failed = assistant_database.assistant.fail_run(
+        owner_context,
+        run_id=second.run.run_id,
+        error_code="SYNTHETIC_PROVIDER_FAILED",
+    )
+    failed_messages = assistant_database.assistant.list_messages(
+        owner_context,
+        conversation_id=second_conversation.conversation_id,
+        limit=100,
+    )
+    failed_message = next(
+        message
+        for message in failed_messages
+        if message.message_id == second.assistant_message.message_id
+    )
+    assert failed.status == "failed"
+    assert failed.error_code == "SYNTHETIC_PROVIDER_FAILED"
+    assert failed_message.status == "failed"
+    assert failed_message.parts == ()
 
     with assistant_database.sessions() as session:
         release_rows = [
@@ -334,3 +403,98 @@ def test_conversation_privacy_archive_and_http_contract(
             )
             == 0
         )
+
+
+def test_http_sse_replays_only_events_after_last_event_id(
+    assistant_database: AssistantHarness,
+) -> None:
+    owner = register(assistant_database, "sse-owner")
+    owner_context = context(owner)
+    publish_runtime_config(assistant_database, owner.account_id, version=4)
+    conversation = assistant_database.assistant.create_conversation(
+        owner_context,
+        title="合成 SSE 会话",
+    )
+    submission = assistant_database.assistant.create_user_message(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        texts=("合成 SSE 问题",),
+        idempotency_key="synthetic-sse-message-0001",
+    )
+    claimed = assistant_database.assistant.claim_run(
+        owner_context,
+        run_id=submission.run.run_id,
+    )
+    assert claimed is not None and claimed.assistant_message_id is not None
+
+    streams = TransactionalStreamService(
+        SqlAlchemyStreamUnitOfWork(assistant_database.sessions),
+        StreamPolicy(),
+    )
+    now = datetime.now(UTC)
+    streams.start_run(
+        owner.workspace_id,
+        conversation.conversation_id,
+        claimed.assistant_message_id,
+        claimed.run_id,
+        now=now,
+    )
+    first = streams.append(
+        claimed.run_id,
+        "message.delta",
+        claimed.trace_id,
+        claimed.traceparent,
+        {"delta": "第一段"},
+        now=now,
+    )
+    completed_event = streams.append(
+        claimed.run_id,
+        "message.completed",
+        claimed.trace_id,
+        claimed.traceparent,
+        {"text": "第一段第二段"},
+        now=now,
+    )
+    assistant_database.assistant.complete_run(
+        owner_context,
+        run_id=claimed.run_id,
+        text="第一段第二段",
+    )
+    streams.finish(
+        claimed.run_id,
+        "completed",
+        {"status": "completed", "text": "第一段第二段"},
+        now=now,
+    )
+
+    app = FastAPI()
+    app.state.assistant_conversation_service = assistant_database.assistant
+    app.state.streaming_service = streams
+    app.include_router(assistant_router, prefix="/api/v1")
+    app.dependency_overrides[trusted_request_context] = lambda: owner_context
+    path = (
+        f"/api/v1/workspaces/{owner.workspace_id}/conversations/"
+        f"{conversation.conversation_id}/runs/{claimed.run_id}/events"
+    )
+    with TestClient(app) as client:
+        full = client.get(path)
+        resumed = client.get(path, headers={"Last-Event-ID": str(first.event_id)})
+        acknowledged = client.get(
+            path,
+            headers={"Last-Event-ID": str(completed_event.event_id)},
+        )
+
+    assert full.status_code == 200
+    assert full.headers["content-type"].startswith("text/event-stream")
+    assert f"id: {first.event_id}" in full.text
+    assert f"id: {completed_event.event_id}" in full.text
+    assert "event: message.delta" in full.text
+    assert "event: message.completed" in full.text
+    assert '"sequence_no":1' in full.text and '"sequence_no":2' in full.text
+    assert resumed.status_code == 200
+    assert f"id: {first.event_id}" not in resumed.text
+    assert f"id: {completed_event.event_id}" in resumed.text
+    assert acknowledged.status_code == 200
+    assert "event: message.snapshot" in acknowledged.text
+    assert '"status":"completed"' in acknowledged.text
+    assert "id:" not in acknowledged.text
