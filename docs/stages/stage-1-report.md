@@ -489,7 +489,7 @@
 - 自动验收：P1E-02 单元专项 `6/6`；PostgreSQL 权限前过滤、跨空间隔离、私有/密级过滤、字段投影、重试稳定性和不可变触发器专项 `1/1`；Migration 往返 `3/3`，既有 P0-08 检索回归 `5/5`。统一 `./scripts/verify` 全部通过，React `21/21`、Python `329/329`、Ruff、mypy strict（354 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建均通过。
 - 容器与环境：本地 PostgreSQL 集成使用随机 Schema 和全合成个人空间数据；重建 API、Worker、Web 与 Migration 镜像后，公共数据库正常推进至 `20260815_0027`，Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项诊断全部通过。没有真实模型供应商、Linux 宿主机或容量压测机，因此真实语义质量、百万 Chunk 和完整并发认证继续保持 `not_configured`/`not_run`。
 - 当前边界：本节点不实现 Reranker、FastPass、来源排序、受控全文精读、引用验证、SSE 问答输出或模型调用；这些按 `P1E-03`～`P1E-05` 进入。仍不引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
-- 提交：待本节点独立提交。
+- 提交：`9de3e2e`。
 
 ## 4. 当前限制
 
