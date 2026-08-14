@@ -1875,6 +1875,76 @@ Index(
     postgresql_where=assistant_runs.c.status.in_(("queued", "running")),
 )
 
+message_feedbacks = Table(
+    "message_feedbacks",
+    metadata,
+    Column("feedback_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("conversation_id", UUID(as_uuid=True), nullable=False),
+    Column("message_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("account_id", UUID(as_uuid=True), nullable=False),
+    Column("rating", String(32), nullable=False),
+    Column("issue_codes", ARRAY(String(32)), nullable=False),
+    Column("comment", Text, nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "message_id",
+        "account_id",
+        name="uq_message_feedbacks_account_message",
+    ),
+    ForeignKeyConstraint(
+        ["conversation_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.conversations.conversation_id",
+            f"{SCHEMA_TOKEN}.conversations.workspace_id",
+        ],
+        name="fk_message_feedbacks_conversation",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["message_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.messages.message_id", f"{SCHEMA_TOKEN}.messages.workspace_id"],
+        name="fk_message_feedbacks_message",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["run_id"],
+        [f"{SCHEMA_TOKEN}.assistant_runs.run_id"],
+        name="fk_message_feedbacks_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_message_feedbacks_account",
+    ),
+    CheckConstraint("rating IN ('helpful', 'unhelpful')", name="ck_message_feedbacks_rating"),
+    CheckConstraint(
+        "issue_codes <@ ARRAY['incorrect', 'missing_source', 'source_mismatch', "
+        "'unsafe', 'other']::varchar[]",
+        name="ck_message_feedbacks_issue_codes",
+    ),
+    CheckConstraint(
+        "(rating = 'helpful' AND cardinality(issue_codes) = 0) OR "
+        "(rating = 'unhelpful' AND cardinality(issue_codes) BETWEEN 1 AND 5)",
+        name="ck_message_feedbacks_issue_shape",
+    ),
+    CheckConstraint(
+        "comment IS NULL OR char_length(btrim(comment)) BETWEEN 1 AND 1000",
+        name="ck_message_feedbacks_comment",
+    ),
+    CheckConstraint("version >= 1", name="ck_message_feedbacks_version"),
+)
+Index(
+    "ix_message_feedbacks_workspace_time",
+    message_feedbacks.c.workspace_id,
+    message_feedbacks.c.updated_at,
+)
+
 retrieval_plans = Table(
     "retrieval_plans",
     metadata,

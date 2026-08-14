@@ -17,6 +17,7 @@ from ai_platform_api.modules.assistant.application.errors import (
     AssistantConversationBusyError,
     AssistantDeniedError,
     AssistantIdempotencyConflictError,
+    AssistantValidationError,
 )
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
 from ai_platform_api.modules.assistant.infrastructure.sqlalchemy import (
@@ -43,6 +44,7 @@ from ai_platform_api.persistence.tables import (
     ai_runtime_config_versions,
     assistant_runs,
     audit_records,
+    message_feedbacks,
     message_parts,
     outbox_events,
 )
@@ -498,3 +500,143 @@ def test_http_sse_replays_only_events_after_last_event_id(
     assert "event: message.snapshot" in acknowledged.text
     assert '"status":"completed"' in acknowledged.text
     assert "id:" not in acknowledged.text
+
+
+def test_p1e06_lists_and_cancels_only_owned_active_run(
+    assistant_database: AssistantHarness,
+) -> None:
+    owner = register(assistant_database, "interaction-cancel-owner")
+    outsider = register(assistant_database, "interaction-cancel-outsider")
+    owner_context = context(owner)
+    publish_runtime_config(assistant_database, owner.account_id, version=5)
+    conversation = assistant_database.assistant.create_conversation(
+        owner_context,
+        title="合成取消会话",
+    )
+    submission = assistant_database.assistant.create_user_message(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        texts=("取消这次合成问答",),
+        idempotency_key="synthetic-cancel-message-0001",
+    )
+
+    listed = assistant_database.assistant.list_runs(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        limit=100,
+    )
+    cancelled = assistant_database.assistant.cancel_run(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        run_id=submission.run.run_id,
+    )
+    repeated = assistant_database.assistant.cancel_run(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        run_id=submission.run.run_id,
+    )
+    messages = assistant_database.assistant.list_messages(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        limit=100,
+    )
+    assistant_message = next(message for message in messages if message.role == "assistant")
+
+    assert [run.run_id for run in listed] == [submission.run.run_id]
+    assert cancelled.status == "cancelled"
+    assert cancelled.error_code == "RUN_CANCELLED"
+    assert repeated == cancelled
+    assert assistant_message.status == "failed"
+    assert assistant_message.parts == ()
+    with pytest.raises(AssistantDeniedError):
+        assistant_database.assistant.list_runs(
+            context(outsider, workspace_id=owner.workspace_id),
+            conversation_id=conversation.conversation_id,
+            limit=100,
+        )
+
+
+def test_p1e06_revises_feedback_without_copying_comment_to_events(
+    assistant_database: AssistantHarness,
+) -> None:
+    owner = register(assistant_database, "interaction-feedback-owner")
+    owner_context = context(owner)
+    publish_runtime_config(assistant_database, owner.account_id, version=6)
+    conversation = assistant_database.assistant.create_conversation(
+        owner_context,
+        title="合成反馈会话",
+    )
+    submission = assistant_database.assistant.create_user_message(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        texts=("生成可反馈的合成答案",),
+        idempotency_key="synthetic-feedback-message-0001",
+    )
+    claimed = assistant_database.assistant.claim_run(
+        owner_context,
+        run_id=submission.run.run_id,
+    )
+    assert claimed is not None and claimed.assistant_message_id is not None
+    assistant_database.assistant.complete_run(
+        owner_context,
+        run_id=claimed.run_id,
+        text="仅依据合成证据生成的回答",
+    )
+
+    first = assistant_database.assistant.submit_feedback(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        message_id=claimed.assistant_message_id,
+        rating="helpful",
+        issue_codes=(),
+        comment=None,
+    )
+    revised = assistant_database.assistant.submit_feedback(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        message_id=claimed.assistant_message_id,
+        rating="unhelpful",
+        issue_codes=("incorrect", "missing_source", "incorrect"),
+        comment="  这段合成说明只应保存在反馈事实中  ",
+    )
+    current = assistant_database.assistant.get_feedback(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        message_id=claimed.assistant_message_id,
+    )
+
+    assert first.version == 1
+    assert revised.version == 2
+    assert revised.issue_codes == ("incorrect", "missing_source")
+    assert revised.comment == "这段合成说明只应保存在反馈事实中"
+    assert current == revised
+    with pytest.raises(AssistantValidationError):
+        assistant_database.assistant.submit_feedback(
+            owner_context,
+            conversation_id=conversation.conversation_id,
+            message_id=claimed.assistant_message_id,
+            rating="unhelpful",
+            issue_codes=(),
+            comment=None,
+        )
+
+    with assistant_database.sessions() as session:
+        stored_comment = session.scalar(
+            select(message_feedbacks.c.comment).where(
+                message_feedbacks.c.feedback_id == revised.feedback_id
+            )
+        )
+        audit_payloads = session.scalars(
+            select(audit_records.c.attributes).where(
+                audit_records.c.resource_id == revised.feedback_id
+            )
+        ).all()
+        outbox_payloads = session.scalars(
+            select(outbox_events.c.payload).where(
+                outbox_events.c.aggregate_id == revised.feedback_id
+            )
+        ).all()
+    assert stored_comment == revised.comment
+    assert len(audit_payloads) == 2
+    assert len(outbox_payloads) == 2
+    assert all("comment" not in payload for payload in (*audit_payloads, *outbox_payloads))

@@ -36,6 +36,10 @@ class AssignMemberOrganizationRequest(typing.TypedDict):
     primary_department_id: typing.NotRequired[str | None]
 
 
+class AssistantRunListResponse(typing.TypedDict):
+    items: list[AssistantRunResponse]
+
+
 class AssistantRunResponse(typing.TypedDict):
     agent_release_id: str
     assistant_message_id: str | None
@@ -50,6 +54,24 @@ class AssistantRunResponse(typing.TypedDict):
     updated_at: str
     user_message_id: str
     workspace_id: str
+
+
+class AssistantSourceListResponse(typing.TypedDict):
+    items: list[AssistantSourceResponse]
+
+
+class AssistantSourceResponse(typing.TypedDict):
+    chunk_id: str
+    conflict_detected: bool
+    content_hash: str
+    document_id: str
+    document_title: str
+    document_version_id: str
+    quote: str
+    rank: int
+    source_kind: typing.Literal["manual", "upload", "web", "data_source"]
+    source_name: str
+    source_position: dict[str, object]
 
 
 class AuthenticationContextResponse(typing.TypedDict):
@@ -196,6 +218,10 @@ class CurrentAiRuntimeConfigResponse(typing.TypedDict):
 class CurrentMenuReleaseResponse(typing.TypedDict):
     item: MenuReleaseResponse | None
     snapshot: MenuReleaseSnapshotResponse | None
+
+
+class CurrentMessageFeedbackResponse(typing.TypedDict):
+    item: MessageFeedbackResponse | None
 
 
 class DepartmentListResponse(typing.TypedDict):
@@ -514,6 +540,22 @@ class MenuReleaseSnapshotRoleMenuEntry(typing.TypedDict):
     visible: bool
 
 
+class MessageFeedbackResponse(typing.TypedDict):
+    comment: str | None
+    conversation_id: str
+    created_at: str
+    feedback_id: str
+    issue_codes: list[
+        typing.Literal["incorrect", "missing_source", "source_mismatch", "unsafe", "other"]
+    ]
+    message_id: str
+    rating: typing.Literal["helpful", "unhelpful"]
+    run_id: str
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
 class MessageListResponse(typing.TypedDict):
     items: list[MessageResponse]
 
@@ -730,6 +772,14 @@ class RuntimeRouteResponse(typing.TypedDict):
     provider_configuration_version: int
     provider_id: str
     route_id: str
+
+
+class SubmitMessageFeedbackRequest(typing.TypedDict):
+    comment: typing.NotRequired[str | None]
+    issue_codes: typing.NotRequired[
+        list[typing.Literal["incorrect", "missing_source", "source_mismatch", "unsafe", "other"]]
+    ]
+    rating: typing.Literal["helpful", "unhelpful"]
 
 
 class UploadMetadataResponse(typing.TypedDict):

@@ -13,9 +13,11 @@ from uuid import UUID, uuid4
 from ai_platform_backend.integration.domain import AuditRecord
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.common.runtime import RuntimeConfigSnapshot
 from ai_platform_api.modules.assistant.application.errors import (
     AssistantConversationBusyError,
     AssistantDeniedError,
+    AssistantFeedbackConflictError,
     AssistantIdempotencyConflictError,
     AssistantNotFoundError,
     AssistantValidationError,
@@ -26,10 +28,13 @@ from ai_platform_api.modules.assistant.domain.models import (
     AssistantUnitOfWork,
     AssistantWriteConflictError,
     Conversation,
+    FeedbackIssueCode,
+    FeedbackRating,
     Message,
+    MessageFeedback,
     MessagePart,
     MessageSubmission,
-    RuntimeConfigSnapshot,
+    RuntimeConfigurationBootstrap,
 )
 from ai_platform_api.modules.integration.domain.events import IntegrationEvent
 from ai_platform_api.modules.model_gateway.domain.runtime_errors import (
@@ -37,20 +42,30 @@ from ai_platform_api.modules.model_gateway.domain.runtime_errors import (
 )
 
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
+FEEDBACK_RATINGS = frozenset({"helpful", "unhelpful"})
+FEEDBACK_ISSUE_CODES = frozenset(
+    {"incorrect", "missing_source", "source_mismatch", "unsafe", "other"}
+)
 
 __all__ = [
     "AssistantConversationService",
     "AssistantRun",
     "Conversation",
     "Message",
+    "MessageFeedback",
 ]
 
 
 class AssistantConversationService:
     """维护创建者私有会话，并把每次用户消息排入可追溯运行队列。"""
 
-    def __init__(self, unit_of_work: AssistantUnitOfWork) -> None:
+    def __init__(
+        self,
+        unit_of_work: AssistantUnitOfWork,
+        runtime_bootstrap: RuntimeConfigurationBootstrap | None = None,
+    ) -> None:
         self._unit_of_work = unit_of_work
+        self._runtime_bootstrap = runtime_bootstrap
 
     def create_conversation(
         self,
@@ -65,7 +80,11 @@ class AssistantConversationService:
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
             _require_active_member(unit_of_work, context.workspace_id, account_id)
-            runtime_config = _current_runtime_config(unit_of_work)
+            runtime_config = _current_runtime_config(
+                unit_of_work,
+                self._runtime_bootstrap,
+                account_id,
+            )
             unit_of_work.assistant.get_or_create_system_release(
                 workspace_id=context.workspace_id,
                 account_id=account_id,
@@ -122,6 +141,27 @@ class AssistantConversationService:
             return unit_of_work.assistant.list_messages(
                 context.workspace_id,
                 conversation_id,
+                limit=limit,
+            )
+
+    def list_runs(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        limit: int,
+    ) -> tuple[AssistantRun, ...]:
+        """返回会话运行事实，供页面刷新后恢复活动 SSE 游标和终态。"""
+
+        account_id = _browser_account(context)
+        _require_limit(limit)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            _owned_conversation(unit_of_work, context, conversation_id, account_id)
+            return unit_of_work.assistant.list_runs(
+                context.workspace_id,
+                conversation_id,
+                account_id,
                 limit=limit,
             )
 
@@ -200,7 +240,11 @@ class AssistantConversationService:
                     raise AssistantNotFoundError
                 if unit_of_work.assistant.has_active_run(context.workspace_id, conversation_id):
                     raise AssistantConversationBusyError
-                runtime_config = _current_runtime_config(unit_of_work)
+                runtime_config = _current_runtime_config(
+                    unit_of_work,
+                    self._runtime_bootstrap,
+                    account_id,
+                )
                 release = unit_of_work.assistant.get_or_create_system_release(
                     workspace_id=context.workspace_id,
                     account_id=account_id,
@@ -250,6 +294,151 @@ class AssistantConversationService:
             if run is None:
                 raise AssistantNotFoundError
             return run
+
+    def get_run_for_message(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        message_id: UUID,
+    ) -> AssistantRun:
+        """验证私有会话和助手消息归属，来源与反馈不得按裸消息 ID 查询。"""
+
+        account_id = _browser_account(context)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            _owned_conversation(unit_of_work, context, conversation_id, account_id)
+            return _owned_run_by_message(
+                unit_of_work,
+                context,
+                conversation_id,
+                message_id,
+                account_id,
+            )
+
+    def cancel_run(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        run_id: UUID,
+    ) -> AssistantRun:
+        """条件取消 queued/running Run，并把流式助手消息收敛为失败展示状态。"""
+
+        account_id = _browser_account(context)
+        now = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            _owned_conversation(unit_of_work, context, conversation_id, account_id)
+            run = _owned_run(unit_of_work, context, run_id, account_id, for_update=True)
+            if run.conversation_id != conversation_id:
+                raise AssistantNotFoundError
+            if run.status not in {"queued", "running"}:
+                return run
+            if run.assistant_message_id is None:
+                raise AssistantConversationBusyError
+
+            # 先把占位消息置为无正文失败态，再以原状态作为条件关闭 Run，避免完成与取消互相覆盖。
+            message = _finished_assistant_message(run, account_id, "", now, "failed")
+            if not unit_of_work.assistant.finish_assistant_message(message):
+                raise AssistantConversationBusyError
+            cancelled = replace(
+                run,
+                status="cancelled",
+                updated_at=now,
+                completed_at=now,
+                error_code="RUN_CANCELLED",
+            )
+            if not unit_of_work.assistant.transition_run(cancelled, expected_status=run.status):
+                raise AssistantConversationBusyError
+            _record_run_finished(unit_of_work, context, cancelled, "cancelled", now)
+            unit_of_work.commit()
+            return cancelled
+
+    def get_feedback(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        message_id: UUID,
+    ) -> MessageFeedback | None:
+        """读取当前账号对助手消息的反馈；没有提交时返回空事实。"""
+
+        account_id = _browser_account(context)
+        with self._unit_of_work as unit_of_work:
+            # 成员、私有会话和消息归属必须与反馈读取位于同一事务，避免撤权后读取旧检查结果。
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            _owned_conversation(unit_of_work, context, conversation_id, account_id)
+            _owned_run_by_message(
+                unit_of_work,
+                context,
+                conversation_id,
+                message_id,
+                account_id,
+            )
+            return unit_of_work.assistant.get_feedback(
+                context.workspace_id,
+                message_id,
+                account_id,
+            )
+
+    def submit_feedback(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        message_id: UUID,
+        rating: FeedbackRating,
+        issue_codes: tuple[FeedbackIssueCode, ...],
+        comment: str | None,
+    ) -> MessageFeedback:
+        """新增或修订单账号单消息反馈，并与审计和 Outbox 同事务提交。"""
+
+        normalized_issues, normalized_comment = _normalize_feedback(rating, issue_codes, comment)
+        account_id = _browser_account(context)
+        now = datetime.now(UTC)
+        try:
+            with self._unit_of_work as unit_of_work:
+                # 1. 在反馈写事务内重新验证成员、私有会话及消息终态，撤权或运行变化立即失败关闭。
+                _require_active_member(unit_of_work, context.workspace_id, account_id)
+                _owned_conversation(unit_of_work, context, conversation_id, account_id)
+                run = _owned_run_by_message(
+                    unit_of_work,
+                    context,
+                    conversation_id,
+                    message_id,
+                    account_id,
+                )
+                if run.status not in {"completed", "failed"}:
+                    raise AssistantConversationBusyError
+
+                # 2. 单账号单消息反馈按版本修订；自由文本只留在反馈事实，不进入审计和 Outbox。
+                current = unit_of_work.assistant.get_feedback(
+                    context.workspace_id,
+                    message_id,
+                    account_id,
+                    for_update=True,
+                )
+                feedback = MessageFeedback(
+                    feedback_id=current.feedback_id if current is not None else uuid4(),
+                    workspace_id=context.workspace_id,
+                    conversation_id=conversation_id,
+                    message_id=message_id,
+                    run_id=run.run_id,
+                    account_id=account_id,
+                    rating=rating,
+                    issue_codes=normalized_issues,
+                    comment=normalized_comment,
+                    created_at=current.created_at if current is not None else now,
+                    updated_at=now,
+                    version=(current.version + 1) if current is not None else 1,
+                )
+                unit_of_work.assistant.save_feedback(feedback)
+                _record_feedback_event(unit_of_work, context, feedback, now)
+                unit_of_work.commit()
+                return feedback
+        except AssistantWriteConflictError as error:
+            raise AssistantFeedbackConflictError from error
 
     def claim_run(self, context: RequestContext, *, run_id: UUID) -> AssistantRun | None:
         """仅把当前账号的 queued Run 认领一次；重复后台任务直接退出。"""
@@ -365,11 +554,18 @@ def _require_active_member(
         raise AssistantDeniedError
 
 
-def _current_runtime_config(unit_of_work: AssistantUnitOfWork) -> RuntimeConfigSnapshot:
+def _current_runtime_config(
+    unit_of_work: AssistantUnitOfWork,
+    bootstrap: RuntimeConfigurationBootstrap | None,
+    account_id: UUID,
+) -> RuntimeConfigSnapshot:
+    if bootstrap is not None:
+        # 显式本地模式每次都做幂等复核，使误停用的内置 Provider 在下一次交互前恢复。
+        return bootstrap.ensure(account_id)
     current = unit_of_work.assistant.get_current_runtime_config()
-    if current is None:
-        raise AiRuntimeConfigNotActiveError
-    return current
+    if current is not None:
+        return current
+    raise AiRuntimeConfigNotActiveError
 
 
 def _owned_conversation(
@@ -411,6 +607,26 @@ def _owned_run(
     return run
 
 
+def _owned_run_by_message(
+    unit_of_work: AssistantUnitOfWork,
+    context: RequestContext,
+    conversation_id: UUID,
+    message_id: UUID,
+    account_id: UUID,
+) -> AssistantRun:
+    """按工作空间、私有会话、助手消息和请求账号共同收敛 Run 读取。"""
+
+    run = unit_of_work.assistant.get_run_by_assistant_message(
+        context.workspace_id,
+        conversation_id,
+        message_id,
+        account_id,
+    )
+    if run is None:
+        raise AssistantNotFoundError
+    return run
+
+
 def _normalize_title(title: str | None) -> str | None:
     if title is None:
         return None
@@ -439,6 +655,27 @@ def _require_limit(limit: int) -> None:
 def _require_idempotency_key(idempotency_key: str) -> None:
     if IDEMPOTENCY_PATTERN.fullmatch(idempotency_key) is None:
         raise AssistantValidationError
+
+
+def _normalize_feedback(
+    rating: FeedbackRating,
+    issue_codes: tuple[FeedbackIssueCode, ...],
+    comment: str | None,
+) -> tuple[tuple[FeedbackIssueCode, ...], str | None]:
+    issues = tuple(dict.fromkeys(issue_codes))
+    normalized_comment = comment.strip() if comment is not None else None
+    if normalized_comment == "":
+        normalized_comment = None
+    if (
+        rating not in FEEDBACK_RATINGS
+        or any(issue not in FEEDBACK_ISSUE_CODES for issue in issues)
+        or (rating == "helpful" and issues)
+        or (rating == "unhelpful" and not issues)
+        or len(issues) > 5
+        or (normalized_comment is not None and len(normalized_comment) > 1000)
+    ):
+        raise AssistantValidationError
+    return issues, normalized_comment
 
 
 def _request_hash(conversation_id: UUID, texts: tuple[str, ...]) -> str:
@@ -666,7 +903,7 @@ def _record_run_finished(
     unit_of_work: AssistantUnitOfWork,
     context: RequestContext,
     run: AssistantRun,
-    outcome: Literal["completed", "failed"],
+    outcome: Literal["completed", "failed", "cancelled"],
     occurred_at: datetime,
 ) -> None:
     """用脱敏终态记录审计和 Outbox，模型正文只保存在助手消息中。"""
@@ -687,7 +924,7 @@ def _record_run_finished(
             action=f"assistant.run.{outcome}",
             resource_type="assistant_run",
             resource_id=run.run_id,
-            outcome="succeeded" if outcome == "completed" else "failed",
+            outcome="succeeded" if outcome in {"completed", "cancelled"} else "failed",
             occurred_at=occurred_at,
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
@@ -702,6 +939,57 @@ def _record_run_finished(
             workspace_id=context.workspace_id,
             aggregate_id=run.run_id,
             aggregate_version=2,
+            occurred_at=occurred_at,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            request_id=context.request_id,
+            payload=attributes,
+        )
+    )
+
+
+def _record_feedback_event(
+    unit_of_work: AssistantUnitOfWork,
+    context: RequestContext,
+    feedback: MessageFeedback,
+    occurred_at: datetime,
+) -> None:
+    """只记录反馈类型和问题标签，用户自由文本不进入审计或集成事件。"""
+
+    attributes: dict[str, object] = {
+        "conversation_id": str(feedback.conversation_id),
+        "message_id": str(feedback.message_id),
+        "run_id": str(feedback.run_id),
+        "rating": feedback.rating,
+        "issue_codes": list(feedback.issue_codes),
+        "version": feedback.version,
+    }
+    unit_of_work.audit.add(
+        AuditRecord(
+            audit_id=uuid4(),
+            workspace_id=context.workspace_id,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            action="assistant.feedback.submitted",
+            resource_type="message_feedback",
+            resource_id=feedback.feedback_id,
+            outcome="succeeded",
+            occurred_at=occurred_at,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            attributes=attributes,
+        )
+    )
+    unit_of_work.outbox.add(
+        IntegrationEvent(
+            event_id=uuid4(),
+            event_type="assistant.feedback.submitted",
+            workspace_id=context.workspace_id,
+            aggregate_id=feedback.feedback_id,
+            aggregate_version=feedback.version,
             occurred_at=occurred_at,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,

@@ -47,6 +47,16 @@ interface RequestOptions extends Omit<RequestInit, "body" | "method"> {
   workspaceId?: string | null;
 }
 
+/** 流式请求只允许读取事件，不复用 JSON 请求的 body 和 Content-Type 处理。 */
+export interface StreamRequestOptions {
+  /** 显式工作空间；未传时沿用当前浏览器会话空间。 */
+  workspaceId?: string | null;
+  /** 由页面生命周期或取消操作控制的请求信号。 */
+  signal?: AbortSignal;
+  /** 最近确认的持久化事件标识，用于断点回放。 */
+  lastEventId?: string | null;
+}
+
 function isErrorResponse(value: unknown): value is ErrorResponse {
   if (!value || typeof value !== "object") return false;
   const item = value as Record<string, unknown>;
@@ -103,6 +113,48 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     );
   }
   return payload as T;
+}
+
+/**
+ * 打开同源 SSE 连接并复用浏览器会话上下文。
+ *
+ * 事件流必须由调用方消费 Response.body；本函数只负责请求头、401 清理和稳定错误转换，
+ * 从而让 JSON API 与 SSE 的安全边界保持一致。
+ */
+export async function apiStreamRequest(
+  path: string,
+  options: StreamRequestOptions = {},
+): Promise<Response> {
+  const session = getApiSession();
+  const headers = new Headers({ Accept: "text/event-stream" });
+  const workspaceId = options.workspaceId === undefined ? session.workspaceId : options.workspaceId;
+  if (workspaceId) headers.set("X-Workspace-ID", workspaceId);
+  if (options.lastEventId) headers.set("Last-Event-ID", options.lastEventId);
+  const response = await fetch(path, {
+    method: "GET",
+    headers,
+    credentials: "same-origin",
+    signal: options.signal,
+  });
+  if (response.ok) return response;
+  if (response.status === 401) handleUnauthorized();
+  const contentType = response.headers.get("content-type") ?? "";
+  const payload: unknown = contentType.includes("application/json") ? await response.json() : null;
+  if (isErrorResponse(payload)) {
+    throw new PlatformApiError(
+      response.status,
+      payload.code,
+      payload.message,
+      payload.retryable,
+      payload.trace_id,
+    );
+  }
+  throw new PlatformApiError(
+    response.status,
+    "HTTP_ERROR",
+    `流式请求失败：HTTP ${response.status}`,
+    false,
+  );
 }
 
 /** 把未知请求失败收敛为可展示文案，不向界面泄露原始响应结构。 */

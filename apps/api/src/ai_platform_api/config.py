@@ -44,13 +44,18 @@ class Settings(BaseSettings):
     stream_delta_batch_characters: int = 512
     session_ttl_seconds: int = 43_200
     session_cookie_secure: bool = False
+    local_mock_bootstrap_enabled: bool = False
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
+        # 1. 先约束认证与本地便利能力，生产环境不能继承开发态 Cookie 或 Mock 配置。
         if not 300 <= self.session_ttl_seconds <= 86_400:
             raise ValueError("Session 有效期必须位于 5 分钟到 24 小时之间")
         if self.environment not in {"local", "test"} and not self.session_cookie_secure:
             raise ValueError("非本地环境必须启用 Secure Session Cookie")
+        if self.environment not in {"local", "test"} and self.local_mock_bootstrap_enabled:
+            raise ValueError("内置 Mock 运行配置只能在 local 或 test 环境启用")
+        # 2. 资源和流式预算必须处于已验证区间，避免配置错误绕过应用层有界处理。
         if not 1024 * 1024 <= self.upload_max_file_size_bytes <= 100 * 1024 * 1024:
             raise ValueError("上传大小上限必须位于 1 MiB 到 100 MiB 之间")
         if not 1 <= self.ingestion_max_attempts <= 10:
@@ -69,6 +74,7 @@ class Settings(BaseSettings):
             raise ValueError("SSE 数据库轮询间隔必须位于 50 到 5000 毫秒之间")
         if not 64 <= self.stream_delta_batch_characters <= 4_096:
             raise ValueError("SSE 增量批次字符数必须位于 64 到 4096 之间")
+        # 3. 供应商白名单只保存规范域名，URL、端口与路径统一由地址策略单独校验。
         normalized_hosts = tuple(
             host.strip().casefold().rstrip(".") for host in self.model_provider_allowed_hosts
         )

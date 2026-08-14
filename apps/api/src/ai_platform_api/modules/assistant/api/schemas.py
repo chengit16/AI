@@ -111,6 +111,14 @@ class AssistantRunResponse(BaseModel):
     error_code: str | None
 
 
+class AssistantRunListResponse(BaseModel):
+    """表示会话内按创建时间正序返回的运行事实。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AssistantRunResponse]
+
+
 class UserMessageCreatedResponse(BaseModel):
     """同时返回幂等创建的用户消息与排队运行。"""
 
@@ -118,3 +126,67 @@ class UserMessageCreatedResponse(BaseModel):
 
     message: MessageResponse
     run: AssistantRunResponse
+
+
+class AssistantSourceResponse(BaseModel):
+    """表示当前仍获授权且版本有效的一条助手引用来源。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rank: int = Field(ge=1)
+    document_id: UUID
+    document_version_id: UUID
+    chunk_id: UUID
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    quote: str = Field(min_length=1, max_length=1000)
+    source_position: dict[str, object]
+    document_title: str = Field(min_length=1, max_length=255)
+    source_kind: Literal["manual", "upload", "web", "data_source"]
+    source_name: str = Field(min_length=1, max_length=255)
+    conflict_detected: bool
+
+
+class AssistantSourceListResponse(BaseModel):
+    """表示单条助手消息在当前授权边界内可查看的来源。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AssistantSourceResponse]
+
+
+class SubmitMessageFeedbackRequest(BaseModel):
+    """表示用户对助手答案的帮助度、问题标签和可选补充说明。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rating: Literal["helpful", "unhelpful"]
+    issue_codes: list[
+        Literal["incorrect", "missing_source", "source_mismatch", "unsafe", "other"]
+    ] = Field(default_factory=list, max_length=5)
+    comment: str | None = Field(default=None, min_length=1, max_length=1000)
+
+
+class MessageFeedbackResponse(BaseModel):
+    """表示当前账号对单条助手消息的最新反馈事实。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    feedback_id: UUID
+    workspace_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    run_id: UUID
+    rating: Literal["helpful", "unhelpful"]
+    issue_codes: list[Literal["incorrect", "missing_source", "source_mismatch", "unsafe", "other"]]
+    comment: str | None
+    created_at: datetime
+    updated_at: datetime
+    version: int = Field(ge=1)
+
+
+class CurrentMessageFeedbackResponse(BaseModel):
+    """表示反馈可能尚未提交的稳定读取包装。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item: MessageFeedbackResponse | None

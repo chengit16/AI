@@ -48,6 +48,10 @@ OWNER_PERMISSION_CODES = (
     "assistant.conversation.read",
     "assistant.conversation.archive",
     "assistant.message.create",
+    "assistant.page.access",
+    "assistant.run.cancel",
+    "assistant.source.read",
+    "assistant.feedback.manage",
     "organization.assignment.read",
     "organization.assignment.write",
     "organization.department.create",
@@ -80,6 +84,10 @@ MEMBER_PERMISSION_CODES = (
     "assistant.conversation.read",
     "assistant.conversation.archive",
     "assistant.message.create",
+    "assistant.page.access",
+    "assistant.run.cancel",
+    "assistant.source.read",
+    "assistant.feedback.manage",
 )
 
 

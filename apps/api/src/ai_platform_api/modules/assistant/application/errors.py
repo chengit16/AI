@@ -31,3 +31,9 @@ class AssistantConversationBusyError(PlatformError):
     """会话已有排队或运行中的生成任务。"""
 
     error_code = "CONVERSATION_BUSY"
+
+
+class AssistantFeedbackConflictError(PlatformError):
+    """反馈已被并发修改，调用方应刷新后重试。"""
+
+    error_code = "ASSISTANT_FEEDBACK_CONFLICT"

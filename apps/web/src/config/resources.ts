@@ -7,6 +7,7 @@ import {
   Cpu,
   LibraryBig,
   LayoutDashboard,
+  MessageSquareText,
   Network,
   UsersRound,
   type LucideIcon,
@@ -25,6 +26,7 @@ export const iconByKey = {
   "library-big": LibraryBig,
   "layout-dashboard": LayoutDashboard,
   network: Network,
+  "message-square-text": MessageSquareText,
   "users-round": UsersRound,
 } satisfies Record<string, LucideIcon>;
 

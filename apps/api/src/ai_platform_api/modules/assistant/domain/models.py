@@ -10,12 +10,21 @@ from uuid import UUID
 
 from ai_platform_backend.integration.domain import AuditWriter
 
+from ai_platform_api.common.runtime import RuntimeConfigSnapshot
 from ai_platform_api.modules.integration.domain.events import OutboxWriter
 
 ConversationStatus = Literal["active", "archived"]
 MessageRole = Literal["system", "user", "assistant", "tool"]
 MessageStatus = Literal["streaming", "completed", "failed"]
 AssistantRunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+FeedbackRating = Literal["helpful", "unhelpful"]
+FeedbackIssueCode = Literal[
+    "incorrect",
+    "missing_source",
+    "source_mismatch",
+    "unsafe",
+    "other",
+]
 
 
 class AssistantWriteConflictError(Exception):
@@ -26,12 +35,10 @@ class AssistantWriteConflictError(Exception):
         super().__init__(reason)
 
 
-@dataclass(frozen=True)
-class RuntimeConfigSnapshot:
-    """标识平台当前发布的不可变运行配置及其内容摘要。"""
+class RuntimeConfigurationBootstrap(Protocol):
+    """在本地零配置模式下创建当前 AI 运行配置，不改变真实配置发布流程。"""
 
-    runtime_config_version_id: UUID
-    content_hash: str
+    def ensure(self, account_id: UUID) -> RuntimeConfigSnapshot: ...
 
 
 @dataclass(frozen=True)
@@ -121,6 +128,24 @@ class MessageSubmission:
     run: AssistantRun
 
 
+@dataclass(frozen=True)
+class MessageFeedback:
+    """保存当前账号对单条助手消息的可修订人工反馈。"""
+
+    feedback_id: UUID
+    workspace_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    run_id: UUID
+    account_id: UUID
+    rating: FeedbackRating
+    issue_codes: tuple[FeedbackIssueCode, ...]
+    comment: str | None
+    created_at: datetime
+    updated_at: datetime
+    version: int
+
+
 class AssistantRepository(Protocol):
     """按工作空间和会话创建者边界读写助手事实。"""
 
@@ -166,6 +191,15 @@ class AssistantRepository(Protocol):
         limit: int,
     ) -> tuple[Message, ...]: ...
 
+    def list_runs(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        account_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[AssistantRun, ...]: ...
+
     def get_submission(
         self,
         workspace_id: UUID,
@@ -183,6 +217,14 @@ class AssistantRepository(Protocol):
         for_update: bool = False,
     ) -> AssistantRun | None: ...
 
+    def get_run_by_assistant_message(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        message_id: UUID,
+        account_id: UUID,
+    ) -> AssistantRun | None: ...
+
     def has_active_run(self, workspace_id: UUID, conversation_id: UUID) -> bool: ...
 
     def add_submission(self, submission: MessageSubmission) -> None: ...
@@ -197,6 +239,17 @@ class AssistantRepository(Protocol):
     ) -> bool: ...
 
     def finish_assistant_message(self, message: Message) -> bool: ...
+
+    def get_feedback(
+        self,
+        workspace_id: UUID,
+        message_id: UUID,
+        account_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> MessageFeedback | None: ...
+
+    def save_feedback(self, feedback: MessageFeedback) -> None: ...
 
 
 class AssistantUnitOfWork(Protocol):

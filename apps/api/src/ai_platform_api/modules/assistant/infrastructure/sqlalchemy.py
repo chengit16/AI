@@ -21,6 +21,7 @@ from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ai_platform_api.common.runtime import RuntimeConfigSnapshot
 from ai_platform_api.modules.assistant.domain.models import (
     AgentRelease,
     AssistantRepository,
@@ -29,10 +30,12 @@ from ai_platform_api.modules.assistant.domain.models import (
     AssistantUnitOfWork,
     AssistantWriteConflictError,
     Conversation,
+    FeedbackIssueCode,
+    FeedbackRating,
     Message,
+    MessageFeedback,
     MessagePart,
     MessageSubmission,
-    RuntimeConfigSnapshot,
 )
 from ai_platform_api.persistence.tables import (
     agent_publications,
@@ -42,6 +45,7 @@ from ai_platform_api.persistence.tables import (
     ai_runtime_config_versions,
     assistant_runs,
     conversations,
+    message_feedbacks,
     message_parts,
     messages,
     workspace_memberships,
@@ -296,6 +300,26 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         )
         return tuple(self._message(row) for row in rows)
 
+    def list_runs(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        account_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[AssistantRun, ...]:
+        rows = self._session.execute(
+            select(assistant_runs)
+            .where(
+                assistant_runs.c.workspace_id == workspace_id,
+                assistant_runs.c.conversation_id == conversation_id,
+                assistant_runs.c.requested_by_account_id == account_id,
+            )
+            .order_by(assistant_runs.c.created_at, assistant_runs.c.run_id)
+            .limit(limit)
+        )
+        return tuple(_run(row) for row in rows)
+
     def get_submission(
         self,
         workspace_id: UUID,
@@ -346,6 +370,23 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         if for_update:
             statement = statement.with_for_update()
         row = self._session.execute(statement).one_or_none()
+        return _run(row) if row is not None else None
+
+    def get_run_by_assistant_message(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        message_id: UUID,
+        account_id: UUID,
+    ) -> AssistantRun | None:
+        row = self._session.execute(
+            select(assistant_runs).where(
+                assistant_runs.c.workspace_id == workspace_id,
+                assistant_runs.c.conversation_id == conversation_id,
+                assistant_runs.c.assistant_message_id == message_id,
+                assistant_runs.c.requested_by_account_id == account_id,
+            )
+        ).one_or_none()
         return _run(row) if row is not None else None
 
     def has_active_run(self, workspace_id: UUID, conversation_id: UUID) -> bool:
@@ -461,6 +502,69 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         if message.parts:
             self._insert_parts(message)
         return True
+
+    def get_feedback(
+        self,
+        workspace_id: UUID,
+        message_id: UUID,
+        account_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> MessageFeedback | None:
+        statement = select(message_feedbacks).where(
+            message_feedbacks.c.workspace_id == workspace_id,
+            message_feedbacks.c.message_id == message_id,
+            message_feedbacks.c.account_id == account_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
+        return _feedback(row) if row is not None else None
+
+    def save_feedback(self, feedback: MessageFeedback) -> None:
+        """首次插入或按版本更新反馈，避免并发覆盖用户刚提交的选择。"""
+
+        # 1. 首次反馈依赖消息唯一约束，竞争插入统一映射为领域写冲突。
+        values = {
+            "rating": feedback.rating,
+            "issue_codes": list(feedback.issue_codes),
+            "comment": feedback.comment,
+            "updated_at": feedback.updated_at,
+            "version": feedback.version,
+        }
+        current_version = feedback.version - 1
+        if current_version == 0:
+            try:
+                self._session.execute(
+                    insert(message_feedbacks).values(
+                        feedback_id=feedback.feedback_id,
+                        workspace_id=feedback.workspace_id,
+                        conversation_id=feedback.conversation_id,
+                        message_id=feedback.message_id,
+                        run_id=feedback.run_id,
+                        account_id=feedback.account_id,
+                        created_at=feedback.created_at,
+                        **values,
+                    )
+                )
+            except IntegrityError as error:
+                raise AssistantWriteConflictError("write") from error
+            return
+        # 2. 修订只接受调用方已读取版本的下一版，行数不匹配代表并发修改。
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(message_feedbacks)
+                .where(
+                    message_feedbacks.c.feedback_id == feedback.feedback_id,
+                    message_feedbacks.c.workspace_id == feedback.workspace_id,
+                    message_feedbacks.c.version == current_version,
+                )
+                .values(**values)
+            ),
+        )
+        if result.rowcount != 1:
+            raise AssistantWriteConflictError("write")
 
     def _insert_message(self, message: Message) -> None:
         self._session.execute(
@@ -644,6 +748,23 @@ def _run(row: Row[Any]) -> AssistantRun:
         row.updated_at,
         row.completed_at,
         row.error_code,
+    )
+
+
+def _feedback(row: Row[Any]) -> MessageFeedback:
+    return MessageFeedback(
+        row.feedback_id,
+        row.workspace_id,
+        row.conversation_id,
+        row.message_id,
+        row.run_id,
+        row.account_id,
+        cast("FeedbackRating", row.rating),
+        tuple(cast("list[FeedbackIssueCode]", row.issue_codes)),
+        row.comment,
+        row.created_at,
+        row.updated_at,
+        row.version,
     )
 
 

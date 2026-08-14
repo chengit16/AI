@@ -7,9 +7,15 @@ from ai_platform_backend.indexing.embeddings import DeterministicHashEmbeddingAd
 from ai_platform_backend.safety import RagSafetyGate
 
 from ai_platform_api.app.errors import ErrorCatalog
+from ai_platform_api.app.local_mock import (
+    LOCAL_MOCK_PROVIDER_ID,
+    LOCAL_MOCK_PROVIDER_KEY,
+    LocalMockRuntimeBootstrap,
+)
 from ai_platform_api.config import Settings
 from ai_platform_api.modules.assistant.application.runner import AssistantRunExecutor
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
+from ai_platform_api.modules.assistant.application.sources import AssistantSourceService
 from ai_platform_api.modules.assistant.infrastructure.sqlalchemy import (
     SqlAlchemyAssistantUnitOfWork,
 )
@@ -94,6 +100,9 @@ from ai_platform_api.modules.model_gateway.application.runtime_gateway import (
 from ai_platform_api.modules.model_gateway.infrastructure.configuration_sqlalchemy import (
     SqlAlchemyModelProviderUnitOfWork,
 )
+from ai_platform_api.modules.model_gateway.infrastructure.local_mock import (
+    LocalMockRuntimeProviderFactory,
+)
 from ai_platform_api.modules.model_gateway.infrastructure.provider_http import (
     OpenAiCompatibleCapabilityProbe,
     OpenAiCompatibleRuntimeProviderFactory,
@@ -156,6 +165,7 @@ class ApplicationContainer:
     model_runtime: RuntimeModelGatewayService | None = None
     assistant_conversations: AssistantConversationService | None = None
     assistant_run_executor: AssistantRunExecutor | None = None
+    assistant_sources: AssistantSourceService | None = None
     streaming: TransactionalStreamService | None = None
     retrieval_planning: BoundedRetrievalPlanningService | None = None
     retrieval_evidence: RetrievalEvidenceService | None = None
@@ -240,8 +250,14 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     ai_runtime_configurations = AiRuntimeConfigurationService(
         SqlAlchemyRuntimeConfigurationUnitOfWork(database.sessions)
     )
+    runtime_bootstrap = (
+        LocalMockRuntimeBootstrap(database.sessions, secret_cipher, ai_runtime_configurations)
+        if settings.local_mock_bootstrap_enabled
+        else None
+    )
     assistant_conversations = AssistantConversationService(
-        SqlAlchemyAssistantUnitOfWork(database.sessions)
+        SqlAlchemyAssistantUnitOfWork(database.sessions),
+        runtime_bootstrap=runtime_bootstrap,
     )
     policy = RbacPolicyDecisionPoint(resource_registry, policy_reader, field_registry)
     retrieval_planning = BoundedRetrievalPlanningService(
@@ -258,11 +274,21 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         DeterministicLexicalReranker(),
     )
     runtime_reader = SqlAlchemyRuntimeConfigurationReader(database.sessions)
+    http_runtime_provider_factory = OpenAiCompatibleRuntimeProviderFactory(provider_url_policy)
+    runtime_provider_factory = (
+        LocalMockRuntimeProviderFactory(
+            http_runtime_provider_factory,
+            provider_id=LOCAL_MOCK_PROVIDER_ID,
+            provider_key=LOCAL_MOCK_PROVIDER_KEY,
+        )
+        if settings.local_mock_bootstrap_enabled
+        else http_runtime_provider_factory
+    )
     model_runtime = RuntimeModelGatewayService(
         runtime_reader,
         SqlAlchemyRuntimeInvocationStore(database.sessions),
         model_provider_configurations,
-        OpenAiCompatibleRuntimeProviderFactory(provider_url_policy),
+        runtime_provider_factory,
         rag_safety,
     )
     streaming = TransactionalStreamService(
@@ -313,6 +339,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             model_runtime=model_runtime,
             assistant_conversations=assistant_conversations,
             assistant_run_executor=assistant_run_executor,
+            assistant_sources=AssistantSourceService(
+                assistant_conversations,
+                retrieval_evidence,
+            ),
             streaming=streaming,
             retrieval_planning=retrieval_planning,
             retrieval_evidence=retrieval_evidence,

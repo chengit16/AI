@@ -3,6 +3,7 @@
 import json
 import time
 from collections.abc import Iterator
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import NAMESPACE_URL, UUID, uuid5
@@ -11,17 +12,24 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request,
 from fastapi.responses import StreamingResponse
 
 from ai_platform_api.common.api_errors import error_responses
+from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.config import Settings, get_settings
 from ai_platform_api.modules.assistant.api.schemas import (
+    AssistantRunListResponse,
     AssistantRunResponse,
+    AssistantSourceListResponse,
+    AssistantSourceResponse,
     ConversationListResponse,
     ConversationResponse,
     CreateConversationRequest,
     CreateUserMessageRequest,
+    CurrentMessageFeedbackResponse,
+    MessageFeedbackResponse,
     MessageListResponse,
     MessagePartResponse,
     MessageResponse,
+    SubmitMessageFeedbackRequest,
     UserMessageCreatedResponse,
 )
 from ai_platform_api.modules.assistant.application.errors import AssistantDeniedError
@@ -31,6 +39,10 @@ from ai_platform_api.modules.assistant.application.service import (
     AssistantRun,
     Conversation,
     Message,
+    MessageFeedback,
+)
+from ai_platform_api.modules.assistant.application.sources import (
+    AssistantSourceService,
 )
 from ai_platform_api.modules.identity.api.dependencies import trusted_request_context
 from ai_platform_api.modules.streaming.application.service import (
@@ -67,6 +79,15 @@ def streaming_service(request: Request) -> TransactionalStreamService:
     service = getattr(request.app.state, "streaming_service", None)
     if not isinstance(service, TransactionalStreamService):
         raise RuntimeError("流式事件服务尚未完成装配")
+    return service
+
+
+def assistant_source_service(request: Request) -> AssistantSourceService:
+    """从应用容器解析来源服务，Router 不直接读取 Retrieval 私有表。"""
+
+    service = getattr(request.app.state, "assistant_source_service", None)
+    if not isinstance(service, AssistantSourceService):
+        raise RuntimeError("助手来源服务尚未完成装配")
     return service
 
 
@@ -129,6 +150,34 @@ def list_messages(
         items=[
             _message(item)
             for item in service.list_messages(
+                context,
+                conversation_id=conversation_id,
+                limit=limit,
+            )
+        ]
+    )
+
+
+@router.get(
+    "/{conversation_id}/runs",
+    response_model=AssistantRunListResponse,
+    operation_id="listAssistantRuns",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def list_runs(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[AssistantConversationService, Depends(assistant_conversation_service)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 200,
+) -> AssistantRunListResponse:
+    """列出会话运行，用于页面刷新后恢复活动流和终态。"""
+
+    _require_workspace_path(context, workspace_id)
+    return AssistantRunListResponse(
+        items=[
+            _run(item)
+            for item in service.list_runs(
                 context,
                 conversation_id=conversation_id,
                 limit=limit,
@@ -228,6 +277,131 @@ def stream_run_events(
 
 
 @router.post(
+    "/{conversation_id}/runs/{run_id}/cancel",
+    response_model=AssistantRunResponse,
+    operation_id="cancelAssistantRun",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def cancel_run(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    run_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    conversations: Annotated[
+        AssistantConversationService,
+        Depends(assistant_conversation_service),
+    ],
+    streams: Annotated[TransactionalStreamService, Depends(streaming_service)],
+) -> AssistantRunResponse:
+    """取消当前账号的活动 Run，并尽力关闭对应可恢复流事实。"""
+
+    _require_workspace_path(context, workspace_id)
+    run = conversations.cancel_run(
+        context,
+        conversation_id=conversation_id,
+        run_id=run_id,
+    )
+    if run.status == "cancelled":
+        _close_cancelled_stream(streams, run)
+    return _run(run)
+
+
+@router.get(
+    "/{conversation_id}/messages/{message_id}/sources",
+    response_model=AssistantSourceListResponse,
+    operation_id="listAssistantMessageSources",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def list_message_sources(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    message_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[AssistantSourceService, Depends(assistant_source_service)],
+) -> AssistantSourceListResponse:
+    """按当前权限和版本重新验证后返回助手消息来源。"""
+
+    _require_workspace_path(context, workspace_id)
+    return AssistantSourceListResponse(
+        items=[
+            AssistantSourceResponse(
+                rank=item.rank,
+                document_id=item.document_id,
+                document_version_id=item.document_version_id,
+                chunk_id=item.chunk_id,
+                content_hash=item.content_hash,
+                quote=item.quote,
+                source_position=dict(item.source_position),
+                document_title=item.document_title,
+                source_kind=item.source_kind,
+                source_name=item.source_name,
+                conflict_detected=item.conflict_detected,
+            )
+            for item in service.list_sources(
+                context,
+                conversation_id=conversation_id,
+                message_id=message_id,
+            )
+        ]
+    )
+
+
+@router.get(
+    "/{conversation_id}/messages/{message_id}/feedback",
+    response_model=CurrentMessageFeedbackResponse,
+    operation_id="getAssistantMessageFeedback",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def get_message_feedback(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    message_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[AssistantConversationService, Depends(assistant_conversation_service)],
+) -> CurrentMessageFeedbackResponse:
+    """读取当前账号对目标助手消息的最新反馈。"""
+
+    _require_workspace_path(context, workspace_id)
+    feedback = service.get_feedback(
+        context,
+        conversation_id=conversation_id,
+        message_id=message_id,
+    )
+    return CurrentMessageFeedbackResponse(
+        item=_feedback(feedback) if feedback is not None else None
+    )
+
+
+@router.put(
+    "/{conversation_id}/messages/{message_id}/feedback",
+    response_model=MessageFeedbackResponse,
+    operation_id="submitAssistantMessageFeedback",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def submit_message_feedback(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    message_id: UUID,
+    body: SubmitMessageFeedbackRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[AssistantConversationService, Depends(assistant_conversation_service)],
+) -> MessageFeedbackResponse:
+    """新增或修订人工反馈，不触发模型调用或自动评分。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _feedback(
+        service.submit_feedback(
+            context,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            rating=body.rating,
+            issue_codes=tuple(body.issue_codes),
+            comment=body.comment,
+        )
+    )
+
+
+@router.post(
     "/{conversation_id}/archive",
     response_model=ConversationResponse,
     operation_id="archiveAssistantConversation",
@@ -299,6 +473,22 @@ def _run(value: AssistantRun) -> AssistantRunResponse:
     )
 
 
+def _feedback(value: MessageFeedback) -> MessageFeedbackResponse:
+    return MessageFeedbackResponse(
+        feedback_id=value.feedback_id,
+        workspace_id=value.workspace_id,
+        conversation_id=value.conversation_id,
+        message_id=value.message_id,
+        run_id=value.run_id,
+        rating=value.rating,
+        issue_codes=list(value.issue_codes),
+        comment=value.comment,
+        created_at=value.created_at,
+        updated_at=value.updated_at,
+        version=value.version,
+    )
+
+
 def _require_workspace_path(context: RequestContext, workspace_id: UUID) -> None:
     if context.workspace_id != workspace_id:
         raise AssistantDeniedError
@@ -323,6 +513,44 @@ def _initial_replay(
         if last_event_id is not None or run.status not in {"queued", "running"}:
             raise
         return None
+
+
+def _close_cancelled_stream(
+    streams: TransactionalStreamService,
+    run: AssistantRun,
+) -> None:
+    """兼容 Run 尚未建流或已由执行器建流的竞态，并最终保存取消快照。"""
+
+    if run.assistant_message_id is None:
+        return
+    now = datetime.now(UTC)
+    with suppress(PlatformError):
+        streams.start_run(
+            run.workspace_id,
+            run.conversation_id,
+            run.assistant_message_id,
+            run.run_id,
+            now=now,
+        )
+    # 已存在的活动流仍需继续追加取消事件；已关闭流则由后续操作自然保持终态。
+    try:
+        streams.append(
+            run.run_id,
+            "message.failed",
+            run.trace_id,
+            run.traceparent,
+            {"error_code": "RUN_CANCELLED"},
+            now=now,
+        )
+        streams.finish(
+            run.run_id,
+            "cancelled",
+            {"status": "cancelled", "error_code": "RUN_CANCELLED"},
+            now=now,
+        )
+    except PlatformError:
+        # 数据库 Run 已是安全终态；流被并发关闭时不能反向回滚取消结果。
+        pass
 
 
 def _stream_frames(
