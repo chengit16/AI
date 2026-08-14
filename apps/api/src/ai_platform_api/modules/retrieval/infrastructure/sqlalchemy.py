@@ -63,9 +63,10 @@ class SqlAlchemySearchIndex:
         self._session = session
 
     def add(self, chunk: IndexedChunk) -> None:
-        # 当前索引物理维度与 BGE-M3 冻结版本绑定，提前失败可避免晦涩的数据库类型错误。
+        # 1. 当前物理维度与 BGE-M3 冻结版本绑定，提前失败可避免晦涩的数据库错误。
         if len(chunk.embedding) != 1024:
             raise ValueError("索引向量维度必须为 1024")
+        # 2. 以索引版本和 Chunk ID 幂等 Upsert，重试只能更新同一构建版本内的投影字段。
         statement = postgresql_insert(retrieval_chunks).values(
             index_version_id=chunk.index_version_id,
             chunk_id=chunk.chunk_id,

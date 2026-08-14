@@ -145,6 +145,8 @@ class ApplicationContainer:
 def build_application_container(settings: Settings) -> ApplicationContainer:
     """装配应用服务及基础设施适配器，集中维护进程级依赖生命周期。"""
 
+    # 长函数保留原因: 进程级资源必须在一个组合根中显式建立所有权和逆序清理关系。
+    # 1. 启动前先验证发布兼容性，再创建数据库、会话和角色缓存等进程级资源。
     verify_release_compatibility(
         settings.release_manifest_path,
         settings.compatibility_matrix_path,
@@ -156,6 +158,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     entitlement_access = SqlAlchemyEntitlementAccessReader(database.sessions)
     digester = Sha256SecretDigester()
     passwords = Argon2idPasswordAdapter()
+    # 2. 从冻结注册表装配授权与领域服务，所有服务共享同一数据库 SessionFactory。
     resource_registry = load_resource_registry(Path(settings.resource_registry_path))
     field_registry = load_field_policy_registry(Path(settings.field_policy_registry_path))
     policy_reader = SqlAlchemyPolicyGrantRepository(database.sessions)
@@ -200,6 +203,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     ai_runtime_configurations = AiRuntimeConfigurationService(
         SqlAlchemyRuntimeConfigurationUnitOfWork(database.sessions)
     )
+    # 3. 容器接管全部资源；构造中途失败时按依赖逆序关闭，避免泄漏连接和缓存客户端。
     try:
         return ApplicationContainer(
             settings=settings,

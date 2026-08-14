@@ -59,6 +59,7 @@ class SqlAlchemyPolicyGrantRepository:
         if context.user_id is None:
             return None
         with self._session_factory() as session:
+            # 1. 工作空间和成员关系必须在同一数据库快照中保持有效，否则主体立即失效。
             workspace_row = session.execute(
                 select(workspaces.c.status, workspaces.c.role_version).where(
                     workspaces.c.workspace_id == context.workspace_id
@@ -87,6 +88,7 @@ class SqlAlchemyPolicyGrantRepository:
                 membership_row.updated_at,
                 membership_row.version,
             )
+            # 2. 使用服务端组织和角色绑定计算有效角色，最终只向 PDP 返回最小主体事实。
             effective = resolve_effective_roles(
                 membership=membership,
                 role_version=workspace_row.role_version,

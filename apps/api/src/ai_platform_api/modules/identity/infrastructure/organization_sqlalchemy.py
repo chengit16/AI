@@ -281,6 +281,7 @@ class SqlAlchemyOrganizationRepository:
         position_ids: tuple[UUID, ...],
         occurred_at: datetime,
     ) -> WorkspaceMembership:
+        # 1. 整体替换先清除旧岗位和部门关系，事务失败时由 UoW 统一回滚。
         self._session.execute(
             delete(membership_positions).where(
                 membership_positions.c.workspace_id == workspace_id,
@@ -294,6 +295,7 @@ class SqlAlchemyOrganizationRepository:
             )
         )
         if department_ids:
+            # 2. 部门与岗位都必须属于当前空间；数据库约束冲突统一映射为组织写冲突。
             try:
                 self._session.execute(
                     insert(membership_departments),
@@ -336,6 +338,7 @@ class SqlAlchemyOrganizationRepository:
                 )
             except IntegrityError as error:
                 raise OrganizationWriteConflictError from error
+        # 3. 最后通过成员版本乐观锁确认没有并发覆盖，再返回新的组织版本事实。
         updated = WorkspaceMembership(
             membership.membership_id,
             membership.workspace_id,

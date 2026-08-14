@@ -140,7 +140,9 @@ class ResourceRegistry:
         return tuple(item for item in self.menu_api_bindings if item.menu_id not in platform_ids)
 
     def violations(self) -> tuple[str, ...]:
+        # 长函数保留原因: 校验器需要一次聚合全部问题，才能给发布者返回完整而稳定的问题清单。
         violations: list[str] = []
+        # 1. 建立各资源唯一索引并验证注册表版本，为后续跨引用检查提供确定查找结果。
         if self.schema_version != 1:
             violations.append("schema_version: 当前只支持版本 1")
         if self.registry_version < 1:
@@ -207,6 +209,7 @@ class ResourceRegistry:
             violations,
         )
 
+        # 2. 校验 Permission、页面和接口自身格式及访问级别，不在此阶段判断菜单引用。
         for permission in self.permissions:
             if not PERMISSION_CODE_PATTERN.fullmatch(permission.code):
                 violations.append(f"permissions[{permission.code}]: permission_code 格式非法")
@@ -247,6 +250,7 @@ class ResourceRegistry:
                 violations,
             )
 
+        # 3. 校验菜单父子关系、页面和权限绑定，并收集已经被导航消费的资源。
         referenced_pages: set[UUID] = set()
         referenced_permissions: set[str] = set()
         for menu in self.menus:
@@ -313,6 +317,7 @@ class ResourceRegistry:
 
         _append_menu_cycle_violations(menu_by_key, violations)
 
+        # 4. 校验动作菜单与接口的一一权限边界，区分平台级与工作空间级资源。
         referenced_action_menus: set[UUID] = set()
         referenced_protected_apis: set[UUID] = set()
         seen_bindings: set[tuple[UUID, UUID]] = set()
@@ -366,6 +371,7 @@ class ResourceRegistry:
             ):
                 violations.append(f"api_resources[{api.api_key}]: 受保护接口未绑定任何动作菜单")
 
+        # 5. 最后检查授权页面、受保护接口和启用 Permission 是否存在未绑定孤岛。
         for page in self.page_resources:
             if (
                 page.status == "active"

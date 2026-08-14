@@ -16,6 +16,7 @@ from ai_platform_api.modules.authorization.domain.fields import (
 def load_field_policy_registry(path: Path) -> FieldPolicyRegistry:
     """从版本化配置加载字段策略注册表，配置不合法时启动失败。"""
 
+    # 1. 先把外部 JSON 收敛为确定的根对象和规则数组，结构错误直接阻断启动。
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -27,6 +28,7 @@ def load_field_policy_registry(path: Path) -> FieldPolicyRegistry:
         raise ValueError("字段策略注册表 rules 必须是数组")
     rules: list[FieldRule] = []
     seen_keys: set[tuple[str, str]] = set()
+    # 2. 逐条验证密级、字段键和继承语义，再交给领域注册表执行跨规则校验。
     for value in raw_rules:
         if not isinstance(value, dict):
             raise ValueError("字段策略规则必须是对象")

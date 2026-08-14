@@ -132,6 +132,7 @@ def trusted_request_context(
 ) -> RequestContext:
     """从应用容器解析可信请求上下文，避免路由自行装配基础设施。"""
 
+    # 1. 先验证空间 Header 及中间件建立的请求标识，业务路由不能自行伪造这些事实。
     try:
         workspace_id = UUID(workspace_header) if workspace_header is not None else None
     except ValueError as error:
@@ -145,6 +146,7 @@ def trusted_request_context(
     if not isinstance(request_id, UUID) or not isinstance(trace, TraceContext):
         raise RuntimeError("可信请求标识尚未建立")
 
+    # 2. API Key 与浏览器会话使用各自认证约束，随后统一进入注册接口的后端授权。
     service = authentication_service(request)
     if authorization is not None:
         scheme, separator, credential = authorization.partition(" ")
@@ -169,6 +171,7 @@ def trusted_request_context(
 
 
 def _authorize_registered_operation(request: Request, context: RequestContext) -> RequestContext:
+    # 1. 由 operation_id 反查冻结接口资源，未注册、停用或缺少权限绑定时默认拒绝。
     operation_id = getattr(request.scope.get("route"), "operation_id", None)
     registry = getattr(request.app.state, "resource_registry", None)
     policy = getattr(request.app.state, "policy_decision_point", None)
@@ -190,6 +193,7 @@ def _authorize_registered_operation(request: Request, context: RequestContext) -
     )
     if permission is None:
         raise AuthorizationDeniedError
+    # 2. PDP 决策成功后只把可信资源范围和字段遮罩写回上下文，路由不能扩大授权。
     decision = cast(PolicyDecisionPoint, policy).decide(
         PolicyRequest(
             context=context,

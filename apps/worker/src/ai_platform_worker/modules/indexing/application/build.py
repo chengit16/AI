@@ -113,6 +113,7 @@ class IndexBuildProcessor:
         now: datetime,
     ) -> IndexProcessOutcome:
         try:
+            # 1. 读取并校验解析产物，再按冻结组件版本生成具有权限元数据的确定性 Chunk。
             artifact = self._read_artifact(version)
             document = _decode_artifact(version, artifact)
             chunks = self._chunker.chunk(
@@ -137,6 +138,7 @@ class IndexBuildProcessor:
                     retryable=False,
                     stage="chunk",
                 )
+            # 2. Embedding 完成后由存储层校验租约并原子切换版本；丢失租约不得覆盖新 Worker。
             built = self._embed(version, chunks)
             return (
                 "succeeded"
@@ -187,6 +189,7 @@ class IndexBuildProcessor:
         version: ClaimedIndexVersion,
         chunks: tuple[Chunk, ...],
     ) -> tuple[BuiltIndexChunk, ...]:
+        # 1. Adapter 版本和物理维度必须匹配索引契约，调用失败按可重试错误收敛。
         if (
             self._embedding.model_version != version.embedding_model_version
             or self._embedding.dimension != 1024
@@ -206,6 +209,7 @@ class IndexBuildProcessor:
                 retryable=True,
                 stage="embedding",
             ) from error
+        # 2. 返回数量、维度和数值全部验证后，才组装可持久化索引事实。
         if len(embeddings) != len(chunks) or any(
             len(vector) != self._embedding.dimension
             or any(not math.isfinite(value) for value in vector)
@@ -282,6 +286,7 @@ class IndexBuildProcessor:
 
 def _decode_artifact(version: ClaimedIndexVersion, payload: bytes) -> ParsedDocument:
     try:
+        # 1. Schema 版本和五项任务身份必须与已认领索引版本完全一致。
         value = json.loads(payload)
         if not isinstance(value, dict) or value.get("schema_version") != 1:
             raise ValueError
@@ -297,6 +302,7 @@ def _decode_artifact(version: ClaimedIndexVersion, payload: bytes) -> ParsedDocu
         blocks_value = value["blocks"]
         if not isinstance(blocks_value, list) or not blocks_value:
             raise ValueError
+        # 2. 逐块恢复类型、正文和来源位置，不接受解析器输出的额外对象形态。
         blocks: list[ParsedBlock] = []
         for item in blocks_value:
             if not isinstance(item, dict) or item.get("block_type") not in {
@@ -320,6 +326,7 @@ def _decode_artifact(version: ClaimedIndexVersion, payload: bytes) -> ParsedDocu
                     ),
                 )
             )
+        # 3. 最后校验解析器元数据和 OCR 事实，再构造不可变 ParsedDocument。
         parser_name = value["parser_name"]
         media_type = value["media_type"]
         page_count = value["page_count"]

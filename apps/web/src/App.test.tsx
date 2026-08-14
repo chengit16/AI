@@ -47,10 +47,13 @@ describe("平台路由与运行状态", () => {
   });
 
   it("有发布快照时按后端返回的当前菜单加载页面", async () => {
+    // 1. 建立已登录的合成个人空间，确保动态菜单请求具有可信会话上下文。
     useSessionStore
       .getState()
       .setAuthenticated("account-id", "workspace-id", "synthetic-csrf-token");
+    // 2. 同时模拟菜单快照及页面依赖，验证导航只消费后端当前发布事实。
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      // 1. 优先识别菜单发布请求，返回能够驱动目录与页面路由的完整快照。
       const url = String(input);
       if (url.endsWith("/menu-releases/current")) {
         return Promise.resolve(
@@ -100,6 +103,7 @@ describe("平台路由与运行状态", () => {
           ),
         );
       }
+      // 2. 补齐应用壳层初始化所需的空间事实，避免菜单断言依赖无关请求失败。
       if (url.endsWith("/api/v1/workspaces")) {
         return Promise.resolve(
           new Response(
@@ -119,6 +123,7 @@ describe("平台路由与运行状态", () => {
           ),
         );
       }
+      // 3. 模拟配额与角色上下文，其余非关键端点使用空集合保持测试边界稳定。
       if (url.includes("/entitlements")) {
         return Promise.resolve(
           new Response(
@@ -155,6 +160,7 @@ describe("平台路由与运行状态", () => {
       );
     });
 
+    // 3. 渲染真实应用壳层，并从最终页面文案确认发布菜单已经驱动路由。
     renderApp(pageRoutes.WorkspaceOverviewPage);
 
     expect((await screen.findAllByText("已发布总览")).length).toBeGreaterThanOrEqual(1);

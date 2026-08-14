@@ -63,6 +63,7 @@ class SqlAlchemyEnterpriseRepository:
         workspace: EnterpriseWorkspace,
         owner: WorkspaceMembership,
     ) -> None:
+        # 1. 企业空间和唯一所有者成员关系共用创建审计字段，不能出现无所有者空间。
         audit_values = {
             "created_at": workspace.created_at,
             "created_by_actor_id": workspace.created_by_account_id,
@@ -84,6 +85,7 @@ class SqlAlchemyEnterpriseRepository:
                 )
             )
             self.add_membership(owner)
+            # 2. 套餐快照和功能开关与空间同时建立，业务请求不会观察到未初始化权益。
             entitlement, feature_settings = default_entitlement(
                 workspace_id=workspace.workspace_id,
                 workspace_type="enterprise",
@@ -113,6 +115,7 @@ class SqlAlchemyEnterpriseRepository:
                     version=feature_settings.version,
                 )
             )
+            # 3. 系统角色、所有者绑定和默认授权作为完整权限种子一次写入。
             system_roles, system_bindings = system_role_seed(
                 workspace_id=workspace.workspace_id,
                 owner_membership_id=owner.membership_id,
@@ -314,6 +317,7 @@ class SqlAlchemyEnterpriseRepository:
         )
 
     def save_membership(self, membership: WorkspaceMembership) -> None:
+        # 1. 先读取原状态，后续只在成员生命周期真正变化时推进角色版本。
         previous_status = self._session.scalar(
             select(workspace_memberships.c.status).where(
                 workspace_memberships.c.membership_id == membership.membership_id,
@@ -321,7 +325,7 @@ class SqlAlchemyEnterpriseRepository:
             )
         )
         if membership.status != "active":
-            # 离开或停用必须同步撤销组织归属，重新加入不能隐式恢复旧权限范围。
+            # 2. 离开或停用同步撤销组织和自定义角色范围，重新加入不能恢复旧权限。
             self._session.execute(
                 delete(membership_positions).where(
                     membership_positions.c.workspace_id == membership.workspace_id,
@@ -353,7 +357,7 @@ class SqlAlchemyEnterpriseRepository:
                     version=role_bindings.c.version + 1,
                 )
             )
-            # 成员状态变化会改变有效角色，即使没有自定义成员绑定也必须推进版本。
+        # 3. 角色版本和成员事实按同一状态变化更新，使旧缓存键立即失效。
         if previous_status != membership.status:
             self._session.execute(
                 update(workspaces)

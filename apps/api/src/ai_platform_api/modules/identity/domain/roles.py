@@ -147,6 +147,7 @@ def resolve_effective_roles(
             role_version,
             (),
         )
+    # 1. 只保留有效角色和有效部门祖先，停用节点不能继续向成员传递部门角色。
     role_by_id = {role.role_id: role for role in roles if role.status == "active"}
     summaries = {item.department_id: item for item in summarize_departments(departments)}
     active_assignments = {
@@ -162,6 +163,7 @@ def resolve_effective_roles(
         ):
             applicable_departments.add(closure.ancestor_department_id)
 
+    # 2. 汇总空间、部门和成员三类绑定来源，并按稳定顺序去重生成缓存事实。
     sources_by_role: dict[UUID, set[EffectiveRoleSource]] = {}
     for binding in bindings:
         if binding.status != "active" or binding.role_id not in role_by_id:

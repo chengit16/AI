@@ -54,6 +54,7 @@ def consume_usage(
 ) -> UsageMutation:
     """只修改当前事务中的用量事实，提交和 Outbox 写入仍由调用用例负责。"""
 
+    # 1. 先验证可信主体、计费周期和幂等键，非法扣减不能进入锁定计数器阶段。
     require_trusted_actor(context, workspace_id)
     now = occurred_at or datetime.now(UTC)
     usage_period_key = period_key(metric, now)
@@ -68,6 +69,7 @@ def consume_usage(
     entitlement = repository.get_entitlement(workspace_id, for_update=True)
     if workspace is None or workspace.status != "active" or entitlement is None:
         raise EntitlementGovernanceDeniedError
+    # 2. 相同幂等键只允许完全相同的计量事实；首次写入再锁定周期计数器计算额度。
     previous = repository.get_usage_record(workspace_id, idempotency_key)
     if previous is not None:
         if (
@@ -88,6 +90,7 @@ def consume_usage(
     resulting_value = current_value + delta_value
     if resulting_value < 0 or resulting_value > entitlement.limit_for(metric):
         raise QuotaExceededError
+    # 3. 计数器、明细、审计和 Outbox 事实由调用方在同一事务中持久化。
     counter = UsageCounter(
         workspace_id,
         metric,

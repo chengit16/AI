@@ -98,9 +98,9 @@ def append_element(
 
 
 def parse_xhtml(payload: bytes, fallback_media_type: str) -> ParsedDocument:
-    # Tika 3.2.3 会用 XML 禁止的 &#0; 表示空标题，移除该兼容性占位后再严格解析结构。
     """解析XHTML，在基础设施边界维持稳定领域对象映射。"""
 
+    # 1. Tika 3.2.3 会用 XML 禁止的 &#0; 表示空标题，先移除占位再严格解析结构。
     payload = payload.replace(TIKA_NULL_REFERENCE, b"")
     try:
         root = ElementTree.fromstring(payload)
@@ -119,6 +119,7 @@ def parse_xhtml(payload: bytes, fallback_media_type: str) -> ParsedDocument:
             "Tika 结果缺少正文结构",
             retryable=False,
         )
+    # 2. 优先按分页容器恢复来源页码，无分页结构时保持单页兼容，再汇总解析元数据。
     blocks: list[ParsedBlock] = []
     pages = [
         element

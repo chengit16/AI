@@ -30,6 +30,7 @@ def reciprocal_rank_fusion(
 ) -> tuple[SearchCandidate, ...]:
     """用倒数排名融合合并多通道候选，重复分块只累计排名贡献。"""
 
+    # 1. 同一 Chunk 在每个通道只贡献一次排名分数，重复结果不能抬高融合排名。
     merged: dict[object, SearchCandidate] = {}
     seen_channels: set[tuple[object, str]] = set()
     for candidate in keyword_candidates + vector_candidates:
@@ -63,6 +64,7 @@ def reciprocal_rank_fusion(
                 hybrid_score=existing.hybrid_score + contribution,
             )
         merged[candidate.chunk.chunk_id] = existing
+    # 2. 按融合分数和稳定 Chunk ID 排序，保证相同输入得到可复现候选顺序。
     return tuple(
         sorted(
             merged.values(),
@@ -90,6 +92,7 @@ class HybridRetriever:
         scope: AuthorizedSearchScope,
         budget: RetrievalBudget,
     ) -> RetrievalResult:
+        # 1. 在模型和索引调用前确认内容权限、组件版本和规范化查询，空查询直接返回。
         if not scope.content_allowed:
             raise RetrievalScopeDeniedError
         if self._embedding_provider.dimension != 1024:
@@ -107,6 +110,7 @@ class HybridRetriever:
                 tokenizer_version=TOKENIZER_VERSION,
             )
 
+        # 2. 在同一授权范围内执行关键词和向量召回，再以固定预算融合并截断重排池。
         embedded = self._embedding_provider.embed((normalized_query,))
         if len(embedded) != 1 or len(embedded[0]) != self._embedding_provider.dimension:
             raise RetrievalConfigurationError
@@ -133,6 +137,7 @@ class HybridRetriever:
             and rerank_pool[0].vector_score >= budget.fastpass_vector_score
         )
         ranked: tuple[SearchCandidate, ...]
+        # 3. FastPass 只跳过重排器，不跳过最终字段遮罩和证据数量预算。
         if not rerank_pool:
             ranked = ()
         elif fastpass:

@@ -110,6 +110,7 @@ class SqlAlchemyStreamStore(StreamStore):
         payload: dict[str, object],
         now: datetime,
     ) -> StreamEvent:
+        # 1. 锁定活动 Run 并先按 event_id 幂等读取，重放生产者不能重复推进序号。
         run_row = (
             self._session.execute(
                 select(stream_runs).where(stream_runs.c.run_id == run_id).with_for_update()
@@ -134,6 +135,7 @@ class SqlAlchemyStreamStore(StreamStore):
         )
         if existing_row is not None:
             return stream_event_from_row(existing_row)
+        # 2. 在同一事务内递增 Run 序号并写入事件，保证客户端观察到严格递增顺序。
         sequence_no = run.last_sequence_no + 1
         self._session.execute(
             update(stream_runs)
@@ -198,6 +200,7 @@ class SqlAlchemyStreamStore(StreamStore):
         now: datetime,
         policy: StreamPolicy,
     ) -> StreamReplay:
+        # 1. 先限定工作空间并验证 Run 和游标保留期，跨空间或过期游标不能回放。
         run_row = (
             self._session.execute(
                 select(stream_runs).where(
@@ -233,6 +236,7 @@ class SqlAlchemyStreamStore(StreamStore):
                 raise StreamEventExpiredError
             start_sequence = cursor["sequence_no"]
 
+        # 2. 按序读取游标后的有效事件，并同时执行事件数和编码字节双重预算。
         rows = (
             self._session.execute(
                 select(stream_events)

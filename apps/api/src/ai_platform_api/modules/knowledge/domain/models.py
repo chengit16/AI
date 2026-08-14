@@ -206,6 +206,7 @@ class DocumentSource:
     scanned_at: datetime | None = None
 
     def assert_valid(self) -> None:
+        # 1. 来源名称和定位字段先执行长度与空值约束，避免不可信定位信息进入持久层。
         if not self.source_name.strip() or len(self.source_name) > 255:
             raise InvalidKnowledgeFactError
         locators = (
@@ -240,7 +241,7 @@ class DocumentSource:
             and bool(self.scanner_version.strip())
             and self.scanned_at is not None
         )
-        # P1D-01 已存在的合成 upload 事实允许无扫描元数据；新上传只允许完整安全事实。
+        # 2. 兼容旧合成 upload 事实不携带扫描元数据；新上传只允许完整且 clean 的安全事实。
         if has_upload_metadata and (self.source_kind != "upload" or not complete_upload_metadata):
             raise InvalidKnowledgeFactError
         valid_shape = {

@@ -26,7 +26,7 @@ def switch_active_document_index(
 ) -> UUID | None:
     """在一个事务中撤销旧索引并启用目标文档版本的最新可用索引。"""
 
-    # 发布事实始终先于索引切换写入，锁定该行可串行化首次激活与并发重建。
+    # 1. 发布事实始终先写入；锁定发布指针并选择最新 ready 版本以串行化并发重建。
     session.execute(
         select(document_publications.c.current_document_version_id)
         .where(
@@ -48,7 +48,7 @@ def switch_active_document_index(
         .with_for_update()
     ).scalar_one_or_none()
 
-    # 先撤销旧 Chunk，即使目标版本尚无索引，也不能继续召回旧文档版本。
+    # 2. 先撤销旧 Chunk；即使目标版本尚无索引，也不能继续召回已过期文档版本。
     session.execute(
         update(retrieval_chunks)
         .where(
@@ -77,6 +77,7 @@ def switch_active_document_index(
         )
         return None
 
+    # 3. 目标版本、Chunk 和当前索引指针在同一事务中启用，对检索端一次可见。
     session.execute(
         update(index_versions)
         .where(index_versions.c.index_version_id == candidate)
@@ -123,6 +124,7 @@ def deactivate_document_indexes(
 ) -> None:
     """文档撤权时同时停用已发布 Chunk 并终止尚未完成的构建。"""
 
+    # 1. 先停用全部可检索 Chunk 和 ready/active 版本，使撤权立即对读取端生效。
     session.execute(
         update(retrieval_chunks)
         .where(
@@ -140,6 +142,7 @@ def deactivate_document_indexes(
         )
         .values(status="retired", updated_at=deactivated_at)
     )
+    # 2. 再终止排队或运行中的构建并删除发布指针，后台任务不能重新暴露该文档。
     session.execute(
         update(index_versions)
         .where(

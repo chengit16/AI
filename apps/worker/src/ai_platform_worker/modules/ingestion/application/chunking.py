@@ -95,6 +95,7 @@ class StructuralChunker:
         identity: DocumentIdentity,
         limits: IngestionLimits,
     ) -> tuple[Chunk, ...]:
+        # 1. 先把超长块拆为有来源位置的最小 Piece，空文本不进入后续分组。
         pieces = [
             piece
             for index, block in enumerate(document.blocks)
@@ -104,6 +105,7 @@ class StructuralChunker:
         groups: list[list[ChunkPiece]] = []
         current: list[ChunkPiece] = []
         current_length = 0
+        # 2. 按页边界和最大字符数聚合 Piece，页面变化时不跨页合并。
         for piece in pieces:
             page_changed = bool(
                 current
@@ -127,6 +129,7 @@ class StructuralChunker:
         chunks: list[Chunk] = []
         previous_tail = ""
         previous_page: int | None = None
+        # 3. 只在同页应用有界重叠，并用序号和内容摘要生成可复现 Chunk ID。
         for sequence_no, group in enumerate(groups, start=1):
             body = "\n".join(piece.text for piece in group)
             position = source_position(group)

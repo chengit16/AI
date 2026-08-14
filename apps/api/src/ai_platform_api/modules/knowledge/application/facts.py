@@ -215,6 +215,7 @@ class KnowledgeFactService:
     ) -> tuple[Document, DocumentVersion, DocumentSource]:
         """在知识库默认策略上创建文档，并固定字段级安全与可见范围。"""
 
+        # 长函数保留原因: 文档、首版、来源、入库任务和存储额度必须在同一事务中建立。
         # 1. 上传来源必须携带完整安全事实，其他来源不能伪造上传扫描结果。
         account_id = _account(context)
         now = datetime.now(UTC)

@@ -152,6 +152,7 @@ def event_to_dict(event: IntegrationEvent) -> dict[str, object]:
 def event_from_dict(value: object) -> IntegrationEvent:
     """处理事件从字典，并保持调用方可依赖的稳定返回语义。"""
 
+    # 1. 先验证固定字段集合和 Schema 版本，未知字段不能静默进入跨进程契约。
     if not isinstance(value, dict):
         raise ValueError("集成事件必须是对象")
     required = {
@@ -171,6 +172,7 @@ def event_from_dict(value: object) -> IntegrationEvent:
     }
     if set(value) != required or value.get("schema_version") != 1:
         raise ValueError("集成事件字段无效")
+    # 2. 载荷键通过检查后再恢复 UUID、时间和 Trace，任何类型错误统一拒绝整个事件。
     payload = value["payload"]
     if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
         raise ValueError("集成事件载荷必须是字符串键对象")

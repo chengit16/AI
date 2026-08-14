@@ -447,6 +447,7 @@ def _snapshot_violations(
 ) -> tuple[str, ...]:
     snapshot = release.snapshot
     errors: list[str] = []
+    # 1. 先验证快照版本、空间归属和摘要，防止继续消费被篡改的发布事实。
     if snapshot.schema_version != 1:
         errors.append("snapshot.schema_version 不受支持")
     if snapshot.registry_version > registry.registry_version:
@@ -460,6 +461,7 @@ def _snapshot_violations(
 
     registered_by_id = {item.menu_id: item for item in registry.workspace_menus}
     snapshot_by_id = {item.menu_id: item for item in snapshot.menus}
+    # 2. 再检查菜单不可覆盖字段、父子结构、接口绑定和角色可见性是否仍在注册边界内。
     if len(snapshot_by_id) != len(snapshot.menus) or not set(snapshot_by_id).issubset(
         registered_by_id
     ):

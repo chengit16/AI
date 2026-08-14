@@ -32,6 +32,7 @@ import { usePlatformAdministration } from "@/hooks/usePlatformAdministration";
 export function usePlatformModels() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  // 1. 供应商事实来自平台管理 Hook，运行配置分别缓存版本清单和当前发布指针。
   const { providers } = usePlatformAdministration();
   const runtimeConfigs = useQuery({
     queryKey: ["platform-ai-runtime-configs"],
@@ -43,7 +44,7 @@ export function usePlatformModels() {
     queryFn: ({ signal }) => getCurrentPlatformAiRuntimeConfig(signal),
     retry: false,
   });
-  // 供应商命令都会改变治理状态或凭证版本，因此成功后统一刷新脱敏列表。
+  // 2. 写操作按供应商和运行配置两类事实集中失效，避免版本清单与当前指针局部陈旧。
   const invalidateProviders = () =>
     queryClient.invalidateQueries({ queryKey: ["platform-model-providers"] });
   // 运行配置写操作同时影响版本清单和当前指针，两份缓存必须作为同一展示事实刷新。

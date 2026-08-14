@@ -61,6 +61,7 @@ class ModelGateway:
     def invoke(self, request: ModelRequest) -> ModelResult:
         """按策略筛选路由并执行有限重试、熔断和降级，完整记录每次尝试。"""
 
+        # 长函数保留原因: 总预算、逐路由熔断、重试和尝试审计共享同一调用状态机。
         # 1. 先执行预算与内容边界校验，再按能力、位置和成本筛选候选路由。
         self._validate_request(request)
         routes = self._eligible_routes(request)

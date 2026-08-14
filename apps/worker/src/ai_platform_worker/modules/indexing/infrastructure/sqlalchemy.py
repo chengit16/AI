@@ -47,6 +47,7 @@ class SqlAlchemyIndexVersionStore:
         embedding_model_version: str,
         tokenizer_version: str,
     ) -> int:
+        # 1. 固定目标列集合，确保从成功入库任务复制的身份和权限元数据不会错位。
         columns = (
             "index_version_id",
             "workspace_id",
@@ -73,6 +74,7 @@ class SqlAlchemyIndexVersionStore:
             "created_at",
             "updated_at",
         )
+        # 2. 只选择成功入库且文档仍有效、尚未创建首个构建版本的来源事实。
         source = (
             select(
                 ingestion_jobs.c.ingestion_job_id,
@@ -119,6 +121,7 @@ class SqlAlchemyIndexVersionStore:
                 ),
             )
         )
+        # 3. 以入库任务和 build_no 幂等插入，重复调度只返回本次真正创建的数量。
         statement = postgresql_insert(index_versions).from_select(columns, source)
         with self._session_factory() as session, session.begin():
             queued_ids = session.scalars(
@@ -143,6 +146,7 @@ class SqlAlchemyIndexVersionStore:
         tokenizer_version: str,
     ) -> UUID:
         with self._session_factory() as session, session.begin():
+            # 1. 锁定成功入库任务和当前文档权限快照，防止重建期间来源事实变化。
             source = (
                 session.execute(
                     # 显式选择并标记列，避免两张事实表的同名列在映射中产生歧义。
@@ -179,6 +183,7 @@ class SqlAlchemyIndexVersionStore:
                 .mappings()
                 .one()
             )
+            # 2. 在锁内计算下一 build_no，使同一入库任务的重建版本严格递增。
             build_no = (
                 int(
                     session.scalar(
@@ -190,6 +195,7 @@ class SqlAlchemyIndexVersionStore:
                 )
                 + 1
             )
+            # 3. 新版本冻结组件版本、来源摘要和权限元数据，创建后保持 queued 不可见。
             index_version_id = uuid4()
             session.execute(
                 insert(index_versions).values(
@@ -230,7 +236,7 @@ class SqlAlchemyIndexVersionStore:
     ) -> ClaimedIndexVersion | None:
         claim_until = now + timedelta(seconds=lease_seconds)
         with self._session_factory() as session, session.begin():
-            # 最后一次执行崩溃时没有异常回调，过期租约必须在下次扫描收敛。
+            # 1. 最后一次执行崩溃时没有异常回调，过期且耗尽次数的租约必须先收敛为失败。
             session.execute(
                 update(index_versions)
                 .where(
@@ -249,6 +255,7 @@ class SqlAlchemyIndexVersionStore:
                     updated_at=now,
                 )
             )
+            # 2. 使用 SKIP LOCKED 认领最早可执行版本，多 Worker 不会拿到同一任务。
             row = session.execute(
                 select(index_versions)
                 .where(
@@ -268,6 +275,7 @@ class SqlAlchemyIndexVersionStore:
             ).one_or_none()
             if row is None:
                 return None
+            # 3. 在同一事务中推进尝试次数和租约，再返回冻结的任务与权限快照。
             attempt_count = cast(int, row.attempt_count) + 1
             session.execute(
                 update(index_versions)
@@ -315,7 +323,7 @@ class SqlAlchemyIndexVersionStore:
         completed_at: datetime,
     ) -> bool:
         with self._session_factory() as session, session.begin():
-            # 与发布事务保持“发布指针 → 索引版本”的锁顺序，避免并发发布形成死锁。
+            # 1. 与发布事务保持“发布指针 → 索引版本”的锁顺序，并复核当前 Worker 租约。
             session.execute(
                 select(document_publications.c.current_document_version_id)
                 .where(
@@ -335,6 +343,7 @@ class SqlAlchemyIndexVersionStore:
             ).scalar_one_or_none()
             if owned is None:
                 return False
+            # 2. Chunk 先以 inactive 幂等写入，构建完成前任何检索都不能观察到半成品。
             statement = postgresql_insert(retrieval_chunks).values(
                 [
                     {
@@ -388,6 +397,7 @@ class SqlAlchemyIndexVersionStore:
                     },
                 )
             )
+            # 3. 文档与索引版本就绪后，仅当该文档版本已发布时才原子切换活动索引。
             session.execute(
                 update(document_versions)
                 .where(

@@ -42,6 +42,7 @@ interface Options {
 export function useOrganizationManagement({ workspaceId, enabled, closeForm }: Options) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  // 1. 三组 Query 共享企业空间启用条件，但分别保存组织、岗位和成员服务端事实。
   const departments = useQuery({
     queryKey: ["departments", workspaceId],
     queryFn: ({ signal }) => getDepartments(workspaceId!, signal),
@@ -68,6 +69,7 @@ export function useOrganizationManagement({ workspaceId, enabled, closeForm }: O
     ]);
   };
   const handleError = (error: unknown) => void message.error(errorMessage(error));
+  // 2. Mutation 按影响范围刷新组织投影；成员归属不改变当前列表，只关闭已提交表单。
   const createDepartmentMutation = useMutation({
     mutationFn: (values: DepartmentFormValues) =>
       createDepartment(workspaceId!, values.name, values.parentId ?? null),

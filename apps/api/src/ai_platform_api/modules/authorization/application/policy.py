@@ -53,6 +53,7 @@ class RbacPolicyDecisionPoint:
             return self._denied(request, "policy_unavailable")
 
     def _decide(self, request: PolicyRequest) -> PolicyDecision:
+        # 1. 先验证工作空间、注册 Permission 和凭证 Scope，任何来源都只能缩小权限。
         if request.resource.workspace_id != request.context.workspace_id:
             return self._denied(request, "workspace_mismatch")
         permission = next(
@@ -71,6 +72,7 @@ class RbacPolicyDecisionPoint:
         ):
             return self._denied(request, "credential_scope_denied")
 
+        # 2. 从服务端事实恢复有效主体和角色授权，不接受前端声明的角色或数据范围。
         subject = self._grants.resolve_subject(request.context)
         if subject is None or not subject.role_ids:
             return self._denied(request, "subject_not_active")
@@ -85,6 +87,7 @@ class RbacPolicyDecisionPoint:
         if not matching:
             return self._denied(request, "permission_not_granted")
 
+        # 3. 合并授权范围并计算字段遮罩，高风险或敏感结果禁止进入允许缓存。
         department_roots = frozenset(
             department_id
             for grant in matching

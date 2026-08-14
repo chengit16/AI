@@ -70,6 +70,7 @@ class IngestionJob:
     last_retried_at: datetime | None = None
 
     def assert_valid(self) -> None:
+        # 1. 校验来源对象、摘要、Trace 和租约状态，所有定位都必须绑定当前工作空间。
         source_prefix = f"workspaces/{self.workspace_id}/uploads/"
         artifact_prefix = f"workspaces/{self.workspace_id}/parsed/"
         if not self.source_name.strip() or len(self.source_name) > 255:
@@ -89,6 +90,7 @@ class IngestionJob:
                 raise InvalidIngestionJobError
         elif self.claimed_by is not None or self.claim_until is not None:
             raise InvalidIngestionJobError
+        # 2. 成功、失败和人工重试元数据必须与状态完整对应，不能保留半完成产物事实。
         if self.status == "succeeded":
             if (
                 self.completed_at is None

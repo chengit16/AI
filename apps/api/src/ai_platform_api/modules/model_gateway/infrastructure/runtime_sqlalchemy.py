@@ -320,6 +320,7 @@ class SqlAlchemyRuntimeInvocationStore:
             raise ModelInvocationConflictError from error
 
     def complete(self, outcome: RuntimeInvocationOutcome) -> None:
+        # 1. 从成功尝试和最终结果生成稳定汇总值，失败调用仍记录零用量与错误码。
         selected_attempt = next(
             (attempt for attempt in reversed(outcome.attempts) if attempt.status == "succeeded"),
             None,
@@ -345,6 +346,7 @@ class SqlAlchemyRuntimeInvocationStore:
             "error_code": outcome.error_code,
             "completed_at": outcome.completed_at,
         }
+        # 2. 只允许 running 状态完成一次，并与全部尝试明细在同一事务中落库。
         try:
             with self._session_factory() as session, session.begin():
                 update_result = cast(

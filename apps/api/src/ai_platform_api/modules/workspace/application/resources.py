@@ -70,6 +70,7 @@ class CreateWorkspaceResource:
         self._event_id_factory = event_id_factory
 
     def execute(self, context: RequestContext, resource: WorkspaceResource) -> IntegrationEvent:
+        # 1. 先验证可信空间并执行后端策略决策，前端传入的资源空间不能扩大访问范围。
         if resource.workspace_id != context.workspace_id:
             raise AuthorizationDeniedError
         decision = self._policy.decide(
@@ -86,6 +87,7 @@ class CreateWorkspaceResource:
         if not decision.allowed:
             raise AuthorizationDeniedError
 
+        # 2. 业务资源、脱敏审计和 Outbox 事件共享时间与 Trace，并在一个 UoW 中提交。
         event = IntegrationEvent(
             event_id=self._event_id_factory(),
             event_type="workspace.resource.created",

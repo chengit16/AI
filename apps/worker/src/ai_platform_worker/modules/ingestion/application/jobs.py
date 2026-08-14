@@ -88,6 +88,7 @@ class IngestionJobProcessor:
         now: datetime,
     ) -> str:
         try:
+            # 1. 读取来源后复核上传摘要，再执行有界解析，来源变化属于不可重试失败。
             try:
                 content = self._storage.read_source(job)
             except IngestionStorageUnavailableError as error:
@@ -112,6 +113,7 @@ class IngestionJobProcessor:
                 ),
                 content,
             )
+            # 2. 解析产物先写对象存储，再由数据库租约条件确认成功，避免暴露半完成任务。
             artifact = _artifact(job, document)
             try:
                 self._storage.write_artifact(job, artifact)

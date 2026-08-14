@@ -26,10 +26,12 @@ class ValkeyRoleResolutionCache:
     def get(
         self, workspace_id: UUID, membership_id: UUID, role_version: int
     ) -> EffectiveRoleSet | None:
+        # 1. 缓存键携带 PostgreSQL 角色版本，版本不一致或值缺失都视为未命中。
         payload = self._client.get(self._key(workspace_id, membership_id, role_version))
         if not isinstance(payload, str):
             return None
         try:
+            # 2. 只恢复完整且类型正确的角色来源；损坏缓存失败关闭并回源数据库。
             document: object = json.loads(payload)
             if not isinstance(document, dict) or document.get("role_version") != role_version:
                 return None

@@ -100,7 +100,7 @@ class SqlAlchemyOutboxLeaseStore:
     ) -> OutboxClaimBatch:
         claim_until = now + timedelta(seconds=lease_seconds)
         with self._session_factory() as session, session.begin():
-            # Worker 在发布期间退出也算一次尝试；达到上限的过期租约直接进入死信，
+            # 1. Worker 在发布期间退出也算一次尝试；达到上限的过期租约直接进入死信，
             # 避免仅靠发布异常路径限制次数而形成无限崩溃循环。
             expired_result = cast(
                 CursorResult[object],
@@ -119,6 +119,7 @@ class SqlAlchemyOutboxLeaseStore:
                     )
                 ),
             )
+            # 2. 使用 SKIP LOCKED 批量认领到期事件，并在返回前写入尝试次数与新租约。
             rows = session.execute(
                 select(outbox_events)
                 .where(

@@ -158,6 +158,7 @@ class OpenAiCompatibleCapabilityProbe:
         model_id: str,
         capability: ModelCapability,
     ) -> tuple[int, str]:
+        # 1. 根据能力构造最小合成请求，探测内容不包含任何用户或工作空间数据。
         payload: dict[str, object] = {
             "model": model_id,
             "messages": [
@@ -188,6 +189,7 @@ class OpenAiCompatibleCapabilityProbe:
                 {"role": "user", "content": '{"status":"ok"}'},
             ]
 
+        # 2. 使用已验证并钉住的目标地址发起请求，同时限制响应大小并确保连接关闭。
         connection = _PinnedHttpsConnection(
             target.hostname,
             address,
@@ -246,6 +248,7 @@ class OpenAiCompatibleRuntimeProvider:
         model_id: str,
         timeout_ms: int,
     ) -> ProviderResponse:
+        # 1. 重新执行 URL 策略并钉住首个审核地址，运行调用不接受重定向或动态换址。
         try:
             target = self._base_url_policy.resolve(self._access.configuration.base_url)
             connection = _PinnedHttpsConnection(
@@ -279,6 +282,7 @@ class OpenAiCompatibleRuntimeProvider:
                     },
                 )
                 response = connection.getresponse()
+                # 2. 有界读取后先映射稳定供应商错误；原始网络和解析异常不能越过 Adapter。
                 payload = response.read(4_194_305)
                 if len(payload) > 4_194_304:
                     raise ProviderInvocationError(

@@ -47,6 +47,7 @@ class WorkerSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_outbox_settings(self) -> "WorkerSettings":
+        # 1. Outbox 与入库调度参数都必须有界，避免零租约、无限忙轮询或无界文件处理。
         values = (
             self.outbox_batch_size,
             self.outbox_lease_seconds,
@@ -68,6 +69,7 @@ class WorkerSettings(BaseSettings):
             raise ValueError("入库任务整数参数必须为正数")
         if not 0.5 <= self.ingestion_dispatch_interval_seconds <= 60:
             raise ValueError("入库任务调度间隔必须位于 0.5 到 60 秒之间")
+        # 2. 索引构建额外约束 Chunk 重叠和版本，保证重试后仍能生成确定性切片。
         indexing_values = (
             self.indexing_batch_size,
             self.indexing_lease_seconds,

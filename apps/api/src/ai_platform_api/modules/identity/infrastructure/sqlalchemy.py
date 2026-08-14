@@ -252,6 +252,8 @@ class SqlAlchemyRegistrationWriter:
         self._session = session
 
     def add(self, registration: AccountRegistration) -> None:
+        # 长函数保留原因: 注册聚合必须在一个 Writer 中原子建立账号、个人空间和权限种子。
+        # 1. 先创建账号、唯一个人空间和所有者成员关系，登录名冲突映射为稳定领域错误。
         audit_values = {
             "created_at": registration.occurred_at,
             "created_by_actor_id": registration.account_id,
@@ -299,6 +301,7 @@ class SqlAlchemyRegistrationWriter:
                 version=1,
             )
         )
+        # 2. 同步建立个人套餐快照和功能开关，避免新空间短暂处于无权益状态。
         entitlement, feature_settings = default_entitlement(
             workspace_id=registration.personal_workspace_id,
             workspace_type="personal",
@@ -328,6 +331,7 @@ class SqlAlchemyRegistrationWriter:
                 version=feature_settings.version,
             )
         )
+        # 3. 最后写入系统角色、所有者绑定和默认权限，注册事务提交后即可完整授权。
         system_roles, system_bindings = system_role_seed(
             workspace_id=registration.personal_workspace_id,
             owner_membership_id=registration.membership_id,

@@ -55,6 +55,7 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
 
 /** 统一附加工作空间、CSRF 与同源 Cookie，并保留后端稳定错误码供页面判断。 */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  // 1. 从会话生成可信请求头；平台接口可显式清空空间，但业务调用默认继承当前空间。
   const session = getApiSession();
   const method = options.method ?? "GET";
   const headers = new Headers(options.headers);
@@ -73,6 +74,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
         ? options.body
         : JSON.stringify(options.body);
 
+  // 2. 统一解析后端错误契约；401 先清理失效会话，其他错误保留稳定错误码供页面分流。
   const response = await fetch(path, {
     ...options,
     method,

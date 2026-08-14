@@ -39,6 +39,8 @@ def load_resource_registry(path: Path) -> ResourceRegistry:
 def resource_registry_from_dict(document: dict[str, object]) -> ResourceRegistry:
     """将已解析配置转换为资源注册表并执行跨引用完整性校验。"""
 
+    # 长函数保留原因: 五类资源使用同一 location 规则完成错误定位，拆分会重复解析契约。
+    # 1. 先解析 Permission，后续页面、接口和菜单只能引用这一冻结权限集合。
     permissions = tuple(
         Permission(
             code=_string(item, "code", location),
@@ -58,6 +60,7 @@ def resource_registry_from_dict(document: dict[str, object]) -> ResourceRegistry
         for index, value in enumerate(_array(document, "permissions", "registry"))
         for location, item in [(f"permissions[{index}]", _object(value, f"permissions[{index}]"))]
     )
+    # 2. 页面和接口分别固定前端路由、后端 operation_id、风险级别及访问边界。
     pages = tuple(
         PageResource(
             page_resource_id=_uuid(item, "page_resource_id", location),
@@ -124,6 +127,7 @@ def resource_registry_from_dict(document: dict[str, object]) -> ResourceRegistry
             (f"api_resources[{index}]", _object(value, f"api_resources[{index}]"))
         ]
     )
+    # 3. 菜单及菜单接口绑定只接受注册 ID，不能从配置注入任意组件或接口地址。
     menus = tuple(
         Menu(
             menu_id=_uuid(item, "menu_id", location),
@@ -179,6 +183,7 @@ def resource_registry_from_dict(document: dict[str, object]) -> ResourceRegistry
             )
         ]
     )
+    # 4. 最终交给领域对象执行跨资源引用、循环、停用和未绑定检查。
     registry = ResourceRegistry(
         schema_version=_integer(document, "schema_version", "registry"),
         registry_version=_integer(document, "registry_version", "registry"),

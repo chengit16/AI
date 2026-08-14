@@ -18,6 +18,24 @@ const validTaskMarkerPattern =
   /\b(?:TODO|FIXME|HACK)\(@[A-Za-z0-9_-]+\s+\d{4}-\d{2}\):\s+\S/;
 const instructionCommentPattern =
   /(?:@ts-|eslint|prettier|istanbul|\bc8\b|vite-ignore|sourceMappingURL|@__PURE__|<reference)/i;
+const stageCommentPattern = /(?:\/\/|\/\*)\s*(\d+)[.、．]\s*(\S[\s\S]*?)(?:\*\/)?$/;
+const longFunctionReasonPattern = /(?:\/\/|\/\*)\s*长函数保留原因[：:]\s*\S/;
+const longFunctionReviewLines = 30;
+const longFunctionRequiredLines = 60;
+const longFunctionSplitLines = 100;
+const layoutOnlyTokenPattern = /^[()[\]{},.:;]+$/;
+const stageCallNames = new Set([
+  "execute",
+  "fetch",
+  "invalidateQueries",
+  "mutate",
+  "publish",
+  "refetch",
+  "request",
+  "send",
+  "useMutation",
+  "useQuery",
+]);
 
 /** 递归收集前端手写 TypeScript 文件，不跨入依赖目录。 */
 function walk(directory) {
@@ -100,6 +118,204 @@ function sourceComments(source, scriptKind) {
   return comments;
 }
 
+/** 返回真实代码 Token，后续按函数体范围统计有效代码行。 */
+function sourceCodeTokens(source, scriptKind) {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, scriptKind, source);
+  const tokens = [];
+  const ignoredKinds = new Set([
+    ts.SyntaxKind.WhitespaceTrivia,
+    ts.SyntaxKind.NewLineTrivia,
+    ts.SyntaxKind.SingleLineCommentTrivia,
+    ts.SyntaxKind.MultiLineCommentTrivia,
+    ts.SyntaxKind.EndOfFileToken,
+  ]);
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+    if (!ignoredKinds.has(token)) {
+      tokens.push({
+        kind: token,
+        text: scanner.getTokenText(),
+        position: scanner.getTokenPos(),
+        end: scanner.getTextPos(),
+      });
+    }
+  }
+  return tokens;
+}
+
+function isJsxNode(node) {
+  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  return (
+    ts.isJsxElement(node) ||
+    ts.isJsxSelfClosingElement(node) ||
+    ts.isJsxFragment(node)
+  );
+}
+
+function functionName(node, sourceFile) {
+  if (node.name) return node.name.getText(sourceFile);
+  const parent = node.parent;
+  if (ts.isVariableDeclaration(parent) && parent.name) return parent.name.getText(sourceFile);
+  if (ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent)) {
+    return parent.name?.getText(sourceFile) ?? "<callback>";
+  }
+  return `<callback@${lineOf(sourceFile, node.getStart(sourceFile))}>`;
+}
+
+/** 遍历当前函数直接拥有的 AST，嵌套回调由自己的函数检查承担。 */
+function visitOwnedNodes(node, callback) {
+  function visit(current) {
+    ts.forEachChild(current, (child) => {
+      if (child !== node && ts.isFunctionLike(child)) return;
+      callback(child);
+      visit(child);
+    });
+  }
+  visit(node);
+}
+
+function nestedFunctionRanges(node) {
+  const ranges = [];
+  function visit(current) {
+    ts.forEachChild(current, (child) => {
+      if (child !== node && ts.isFunctionLike(child)) {
+        ranges.push([child.getStart(), child.end]);
+        return;
+      }
+      visit(child);
+    });
+  }
+  visit(node);
+  return ranges;
+}
+
+function positionInRanges(position, ranges) {
+  return ranges.some(([start, end]) => start <= position && position <= end);
+}
+
+/** 纯 JSX 返回和函数内类型声明不计入逻辑长度，但其中嵌套回调仍单独检查。 */
+function declarativeRanges(node) {
+  const ranges = [];
+  visitOwnedNodes(node, (child) => {
+    if (ts.isReturnStatement(child) && child.expression && isJsxNode(child.expression)) {
+      ranges.push([child.expression.getStart(), child.expression.end]);
+    }
+    if (ts.isTypeAliasDeclaration(child) || ts.isInterfaceDeclaration(child)) {
+      ranges.push([child.getStart(), child.end]);
+    }
+  });
+  if (!ts.isBlock(node.body) && isJsxNode(node.body)) {
+    ranges.push([node.body.getStart(), node.body.end]);
+  }
+  return ranges;
+}
+
+function effectiveFunctionLines(sourceFile, node, codeTokens) {
+  const bodyStart = node.body.getStart(sourceFile);
+  const bodyEnd = node.body.end;
+  const excludedRanges = [...nestedFunctionRanges(node), ...declarativeRanges(node)];
+  const lines = new Set();
+  for (const token of codeTokens) {
+    if (token.position < bodyStart || token.end > bodyEnd) continue;
+    if (positionInRanges(token.position, excludedRanges)) continue;
+    if (layoutOnlyTokenPattern.test(token.text)) continue;
+    lines.add(lineOf(sourceFile, token.position));
+  }
+  return lines.size;
+}
+
+function callName(node) {
+  if (!ts.isCallExpression(node)) return "";
+  const expression = node.expression;
+  if (ts.isIdentifier(expression)) return expression.text;
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+  return "";
+}
+
+function stageSignalCount(node) {
+  let count = 0;
+  visitOwnedNodes(node, (child) => {
+    if (
+      ts.isIfStatement(child) ||
+      ts.isForStatement(child) ||
+      ts.isForInStatement(child) ||
+      ts.isForOfStatement(child) ||
+      ts.isWhileStatement(child) ||
+      ts.isDoStatement(child) ||
+      ts.isSwitchStatement(child) ||
+      ts.isTryStatement(child) ||
+      ts.isAwaitExpression(child)
+    ) {
+      count += 1;
+    }
+    if (ts.isCallExpression(child) && stageCallNames.has(callName(child))) {
+      count += 1;
+    }
+  });
+  return count;
+}
+
+/** 检查长函数内部阶段说明，语义质量仍由代码审查负责。 */
+function checkLongFunctions(sourceFile, source, scriptKind, violations) {
+  const codeTokens = sourceCodeTokens(source, scriptKind);
+  const comments = sourceComments(source, scriptKind);
+
+  function visit(node) {
+    if (ts.isFunctionLike(node) && node.body) {
+      const effectiveLines = effectiveFunctionLines(sourceFile, node, codeTokens);
+      if (effectiveLines >= longFunctionReviewLines) {
+        const nestedRanges = nestedFunctionRanges(node);
+        const bodyStart = node.body.getStart(sourceFile);
+        const bodyEnd = node.body.end;
+        const ownedComments = comments.filter(
+          (comment) =>
+            bodyStart <= comment.position &&
+            comment.position <= bodyEnd &&
+            !positionInRanges(comment.position, nestedRanges),
+        );
+        const numbers = ownedComments
+          .map((comment) => ({
+            line: lineOf(sourceFile, comment.position),
+            match: comment.text.match(stageCommentPattern),
+          }))
+          .filter(({ match }) => match)
+          .sort((left, right) => left.line - right.line)
+          .map(({ match }) => Number(match[1]));
+        const expected = Array.from({ length: numbers.length }, (_, index) => index + 1);
+        const name = functionName(node, sourceFile);
+        if (numbers.length && numbers.some((number, index) => number !== expected[index])) {
+          violations.push({
+            filePath: sourceFile.fileName,
+            line: lineOf(sourceFile, node.getStart(sourceFile)),
+            message: `长函数 ${name} 的阶段注释编号必须从 1 连续递增`,
+          });
+        }
+
+        const requiredStages =
+          effectiveLines >= longFunctionRequiredLines ? 3 : stageSignalCount(node) >= 2 ? 2 : 0;
+        if (requiredStages && numbers.length < requiredStages) {
+          violations.push({
+            filePath: sourceFile.fileName,
+            line: lineOf(sourceFile, node.getStart(sourceFile)),
+            message: `长函数 ${name} 有 ${effectiveLines} 行有效代码，至少需要 ${requiredStages} 个连续编号的内部阶段注释`,
+          });
+        }
+        if (
+          effectiveLines >= longFunctionSplitLines &&
+          !ownedComments.some((comment) => longFunctionReasonPattern.test(comment.text))
+        ) {
+          violations.push({
+            filePath: sourceFile.fileName,
+            line: lineOf(sourceFile, node.getStart(sourceFile)),
+            message: `长函数 ${name} 有 ${effectiveLines} 行有效代码，必须拆分或使用“长函数保留原因：”说明取舍`,
+          });
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+}
+
 /**
  * 收集前端注释结构违规。
  *
@@ -152,6 +368,8 @@ export function collectFrontendCommentViolations(root = projectRoot) {
         }
       }
     }
+
+    checkLongFunctions(sourceFile, source, scriptKind, violations);
 
     for (const comment of sourceComments(source, scriptKind)) {
       if (taskMarkerPattern.test(comment.text) && !validTaskMarkerPattern.test(comment.text)) {

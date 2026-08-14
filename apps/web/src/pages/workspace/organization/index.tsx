@@ -23,7 +23,7 @@ type FormMode = "department" | "position" | "assignment" | null;
 export default function WorkspaceOrganizationPage() {
   const { workspaceId, workspaces, currentWorkspace } = useCurrentWorkspace();
   const [formMode, setFormMode] = useState<FormMode>(null);
-  // 组织接口只属于企业空间，先确认空间类型可避免个人空间产生无意义的拒绝请求。
+  // 1. 组织接口只属于企业空间，先确认空间类型可避免个人空间产生无意义的拒绝请求。
   const canQuery = Boolean(workspaceId && currentWorkspace?.workspace_type === "enterprise");
   const {
     departments,
@@ -40,6 +40,7 @@ export default function WorkspaceOrganizationPage() {
     closeForm: () => setFormMode(null),
   });
 
+  // 2. 先收敛空间和权限状态，再构造治理表格，避免失败数据进入可操作界面。
   if (workspaces.isLoading || (!currentWorkspace && !workspaces.isError))
     return <Skeleton active paragraph={{ rows: 9 }} />;
   if (workspaces.isError || !currentWorkspace)

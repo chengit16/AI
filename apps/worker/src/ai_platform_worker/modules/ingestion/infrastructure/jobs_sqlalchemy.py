@@ -33,7 +33,7 @@ class SqlAlchemyIngestionJobStore:
     ) -> ClaimedIngestionJob | None:
         claim_until = now + timedelta(seconds=lease_seconds)
         with self._session_factory() as session, session.begin():
-            # 最后一次执行中进程退出时没有异常回调，过期租约必须在下次扫描时明确终止。
+            # 1. 最后一次执行中进程退出没有异常回调，过期且耗尽次数的租约必须先终止。
             session.execute(
                 update(ingestion_jobs)
                 .where(
@@ -52,6 +52,7 @@ class SqlAlchemyIngestionJobStore:
                     updated_at=now,
                 )
             )
+            # 2. 使用 SKIP LOCKED 选择最早可执行任务，多 Worker 不能同时认领同一行。
             row = session.execute(
                 select(ingestion_jobs)
                 .where(
@@ -73,6 +74,7 @@ class SqlAlchemyIngestionJobStore:
             ).one_or_none()
             if row is None:
                 return None
+            # 3. 尝试次数和新租约在同一事务中推进，再返回冻结的来源与 Trace 事实。
             attempt_count = cast(int, row.attempt_count) + 1
             session.execute(
                 update(ingestion_jobs)
