@@ -1,3 +1,4 @@
+/** 空间总览页，组合当前空间、套餐配额、Open API 开关和邀请加入入口。 */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,
@@ -22,8 +23,6 @@ import { StateView } from "@/components/StateView/StateView";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 import { useSessionStore } from "@/store/session";
 
-import styles from "./OverviewPage.module.css";
-
 const quotaLabels = {
   members: "成员",
   storage_bytes: "存储空间",
@@ -38,6 +37,11 @@ function quotaValue(metric: keyof typeof quotaLabels, value: number) {
   return value.toLocaleString("zh-CN");
 }
 
+/**
+ * 展示当前工作空间的服务端权益快照和可操作入口。
+ *
+ * 页面中的所有者判断只控制交互状态，套餐、配额和接口开关仍由后端逐请求授权并原子校验。
+ */
 export default function WorkspaceOverviewPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -62,6 +66,7 @@ export default function WorkspaceOverviewPage() {
     mutationFn: ({ invitationId }: { invitationId: string }) =>
       acceptWorkspaceInvitation(invitationId),
     onSuccess: async (workspace) => {
+      // 接受邀请会切换隔离上下文，先刷新空间清单再更新当前空间，避免选项短暂缺失。
       await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       setWorkspaceId(workspace.workspace_id);
       setInvitationOpen(false);
@@ -108,14 +113,21 @@ export default function WorkspaceOverviewPage() {
         }
       />
 
-      <section className={styles.summary} aria-labelledby="workspace-summary-title">
-        <div className={styles.summaryHeading}>
-          <span className={styles.workspaceIcon}>
+      <section
+        className="ui-surface-panel p-6 phone-down:p-5"
+        aria-labelledby="workspace-summary-title"
+      >
+        <div className="mb-6 flex items-center gap-4">
+          <span className="ui-icon-badge h-11 w-11">
             {isEnterprise ? <Building2 size={22} /> : <UserRound size={22} />}
           </span>
-          <div>
-            <h2 id="workspace-summary-title">空间概况</h2>
-            <p>{isEnterprise ? "企业治理空间" : "默认个人空间"}</p>
+          <div className="flex-1">
+            <h2 className="m-0 text-[17px]" id="workspace-summary-title">
+              空间概况
+            </h2>
+            <p className="mb-0 mt-1 text-[13px] text-text-muted">
+              {isEnterprise ? "企业治理空间" : "默认个人空间"}
+            </p>
           </div>
           <Tag color={currentWorkspace.status === "active" ? "success" : "warning"}>
             {currentWorkspace.status === "active" ? "运行中" : currentWorkspace.status}
@@ -132,45 +144,64 @@ export default function WorkspaceOverviewPage() {
         </Descriptions>
       </section>
 
-      <section className={styles.section} aria-labelledby="quota-title">
-        <div className={styles.sectionHeading}>
+      <section className="ui-surface-panel mt-6" aria-labelledby="quota-title">
+        <div className="flex items-center justify-between border-b border-border px-6 py-5 phone-down:p-5">
           <div>
-            <h2 id="quota-title">资源配额</h2>
-            <p>当前周期用量与可用余量</p>
+            <h2 className="m-0 text-[17px]" id="quota-title">
+              资源配额
+            </h2>
+            <p className="mb-0 mt-1 text-[13px] text-text-muted">当前周期用量与可用余量</p>
           </div>
-          <span>版本 {entitlement.data.entitlement_version}</span>
+          <span className="text-xs text-text-muted">
+            版本 {entitlement.data.entitlement_version}
+          </span>
         </div>
-        <div className={styles.quotaGrid}>
+        <div className="grid grid-cols-[repeat(5,minmax(140px,1fr))] desktop-down:grid-cols-2 phone-down:grid-cols-1">
           {entitlement.data.quotas.map((quota) => {
+            // 进度只用于展示，零额度必须显式归零，避免除零产生无效 CSS 百分比。
             const percent =
               quota.limit_value === 0
                 ? 0
                 : Math.min(100, Math.round((quota.used_value / quota.limit_value) * 100));
             return (
-              <article className={styles.quotaItem} key={quota.metric}>
-                <div>
-                  <strong>{quotaLabels[quota.metric]}</strong>
-                  <span>{quota.period_key === "lifetime" ? "总额度" : quota.period_key}</span>
+              <article
+                className="min-w-0 border-r border-border-soft p-5 last:border-r-0 desktop-down:border-b phone-down:border-r-0"
+                key={quota.metric}
+              >
+                <div className="flex justify-between gap-2">
+                  <strong className="text-sm">{quotaLabels[quota.metric]}</strong>
+                  <span className="text-[11px] text-text-muted">
+                    {quota.period_key === "lifetime" ? "总额度" : quota.period_key}
+                  </span>
                 </div>
-                <p>
-                  <b>{quotaValue(quota.metric, quota.used_value)}</b> /{" "}
-                  {quotaValue(quota.metric, quota.limit_value)}
+                <p className="mb-3 mt-5 text-xs text-text-muted">
+                  <b className="text-[19px] text-text-strong">
+                    {quotaValue(quota.metric, quota.used_value)}
+                  </b>{" "}
+                  / {quotaValue(quota.metric, quota.limit_value)}
                 </p>
-                <Progress percent={percent} showInfo={false} strokeColor="#176b52" />
-                <small>剩余 {quotaValue(quota.metric, quota.remaining_value)}</small>
+                <Progress percent={percent} showInfo={false} strokeColor="var(--color-brand)" />
+                <small className="mt-2 block text-[11px] text-text-muted">
+                  剩余 {quotaValue(quota.metric, quota.remaining_value)}
+                </small>
               </article>
             );
           })}
         </div>
       </section>
 
-      <section className={styles.featureRow} aria-labelledby="open-api-title">
-        <span className={styles.featureIcon}>
+      <section
+        className="ui-surface-panel mt-6 flex min-h-22 items-center gap-4 px-6 py-5"
+        aria-labelledby="open-api-title"
+      >
+        <span className="ui-icon-badge h-11 w-11">
           <KeyRound size={20} />
         </span>
-        <div>
-          <h2 id="open-api-title">Open API</h2>
-          <p>
+        <div className="flex-1">
+          <h2 className="m-0 text-[17px]" id="open-api-title">
+            Open API
+          </h2>
+          <p className="mb-0 mt-1 text-[13px] text-text-muted">
             {entitlement.data.open_api_allowed
               ? "允许由企业所有者配置接口访问"
               : "当前套餐不包含 Open API"}

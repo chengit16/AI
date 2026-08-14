@@ -1,3 +1,4 @@
+/** 企业组织治理页，组合部门树、岗位、成员归属表单及状态操作。 */
 import { Button, Dropdown, Skeleton, Table, Tag } from "antd";
 import type { MenuProps, TableColumnsType } from "antd";
 import { BriefcaseBusiness, Network, Plus, UserCog } from "lucide-react";
@@ -10,14 +11,19 @@ import { StateView } from "@/components/StateView/StateView";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 
 import { OrganizationForms } from "./OrganizationForms";
-import styles from "./OrganizationPage.module.css";
 import { useOrganizationManagement } from "./useOrganizationManagement";
 
 type FormMode = "department" | "position" | "assignment" | null;
 
+/**
+ * 展示企业组织事实并编排治理操作。
+ *
+ * 个人空间不发起组织查询；企业普通成员的拒绝状态来自后端 PDP，前端不自行推断授权结果。
+ */
 export default function WorkspaceOrganizationPage() {
   const { workspaceId, workspaces, currentWorkspace } = useCurrentWorkspace();
   const [formMode, setFormMode] = useState<FormMode>(null);
+  // 组织接口只属于企业空间，先确认空间类型可避免个人空间产生无意义的拒绝请求。
   const canQuery = Boolean(workspaceId && currentWorkspace?.workspace_type === "enterprise");
   const {
     departments,
@@ -86,12 +92,18 @@ export default function WorkspaceOrganizationPage() {
       title: "部门",
       dataIndex: "name",
       key: "name",
-      render: (name, record) => (
-        <span className={styles.treeName} style={{ paddingInlineStart: record.depth * 20 }}>
-          <Network size={15} />
-          {name}
-        </span>
-      ),
+      render: (name, record) => {
+        // 层级深度来自服务端树事实，使用运行时内联缩进，避免拼接无法静态提取的 Utility。
+        return (
+          <span
+            className="inline-flex items-center gap-2 font-650"
+            style={{ paddingInlineStart: record.depth * 20 }}
+          >
+            <Network size={15} />
+            {name}
+          </span>
+        );
+      },
     },
     {
       title: "层级",
@@ -188,11 +200,18 @@ export default function WorkspaceOrganizationPage() {
           </Dropdown>
         }
       />
-      <section className={styles.section}>
-        <div className={styles.sectionHeading}>
+      <section
+        className="ui-surface-panel mb-6 overflow-hidden"
+        aria-labelledby="department-section-title"
+      >
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
           <div>
-            <h2>部门层级</h2>
-            <p>{departments.data?.length ?? 0} 个部门</p>
+            <h2 className="m-0 text-[17px]" id="department-section-title">
+              部门层级
+            </h2>
+            <p className="mb-0 mt-1 text-xs text-text-muted">
+              {departments.data?.length ?? 0} 个部门
+            </p>
           </div>
         </div>
         <Table<Department>
@@ -204,11 +223,18 @@ export default function WorkspaceOrganizationPage() {
           locale={{ emptyText: "还没有部门，请先创建一级部门" }}
         />
       </section>
-      <section className={styles.section}>
-        <div className={styles.sectionHeading}>
+      <section
+        className="ui-surface-panel mb-6 overflow-hidden"
+        aria-labelledby="position-section-title"
+      >
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
           <div>
-            <h2>岗位清单</h2>
-            <p>{positions.data?.length ?? 0} 个岗位</p>
+            <h2 className="m-0 text-[17px]" id="position-section-title">
+              岗位清单
+            </h2>
+            <p className="mb-0 mt-1 text-xs text-text-muted">
+              {positions.data?.length ?? 0} 个岗位
+            </p>
           </div>
         </div>
         <Table<Position>

@@ -1,3 +1,4 @@
+/** 企业成员治理页，处理邀请创建、成员状态展示和即时停用入口。 */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Form, Input, Modal, Popconfirm, Skeleton, Table, Tag } from "antd";
 import type { TableColumnsType } from "antd";
@@ -15,14 +16,18 @@ import { PageHeader } from "@/components/PageHeader/PageHeader";
 import { StateView } from "@/components/StateView/StateView";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 
-import styles from "./MembersPage.module.css";
-
+/**
+ * 展示企业成员清单和治理动作。
+ *
+ * 个人空间不会请求企业成员接口；无权限与请求错误分开呈现，页面按钮隐藏不替代后端授权。
+ */
 export default function WorkspaceMembersPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const { workspaceId, workspaces, currentWorkspace } = useCurrentWorkspace();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [form] = Form.useForm<{ loginName: string }>();
+  // 个人空间没有成员集合，提前关闭 Query 可避免无意义请求和错误状态闪烁。
   const members = useQuery({
     queryKey: ["workspace-members", workspaceId],
     queryFn: ({ signal }) => getWorkspaceMembers(workspaceId!, signal),
@@ -93,9 +98,11 @@ export default function WorkspaceMembersPage() {
       dataIndex: "display_name",
       key: "display_name",
       render: (name, record) => (
-        <div className={styles.identity}>
-          <strong>{name}</strong>
-          <span>{record.account_id}</span>
+        <div>
+          <strong className="block text-text-strong">{name}</strong>
+          <span className="mt-[3px] block font-mono text-[11px] text-text-muted">
+            {record.account_id}
+          </span>
         </div>
       ),
     },
@@ -123,7 +130,7 @@ export default function WorkspaceMembersPage() {
       width: 120,
       render: (_, record) =>
         record.membership_type === "owner" || record.status !== "active" ? (
-          <span className={styles.muted}>不可停用</span>
+          <span className="text-xs text-text-muted">不可停用</span>
         ) : (
           <Popconfirm
             title="确认停用该成员？"
@@ -152,7 +159,7 @@ export default function WorkspaceMembersPage() {
           </Button>
         }
       />
-      <section className={styles.tableSection} aria-label="企业成员清单">
+      <section className="ui-surface-panel overflow-hidden" aria-label="企业成员清单">
         <Table<WorkspaceMember>
           rowKey="account_id"
           columns={columns}

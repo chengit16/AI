@@ -17,7 +17,13 @@
   --color-nav-hover: rgba(255, 255, 255, 0.07);
   --color-nav-active: rgba(255, 255, 255, 0.11);
   --color-nav-divider: rgba(255, 255, 255, 0.1);
+  --color-nav-separator: rgba(255, 255, 255, 0.16);
   --color-topbar: rgba(255, 255, 255, 0.96);
+  --color-status-banner: #1b4b3e;
+  --color-status-banner-pending: #46524d;
+  --color-status-foreground: #f5fbf8;
+  --color-status-label: #bed1ca;
+  --color-status-detail: #d5e1dc;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;

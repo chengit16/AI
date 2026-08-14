@@ -1,4 +1,23 @@
 import { defineConfig, presetWind3 } from "unocss";
+import type { Variant } from "unocss";
+
+/** 创建包含临界像素的项目级 max-width Variant，避免 `lt-*` 自动减去 0.1px。 */
+function maxWidthVariant(name: string, width: number): Variant {
+  return {
+    name,
+    order: -1,
+    match(matcher) {
+      const prefix = `${name}:`;
+      if (!matcher.startsWith(prefix)) {
+        return undefined;
+      }
+      return {
+        matcher: matcher.slice(prefix.length),
+        parent: `@media (max-width: ${width}px)`,
+      };
+    },
+  };
+}
 
 /**
  * Web 前端唯一的 UnoCSS 配置入口。
@@ -29,8 +48,14 @@ export default defineConfig({
       "nav-divider": "var(--color-nav-divider)",
       "nav-hover": "var(--color-nav-hover)",
       "nav-muted": "var(--color-nav-muted)",
+      "nav-separator": "var(--color-nav-separator)",
       "nav-text": "var(--color-nav-text)",
       "nav-text-strong": "var(--color-nav-text-strong)",
+      "status-banner": "var(--color-status-banner)",
+      "status-banner-pending": "var(--color-status-banner-pending)",
+      "status-detail": "var(--color-status-detail)",
+      "status-foreground": "var(--color-status-foreground)",
+      "status-label": "var(--color-status-label)",
       surface: "var(--color-surface)",
       text: "var(--color-text)",
       "text-muted": "var(--color-text-muted)",
@@ -50,21 +75,10 @@ export default defineConfig({
   },
   safelist: [],
   variants: [
-    {
-      name: "nav-mobile",
-      order: -1,
-      match(matcher) {
-        const prefix = "nav-mobile:";
-        if (!matcher.startsWith(prefix)) {
-          return undefined;
-        }
-        return {
-          matcher: matcher.slice(prefix.length),
-          // 导航旧基线包含 720px 边界，不能使用生成到 719.9px 的 lt-nav 代替。
-          parent: "@media (max-width: 720px)",
-        };
-      },
-    },
+    maxWidthVariant("phone-down", 560),
+    maxWidthVariant("nav-mobile", 720),
+    maxWidthVariant("tablet-down", 820),
+    maxWidthVariant("desktop-down", 1024),
     {
       name: "landscape-mobile",
       // 必须早于 Wind3 自带的 landscape Variant，否则复合前缀会被提前截获。

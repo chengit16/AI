@@ -1,3 +1,4 @@
+/** 登录与个人账号注册入口，建立服务端 Session 和默认个人空间上下文。 */
 import { useMutation } from "@tanstack/react-query";
 import { Alert, Button, Form, Input, Segmented } from "antd";
 import { ArrowRight, LockKeyhole, UserRound } from "lucide-react";
@@ -9,8 +10,6 @@ import { loginWithPassword, registerPersonalAccount } from "@/api/services/auth"
 import { PlatformMark } from "@/components/PlatformMark/PlatformMark";
 import { useSessionStore } from "@/store/session";
 
-import styles from "./LoginPage.module.css";
-
 interface LoginForm {
   loginName: string;
   password: string;
@@ -20,6 +19,12 @@ interface RegistrationForm extends LoginForm {
   displayName: string;
 }
 
+/**
+ * 提供本地账号登录与个人账号创建流程。
+ *
+ * 浏览器只保存账号、当前空间与 CSRF Token；Session Cookie、身份校验和默认个人空间
+ * 一致性均由服务端负责，缺少个人空间时页面失败关闭而不进入业务路由。
+ */
 export default function LoginPage() {
   const navigate = useNavigate();
   const workspaceId = useSessionStore((state) => state.workspaceId);
@@ -39,6 +44,7 @@ export default function LoginPage() {
     },
     onError: (reason) => setError(errorMessage(reason)),
   });
+  // 注册事实由后端一次事务创建；成功后再登录，以取得与普通登录完全一致的 Session。
   const register = useMutation({
     mutationFn: async ({ loginName, displayName, password }: RegistrationForm) => {
       await registerPersonalAccount({
@@ -63,39 +69,56 @@ export default function LoginPage() {
   const pending = login.isPending || register.isPending;
 
   return (
-    <main className={styles.page}>
-      <section className={styles.identity} aria-labelledby="platform-title">
+    <main className="grid min-h-[100dvh] grid-cols-[minmax(340px,0.9fr)_minmax(460px,1.1fr)] bg-surface tablet-down:block tablet-down:bg-canvas">
+      <section
+        className="flex flex-col justify-between gap-16 border-r-[5px] border-r-solid border-accent bg-nav-bg p-[clamp(32px,6vw,76px)] text-nav-text-strong tablet-down:min-h-[310px] tablet-down:gap-8 tablet-down:border-b-4 tablet-down:border-b-solid tablet-down:border-r-0 tablet-down:p-6"
+        aria-labelledby="platform-title"
+      >
         <PlatformMark />
         <div>
-          <p className={styles.kicker}>LOCAL AI WORKSPACE</p>
-          <h1 id="platform-title">把知识、权限与 AI 工作流放在一个可信空间里</h1>
-          <p>个人空间开箱即用，企业空间保留组织、成员和套餐治理能力。</p>
+          <p className="mb-4 mt-0 text-xs font-800 text-accent">LOCAL AI WORKSPACE</p>
+          <h1
+            className="m-0 max-w-[620px] text-[clamp(34px,4vw,54px)] leading-[1.18] tablet-down:text-[30px]"
+            id="platform-title"
+          >
+            把知识、权限与 AI 工作流放在一个可信空间里
+          </h1>
+          <p className="mb-0 mt-6 max-w-[560px] text-[17px] leading-[1.8] text-nav-text tablet-down:text-[15px]">
+            个人空间开箱即用，企业空间保留组织、成员和套餐治理能力。
+          </p>
         </div>
-        <dl className={styles.facts}>
-          <div>
-            <dt>运行方式</dt>
-            <dd>本地 Docker</dd>
+        <dl className="m-0 grid grid-cols-3 border-t border-nav-separator tablet-down:hidden">
+          <div className="pr-3 pt-5">
+            <dt className="text-xs text-nav-muted">运行方式</dt>
+            <dd className="mb-0 ml-0 mr-0 mt-2 font-700">本地 Docker</dd>
           </div>
-          <div>
-            <dt>空间模型</dt>
-            <dd>个人 + 企业</dd>
+          <div className="pr-3 pt-5">
+            <dt className="text-xs text-nav-muted">空间模型</dt>
+            <dd className="mb-0 ml-0 mr-0 mt-2 font-700">个人 + 企业</dd>
           </div>
-          <div>
-            <dt>安全边界</dt>
-            <dd>Session + Workspace</dd>
+          <div className="pr-3 pt-5">
+            <dt className="text-xs text-nav-muted">安全边界</dt>
+            <dd className="mb-0 ml-0 mr-0 mt-2 font-700">Session + Workspace</dd>
           </div>
         </dl>
       </section>
 
-      <section className={styles.formArea} aria-labelledby="auth-title">
-        <div className={styles.formPanel}>
-          <div className={styles.formHeading}>
-            <span className={styles.formIcon}>
+      <section
+        className="grid place-items-center bg-canvas p-8 tablet-down:px-5 tablet-down:py-8"
+        aria-labelledby="auth-title"
+      >
+        <div className="w-[min(430px,100%)]">
+          <div className="mb-6 flex items-center gap-4">
+            <span className="ui-icon-badge h-11 w-11">
               <LockKeyhole size={20} />
             </span>
             <div>
-              <h2 id="auth-title">进入平台</h2>
-              <p>使用本地账号建立可信工作空间上下文</p>
+              <h2 className="m-0 text-2xl" id="auth-title">
+                进入平台
+              </h2>
+              <p className="mb-0 mt-1 text-[13px] text-text-muted">
+                使用本地账号建立可信工作空间上下文
+              </p>
             </div>
           </div>
           <Segmented
@@ -110,8 +133,9 @@ export default function LoginPage() {
               setError(null);
             }}
           />
-          {error && <Alert className={styles.alert} type="error" showIcon message={error} />}
+          {error && <Alert className="!my-4" type="error" showIcon message={error} />}
           <Form<LoginForm & Partial<RegistrationForm>>
+            className="!mt-6"
             layout="vertical"
             requiredMark={false}
             onFinish={(values) => {
@@ -162,7 +186,7 @@ export default function LoginPage() {
               />
             </Form.Item>
             <Button
-              className={styles.submit}
+              className="!mt-2 !min-h-11 !w-full"
               type="primary"
               htmlType="submit"
               loading={pending}

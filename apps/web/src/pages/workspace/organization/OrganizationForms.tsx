@@ -3,14 +3,19 @@ import { Button, Drawer, Form, Input, Select } from "antd";
 import type { Department, Position } from "@/api/services/organization";
 import type { WorkspaceMember } from "@/api/services/workspaces";
 
+/** 新建部门表单值；未提供上级时创建一级部门。 */
 export interface DepartmentFormValues {
   name: string;
   parentId?: string;
 }
+
+/** 新建岗位表单值；岗位必须归属一个有效部门。 */
 export interface PositionFormValues {
   name: string;
   departmentId: string;
 }
+
+/** 成员组织归属表单值；主部门必须同时存在于所属部门集合中。 */
 export interface AssignmentFormValues {
   accountId: string;
   departmentIds: string[];
@@ -30,12 +35,26 @@ interface OrganizationFormsProps {
   onAssignment: (values: AssignmentFormValues) => void;
 }
 
+/**
+ * 统一承载部门、岗位和成员归属三类组织表单。
+ *
+ * 下拉选项仅展示服务端投影中的有效事实，提交值的工作空间归属、层级约束和权限仍由后端校验。
+ */
 export function OrganizationForms(props: OrganizationFormsProps) {
   const { mode, departments, positions, members, pending, onClose } = props;
   const [departmentForm] = Form.useForm<DepartmentFormValues>();
   const [positionForm] = Form.useForm<PositionFormValues>();
   const [assignmentForm] = Form.useForm<AssignmentFormValues>();
   const titles = { department: "新建部门", position: "新建岗位", assignment: "设置成员归属" };
+  const activeDepartmentOptions = departments
+    .filter((item) => item.effective_active)
+    .map((item) => ({ value: item.department_id, label: item.name }));
+  const activePositionOptions = positions
+    .filter((item) => item.effective_active)
+    .map((item) => ({ value: item.position_id, label: item.name }));
+  const activeMemberOptions = members
+    .filter((item) => item.status === "active")
+    .map((item) => ({ value: item.account_id, label: item.display_name }));
 
   return (
     <Drawer
@@ -60,13 +79,7 @@ export function OrganizationForms(props: OrganizationFormsProps) {
             <Input autoFocus />
           </Form.Item>
           <Form.Item label="上级部门" name="parentId">
-            <Select
-              allowClear
-              placeholder="作为一级部门"
-              options={departments
-                .filter((item) => item.effective_active)
-                .map((item) => ({ value: item.department_id, label: item.name }))}
-            />
+            <Select allowClear placeholder="作为一级部门" options={activeDepartmentOptions} />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={pending}>
             创建部门
@@ -85,11 +98,7 @@ export function OrganizationForms(props: OrganizationFormsProps) {
             name="departmentId"
             rules={[{ required: true, message: "请选择所属部门" }]}
           >
-            <Select
-              options={departments
-                .filter((item) => item.effective_active)
-                .map((item) => ({ value: item.department_id, label: item.name }))}
-            />
+            <Select options={activeDepartmentOptions} />
           </Form.Item>
           <Form.Item
             label="岗位名称"
@@ -115,42 +124,24 @@ export function OrganizationForms(props: OrganizationFormsProps) {
             name="accountId"
             rules={[{ required: true, message: "请选择成员" }]}
           >
-            <Select
-              options={members
-                .filter((item) => item.status === "active")
-                .map((item) => ({ value: item.account_id, label: item.display_name }))}
-            />
+            <Select options={activeMemberOptions} />
           </Form.Item>
           <Form.Item
             label="所属部门"
             name="departmentIds"
             rules={[{ required: true, message: "至少选择一个部门" }]}
           >
-            <Select
-              mode="multiple"
-              options={departments
-                .filter((item) => item.effective_active)
-                .map((item) => ({ value: item.department_id, label: item.name }))}
-            />
+            <Select mode="multiple" options={activeDepartmentOptions} />
           </Form.Item>
           <Form.Item
             label="主部门"
             name="primaryDepartmentId"
             rules={[{ required: true, message: "请选择主部门" }]}
           >
-            <Select
-              options={departments
-                .filter((item) => item.effective_active)
-                .map((item) => ({ value: item.department_id, label: item.name }))}
-            />
+            <Select options={activeDepartmentOptions} />
           </Form.Item>
           <Form.Item label="岗位" name="positionIds">
-            <Select
-              mode="multiple"
-              options={positions
-                .filter((item) => item.effective_active)
-                .map((item) => ({ value: item.position_id, label: item.name }))}
-            />
+            <Select mode="multiple" options={activePositionOptions} />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={pending}>
             保存归属

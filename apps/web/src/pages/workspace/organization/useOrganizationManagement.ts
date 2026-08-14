@@ -25,7 +25,13 @@ interface Options {
   closeForm: () => void;
 }
 
-/** 集中维护组织页缓存边界，部门或岗位变化后只刷新关联事实。 */
+/**
+ * 集中维护组织页 Query、Mutation 与缓存刷新边界。
+ *
+ * `enabled` 由页面在确认企业空间后开启；部门与岗位的新增或状态变化可能改变
+ * 有效层级和可选岗位，因此两类缓存必须一起失效。成员归属提交不改变当前页面的
+ * 部门、岗位或成员摘要，成功后只关闭表单并等待后续成员详情能力读取新事实。
+ */
 export function useOrganizationManagement({ workspaceId, enabled, closeForm }: Options) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -48,6 +54,7 @@ export function useOrganizationManagement({ workspaceId, enabled, closeForm }: O
     retry: false,
   });
   const refreshOrganization = async () => {
+    // 上级部门状态会级联影响岗位有效性，两份服务端投影必须在同一动作后共同刷新。
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["departments", workspaceId] }),
       queryClient.invalidateQueries({ queryKey: ["positions", workspaceId] }),

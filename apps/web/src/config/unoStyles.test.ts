@@ -5,11 +5,16 @@ import { describe, expect, it } from "vitest";
 import unoConfig from "../../uno.config";
 
 describe("UnoCSS 项目 Variant", () => {
-  it("为导航移动态保留包含 720px 的旧断点边界", async () => {
+  it.each([
+    ["phone-down", 560],
+    ["nav-mobile", 720],
+    ["tablet-down", 820],
+    ["desktop-down", 1024],
+  ])("为 %s 保留包含 %i px 的旧断点边界", async (variant, width) => {
     const generator = await createGenerator(unoConfig);
-    const { css } = await generator.generate("nav-mobile:hidden");
+    const { css } = await generator.generate(`${variant}:hidden`);
 
-    expect(css).toContain("@media (max-width: 720px)");
+    expect(css).toContain(`@media (max-width: ${width}px)`);
     expect(css).toMatch(/display:\s*none;/);
   });
 
