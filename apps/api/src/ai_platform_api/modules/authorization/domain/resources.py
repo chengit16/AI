@@ -8,8 +8,8 @@ from uuid import UUID
 
 PermissionScope = Literal["platform", "account", "workspace", "resource", "field"]
 ResourceStatus = Literal["active", "disabled"]
-PageAccessLevel = Literal["public", "authenticated", "authorized"]
-ApiAccessLevel = Literal["public", "authenticated", "authorized"]
+PageAccessLevel = Literal["public", "authenticated", "authorized", "platform_admin"]
+ApiAccessLevel = Literal["public", "authenticated", "authorized", "platform_admin"]
 MenuType = Literal["directory", "page", "action"]
 MenuSource = Literal["system", "workspace"]
 HttpMethod = Literal["DELETE", "GET", "PATCH", "POST", "PUT"]
@@ -87,6 +87,43 @@ class ResourceRegistry:
     api_resources: tuple[ApiResource, ...]
     menus: tuple[Menu, ...]
     menu_api_bindings: tuple[MenuApiBinding, ...]
+
+    @property
+    def platform_menu_ids(self) -> frozenset[UUID]:
+        platform_page_ids = {
+            item.page_resource_id
+            for item in self.page_resources
+            if item.access_level == "platform_admin"
+        }
+        selected = {
+            item.menu_id for item in self.menus if item.page_resource_id in platform_page_ids
+        }
+        # 平台目录与动作都由页面关系推导，避免新增一个可被工作空间伪造的 scope 字段。
+        while True:
+            selected_keys = {item.menu_key for item in self.menus if item.menu_id in selected}
+            parent_keys = {
+                item.parent_menu_key
+                for item in self.menus
+                if item.menu_id in selected and item.parent_menu_key is not None
+            }
+            expanded = selected | {
+                item.menu_id
+                for item in self.menus
+                if item.menu_key in parent_keys or item.parent_menu_key in selected_keys
+            }
+            if expanded == selected:
+                return frozenset(selected)
+            selected = expanded
+
+    @property
+    def workspace_menus(self) -> tuple[Menu, ...]:
+        platform_ids = self.platform_menu_ids
+        return tuple(item for item in self.menus if item.menu_id not in platform_ids)
+
+    @property
+    def workspace_menu_api_bindings(self) -> tuple[MenuApiBinding, ...]:
+        platform_ids = self.platform_menu_ids
+        return tuple(item for item in self.menu_api_bindings if item.menu_id not in platform_ids)
 
     def violations(self) -> tuple[str, ...]:
         violations: list[str] = []
@@ -238,8 +275,14 @@ class ResourceRegistry:
                         violations.append(f"{location}: 启用菜单不能引用停用页面")
                     if bound_page.permission_code != menu.permission_code:
                         violations.append(f"{location}: 菜单与页面必须引用同一 permission_code")
-                if menu.permission_code is None:
-                    violations.append(f"{location}: 页面菜单必须绑定 permission_code")
+                if bound_page is not None:
+                    if bound_page.access_level == "authorized" and menu.permission_code is None:
+                        violations.append(f"{location}: 工作空间页面菜单必须绑定 permission_code")
+                    if (
+                        bound_page.access_level == "platform_admin"
+                        and menu.permission_code is not None
+                    ):
+                        violations.append(f"{location}: 平台管理员页面菜单不能绑定工作空间权限")
             elif menu.page_resource_id is not None:
                 violations.append(f"{location}: 动作菜单不能直接绑定页面")
             elif menu.menu_type == "action" and menu.parent_menu_key is None:
@@ -257,7 +300,7 @@ class ResourceRegistry:
         _append_menu_cycle_violations(menu_by_key, violations)
 
         referenced_action_menus: set[UUID] = set()
-        referenced_authorized_apis: set[UUID] = set()
+        referenced_protected_apis: set[UUID] = set()
         seen_bindings: set[tuple[UUID, UUID]] = set()
         for binding in self.menu_api_bindings:
             location = f"menu_api_bindings[{binding.menu_id}:{binding.api_resource_id}]"
@@ -276,15 +319,19 @@ class ResourceRegistry:
                 referenced_action_menus.add(bound_menu.menu_id)
             if bound_api is None:
                 violations.append(f"{location}: api_resource_id 指向未注册接口")
-            elif bound_api.access_level != "authorized":
-                violations.append(f"{location}: 只允许绑定后端授权接口")
+            elif bound_api.access_level not in {"authorized", "platform_admin"}:
+                violations.append(f"{location}: 只允许绑定后端受保护接口")
             else:
-                referenced_authorized_apis.add(bound_api.api_resource_id)
+                referenced_protected_apis.add(bound_api.api_resource_id)
             if bound_menu is not None and bound_api is not None:
                 if bound_menu.status != "active" or bound_api.status != "active":
                     violations.append(f"{location}: 启用绑定不能引用停用资源")
                 if bound_menu.permission_code != bound_api.permission_code:
                     violations.append(f"{location}: 动作菜单与接口必须使用同一 permission_code")
+                if (bound_menu.menu_id in self.platform_menu_ids) != (
+                    bound_api.access_level == "platform_admin"
+                ):
+                    violations.append(f"{location}: 平台菜单与接口访问级别不一致")
                 if binding.action_type == "query" and bound_api.method != "GET":
                     violations.append(f"{location}: query 绑定只能引用 GET 接口")
                 if binding.action_type != "query" and bound_api.method == "GET":
@@ -300,15 +347,15 @@ class ResourceRegistry:
         for api in self.api_resources:
             if (
                 api.status == "active"
-                and api.access_level == "authorized"
-                and api.api_resource_id not in referenced_authorized_apis
+                and api.access_level in {"authorized", "platform_admin"}
+                and api.api_resource_id not in referenced_protected_apis
             ):
-                violations.append(f"api_resources[{api.api_key}]: 授权接口未绑定任何动作菜单")
+                violations.append(f"api_resources[{api.api_key}]: 受保护接口未绑定任何动作菜单")
 
         for page in self.page_resources:
             if (
                 page.status == "active"
-                and page.access_level == "authorized"
+                and page.access_level in {"authorized", "platform_admin"}
                 and page.page_resource_id not in referenced_pages
             ):
                 violations.append(f"page_resources[{page.page_key}]: 授权页面未绑定任何菜单")
@@ -365,7 +412,9 @@ def _validate_access_permission(
         elif permission_by_code[permission_code].status != "active":
             violations.append(f"{location}: authorized 资源不能引用停用权限")
     elif permission_code is not None:
-        violations.append(f"{location}: public/authenticated 资源不能绑定 permission_code")
+        violations.append(
+            f"{location}: public/authenticated/platform_admin 资源不能绑定 permission_code"
+        )
 
 
 def _append_menu_cycle_violations(

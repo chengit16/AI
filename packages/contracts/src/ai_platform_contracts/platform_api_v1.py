@@ -289,8 +289,45 @@ class HealthResponse(typing.TypedDict):
     version: str
 
 
+class IngestionJobListResponse(typing.TypedDict):
+    items: list[IngestionJobResponse]
+
+
+class IngestionJobResponse(typing.TypedDict):
+    attempt_count: int
+    available_at: str
+    block_count: int | None
+    can_retry_manually: bool
+    completed_at: str | None
+    created_at: str
+    document_id: str
+    document_version_id: str
+    error_code: str | None
+    error_message: str | None
+    failure_stage: typing.Literal["source", "parse", "ocr", "artifact", "worker"] | None
+    ingestion_job_id: str
+    knowledge_base_id: str
+    last_retried_at: str | None
+    manual_retry_count: int
+    max_attempts: int
+    ocr_used: bool | None
+    page_count: int | None
+    parsed_content_hash: str | None
+    parser_name: str | None
+    source_id: str
+    source_media_type: str
+    source_name: str
+    started_at: str | None
+    status: typing.Literal["queued", "running", "retry_wait", "succeeded", "failed"]
+    updated_at: str
+
+
 class InviteWorkspaceMemberRequest(typing.TypedDict):
     login_name: str
+
+
+class KnowledgeBaseListResponse(typing.TypedDict):
+    items: list[KnowledgeBaseSummaryResponse]
 
 
 class KnowledgeBaseResponse(typing.TypedDict):
@@ -307,6 +344,32 @@ class KnowledgeBaseResponse(typing.TypedDict):
     updated_at: str
     version: int
     workspace_id: str
+
+
+class KnowledgeBaseSummaryResponse(typing.TypedDict):
+    default_security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    default_visibility: typing.Literal["private", "workspace", "departments"]
+    description: str | None
+    knowledge_base_id: str
+    name: str
+    updated_at: str
+
+
+class KnowledgeDocumentListResponse(typing.TypedDict):
+    items: list[KnowledgeDocumentSummaryResponse]
+
+
+class KnowledgeDocumentSummaryResponse(typing.TypedDict):
+    current_document_version_id: str | None
+    document_id: str
+    latest_version: DocumentVersionResponse
+    security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    source_id: str
+    source_kind: typing.Literal["manual", "upload", "web", "data_source"]
+    source_name: str
+    title: str
+    updated_at: str
+    visibility: typing.Literal["private", "workspace", "departments"]
 
 
 class LoginRequest(typing.TypedDict):

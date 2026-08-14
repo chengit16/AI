@@ -40,6 +40,7 @@ describe("平台路由与运行状态", () => {
       ["空间总览", "/workspace/overview", "workspace.overview.access"],
       ["成员管理", "/workspace/members", "workspace.members.access"],
       ["组织架构", "/workspace/organization", "organization.structure.access"],
+      ["知识生产", "/workspace/knowledge", "knowledge.production.access"],
       ["运行状态", "/status", "system.runtime.access"],
     ]);
   });

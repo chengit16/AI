@@ -78,7 +78,7 @@
         "route": { "type": "string", "pattern": "^/" },
         "component_key": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$" },
         "layout_key": { "$ref": "#/$defs/registry_key" },
-        "access_level": { "enum": ["public", "authenticated", "authorized"] },
+        "access_level": { "enum": ["public", "authenticated", "authorized", "platform_admin"] },
         "permission_code": {
           "oneOf": [{ "$ref": "#/$defs/permission_code" }, { "type": "null" }]
         },
@@ -106,7 +106,7 @@
         "operation_id": { "type": "string", "minLength": 1, "maxLength": 120 },
         "method": { "enum": ["DELETE", "GET", "PATCH", "POST", "PUT"] },
         "path_pattern": { "type": "string", "pattern": "^/api/v1/" },
-        "access_level": { "enum": ["public", "authenticated", "authorized"] },
+        "access_level": { "enum": ["public", "authenticated", "authorized", "platform_admin"] },
         "permission_code": {
           "oneOf": [{ "$ref": "#/$defs/permission_code" }, { "type": "null" }]
         },

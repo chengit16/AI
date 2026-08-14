@@ -59,6 +59,7 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyRegistrationUnitOfWork,
 )
 from ai_platform_api.modules.knowledge.application.facts import KnowledgeFactService
+from ai_platform_api.modules.knowledge.application.management import KnowledgeManagementService
 from ai_platform_api.modules.knowledge.application.uploads import KnowledgeUploadService
 from ai_platform_api.modules.knowledge.infrastructure.object_storage import MinioObjectStorage
 from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
@@ -118,6 +119,7 @@ class ApplicationContainer:
     menu_releases: MenuReleaseService | None = None
     knowledge_facts: KnowledgeFactService | None = None
     knowledge_uploads: KnowledgeUploadService | None = None
+    knowledge_management: KnowledgeManagementService | None = None
     model_provider_configurations: ModelProviderConfigurationService | None = None
     ai_runtime_configurations: AiRuntimeConfigurationService | None = None
     model_runtime: RuntimeModelGatewayService | None = None
@@ -168,6 +170,12 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         ),
         ingestion_max_attempts=settings.ingestion_max_attempts,
     )
+    knowledge_management = KnowledgeManagementService(
+        SqlAlchemyKnowledgeUnitOfWork(
+            database.sessions,
+            SqlAlchemyEntitlementRepository,
+        )
+    )
     object_storage = MinioObjectStorage(
         endpoint=settings.minio_endpoint,
         access_key=settings.minio_access_key,
@@ -205,6 +213,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             menu_configuration=menu_configuration,
             menu_releases=menu_releases,
             knowledge_facts=knowledge_facts,
+            knowledge_management=knowledge_management,
             knowledge_uploads=KnowledgeUploadService(
                 knowledge_facts,
                 object_storage,

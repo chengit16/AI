@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -35,6 +35,7 @@ from ai_platform_api.modules.knowledge.application.facts import (
     KnowledgeQuotaExceededError,
     KnowledgeValidationError,
 )
+from ai_platform_api.modules.knowledge.application.management import KnowledgeManagementService
 from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
     SqlAlchemyKnowledgeUnitOfWork,
 )
@@ -85,6 +86,7 @@ class KnowledgeHarness:
     enterprise: EnterpriseWorkspaceService
     organization: OrganizationService
     knowledge: KnowledgeFactService
+    management: KnowledgeManagementService
 
 
 @pytest.fixture(scope="module")
@@ -109,6 +111,10 @@ def knowledge_database() -> Iterator[KnowledgeHarness]:
     sessions = create_session_factory(engine)
     reader = SqlAlchemyIdentityReader(sessions)
     try:
+        knowledge_unit_of_work = SqlAlchemyKnowledgeUnitOfWork(
+            sessions,
+            SqlAlchemyEntitlementRepository,
+        )
         yield KnowledgeHarness(
             engine=engine,
             sessions=sessions,
@@ -119,7 +125,8 @@ def knowledge_database() -> Iterator[KnowledgeHarness]:
             ),
             enterprise=EnterpriseWorkspaceService(SqlAlchemyEnterpriseUnitOfWork(sessions)),
             organization=OrganizationService(SqlAlchemyOrganizationUnitOfWork(sessions)),
-            knowledge=KnowledgeFactService(
+            knowledge=KnowledgeFactService(knowledge_unit_of_work),
+            management=KnowledgeManagementService(
                 SqlAlchemyKnowledgeUnitOfWork(sessions, SqlAlchemyEntitlementRepository)
             ),
         )
@@ -470,6 +477,140 @@ def test_ingestion_job_lease_and_retry_are_bounded(
                 )
             )
             == 0
+        )
+
+
+def test_p1d07_management_queries_and_manual_retry_are_scoped_and_audited(
+    knowledge_database: KnowledgeHarness,
+) -> None:
+    owner = register(knowledge_database, identity="management-owner")
+    owner_context = context(owner)
+    authorized_context = replace(owner_context, authorized_workspace=True)
+    knowledge_base = knowledge_database.knowledge.create_knowledge_base(
+        owner_context,
+        name="合成知识生产台",
+        default_visibility="workspace",
+    )
+    document, version, _ = knowledge_database.knowledge.create_document(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        title="合成可重试文档",
+        source_kind="upload",
+        source_name="synthetic-management.txt",
+        original_object_key=(
+            f"workspaces/{owner.personal_workspace_id}/uploads/00000000000000000000000000000007.txt"
+        ),
+        upload_media_type="text/plain",
+        upload_size_bytes=64,
+        upload_content_hash=CONTENT_HASH_1,
+        upload_scan_status="clean",
+        upload_scanner_version="synthetic-scanner-v1",
+        upload_scanned_at=NOW,
+    )
+    failed_at = datetime.now(UTC)
+    with knowledge_database.engine.begin() as connection:
+        job_id = connection.scalar(
+            select(ingestion_jobs.c.ingestion_job_id).where(
+                ingestion_jobs.c.document_version_id == version.document_version_id
+            )
+        )
+        assert isinstance(job_id, UUID)
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.ingestion_job_id == job_id)
+            .values(
+                status="failed",
+                attempt_count=3,
+                completed_at=failed_at,
+                failure_stage="parse",
+                error_code="INGESTION_PARSER_UNAVAILABLE",
+                error_message="合成解析服务暂时不可用",
+                updated_at=failed_at,
+            )
+        )
+
+    bases = knowledge_database.management.list_knowledge_bases(authorized_context, limit=100)
+    summaries = knowledge_database.management.list_documents(
+        authorized_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        limit=100,
+    )
+    jobs = knowledge_database.management.list_ingestion_jobs(
+        authorized_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        limit=100,
+    )
+    assert knowledge_base.knowledge_base_id in {item.knowledge_base_id for item in bases}
+    assert summaries[0].document.document_id == document.document_id
+    assert jobs[0].ingestion_job_id == job_id
+    assert jobs[0].can_retry_manually is True
+
+    retried = knowledge_database.management.retry_ingestion_job(
+        authorized_context,
+        ingestion_job_id=job_id,
+    )
+    assert retried.status == "queued"
+    assert retried.attempt_count == 0
+    assert retried.manual_retry_count == 1
+    with knowledge_database.engine.connect() as connection:
+        audit_count = connection.scalar(
+            select(func.count())
+            .select_from(audit_records)
+            .where(
+                audit_records.c.workspace_id == owner.personal_workspace_id,
+                audit_records.c.action == "knowledge.ingestion.retry",
+                audit_records.c.resource_id == job_id,
+            )
+        )
+        event_count = connection.scalar(
+            select(func.count())
+            .select_from(outbox_events)
+            .where(
+                outbox_events.c.workspace_id == owner.personal_workspace_id,
+                outbox_events.c.event_type == "knowledge.ingestion.retry_requested",
+                outbox_events.c.aggregate_id == job_id,
+            )
+        )
+    assert audit_count == event_count == 1
+
+    with knowledge_database.engine.begin() as connection:
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.ingestion_job_id == job_id)
+            .values(
+                status="failed",
+                attempt_count=1,
+                completed_at=failed_at,
+                failure_stage="parse",
+                error_code="INGESTION_PARSE_FAILED",
+                error_message="合成内容无法解析",
+                updated_at=failed_at,
+            )
+        )
+    with pytest.raises(KnowledgeConflictError):
+        knowledge_database.management.retry_ingestion_job(
+            authorized_context,
+            ingestion_job_id=job_id,
+        )
+
+    knowledge_database.knowledge.delete_document(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        document_id=document.document_id,
+    )
+    with knowledge_database.engine.begin() as connection:
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.ingestion_job_id == job_id)
+            .values(
+                error_code="INGESTION_SOURCE_UNAVAILABLE",
+                error_message="合成来源暂时不可用",
+            )
+        )
+    with pytest.raises(KnowledgeNotFoundError):
+        knowledge_database.management.retry_ingestion_job(
+            authorized_context,
+            ingestion_job_id=job_id,
         )
 
 

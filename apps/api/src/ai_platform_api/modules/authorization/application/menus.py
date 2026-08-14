@@ -189,7 +189,7 @@ class MenuConfigurationService:
 
     def _validate_overrides(self, overrides: tuple[WorkspaceMenuOverride, ...]) -> None:
         menu_by_id = {
-            item.menu_id: item for item in self._registry.menus if item.status == "active"
+            item.menu_id: item for item in self._registry.workspace_menus if item.status == "active"
         }
         if len(overrides) > len(menu_by_id) or len({item.menu_id for item in overrides}) != len(
             overrides
@@ -220,7 +220,7 @@ class MenuConfigurationService:
             menu.menu_id: (
                 override_by_id[menu.menu_id].parent_menu_id
                 if menu.menu_id in override_by_id
-                else _parent_id(menu, self._registry.menus)
+                else _parent_id(menu, self._registry.workspace_menus)
             )
             for menu in menu_by_id.values()
         }
@@ -234,7 +234,9 @@ class MenuConfigurationService:
                 current = parent_by_id.get(current)
 
     def _validate_role_menus(self, entries: tuple[RoleMenuVisibility, ...]) -> None:
-        registered = {item.menu_id for item in self._registry.menus if item.status == "active"}
+        registered = {
+            item.menu_id for item in self._registry.workspace_menus if item.status == "active"
+        }
         menu_ids = {item.menu_id for item in entries}
         if (
             len(entries) > len(registered)
@@ -251,7 +253,7 @@ class MenuConfigurationService:
                     binding.api_resource_id,
                     binding.action_type,
                 )
-                for binding in self._registry.menu_api_bindings
+                for binding in self._registry.workspace_menu_api_bindings
             )
         )
         if repository.list_registered_bindings() != expected:

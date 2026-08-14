@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -8,9 +8,23 @@ from uuid import UUID
 IngestionJobStatus = Literal["queued", "running", "retry_wait", "succeeded", "failed"]
 IngestionFailureStage = Literal["source", "parse", "ocr", "artifact", "worker"]
 
+MANUALLY_RETRYABLE_ERROR_CODES = frozenset(
+    {
+        "INGESTION_PARSER_UNAVAILABLE",
+        "INGESTION_SOURCE_UNAVAILABLE",
+        "INGESTION_ARTIFACT_UNAVAILABLE",
+        "INGESTION_WORKER_LEASE_EXPIRED",
+        "INTERNAL_ERROR",
+    }
+)
+
 
 class InvalidIngestionJobError(Exception):
     """入库任务状态、来源快照或结果字段不满足事实约束。"""
+
+
+class ManualIngestionRetryNotAllowedError(Exception):
+    """任务未终止，或失败原因需要修复内容并上传新版本。"""
 
 
 @dataclass(frozen=True)
@@ -47,6 +61,9 @@ class IngestionJob:
     ocr_used: bool | None = None
     page_count: int | None = None
     block_count: int | None = None
+    manual_retry_count: int = 0
+    last_retried_by_actor_id: UUID | None = None
+    last_retried_at: datetime | None = None
 
     def assert_valid(self) -> None:
         source_prefix = f"workspaces/{self.workspace_id}/uploads/"
@@ -105,6 +122,50 @@ class IngestionJob:
             raise InvalidIngestionJobError
         if self.status == "failed" and self.completed_at is None:
             raise InvalidIngestionJobError
+        retry_metadata_complete = (
+            self.last_retried_by_actor_id is not None and self.last_retried_at is not None
+        )
+        if self.manual_retry_count < 0 or (self.manual_retry_count > 0) != retry_metadata_complete:
+            raise InvalidIngestionJobError
+
+    @property
+    def can_retry_manually(self) -> bool:
+        return self.status == "failed" and self.error_code in MANUALLY_RETRYABLE_ERROR_CODES
+
+    def retry_manually(
+        self,
+        *,
+        actor_id: UUID,
+        trace_id: str,
+        traceparent: str,
+        occurred_at: datetime,
+    ) -> IngestionJob:
+        """人工重试开启新的有限尝试窗口，同时保留累计人工重试事实。"""
+
+        if not self.can_retry_manually:
+            raise ManualIngestionRetryNotAllowedError
+        retried = replace(
+            self,
+            status="queued",
+            attempt_count=0,
+            available_at=occurred_at,
+            claimed_by=None,
+            claim_until=None,
+            requested_by_actor_id=actor_id,
+            trace_id=trace_id,
+            traceparent=traceparent,
+            started_at=None,
+            completed_at=None,
+            failure_stage=None,
+            error_code=None,
+            error_message=None,
+            updated_at=occurred_at,
+            manual_retry_count=self.manual_retry_count + 1,
+            last_retried_by_actor_id=actor_id,
+            last_retried_at=occurred_at,
+        )
+        retried.assert_valid()
+        return retried
 
 
 def _is_sha256(value: str | None) -> bool:

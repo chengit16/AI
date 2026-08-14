@@ -50,20 +50,27 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const session = getApiSession();
   const method = options.method ?? "GET";
   const headers = new Headers(options.headers);
+  const isMultipart = options.body instanceof FormData;
   headers.set("Accept", "application/json");
   const workspaceId = options.workspaceId === undefined ? session.workspaceId : options.workspaceId;
   if (workspaceId) headers.set("X-Workspace-ID", workspaceId);
   if (method !== "GET" && session.csrfToken) {
     headers.set("X-CSRF-Token", session.csrfToken);
   }
-  if (options.body !== undefined) headers.set("Content-Type", "application/json");
+  if (options.body !== undefined && !isMultipart) headers.set("Content-Type", "application/json");
+  const requestBody: BodyInit | undefined =
+    options.body === undefined
+      ? undefined
+      : options.body instanceof FormData
+        ? options.body
+        : JSON.stringify(options.body);
 
   const response = await fetch(path, {
     ...options,
     method,
     headers,
     credentials: "same-origin",
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: requestBody,
   });
   const contentType = response.headers.get("content-type") ?? "";
   const payload: unknown = contentType.includes("application/json") ? await response.json() : null;

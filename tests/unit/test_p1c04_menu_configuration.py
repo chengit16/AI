@@ -50,7 +50,7 @@ class MenuRepository:
         self.bindings = tuple(
             sorted(
                 (item.menu_id, item.api_resource_id, item.action_type)
-                for item in registry.menu_api_bindings
+                for item in registry.workspace_menu_api_bindings
             )
         )
 

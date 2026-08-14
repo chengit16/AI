@@ -6,6 +6,7 @@ import {
   getEffectiveWorkspaceRoles,
 } from "@/api/services/workspaces";
 import { buildDynamicNavigation } from "@/config/dynamicMenu";
+import { resourceRegistry } from "@/config/resourceRegistry.generated";
 import { iconByKey, staticWorkspaceNavigation } from "@/config/resources";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 import { useSessionStore } from "@/store/session";
@@ -35,10 +36,37 @@ export function useWorkspaceMenuNavigation() {
         : staticWorkspaceNavigation,
     [release.data, roles.data],
   );
+  const visiblePermissionCodes = useMemo(() => {
+    if (!release.data?.snapshot) {
+      return new Set(
+        resourceRegistry.menus
+          .filter((menu) => menu.status === "active" && menu.permission_code)
+          .map((menu) => menu.permission_code!),
+      );
+    }
+    const roleIds = new Set(roles.data?.roles.map((role) => role.role_id) ?? []);
+    const hiddenMenuIds = new Set(
+      release.data.snapshot.role_menus
+        .filter((item) => roleIds.has(item.role_id) && !item.visible)
+        .map((item) => item.menu_id),
+    );
+    return new Set(
+      release.data.snapshot.menus
+        .filter(
+          (menu) =>
+            menu.status === "active" &&
+            menu.visible &&
+            !hiddenMenuIds.has(menu.menu_id) &&
+            menu.permission_code,
+        )
+        .map((menu) => menu.permission_code!),
+    );
+  }, [release.data, roles.data]);
   return {
     release,
     roles,
     navigation,
+    visiblePermissionCodes,
     isLoading: release.isLoading || roles.isLoading || workspace.workspaces.isLoading,
     error: release.error ?? roles.error ?? workspace.workspaces.error,
     hasPublishedRelease: Boolean(release.data?.snapshot),

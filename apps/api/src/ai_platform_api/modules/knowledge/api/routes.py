@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 
 from ai_platform_api.common.api_errors import error_responses
@@ -19,7 +19,13 @@ from ai_platform_api.modules.knowledge.api.schemas import (
     DocumentVersionCreatedResponse,
     DocumentVersionResponse,
     DocumentVersionUploadResponse,
+    IngestionJobListResponse,
+    IngestionJobResponse,
+    KnowledgeBaseListResponse,
     KnowledgeBaseResponse,
+    KnowledgeBaseSummaryResponse,
+    KnowledgeDocumentListResponse,
+    KnowledgeDocumentSummaryResponse,
     MarkDocumentVersionReadyRequest,
     UploadMetadataResponse,
 )
@@ -30,6 +36,11 @@ from ai_platform_api.modules.knowledge.application.facts import (
     KnowledgeBase,
     KnowledgeDeniedError,
     KnowledgeFactService,
+)
+from ai_platform_api.modules.knowledge.application.management import (
+    IngestionJob,
+    KnowledgeDocumentSummary,
+    KnowledgeManagementService,
 )
 from ai_platform_api.modules.knowledge.application.uploads import (
     KnowledgeUploadService,
@@ -51,6 +62,98 @@ def knowledge_upload_service(request: Request) -> KnowledgeUploadService:
     if not isinstance(service, KnowledgeUploadService):
         raise RuntimeError("知识上传服务尚未完成装配")
     return service
+
+
+def knowledge_management_service(request: Request) -> KnowledgeManagementService:
+    service = getattr(request.app.state, "knowledge_management_service", None)
+    if not isinstance(service, KnowledgeManagementService):
+        raise RuntimeError("知识管理服务尚未完成装配")
+    return service
+
+
+@router.get(
+    "/knowledge-bases",
+    response_model=KnowledgeBaseListResponse,
+    operation_id="listKnowledgeBases",
+    responses=error_responses(400, 401, 403, 422, 500),
+)
+def list_knowledge_bases(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+) -> KnowledgeBaseListResponse:
+    _require_workspace_path(context, workspace_id)
+    items = service.list_knowledge_bases(context, limit=limit)
+    return KnowledgeBaseListResponse(items=[_knowledge_base_summary(item) for item in items])
+
+
+@router.get(
+    "/knowledge-bases/{knowledge_base_id}/documents",
+    response_model=KnowledgeDocumentListResponse,
+    operation_id="listKnowledgeDocuments",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def list_documents(
+    workspace_id: UUID,
+    knowledge_base_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+) -> KnowledgeDocumentListResponse:
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeDocumentListResponse(
+        items=[
+            _document_summary(item)
+            for item in service.list_documents(
+                context,
+                knowledge_base_id=knowledge_base_id,
+                limit=limit,
+            )
+        ]
+    )
+
+
+@router.get(
+    "/knowledge-bases/{knowledge_base_id}/ingestion-jobs",
+    response_model=IngestionJobListResponse,
+    operation_id="listKnowledgeIngestionJobs",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def list_ingestion_jobs(
+    workspace_id: UUID,
+    knowledge_base_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+) -> IngestionJobListResponse:
+    _require_workspace_path(context, workspace_id)
+    return IngestionJobListResponse(
+        items=[
+            _ingestion_job(item)
+            for item in service.list_ingestion_jobs(
+                context,
+                knowledge_base_id=knowledge_base_id,
+                limit=limit,
+            )
+        ]
+    )
+
+
+@router.post(
+    "/ingestion-jobs/{ingestion_job_id}/retry",
+    response_model=IngestionJobResponse,
+    operation_id="retryKnowledgeIngestionJob",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def retry_ingestion_job(
+    workspace_id: UUID,
+    ingestion_job_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+) -> IngestionJobResponse:
+    _require_workspace_path(context, workspace_id)
+    return _ingestion_job(service.retry_ingestion_job(context, ingestion_job_id=ingestion_job_id))
 
 
 @router.post(
@@ -349,6 +452,17 @@ def _knowledge_base(value: KnowledgeBase) -> KnowledgeBaseResponse:
     )
 
 
+def _knowledge_base_summary(value: KnowledgeBase) -> KnowledgeBaseSummaryResponse:
+    return KnowledgeBaseSummaryResponse(
+        knowledge_base_id=value.knowledge_base_id,
+        name=value.name,
+        description=value.description,
+        default_visibility=value.default_visibility,
+        default_security_level=value.default_security_level,
+        updated_at=value.updated_at,
+    )
+
+
 def _document(value: Document) -> DocumentResponse:
     return DocumentResponse(
         document_id=value.document_id,
@@ -380,6 +494,52 @@ def _document_version(value: DocumentVersion) -> DocumentVersionResponse:
         created_at=value.created_at,
         published_at=value.published_at,
         record_version=value.record_version,
+    )
+
+
+def _document_summary(value: KnowledgeDocumentSummary) -> KnowledgeDocumentSummaryResponse:
+    return KnowledgeDocumentSummaryResponse(
+        document_id=value.document.document_id,
+        title=value.document.title,
+        visibility=value.document.visibility,
+        security_level=value.document.security_level,
+        updated_at=value.document.updated_at,
+        latest_version=_document_version(value.latest_version),
+        source_id=value.source_id,
+        source_kind=value.source_kind,
+        source_name=value.source_name,
+        current_document_version_id=value.current_document_version_id,
+    )
+
+
+def _ingestion_job(value: IngestionJob) -> IngestionJobResponse:
+    return IngestionJobResponse(
+        ingestion_job_id=value.ingestion_job_id,
+        knowledge_base_id=value.knowledge_base_id,
+        document_id=value.document_id,
+        document_version_id=value.document_version_id,
+        source_id=value.source_id,
+        source_name=value.source_name,
+        source_media_type=value.source_media_type,
+        status=value.status,
+        attempt_count=value.attempt_count,
+        max_attempts=value.max_attempts,
+        available_at=value.available_at,
+        started_at=value.started_at,
+        completed_at=value.completed_at,
+        failure_stage=value.failure_stage,
+        error_code=value.error_code,
+        error_message=value.error_message,
+        parsed_content_hash=value.parsed_content_hash,
+        parser_name=value.parser_name,
+        ocr_used=value.ocr_used,
+        page_count=value.page_count,
+        block_count=value.block_count,
+        can_retry_manually=value.can_retry_manually,
+        manual_retry_count=value.manual_retry_count,
+        last_retried_at=value.last_retried_at,
+        created_at=value.created_at,
+        updated_at=value.updated_at,
     )
 
 

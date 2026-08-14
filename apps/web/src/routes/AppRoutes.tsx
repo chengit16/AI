@@ -6,6 +6,7 @@ import { AppShell } from "@/app/AppShell";
 import { pageRoutes } from "@/config/resources";
 import { StateView } from "@/components/StateView/StateView";
 import { useWorkspaceMenuNavigation } from "@/hooks/useWorkspaceMenuNavigation";
+import { usePlatformAdministration } from "@/hooks/usePlatformAdministration";
 import { useSessionStore } from "@/store/session";
 
 const LoginPage = lazy(() => import("@/pages/auth/login"));
@@ -13,6 +14,8 @@ const StatusPage = lazy(() => import("@/pages/system/status"));
 const WorkspaceMembersPage = lazy(() => import("@/pages/workspace/members"));
 const WorkspaceOrganizationPage = lazy(() => import("@/pages/workspace/organization"));
 const WorkspaceOverviewPage = lazy(() => import("@/pages/workspace/overview"));
+const KnowledgeProductionPage = lazy(() => import("@/pages/workspace/knowledge"));
+const PlatformModelsPage = lazy(() => import("@/pages/platform/models"));
 
 function RequireSession() {
   const location = useLocation();
@@ -43,6 +46,30 @@ function RequireMenuRoute({ children }: { children: ReactNode }) {
         kind="denied"
         title="没有访问此页面的权限"
         description="当前空间的菜单发布或角色配置未向当前账号开放此页面。"
+      />
+    );
+  }
+  return <>{children}</>;
+}
+
+function RequirePlatformAdministrator({ children }: { children: ReactNode }) {
+  const { providers, isDenied } = usePlatformAdministration();
+  if (providers.isLoading) return <Skeleton active paragraph={{ rows: 10 }} />;
+  if (isDenied) {
+    return (
+      <StateView
+        kind="denied"
+        title="仅平台管理员可访问"
+        description="模型供应商和运行配置属于平台级治理，不接受工作空间角色授权。"
+      />
+    );
+  }
+  if (providers.isError) {
+    return (
+      <StateView
+        kind="error"
+        title="平台权限暂时无法核验"
+        description="未能从服务端确认平台管理员资格，请稍后重试。"
       />
     );
   }
@@ -81,11 +108,27 @@ export function AppRoutes() {
               }
             />
             <Route
+              path={pageRoutes.KnowledgeProductionPage}
+              element={
+                <RequireMenuRoute>
+                  <KnowledgeProductionPage />
+                </RequireMenuRoute>
+              }
+            />
+            <Route
               path={pageRoutes.StatusPage}
               element={
                 <RequireMenuRoute>
                   <StatusPage />
                 </RequireMenuRoute>
+              }
+            />
+            <Route
+              path={pageRoutes.PlatformModelsPage}
+              element={
+                <RequirePlatformAdministrator>
+                  <PlatformModelsPage />
+                </RequirePlatformAdministrator>
               }
             />
           </Route>

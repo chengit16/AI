@@ -250,6 +250,16 @@ class KnowledgeRepository(Protocol):
 
     def add_knowledge_base(self, knowledge_base: KnowledgeBase) -> None: ...
 
+    def list_knowledge_bases(
+        self,
+        workspace_id: UUID,
+        *,
+        limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> tuple[KnowledgeBase, ...]: ...
+
     def get_knowledge_base(
         self, workspace_id: UUID, knowledge_base_id: UUID, *, for_update: bool = False
     ) -> KnowledgeBase | None: ...
@@ -259,6 +269,18 @@ class KnowledgeRepository(Protocol):
     def has_active_documents(self, workspace_id: UUID, knowledge_base_id: UUID) -> bool: ...
 
     def add_document(self, document: Document) -> None: ...
+
+    def list_document_summaries(
+        self,
+        workspace_id: UUID,
+        knowledge_base_id: UUID,
+        *,
+        limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> tuple[KnowledgeDocumentSummary, ...]: ...
 
     def get_document(
         self, workspace_id: UUID, document_id: UUID, *, for_update: bool = False
@@ -271,6 +293,24 @@ class KnowledgeRepository(Protocol):
     def add_document_version(self, version: DocumentVersion, source: DocumentSource) -> None: ...
 
     def add_ingestion_job(self, ingestion_job: IngestionJob) -> None: ...
+
+    def list_ingestion_jobs(
+        self,
+        workspace_id: UUID,
+        knowledge_base_id: UUID,
+        *,
+        limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> tuple[IngestionJob, ...]: ...
+
+    def get_ingestion_job(
+        self, workspace_id: UUID, ingestion_job_id: UUID, *, for_update: bool = False
+    ) -> IngestionJob | None: ...
+
+    def save_ingestion_job(self, ingestion_job: IngestionJob) -> None: ...
 
     def get_document_version(
         self,
@@ -337,3 +377,13 @@ class KnowledgeUnitOfWork(Protocol):
     ) -> None: ...
 
     def commit(self) -> None: ...
+
+
+@dataclass(frozen=True)
+class KnowledgeDocumentSummary:
+    document: Document
+    latest_version: DocumentVersion
+    source_id: UUID
+    source_kind: DocumentSourceKind
+    source_name: str
+    current_document_version_id: UUID | None

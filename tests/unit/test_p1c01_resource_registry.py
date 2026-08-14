@@ -27,12 +27,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 7
-    assert len(resource_registry.permissions) == 45
-    assert len(resource_registry.page_resources) == 5
-    assert len(resource_registry.api_resources) == 64
-    assert len(resource_registry.menus) == 49
-    assert len(resource_registry.menu_api_bindings) == 46
+    assert resource_registry.registry_version == 8
+    assert len(resource_registry.permissions) == 50
+    assert len(resource_registry.page_resources) == 7
+    assert len(resource_registry.api_resources) == 68
+    assert len(resource_registry.menus) == 67
+    assert len(resource_registry.menu_api_bindings) == 61
     assert registry_openapi_violations() == ()
 
 
@@ -99,7 +99,10 @@ def test_registry_rejects_menu_cycle_and_access_level_bypass() -> None:
     violations = invalid.violations()
 
     assert any("菜单父子关系存在循环" in item for item in violations)
-    assert any("public/authenticated 资源不能绑定 permission_code" in item for item in violations)
+    assert any(
+        "public/authenticated/platform_admin 资源不能绑定 permission_code" in item
+        for item in violations
+    )
 
 
 def test_registry_rejects_active_resources_that_reference_disabled_entries() -> None:
@@ -147,4 +150,4 @@ def test_registry_rejects_menu_api_permission_mismatch_and_unbound_api() -> None
 
     assert any("动作菜单与接口必须使用同一 permission_code" in item for item in violations)
     assert any("api_resource_id 指向未注册接口" in item for item in violations)
-    assert any("授权接口未绑定任何动作菜单" in item for item in violations)
+    assert any("受保护接口未绑定任何动作菜单" in item for item in violations)

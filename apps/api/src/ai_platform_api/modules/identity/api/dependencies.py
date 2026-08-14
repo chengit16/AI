@@ -206,6 +206,7 @@ def _resource_reference(
                 "document_version_id",
                 "document_id",
                 "knowledge_base_id",
+                "ingestion_job_id",
             )
             if (value := values.get(key)) is not None
         ),
@@ -222,6 +223,7 @@ def _resource_reference(
             "knowledge_base_id",
             "document_id",
             "document_version_id",
+            "ingestion_job_id",
         )
         if (value := values.get(key)) is not None
     }

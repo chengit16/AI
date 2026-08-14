@@ -331,9 +331,11 @@ def _build_snapshot(
     role_menus: tuple[RoleMenuVisibility, ...],
 ) -> MenuReleaseSnapshot:
     override_by_id = {item.menu_id: item for item in overrides}
+    workspace_menus = registry.workspace_menus
+    workspace_menu_ids = {item.menu_id for item in workspace_menus}
     menus = tuple(
-        _snapshot_item(menu, registry.menus, override_by_id.get(menu.menu_id))
-        for menu in sorted(registry.menus, key=lambda item: item.menu_id.int)
+        _snapshot_item(menu, workspace_menus, override_by_id.get(menu.menu_id))
+        for menu in sorted(workspace_menus, key=lambda item: item.menu_id.int)
     )
     bindings = tuple(
         sorted(
@@ -342,7 +344,7 @@ def _build_snapshot(
                 binding.api_resource_id,
                 binding.action_type,
             )
-            for binding in registry.menu_api_bindings
+            for binding in registry.workspace_menu_api_bindings
         )
     )
     return MenuReleaseSnapshot(
@@ -351,7 +353,12 @@ def _build_snapshot(
         workspace_id=workspace_id,
         menu_version=menu_version,
         menus=menus,
-        role_menus=tuple(sorted(role_menus, key=lambda item: (item.role_id.int, item.menu_id.int))),
+        role_menus=tuple(
+            sorted(
+                (item for item in role_menus if item.menu_id in workspace_menu_ids),
+                key=lambda item: (item.role_id.int, item.menu_id.int),
+            )
+        ),
         menu_api_bindings=bindings,
     )
 
@@ -405,8 +412,8 @@ def _snapshot_violations(
     errors: list[str] = []
     if snapshot.schema_version != 1:
         errors.append("snapshot.schema_version 不受支持")
-    if snapshot.registry_version != registry.registry_version:
-        errors.append("snapshot.registry_version 与当前注册表不一致")
+    if snapshot.registry_version > registry.registry_version:
+        errors.append("snapshot.registry_version 高于当前注册表")
     if snapshot.workspace_id != release.workspace_id:
         errors.append("snapshot.workspace_id 与发布记录不一致")
     if snapshot.menu_version < 1:
@@ -414,10 +421,12 @@ def _snapshot_violations(
     if _snapshot_digest(snapshot) != release.snapshot_digest:
         errors.append("snapshot_digest 校验失败")
 
-    registered_by_id = {item.menu_id: item for item in registry.menus}
+    registered_by_id = {item.menu_id: item for item in registry.workspace_menus}
     snapshot_by_id = {item.menu_id: item for item in snapshot.menus}
-    if len(snapshot_by_id) != len(snapshot.menus) or set(snapshot_by_id) != set(registered_by_id):
-        errors.append("snapshot.menus 未完整镜像当前注册菜单")
+    if len(snapshot_by_id) != len(snapshot.menus) or not set(snapshot_by_id).issubset(
+        registered_by_id
+    ):
+        errors.append("snapshot.menus 包含重复或未注册的工作空间菜单")
     for menu_id, item in snapshot_by_id.items():
         registered = registered_by_id.get(menu_id)
         if registered is None:
@@ -448,14 +457,15 @@ def _snapshot_violations(
     expected_bindings = tuple(
         sorted(
             (item.menu_id, item.api_resource_id, item.action_type)
-            for item in registry.menu_api_bindings
+            for item in registry.workspace_menu_api_bindings
+            if item.menu_id in snapshot_by_id
         )
     )
     if snapshot.menu_api_bindings != expected_bindings:
         errors.append("snapshot.menu_api_bindings 与当前注册表不一致")
     role_keys = {(item.role_id, item.menu_id) for item in snapshot.role_menus}
     if len(role_keys) != len(snapshot.role_menus) or any(
-        item.workspace_id != release.workspace_id or item.menu_id not in registered_by_id
+        item.workspace_id != release.workspace_id or item.menu_id not in snapshot_by_id
         for item in snapshot.role_menus
     ):
         errors.append("snapshot.role_menus 包含重复或越界资源")
@@ -527,7 +537,7 @@ def _assert_binding_mirror(
     expected = tuple(
         sorted(
             (binding.menu_id, binding.api_resource_id, binding.action_type)
-            for binding in registry.menu_api_bindings
+            for binding in registry.workspace_menu_api_bindings
         )
     )
     if repository.list_registered_bindings() != expected:

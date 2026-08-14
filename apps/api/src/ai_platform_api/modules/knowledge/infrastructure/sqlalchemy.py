@@ -16,10 +16,11 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
 )
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import false, func, insert, or_, select, true, update
 from sqlalchemy.engine import CursorResult, Row
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.identity.domain.entitlements import UsageRepository
@@ -31,6 +32,7 @@ from ai_platform_api.modules.knowledge.domain.models import (
     DocumentVersionStatus,
     DocumentVisibility,
     KnowledgeBase,
+    KnowledgeDocumentSummary,
     KnowledgeWriteConflictError,
 )
 from ai_platform_api.persistence.tables import (
@@ -75,6 +77,37 @@ class SqlAlchemyKnowledgeRepository:
         self._session.execute(
             insert(knowledge_bases).values(**_knowledge_base_values(knowledge_base))
         )
+
+    def list_knowledge_bases(
+        self,
+        workspace_id: UUID,
+        *,
+        limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> tuple[KnowledgeBase, ...]:
+        scope: ColumnElement[bool] = (
+            true()
+            if authorized_workspace
+            else or_(
+                knowledge_bases.c.knowledge_base_id.in_(resource_ids),
+                knowledge_bases.c.department_ids.overlap(list(department_ids)),
+            )
+            if department_ids or resource_ids
+            else false()
+        )
+        rows = self._session.execute(
+            select(knowledge_bases)
+            .where(
+                knowledge_bases.c.workspace_id == workspace_id,
+                knowledge_bases.c.status == "active",
+                scope,
+            )
+            .order_by(knowledge_bases.c.updated_at.desc(), knowledge_bases.c.knowledge_base_id)
+            .limit(limit)
+        )
+        return tuple(_knowledge_base(row) for row in rows)
 
     def get_knowledge_base(
         self,
@@ -124,6 +157,84 @@ class SqlAlchemyKnowledgeRepository:
 
     def add_document(self, document: Document) -> None:
         self._session.execute(insert(documents).values(**_document_values(document)))
+
+    def list_document_summaries(
+        self,
+        workspace_id: UUID,
+        knowledge_base_id: UUID,
+        *,
+        limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> tuple[KnowledgeDocumentSummary, ...]:
+        scope = _document_scope(
+            authorized_workspace=authorized_workspace,
+            department_ids=department_ids,
+            account_ids=account_ids,
+            resource_ids=resource_ids,
+        )
+        latest_versions = (
+            select(
+                document_versions.c.workspace_id,
+                document_versions.c.document_id,
+                func.max(document_versions.c.version_number).label("latest_version_number"),
+            )
+            .where(document_versions.c.workspace_id == workspace_id)
+            .group_by(document_versions.c.workspace_id, document_versions.c.document_id)
+            .subquery()
+        )
+        rows = self._session.execute(
+            select(
+                documents,
+                document_versions.c.document_version_id.label("latest_document_version_id"),
+                document_versions.c.version_number.label("latest_version_number"),
+                document_versions.c.status.label("latest_version_status"),
+                document_versions.c.content_hash.label("latest_content_hash"),
+                document_versions.c.created_by_account_id.label("latest_created_by_account_id"),
+                document_versions.c.created_at.label("latest_created_at"),
+                document_versions.c.published_at.label("latest_published_at"),
+                document_versions.c.record_version.label("latest_record_version"),
+                document_sources.c.source_id.label("latest_source_id"),
+                document_sources.c.source_kind.label("latest_source_kind"),
+                document_sources.c.source_name.label("latest_source_name"),
+                document_publications.c.current_document_version_id,
+            )
+            .join(
+                latest_versions,
+                (latest_versions.c.workspace_id == documents.c.workspace_id)
+                & (latest_versions.c.document_id == documents.c.document_id),
+            )
+            .join(
+                document_versions,
+                (document_versions.c.workspace_id == latest_versions.c.workspace_id)
+                & (document_versions.c.document_id == latest_versions.c.document_id)
+                & (document_versions.c.version_number == latest_versions.c.latest_version_number),
+            )
+            .join(
+                document_sources,
+                (document_sources.c.workspace_id == document_versions.c.workspace_id)
+                & (
+                    document_sources.c.document_version_id
+                    == document_versions.c.document_version_id
+                ),
+            )
+            .outerjoin(
+                document_publications,
+                (document_publications.c.workspace_id == documents.c.workspace_id)
+                & (document_publications.c.document_id == documents.c.document_id),
+            )
+            .where(
+                documents.c.workspace_id == workspace_id,
+                documents.c.knowledge_base_id == knowledge_base_id,
+                documents.c.status == "active",
+                scope,
+            )
+            .order_by(documents.c.updated_at.desc(), documents.c.document_id)
+            .limit(limit)
+        )
+        return tuple(_document_summary(row) for row in rows)
 
     def get_document(
         self,
@@ -177,6 +288,74 @@ class SqlAlchemyKnowledgeRepository:
 
     def add_ingestion_job(self, ingestion_job: IngestionJob) -> None:
         self._session.execute(insert(ingestion_jobs).values(**_ingestion_job_values(ingestion_job)))
+
+    def list_ingestion_jobs(
+        self,
+        workspace_id: UUID,
+        knowledge_base_id: UUID,
+        *,
+        limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> tuple[IngestionJob, ...]:
+        scope = _document_scope(
+            authorized_workspace=authorized_workspace,
+            department_ids=department_ids,
+            account_ids=account_ids,
+            resource_ids=resource_ids,
+        )
+        rows = self._session.execute(
+            select(ingestion_jobs)
+            .join(
+                documents,
+                (documents.c.workspace_id == ingestion_jobs.c.workspace_id)
+                & (documents.c.document_id == ingestion_jobs.c.document_id),
+            )
+            .where(
+                ingestion_jobs.c.workspace_id == workspace_id,
+                ingestion_jobs.c.knowledge_base_id == knowledge_base_id,
+                documents.c.status == "active",
+                scope,
+            )
+            .order_by(ingestion_jobs.c.updated_at.desc(), ingestion_jobs.c.ingestion_job_id)
+            .limit(limit)
+        )
+        return tuple(_ingestion_job(row) for row in rows)
+
+    def get_ingestion_job(
+        self,
+        workspace_id: UUID,
+        ingestion_job_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> IngestionJob | None:
+        statement = select(ingestion_jobs).where(
+            ingestion_jobs.c.workspace_id == workspace_id,
+            ingestion_jobs.c.ingestion_job_id == ingestion_job_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
+        return _ingestion_job(row) if row is not None else None
+
+    def save_ingestion_job(self, ingestion_job: IngestionJob) -> None:
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(ingestion_jobs)
+                .where(
+                    ingestion_jobs.c.workspace_id == ingestion_job.workspace_id,
+                    ingestion_jobs.c.ingestion_job_id == ingestion_job.ingestion_job_id,
+                    ingestion_jobs.c.status == "failed",
+                    ingestion_jobs.c.manual_retry_count == ingestion_job.manual_retry_count - 1,
+                )
+                .values(**_ingestion_job_values(ingestion_job))
+            ),
+        )
+        if result.rowcount != 1:
+            raise KnowledgeWriteConflictError
 
     def get_document_version(
         self,
@@ -480,6 +659,9 @@ def _ingestion_job_values(value: IngestionJob) -> dict[str, object]:
         "ocr_used": value.ocr_used,
         "page_count": value.page_count,
         "block_count": value.block_count,
+        "manual_retry_count": value.manual_retry_count,
+        "last_retried_by_actor_id": value.last_retried_by_actor_id,
+        "last_retried_at": value.last_retried_at,
         "created_at": value.created_at,
         "updated_at": value.updated_at,
     }
@@ -579,3 +761,84 @@ def _source(value: Row[Any]) -> DocumentSource:
         value.scanner_version,
         value.scanned_at,
     )
+
+
+def _document_summary(value: Row[Any]) -> KnowledgeDocumentSummary:
+    return KnowledgeDocumentSummary(
+        document=_document(value),
+        latest_version=DocumentVersion(
+            value.latest_document_version_id,
+            value.workspace_id,
+            value.document_id,
+            value.latest_version_number,
+            cast(DocumentVersionStatus, value.latest_version_status),
+            value.latest_content_hash,
+            value.latest_created_by_account_id,
+            value.latest_created_at,
+            value.latest_published_at,
+            value.latest_record_version,
+        ),
+        source_id=value.latest_source_id,
+        source_kind=cast(DocumentSourceKind, value.latest_source_kind),
+        source_name=value.latest_source_name,
+        current_document_version_id=value.current_document_version_id,
+    )
+
+
+def _ingestion_job(value: Row[Any]) -> IngestionJob:
+    return IngestionJob(
+        ingestion_job_id=value.ingestion_job_id,
+        workspace_id=value.workspace_id,
+        knowledge_base_id=value.knowledge_base_id,
+        document_id=value.document_id,
+        document_version_id=value.document_version_id,
+        source_id=value.source_id,
+        source_name=value.source_name,
+        source_object_key=value.source_object_key,
+        source_media_type=value.source_media_type,
+        source_content_hash=value.source_content_hash,
+        status=value.status,
+        attempt_count=value.attempt_count,
+        max_attempts=value.max_attempts,
+        available_at=value.available_at,
+        requested_by_actor_id=value.requested_by_actor_id,
+        trace_id=value.trace_id,
+        traceparent=value.traceparent,
+        created_at=value.created_at,
+        updated_at=value.updated_at,
+        claimed_by=value.claimed_by,
+        claim_until=value.claim_until,
+        started_at=value.started_at,
+        completed_at=value.completed_at,
+        failure_stage=value.failure_stage,
+        error_code=value.error_code,
+        error_message=value.error_message,
+        artifact_object_key=value.artifact_object_key,
+        parsed_content_hash=value.parsed_content_hash,
+        parser_name=value.parser_name,
+        ocr_used=value.ocr_used,
+        page_count=value.page_count,
+        block_count=value.block_count,
+        manual_retry_count=value.manual_retry_count,
+        last_retried_by_actor_id=value.last_retried_by_actor_id,
+        last_retried_at=value.last_retried_at,
+    )
+
+
+def _document_scope(
+    *,
+    authorized_workspace: bool,
+    department_ids: frozenset[UUID],
+    account_ids: frozenset[UUID],
+    resource_ids: frozenset[UUID],
+) -> ColumnElement[bool]:
+    if authorized_workspace:
+        return true()
+    conditions = []
+    if department_ids:
+        conditions.append(documents.c.department_ids.overlap(list(department_ids)))
+    if account_ids:
+        conditions.append(documents.c.created_by_account_id.in_(account_ids))
+    if resource_ids:
+        conditions.append(documents.c.document_id.in_(resource_ids))
+    return or_(*conditions) if conditions else false()

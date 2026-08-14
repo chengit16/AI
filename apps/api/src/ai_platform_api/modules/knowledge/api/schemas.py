@@ -33,6 +33,23 @@ class KnowledgeBaseResponse(BaseModel):
     version: int
 
 
+class KnowledgeBaseSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    knowledge_base_id: UUID
+    name: str
+    description: str | None
+    default_visibility: Literal["private", "workspace", "departments"]
+    default_security_level: Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    updated_at: datetime
+
+
+class KnowledgeBaseListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[KnowledgeBaseSummaryResponse]
+
+
 class DocumentSourceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -107,6 +124,64 @@ class DocumentVersionResponse(BaseModel):
     created_at: datetime
     published_at: datetime | None
     record_version: int
+
+
+class KnowledgeDocumentSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: UUID
+    title: str
+    visibility: Literal["private", "workspace", "departments"]
+    security_level: Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    updated_at: datetime
+    latest_version: DocumentVersionResponse
+    source_id: UUID
+    source_kind: Literal["manual", "upload", "web", "data_source"]
+    source_name: str
+    current_document_version_id: UUID | None
+
+
+class KnowledgeDocumentListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[KnowledgeDocumentSummaryResponse]
+
+
+class IngestionJobResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ingestion_job_id: UUID
+    knowledge_base_id: UUID
+    document_id: UUID
+    document_version_id: UUID
+    source_id: UUID
+    source_name: str
+    source_media_type: str
+    status: Literal["queued", "running", "retry_wait", "succeeded", "failed"]
+    attempt_count: int
+    max_attempts: int
+    available_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+    failure_stage: Literal["source", "parse", "ocr", "artifact", "worker"] | None
+    error_code: str | None
+    error_message: str | None
+    parsed_content_hash: str | None
+    parser_name: str | None
+    ocr_used: bool | None
+    page_count: int | None
+    block_count: int | None
+    can_retry_manually: bool
+    manual_retry_count: int
+    last_retried_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class IngestionJobListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[IngestionJobResponse]
 
 
 class DocumentSourceResponse(BaseModel):

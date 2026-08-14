@@ -74,6 +74,7 @@ def create_app(
     application.state.menu_release_service = dependencies.menu_releases
     application.state.knowledge_fact_service = dependencies.knowledge_facts
     application.state.knowledge_upload_service = dependencies.knowledge_uploads
+    application.state.knowledge_management_service = dependencies.knowledge_management
     application.state.model_provider_configuration_service = (
         dependencies.model_provider_configurations
     )

@@ -50,6 +50,9 @@ ingestion_jobs = Table(
     Column("ocr_used", Boolean, nullable=True),
     Column("page_count", Integer, nullable=True),
     Column("block_count", Integer, nullable=True),
+    Column("manual_retry_count", Integer, nullable=False, server_default="0"),
+    Column("last_retried_by_actor_id", UUID(as_uuid=True), nullable=True),
+    Column("last_retried_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint(
@@ -127,6 +130,14 @@ ingestion_jobs = Table(
         "(status IN ('succeeded', 'failed') AND completed_at IS NOT NULL) OR "
         "(status NOT IN ('succeeded', 'failed') AND completed_at IS NULL)",
         name="ck_ingestion_jobs_completed_at",
+    ),
+    CheckConstraint(
+        "manual_retry_count >= 0 AND "
+        "((manual_retry_count = 0 AND last_retried_by_actor_id IS NULL "
+        "AND last_retried_at IS NULL) OR "
+        "(manual_retry_count > 0 AND last_retried_by_actor_id IS NOT NULL "
+        "AND last_retried_at IS NOT NULL))",
+        name="ck_ingestion_jobs_manual_retry",
     ),
 )
 
