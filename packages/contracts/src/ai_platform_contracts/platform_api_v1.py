@@ -5,6 +5,31 @@ from __future__ import annotations
 import typing
 
 
+class AiRuntimeConfigListResponse(typing.TypedDict):
+    items: list[AiRuntimeConfigResponse]
+
+
+class AiRuntimeConfigPublicationResponse(typing.TypedDict):
+    generation: int
+    published_at: str
+    published_by_account_id: str
+    runtime_config_version_id: str
+
+
+class AiRuntimeConfigResponse(typing.TypedDict):
+    components: RuntimeComponentVersionsSchema
+    content_hash: str
+    created_at: str
+    created_by_account_id: str
+    display_name: str
+    policy: GatewayPolicySchema
+    routes: list[RuntimeRouteResponse]
+    runtime_config_version_id: str
+    system_prompt_hash: str
+    system_prompt_template: str
+    version_number: int
+
+
 class AssignMemberOrganizationRequest(typing.TypedDict):
     department_ids: list[str]
     position_ids: list[str]
@@ -34,6 +59,14 @@ class Body_uploadKnowledgeDocument(typing.TypedDict):
 
 class Body_uploadKnowledgeDocumentVersion(typing.TypedDict):
     file: str
+
+
+class CreateAiRuntimeConfigRequest(typing.TypedDict):
+    components: RuntimeComponentVersionsSchema
+    display_name: str
+    policy: GatewayPolicySchema
+    routes: list[RuntimeRouteRequest]
+    system_prompt_template: str
 
 
 class CreateDepartmentRequest(typing.TypedDict):
@@ -110,6 +143,10 @@ class CreateRoleBindingRequest(typing.TypedDict):
 class CreateRoleRequest(typing.TypedDict):
     name: str
     role_key: str
+
+
+class CurrentAiRuntimeConfigResponse(typing.TypedDict):
+    item: AiRuntimeConfigResponse | None
 
 
 class CurrentMenuReleaseResponse(typing.TypedDict):
@@ -229,6 +266,19 @@ class ErrorResponse(typing.TypedDict):
     request_id: str
     retryable: bool
     trace_id: str
+
+
+class GatewayPolicySchema(typing.TypedDict):
+    attempt_timeout_ms: int
+    circuit_failure_threshold: int
+    circuit_recovery_ms: int
+    max_attempts_per_route: int
+    max_estimated_cost_microunits: int
+    max_output_tokens: int
+    max_prompt_characters: int
+    max_response_characters: int
+    rule_degradation_message: typing.NotRequired[str | None]
+    total_timeout_ms: int
 
 
 class HealthResponse(typing.TypedDict):
@@ -514,6 +564,41 @@ class RoleStatusRequest(typing.TypedDict):
 
 class RotateModelProviderCredentialRequest(typing.TypedDict):
     api_key: str
+
+
+class RuntimeComponentVersionsSchema(typing.TypedDict):
+    chunking: str
+    data_source_interface: str
+    embedding: str
+    index_schema: str
+    multimodal_router_interface: str
+    relevance_grader_interface: str
+    reranker: str
+    retrieval: str
+    safety: str
+    source_ranking: str
+
+
+class RuntimeRouteRequest(typing.TypedDict):
+    capabilities: list[typing.Literal["generation", "streaming", "tools", "structured_output"]]
+    input_price_microunits_per_million_tokens: int
+    model_id: str
+    output_price_microunits_per_million_tokens: int
+    priority: int
+    provider_id: str
+
+
+class RuntimeRouteResponse(typing.TypedDict):
+    capabilities: list[typing.Literal["generation", "streaming", "tools", "structured_output"]]
+    currency: str
+    input_price_microunits_per_million_tokens: int
+    location: typing.Literal["external", "private"]
+    model_id: str
+    output_price_microunits_per_million_tokens: int
+    priority: int
+    provider_configuration_version: int
+    provider_id: str
+    route_id: str
 
 
 class UploadMetadataResponse(typing.TypedDict):

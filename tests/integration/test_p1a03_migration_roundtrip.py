@@ -93,9 +93,12 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260814_0021"
+    assert current_revision(connection, schema) == "20260814_0022"
     assert business_tables(connection, schema) == {
         "accounts",
+        "ai_runtime_config_publication",
+        "ai_runtime_config_versions",
+        "ai_runtime_model_routes",
         "audit_records",
         "consumer_receipts",
         "department_closure",
@@ -113,6 +116,8 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "menu_releases",
         "model_provider_configurations",
         "model_provider_credentials",
+        "model_invocation_attempts",
+        "model_invocations",
         "open_api_keys",
         "outbox_events",
         "positions",
@@ -148,7 +153,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260814_0021"
+    assert current_revision(connection, schema) == "20260814_0022"
     assert schema_snapshot(connection, schema) == first_head
 
 

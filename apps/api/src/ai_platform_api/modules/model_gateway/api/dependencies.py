@@ -9,6 +9,9 @@ from ai_platform_api.modules.identity.api.dependencies import authentication_ser
 from ai_platform_api.modules.model_gateway.application.configurations import (
     ModelProviderConfigurationService,
 )
+from ai_platform_api.modules.model_gateway.application.runtime_configurations import (
+    AiRuntimeConfigurationService,
+)
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -19,6 +22,13 @@ def model_provider_configuration_service(
     service = getattr(request.app.state, "model_provider_configuration_service", None)
     if not isinstance(service, ModelProviderConfigurationService):
         raise RuntimeError("模型供应商配置服务尚未完成装配")
+    return service
+
+
+def ai_runtime_configuration_service(request: Request) -> AiRuntimeConfigurationService:
+    service = getattr(request.app.state, "ai_runtime_configuration_service", None)
+    if not isinstance(service, AiRuntimeConfigurationService):
+        raise RuntimeError("AI 运行配置服务尚未完成装配")
     return service
 
 

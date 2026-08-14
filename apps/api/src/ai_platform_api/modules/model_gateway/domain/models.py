@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Literal, Protocol
 from uuid import UUID
 
+from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.model_gateway.domain.errors import ProviderFailureKind
 
 ModelCapability = Literal["generation", "streaming", "tools", "structured_output"]
@@ -30,6 +31,7 @@ class ModelRequest:
     required_capabilities: frozenset[ModelCapability]
     max_output_tokens: int
     external_data_allowed: bool
+    security_level: SecurityLevel = "PUBLIC"
 
     def __post_init__(self) -> None:
         if not self.messages:
@@ -103,6 +105,7 @@ class GatewayPolicy:
     circuit_failure_threshold: int
     circuit_recovery_ms: int
     rule_degradation_message: str | None = None
+    max_estimated_cost_microunits: int = 50_000_000
 
     def __post_init__(self) -> None:
         positive_values = (
@@ -114,6 +117,7 @@ class GatewayPolicy:
             self.max_response_characters,
             self.circuit_failure_threshold,
             self.circuit_recovery_ms,
+            self.max_estimated_cost_microunits,
         )
         if min(positive_values) < 1:
             raise ValueError("模型网关预算和熔断参数必须为正整数")
@@ -151,6 +155,7 @@ class ModelResult:
     degraded: bool
     degradation_reason: str | None
     attempts: tuple[ModelAttempt, ...]
+    runtime_config_version_id: UUID | None = None
 
 
 class ModelProvider(Protocol):

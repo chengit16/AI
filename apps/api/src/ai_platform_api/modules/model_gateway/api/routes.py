@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Annotated, cast
 from uuid import UUID
 
@@ -6,23 +7,40 @@ from fastapi import APIRouter, Depends, Response, status
 from ai_platform_api.common.api_errors import error_responses
 from ai_platform_api.common.request_context import PlatformRequestContext
 from ai_platform_api.modules.model_gateway.api.dependencies import (
+    ai_runtime_configuration_service,
     model_provider_configuration_service,
     trusted_platform_context,
 )
 from ai_platform_api.modules.model_gateway.api.schemas import (
+    AiRuntimeConfigListResponse,
+    AiRuntimeConfigPublicationResponse,
+    AiRuntimeConfigResponse,
     Capability,
+    CreateAiRuntimeConfigRequest,
     CreateModelProviderRequest,
+    CurrentAiRuntimeConfigResponse,
+    GatewayPolicySchema,
     ModelProviderConfigurationListResponse,
     ModelProviderConfigurationResponse,
     ReviewModelProviderDataPolicyRequest,
     RotateModelProviderCredentialRequest,
+    RuntimeComponentVersionsSchema,
+    RuntimeRouteResponse,
 )
 from ai_platform_api.modules.model_gateway.application.configurations import (
     ModelProviderConfiguration,
     ModelProviderConfigurationService,
 )
+from ai_platform_api.modules.model_gateway.application.runtime_configurations import (
+    AiRuntimeConfigurationService,
+    AiRuntimeConfigVersion,
+    GatewayPolicy,
+    RuntimeComponentVersions,
+    RuntimeRouteDraft,
+)
 
 router = APIRouter(prefix="/platform/model-providers", tags=["平台模型供应商"])
+runtime_router = APIRouter(prefix="/platform/ai-runtime-configs", tags=["平台 AI 运行配置"])
 
 
 @router.get(
@@ -216,4 +234,142 @@ def _response(configuration: ModelProviderConfiguration) -> ModelProviderConfigu
         created_at=configuration.created_at,
         updated_at=configuration.updated_at,
         version=configuration.version,
+    )
+
+
+@runtime_router.get(
+    "",
+    response_model=AiRuntimeConfigListResponse,
+    operation_id="listPlatformAiRuntimeConfigs",
+    responses=error_responses(401, 403, 422, 500),
+)
+def list_ai_runtime_configs(
+    response: Response,
+    context: Annotated[PlatformRequestContext, Depends(trusted_platform_context)],
+    service: Annotated[
+        AiRuntimeConfigurationService,
+        Depends(ai_runtime_configuration_service),
+    ],
+) -> AiRuntimeConfigListResponse:
+    response.headers["Cache-Control"] = "no-store"
+    return AiRuntimeConfigListResponse(
+        items=[_runtime_response(item) for item in service.list_configurations(context)]
+    )
+
+
+@runtime_router.get(
+    "/current",
+    response_model=CurrentAiRuntimeConfigResponse,
+    operation_id="getCurrentPlatformAiRuntimeConfig",
+    responses=error_responses(401, 403, 422, 500),
+)
+def get_current_ai_runtime_config(
+    response: Response,
+    context: Annotated[PlatformRequestContext, Depends(trusted_platform_context)],
+    service: Annotated[
+        AiRuntimeConfigurationService,
+        Depends(ai_runtime_configuration_service),
+    ],
+) -> CurrentAiRuntimeConfigResponse:
+    response.headers["Cache-Control"] = "no-store"
+    current = service.current_configuration(context)
+    return CurrentAiRuntimeConfigResponse(
+        item=_runtime_response(current) if current is not None else None
+    )
+
+
+@runtime_router.post(
+    "",
+    response_model=AiRuntimeConfigResponse,
+    operation_id="createPlatformAiRuntimeConfig",
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(401, 403, 409, 422, 500),
+)
+def create_ai_runtime_config(
+    body: CreateAiRuntimeConfigRequest,
+    response: Response,
+    context: Annotated[PlatformRequestContext, Depends(trusted_platform_context)],
+    service: Annotated[
+        AiRuntimeConfigurationService,
+        Depends(ai_runtime_configuration_service),
+    ],
+) -> AiRuntimeConfigResponse:
+    response.headers["Cache-Control"] = "no-store"
+    return _runtime_response(
+        service.create(
+            context,
+            display_name=body.display_name,
+            system_prompt_template=body.system_prompt_template,
+            components=RuntimeComponentVersions(**body.components.model_dump()),
+            policy=GatewayPolicy(**body.policy.model_dump()),
+            routes=tuple(
+                RuntimeRouteDraft(
+                    provider_id=item.provider_id,
+                    priority=item.priority,
+                    model_id=item.model_id,
+                    capabilities=frozenset(item.capabilities),
+                    input_price_microunits_per_million_tokens=(
+                        item.input_price_microunits_per_million_tokens
+                    ),
+                    output_price_microunits_per_million_tokens=(
+                        item.output_price_microunits_per_million_tokens
+                    ),
+                )
+                for item in body.routes
+            ),
+        )
+    )
+
+
+@runtime_router.post(
+    "/{runtime_config_version_id}/activate",
+    response_model=AiRuntimeConfigPublicationResponse,
+    operation_id="activatePlatformAiRuntimeConfig",
+    responses=error_responses(401, 403, 404, 409, 422, 500),
+)
+def activate_ai_runtime_config(
+    runtime_config_version_id: UUID,
+    response: Response,
+    context: Annotated[PlatformRequestContext, Depends(trusted_platform_context)],
+    service: Annotated[
+        AiRuntimeConfigurationService,
+        Depends(ai_runtime_configuration_service),
+    ],
+) -> AiRuntimeConfigPublicationResponse:
+    response.headers["Cache-Control"] = "no-store"
+    publication = service.activate(context, runtime_config_version_id)
+    return AiRuntimeConfigPublicationResponse(**asdict(publication))
+
+
+def _runtime_response(configuration: AiRuntimeConfigVersion) -> AiRuntimeConfigResponse:
+    return AiRuntimeConfigResponse(
+        runtime_config_version_id=configuration.runtime_config_version_id,
+        version_number=configuration.version_number,
+        display_name=configuration.display_name,
+        content_hash=configuration.content_hash,
+        system_prompt_template=configuration.system_prompt_template,
+        system_prompt_hash=configuration.system_prompt_hash,
+        components=RuntimeComponentVersionsSchema(**asdict(configuration.components)),
+        policy=GatewayPolicySchema(**asdict(configuration.policy)),
+        routes=[
+            RuntimeRouteResponse(
+                route_id=item.route_id,
+                provider_id=item.provider_id,
+                provider_configuration_version=item.provider_configuration_version,
+                priority=item.priority,
+                model_id=item.model_id,
+                location=item.location,
+                capabilities=cast("list[Capability]", sorted(item.capabilities)),
+                input_price_microunits_per_million_tokens=(
+                    item.input_price_microunits_per_million_tokens
+                ),
+                output_price_microunits_per_million_tokens=(
+                    item.output_price_microunits_per_million_tokens
+                ),
+                currency=item.currency,
+            )
+            for item in configuration.routes
+        ],
+        created_by_account_id=configuration.created_by_account_id,
+        created_at=configuration.created_at,
     )

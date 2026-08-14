@@ -71,12 +71,24 @@ from ai_platform_api.modules.knowledge.infrastructure.upload_security import (
 from ai_platform_api.modules.model_gateway.application.configurations import (
     ModelProviderConfigurationService,
 )
+from ai_platform_api.modules.model_gateway.application.runtime_configurations import (
+    AiRuntimeConfigurationService,
+)
+from ai_platform_api.modules.model_gateway.application.runtime_gateway import (
+    RuntimeModelGatewayService,
+)
 from ai_platform_api.modules.model_gateway.infrastructure.configuration_sqlalchemy import (
     SqlAlchemyModelProviderUnitOfWork,
 )
 from ai_platform_api.modules.model_gateway.infrastructure.provider_http import (
     OpenAiCompatibleCapabilityProbe,
+    OpenAiCompatibleRuntimeProviderFactory,
     StrictProviderBaseUrlPolicy,
+)
+from ai_platform_api.modules.model_gateway.infrastructure.runtime_sqlalchemy import (
+    SqlAlchemyRuntimeConfigurationReader,
+    SqlAlchemyRuntimeConfigurationUnitOfWork,
+    SqlAlchemyRuntimeInvocationStore,
 )
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
 from ai_platform_api.persistence.database import PlatformDatabase
@@ -107,6 +119,8 @@ class ApplicationContainer:
     knowledge_facts: KnowledgeFactService | None = None
     knowledge_uploads: KnowledgeUploadService | None = None
     model_provider_configurations: ModelProviderConfigurationService | None = None
+    ai_runtime_configurations: AiRuntimeConfigurationService | None = None
+    model_runtime: RuntimeModelGatewayService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -162,6 +176,18 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     )
     secret_cipher = EnvelopeSecretCipher(MasterKeyFile(settings.master_key_path))
     provider_url_policy = StrictProviderBaseUrlPolicy(settings.model_provider_allowed_hosts)
+    model_provider_configurations = ModelProviderConfigurationService(
+        SqlAlchemyModelProviderUnitOfWork(database.sessions),
+        secret_cipher,
+        provider_url_policy,
+        OpenAiCompatibleCapabilityProbe(
+            provider_url_policy,
+            timeout_seconds=settings.model_provider_probe_timeout_seconds,
+        ),
+    )
+    ai_runtime_configurations = AiRuntimeConfigurationService(
+        SqlAlchemyRuntimeConfigurationUnitOfWork(database.sessions)
+    )
     try:
         return ApplicationContainer(
             settings=settings,
@@ -185,14 +211,13 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 BoundedUploadInspector(settings.upload_max_file_size_bytes),
                 DeterministicUploadScanner(),
             ),
-            model_provider_configurations=ModelProviderConfigurationService(
-                SqlAlchemyModelProviderUnitOfWork(database.sessions),
-                secret_cipher,
-                provider_url_policy,
-                OpenAiCompatibleCapabilityProbe(
-                    provider_url_policy,
-                    timeout_seconds=settings.model_provider_probe_timeout_seconds,
-                ),
+            model_provider_configurations=model_provider_configurations,
+            ai_runtime_configurations=ai_runtime_configurations,
+            model_runtime=RuntimeModelGatewayService(
+                SqlAlchemyRuntimeConfigurationReader(database.sessions),
+                SqlAlchemyRuntimeInvocationStore(database.sessions),
+                model_provider_configurations,
+                OpenAiCompatibleRuntimeProviderFactory(provider_url_policy),
             ),
             authentication=AuthenticationService(
                 repository=reader,

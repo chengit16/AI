@@ -29,7 +29,7 @@ MICRO_UNITS_PER_MILLION = 1_000_000
 
 
 @dataclass
-class _Circuit:
+class CircuitState:
     consecutive_failures: int = 0
     opened_at: float | None = None
 
@@ -44,13 +44,15 @@ class ModelGateway:
         policy: GatewayPolicy,
         usage_recorder: ModelUsageRecorder | None = None,
         clock: Callable[[], float] = monotonic,
+        circuit_states: dict[str, CircuitState] | None = None,
     ) -> None:
         self._routes = routes
         self._providers = providers
         self._policy = policy
         self._usage_recorder = usage_recorder
         self._clock = clock
-        self._circuits: dict[str, _Circuit] = {}
+        # 运行服务可跨请求复用同一状态表；默认仍保持独立实例，兼容阶段 0 的纯领域测试。
+        self._circuits = circuit_states if circuit_states is not None else {}
 
     def invoke(self, request: ModelRequest) -> ModelResult:
         self._validate_request(request)
@@ -59,7 +61,7 @@ class ModelGateway:
             if not request.external_data_allowed and any(
                 route.active and route.location == "external" for route in self._routes
             ):
-                raise ModelDataBoundaryDeniedError
+                raise ModelDataBoundaryDeniedError()
             raise ModelRouteUnavailableError
 
         attempts: list[ModelAttempt] = []
@@ -67,7 +69,7 @@ class ModelGateway:
         for route in routes:
             if (self._clock() - started_total_at) * 1000 >= self._policy.total_timeout_ms:
                 break
-            circuit = self._circuits.setdefault(route.route_id, _Circuit())
+            circuit = self._circuits.setdefault(route.route_id, CircuitState())
             if self._is_circuit_open(circuit):
                 attempts.append(
                     self._attempt(
@@ -86,7 +88,7 @@ class ModelGateway:
 
             provider = self._providers.get(route.provider_id)
             if provider is None:
-                self._record_failure(route, circuit)
+                self._record_failure(circuit)
                 attempts.append(
                     self._attempt(
                         route,
@@ -102,11 +104,19 @@ class ModelGateway:
                 )
                 continue
 
+            fallback_allowed = True
             for attempt_no in range(1, self._policy.max_attempts_per_route + 1):
+                remaining_ms = self._policy.total_timeout_ms - int(
+                    (self._clock() - started_total_at) * 1000
+                )
+                if remaining_ms <= 0:
+                    break
                 started_at = self._clock()
                 try:
                     response = provider.invoke(
-                        request, route.model_id, self._policy.attempt_timeout_ms
+                        request,
+                        route.model_id,
+                        min(self._policy.attempt_timeout_ms, remaining_ms),
                     )
                     self._validate_response(response)
                 except ProviderInvocationError as error:
@@ -124,7 +134,9 @@ class ModelGateway:
                             traceparent=request.traceparent,
                         )
                     )
-                    self._record_failure(route, circuit)
+                    fallback_allowed = error.fallback_allowed
+                    if error.kind in {"timeout", "rate_limited", "unavailable", "internal"}:
+                        self._record_failure(circuit)
                     if (
                         not error.retryable
                         or attempt_no == self._policy.max_attempts_per_route
@@ -164,16 +176,12 @@ class ModelGateway:
                     attempts=tuple(attempts),
                 )
 
-            # 一个路由的错误若允许备用，继续到下一路由；认证、策略和非法请求错误会在此终止。
-            latest_failure = attempts[-1]
-            if latest_failure.failure_kind in {
-                "authentication",
-                "content_policy",
-                "invalid_request",
-                "capability_unsupported",
-            }:
+            # Adapter 明确禁止备用时立即终止，避免认证或内容策略错误被其他模型绕过。
+            if not fallback_allowed:
                 break
 
+        if attempts and all(attempt.failure_kind == "data_boundary" for attempt in attempts):
+            raise ModelDataBoundaryDeniedError(tuple(attempts))
         if self._policy.rule_degradation_message is not None:
             return ModelResult(
                 content=self._policy.rule_degradation_message,
@@ -196,13 +204,30 @@ class ModelGateway:
             raise ModelRequestRejectedError
 
     def _eligible_routes(self, request: ModelRequest) -> tuple[ModelRoute, ...]:
-        return tuple(
+        eligible = tuple(
             route
             for route in self._routes
             if route.active
             and (request.external_data_allowed or route.location == "private")
             and request.required_capabilities.issubset(route.capabilities)
         )
+        affordable = tuple(
+            route
+            for route in eligible
+            if self._estimated_request_cost(request, route)
+            <= self._policy.max_estimated_cost_microunits
+        )
+        if eligible and not affordable:
+            raise ModelRequestRejectedError
+        return affordable
+
+    @staticmethod
+    def _estimated_request_cost(request: ModelRequest, route: ModelRoute) -> int:
+        # 以一个字符最多消耗一个输入 Token 做保守准入估算，实际账单仍以供应商 Usage 为准。
+        return (
+            request.prompt_characters * route.input_price_microunits_per_million_tokens
+            + request.max_output_tokens * route.output_price_microunits_per_million_tokens
+        ) // MICRO_UNITS_PER_MILLION
 
     def _validate_response(self, response: ProviderResponse) -> None:
         if (
@@ -226,7 +251,7 @@ class ModelGateway:
                 provider_request_id=response.provider_request_id,
             )
 
-    def _is_circuit_open(self, circuit: _Circuit) -> bool:
+    def _is_circuit_open(self, circuit: CircuitState) -> bool:
         if circuit.opened_at is None:
             return False
         if (self._clock() - circuit.opened_at) * 1000 >= self._policy.circuit_recovery_ms:
@@ -235,14 +260,13 @@ class ModelGateway:
             return False
         return True
 
-    def _record_failure(self, route: ModelRoute, circuit: _Circuit) -> None:
-        del route
+    def _record_failure(self, circuit: CircuitState) -> None:
         circuit.consecutive_failures += 1
         if circuit.consecutive_failures >= self._policy.circuit_failure_threshold:
             circuit.opened_at = self._clock()
 
     @staticmethod
-    def _record_success(circuit: _Circuit) -> None:
+    def _record_success(circuit: CircuitState) -> None:
         circuit.consecutive_failures = 0
         circuit.opened_at = None
 

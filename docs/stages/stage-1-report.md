@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1D-06` 待开始 |
+| 当前节点 | `P1D-07` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -330,10 +330,23 @@
 - 配置与凭证：新增 OpenAI-compatible 供应商配置、不可覆盖的递增凭证版本、单一活跃凭证和独立平台审计。API Key 使用 AES-256-GCM 信封加密，关联数据绑定供应商、凭证主键和版本；响应、审计及错误均不回显明文，轮换后旧凭证原子撤销并强制重新探测。
 - 外发安全：自定义 `base_url` 仅接受运维通过 `MODEL_PROVIDER_ALLOWED_HOSTS` 明确批准的公网 HTTPS 域名和 443 端口，拒绝认证信息、查询参数、片段、路径穿越、私网/保留地址及混合 DNS。能力探测连接钉住校验后的公网 IP、保留原域名 TLS 校验且不跟随重定向，并限制超时和响应读取量。
 - 数据政策与运行边界：供应商默认处于 `draft`，只有数据政策已审核、声明能力全部探测通过且存在活跃凭证时才能激活。外发前继续按四级敏感级别、保留期限、训练用途和供应商位置失败关闭；后续模型网关只能通过 `resolve_runtime_access` 在调用边缘短暂取得已审核配置和明文 Key，不能直接读取凭证表。
-- 数据与契约：新增 Migration `20260814_0021` 及平台管理员、供应商配置、版本化凭证和平台审计表。OpenAPI 新增供应商列表、创建、凭证轮换、数据政策审核、探测、激活和停用 7 个接口；`ResourceRegistry` 推进至版本 6，覆盖 52 项 Permission、60 个 API、49 个菜单和 46 个菜单接口绑定。新增可复现 OpenAPI 导出脚本并纳入统一漂移门禁。
+- 数据与契约：新增 Migration `20260814_0021` 及平台管理员、供应商配置、版本化凭证和平台审计表。OpenAPI 新增供应商列表、创建、凭证轮换、数据政策审核、探测、激活和停用 7 个接口；`ResourceRegistry` 推进至版本 6，覆盖 45 项 Permission、60 个 API、49 个菜单和 46 个菜单接口绑定。新增可复现 OpenAPI 导出脚本并纳入统一漂移门禁。
 - 自动化验收：统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `289/289`，Ruff、mypy strict、架构、契约兼容与生成漂移、Secret Scanner、SBOM 和许可证检查均通过；真实 PostgreSQL 供应商生命周期、Migration `base → head → base → head` 和平台管理员安全边界通过。
 - 容器与 HTTP 验收：以当前工作树重建 API、Worker、Web 和 Migration 镜像，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0021`。全合成平台管理员不需要 `X-Workspace-ID` 即可读取空供应商列表；执行本地撤权后，同一 Session 立即返回 `403 PLATFORM_ADMIN_REQUIRED`，验收账号最终均保持 `revoked`。
 - 当前边界：未配置真实供应商，`MODEL_PROVIDER_ALLOWED_HOSTS` 默认是空列表，`provider_integration` 和 `ai_quality` 继续保持 `not_configured`。本节点只提供后端配置 API，管理页面进入 `P1D-07`；主备路由、预算、熔断、用量和不可变运行配置进入 `P1D-06`。未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`0a5a86e`。
+
+### P1D-06 模型网关与运行配置版本
+
+- 状态：通过。
+- 不可变运行配置：新增全局 `AiRuntimeConfigVersion`、按优先级排序的主备路由和独立当前发布指针。每个版本冻结系统 Prompt 及摘要、模型和供应商配置版本、能力、价格、超时、有限重试、共享熔断、输出上限与单次成本预算；数据库触发器禁止修改或删除配置和路由快照，切换及回滚只移动发布指针。
+- 知识运行版本：配置同时冻结 Chunker、Embedding、索引 Schema、Reranker、检索、来源排序和安全策略版本。多源数据连接器、LLM Grading 与多模态图片问答分别只冻结 `data_source_interface`、`relevance_grader_interface` 和 `multimodal_router_interface` 版本，不实现后置能力，也不进入当前运行链路。
+- 调用事实与幂等：模型调用在访问供应商前先以全局唯一 `invocation_id` 占位，并持久化运行配置、路由、供应商配置、凭证、Trace、逐次尝试、Token、成本、结束状态和稳定错误码；同一 ID 的重复请求稳定冲突，不会再次触发供应商。预算在外发前按冻结价格保守估算，最终成本按供应商 Usage 结算。
+- 运行安全：每次外发都在调用边缘重新解析供应商状态、活跃凭证和数据政策，真实 Key 不进入长生命周期缓存。OpenAI-compatible 非流式 Adapter 使用已经校验并钉住的公网 IP、原域名 TLS 校验、无重定向、有限响应读取和脱敏错误分类；业务模块仍不能绕过统一网关。
+- 数据与契约：新增 Migration `20260814_0022` 及运行配置、路由、当前发布、调用和尝试事实表。OpenAPI 新增运行配置列表、当前版本、创建和激活 4 个接口；`ResourceRegistry` 推进至版本 7，覆盖 45 项 Permission、64 个 API、49 个菜单和 46 个菜单接口绑定。
+- 自动化验收：统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `299/299`，Ruff、mypy strict（327 个源文件）、前后端架构、契约兼容与生成漂移、Secret Scanner、SBOM 和许可证检查均通过。运行配置与模型网关专项单元测试 `8/8`、真实 PostgreSQL 配置发布/调用/防篡改闭环 `1/1`、Migration `base → head → base → head` `1/1` 通过。
+- 容器与 HTTP 验收：以当前工作树运行 Web、API、Worker、PostgreSQL、Valkey、MinIO 和 Tika，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0022`。全合成平台管理员不携带 `X-Workspace-ID` 可读取空供应商列表、空运行配置列表和空当前版本；撤权后同一 Session 立即返回 `403 PLATFORM_ADMIN_REQUIRED`，账号最终保持 `revoked`。
+- 当前边界：真实供应商仍为 `not_configured`，运行网关只以 Mock Provider 和全合成数据完成功能验收，不能据此宣称真实模型兼容性、质量或成本通过。管理页面进入 `P1D-07`；未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -345,4 +358,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-05`，当前进入 `P1D-06`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-06`，当前进入 `P1D-07`。

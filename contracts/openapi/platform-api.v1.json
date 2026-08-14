@@ -8703,10 +8703,491 @@
           }
         }
       }
+    },
+    "/api/v1/platform/ai-runtime-configs": {
+      "get": {
+        "tags": [
+          "平台 AI 运行配置"
+        ],
+        "summary": "List Ai Runtime Configs",
+        "operationId": "listPlatformAiRuntimeConfigs",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRuntimeConfigListResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "平台 AI 运行配置"
+        ],
+        "summary": "Create Ai Runtime Config",
+        "operationId": "createPlatformAiRuntimeConfig",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAiRuntimeConfigRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRuntimeConfigResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-runtime-configs/current": {
+      "get": {
+        "tags": [
+          "平台 AI 运行配置"
+        ],
+        "summary": "Get Current Ai Runtime Config",
+        "operationId": "getCurrentPlatformAiRuntimeConfig",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentAiRuntimeConfigResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-runtime-configs/{runtime_config_version_id}/activate": {
+      "post": {
+        "tags": [
+          "平台 AI 运行配置"
+        ],
+        "summary": "Activate Ai Runtime Config",
+        "operationId": "activatePlatformAiRuntimeConfig",
+        "parameters": [
+          {
+            "name": "runtime_config_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Runtime Config Version Id"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRuntimeConfigPublicationResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AiRuntimeConfigListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AiRuntimeConfigResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "AiRuntimeConfigListResponse"
+      },
+      "AiRuntimeConfigPublicationResponse": {
+        "properties": {
+          "runtime_config_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Runtime Config Version Id"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "published_by_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Published By Account Id"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runtime_config_version_id",
+          "generation",
+          "published_by_account_id",
+          "published_at"
+        ],
+        "title": "AiRuntimeConfigPublicationResponse"
+      },
+      "AiRuntimeConfigResponse": {
+        "properties": {
+          "runtime_config_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Runtime Config Version Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "system_prompt_template": {
+            "type": "string",
+            "title": "System Prompt Template"
+          },
+          "system_prompt_hash": {
+            "type": "string",
+            "title": "System Prompt Hash"
+          },
+          "components": {
+            "$ref": "#/components/schemas/RuntimeComponentVersionsSchema"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/GatewayPolicySchema"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeRouteResponse"
+            },
+            "type": "array",
+            "title": "Routes"
+          },
+          "created_by_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By Account Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "runtime_config_version_id",
+          "version_number",
+          "display_name",
+          "content_hash",
+          "system_prompt_template",
+          "system_prompt_hash",
+          "components",
+          "policy",
+          "routes",
+          "created_by_account_id",
+          "created_at"
+        ],
+        "title": "AiRuntimeConfigResponse"
+      },
       "AssignMemberOrganizationRequest": {
         "properties": {
           "department_ids": {
@@ -8911,6 +9392,47 @@
           "file"
         ],
         "title": "Body_uploadKnowledgeDocumentVersion"
+      },
+      "CreateAiRuntimeConfigRequest": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "system_prompt_template": {
+            "type": "string",
+            "maxLength": 16000,
+            "minLength": 1,
+            "title": "System Prompt Template"
+          },
+          "components": {
+            "$ref": "#/components/schemas/RuntimeComponentVersionsSchema"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/GatewayPolicySchema"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeRouteRequest"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Routes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "display_name",
+          "system_prompt_template",
+          "components",
+          "policy",
+          "routes"
+        ],
+        "title": "CreateAiRuntimeConfigRequest"
       },
       "CreateDepartmentRequest": {
         "properties": {
@@ -9427,6 +9949,26 @@
           "name"
         ],
         "title": "CreateRoleRequest"
+      },
+      "CurrentAiRuntimeConfigResponse": {
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiRuntimeConfigResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item"
+        ],
+        "title": "CurrentAiRuntimeConfigResponse"
       },
       "CurrentMenuReleaseResponse": {
         "properties": {
@@ -10054,6 +10596,91 @@
           "trace_id"
         ],
         "title": "ErrorResponse"
+      },
+      "GatewayPolicySchema": {
+        "properties": {
+          "attempt_timeout_ms": {
+            "type": "integer",
+            "maximum": 120000.0,
+            "minimum": 1.0,
+            "title": "Attempt Timeout Ms"
+          },
+          "total_timeout_ms": {
+            "type": "integer",
+            "maximum": 300000.0,
+            "minimum": 1.0,
+            "title": "Total Timeout Ms"
+          },
+          "max_attempts_per_route": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Max Attempts Per Route"
+          },
+          "max_prompt_characters": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "minimum": 1.0,
+            "title": "Max Prompt Characters"
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "maximum": 65536.0,
+            "minimum": 1.0,
+            "title": "Max Output Tokens"
+          },
+          "max_response_characters": {
+            "type": "integer",
+            "maximum": 4000000.0,
+            "minimum": 1.0,
+            "title": "Max Response Characters"
+          },
+          "circuit_failure_threshold": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Circuit Failure Threshold"
+          },
+          "circuit_recovery_ms": {
+            "type": "integer",
+            "maximum": 3600000.0,
+            "minimum": 1.0,
+            "title": "Circuit Recovery Ms"
+          },
+          "rule_degradation_message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Degradation Message"
+          },
+          "max_estimated_cost_microunits": {
+            "type": "integer",
+            "maximum": 1000000000000.0,
+            "minimum": 1.0,
+            "title": "Max Estimated Cost Microunits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attempt_timeout_ms",
+          "total_timeout_ms",
+          "max_attempts_per_route",
+          "max_prompt_characters",
+          "max_output_tokens",
+          "max_response_characters",
+          "circuit_failure_threshold",
+          "circuit_recovery_ms",
+          "max_estimated_cost_microunits"
+        ],
+        "title": "GatewayPolicySchema"
       },
       "HealthResponse": {
         "properties": {
@@ -11674,6 +12301,219 @@
           "api_key"
         ],
         "title": "RotateModelProviderCredentialRequest"
+      },
+      "RuntimeComponentVersionsSchema": {
+        "properties": {
+          "chunking": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Chunking"
+          },
+          "embedding": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Embedding"
+          },
+          "index_schema": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Index Schema"
+          },
+          "reranker": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Reranker"
+          },
+          "retrieval": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Retrieval"
+          },
+          "source_ranking": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source Ranking"
+          },
+          "safety": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Safety"
+          },
+          "data_source_interface": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Source Interface"
+          },
+          "relevance_grader_interface": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Relevance Grader Interface"
+          },
+          "multimodal_router_interface": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Multimodal Router Interface"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chunking",
+          "embedding",
+          "index_schema",
+          "reranker",
+          "retrieval",
+          "source_ranking",
+          "safety",
+          "data_source_interface",
+          "relevance_grader_interface",
+          "multimodal_router_interface"
+        ],
+        "title": "RuntimeComponentVersionsSchema"
+      },
+      "RuntimeRouteRequest": {
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Provider Id"
+          },
+          "priority": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Priority"
+          },
+          "model_id": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Model Id"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "generation",
+                "streaming",
+                "tools",
+                "structured_output"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Capabilities"
+          },
+          "input_price_microunits_per_million_tokens": {
+            "type": "integer",
+            "maximum": 1000000000000.0,
+            "minimum": 0.0,
+            "title": "Input Price Microunits Per Million Tokens"
+          },
+          "output_price_microunits_per_million_tokens": {
+            "type": "integer",
+            "maximum": 1000000000000.0,
+            "minimum": 0.0,
+            "title": "Output Price Microunits Per Million Tokens"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider_id",
+          "priority",
+          "model_id",
+          "capabilities",
+          "input_price_microunits_per_million_tokens",
+          "output_price_microunits_per_million_tokens"
+        ],
+        "title": "RuntimeRouteRequest"
+      },
+      "RuntimeRouteResponse": {
+        "properties": {
+          "route_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Route Id"
+          },
+          "provider_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Provider Id"
+          },
+          "provider_configuration_version": {
+            "type": "integer",
+            "title": "Provider Configuration Version"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "location": {
+            "type": "string",
+            "enum": [
+              "external",
+              "private"
+            ],
+            "title": "Location"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "generation",
+                "streaming",
+                "tools",
+                "structured_output"
+              ]
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "input_price_microunits_per_million_tokens": {
+            "type": "integer",
+            "title": "Input Price Microunits Per Million Tokens"
+          },
+          "output_price_microunits_per_million_tokens": {
+            "type": "integer",
+            "title": "Output Price Microunits Per Million Tokens"
+          },
+          "currency": {
+            "type": "string",
+            "const": "CNY",
+            "title": "Currency"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "route_id",
+          "provider_id",
+          "provider_configuration_version",
+          "priority",
+          "model_id",
+          "location",
+          "capabilities",
+          "input_price_microunits_per_million_tokens",
+          "output_price_microunits_per_million_tokens",
+          "currency"
+        ],
+        "title": "RuntimeRouteResponse"
       },
       "UploadMetadataResponse": {
         "properties": {

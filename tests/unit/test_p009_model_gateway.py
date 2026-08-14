@@ -162,6 +162,19 @@ def test_invalid_request_and_prompt_budget_fail_before_provider_call() -> None:
         ).invoke(request(max_output_tokens=9))
 
 
+def test_estimated_cost_budget_rejects_before_provider_call() -> None:
+    provider = MockProvider("primary")
+
+    with pytest.raises(ModelRequestRejectedError):
+        gateway(
+            (route("primary-route", "primary"),),
+            {"primary": provider},
+            max_estimated_cost_microunits=1,
+        ).invoke(request())
+
+    assert provider.calls == []
+
+
 def test_private_data_only_uses_private_route() -> None:
     external = MockProvider("external")
     private = MockProvider("private", response_prefix="私有模型")

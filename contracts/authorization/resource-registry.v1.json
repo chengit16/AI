@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 6,
+  "registry_version": 7,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -165,7 +165,11 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000057", "api_key": "platform.model_provider.policy_review", "operation_id": "reviewPlatformModelProviderDataPolicy", "method": "POST", "path_pattern": "/api/v1/platform/model-providers/{provider_id}/data-policy/review", "access_level": "authenticated", "permission_code": null, "risk_level": "critical", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000058", "api_key": "platform.model_provider.probe", "operation_id": "probePlatformModelProviderCapabilities", "method": "POST", "path_pattern": "/api/v1/platform/model-providers/{provider_id}/probe", "access_level": "authenticated", "permission_code": null, "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000059", "api_key": "platform.model_provider.activate", "operation_id": "activatePlatformModelProvider", "method": "POST", "path_pattern": "/api/v1/platform/model-providers/{provider_id}/activate", "access_level": "authenticated", "permission_code": null, "risk_level": "critical", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000060", "api_key": "platform.model_provider.disable", "operation_id": "disablePlatformModelProvider", "method": "POST", "path_pattern": "/api/v1/platform/model-providers/{provider_id}/disable", "access_level": "authenticated", "permission_code": null, "risk_level": "critical", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000060", "api_key": "platform.model_provider.disable", "operation_id": "disablePlatformModelProvider", "method": "POST", "path_pattern": "/api/v1/platform/model-providers/{provider_id}/disable", "access_level": "authenticated", "permission_code": null, "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000061", "api_key": "platform.ai_runtime_config.list", "operation_id": "listPlatformAiRuntimeConfigs", "method": "GET", "path_pattern": "/api/v1/platform/ai-runtime-configs", "access_level": "authenticated", "permission_code": null, "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000062", "api_key": "platform.ai_runtime_config.current", "operation_id": "getCurrentPlatformAiRuntimeConfig", "method": "GET", "path_pattern": "/api/v1/platform/ai-runtime-configs/current", "access_level": "authenticated", "permission_code": null, "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000063", "api_key": "platform.ai_runtime_config.create", "operation_id": "createPlatformAiRuntimeConfig", "method": "POST", "path_pattern": "/api/v1/platform/ai-runtime-configs", "access_level": "authenticated", "permission_code": null, "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000064", "api_key": "platform.ai_runtime_config.activate", "operation_id": "activatePlatformAiRuntimeConfig", "method": "POST", "path_pattern": "/api/v1/platform/ai-runtime-configs/{runtime_config_version_id}/activate", "access_level": "authenticated", "permission_code": null, "risk_level": "critical", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },

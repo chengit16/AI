@@ -17,6 +17,7 @@ ProviderFailureKind = Literal[
     "content_policy",
     "invalid_request",
     "invalid_response",
+    "data_boundary",
     "internal",
 ]
 
@@ -37,10 +38,12 @@ class ModelRequestRejectedError(PlatformError):
     error_code = "MODEL_REQUEST_REJECTED"
 
 
+@dataclass
 class ModelDataBoundaryDeniedError(PlatformError):
     """当前数据禁止外发且没有可用的私有模型路由。"""
 
     error_code = "MODEL_DATA_BOUNDARY_DENIED"
+    attempts: tuple[ModelAttempt, ...] = ()
 
 
 class ModelRouteUnavailableError(PlatformError):

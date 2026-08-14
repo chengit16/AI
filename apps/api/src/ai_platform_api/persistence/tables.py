@@ -14,6 +14,7 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -209,12 +210,133 @@ Index(
     postgresql_where=model_provider_credentials.c.status == "active",
 )
 
+ai_runtime_config_versions = Table(
+    "ai_runtime_config_versions",
+    metadata,
+    Column("runtime_config_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("version_number", Integer, nullable=False, unique=True),
+    Column("display_name", String(120), nullable=False),
+    Column("content_hash", String(64), nullable=False, unique=True),
+    Column("system_prompt_template", Text, nullable=False),
+    Column("system_prompt_hash", String(64), nullable=False),
+    Column("component_versions", JSONB, nullable=False),
+    Column("attempt_timeout_ms", Integer, nullable=False),
+    Column("total_timeout_ms", Integer, nullable=False),
+    Column("max_attempts_per_route", Integer, nullable=False),
+    Column("max_prompt_characters", Integer, nullable=False),
+    Column("max_output_tokens", Integer, nullable=False),
+    Column("max_response_characters", Integer, nullable=False),
+    Column("circuit_failure_threshold", Integer, nullable=False),
+    Column("circuit_recovery_ms", Integer, nullable=False),
+    Column("rule_degradation_message", Text, nullable=True),
+    Column("max_estimated_cost_microunits", BigInteger, nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_ai_runtime_configs_creator",
+    ),
+    CheckConstraint("version_number >= 1", name="ck_ai_runtime_configs_version"),
+    CheckConstraint(
+        "content_hash ~ '^[0-9a-f]{64}$' AND system_prompt_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_ai_runtime_configs_hashes",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(component_versions) = 'object'",
+        name="ck_ai_runtime_configs_components",
+    ),
+    CheckConstraint(
+        "attempt_timeout_ms BETWEEN 1 AND 120000 "
+        "AND total_timeout_ms BETWEEN attempt_timeout_ms AND 300000 "
+        "AND max_attempts_per_route BETWEEN 1 AND 5 "
+        "AND max_prompt_characters BETWEEN 1 AND 2000000 "
+        "AND max_output_tokens BETWEEN 1 AND 65536 "
+        "AND max_response_characters BETWEEN 1 AND 4000000 "
+        "AND circuit_failure_threshold BETWEEN 1 AND 20 "
+        "AND circuit_recovery_ms BETWEEN 1 AND 3600000 "
+        "AND max_estimated_cost_microunits BETWEEN 1 AND 1000000000000",
+        name="ck_ai_runtime_configs_budgets",
+    ),
+)
+
+ai_runtime_model_routes = Table(
+    "ai_runtime_model_routes",
+    metadata,
+    Column("route_id", UUID(as_uuid=True), primary_key=True),
+    Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
+    Column("provider_id", UUID(as_uuid=True), nullable=False),
+    Column("provider_configuration_version", Integer, nullable=False),
+    Column("priority", Integer, nullable=False),
+    Column("model_id", String(255), nullable=False),
+    Column("location", String(32), nullable=False),
+    Column("capabilities", ARRAY(String(32)), nullable=False),
+    Column("input_price_microunits_per_million_tokens", BigInteger, nullable=False),
+    Column("output_price_microunits_per_million_tokens", BigInteger, nullable=False),
+    Column("currency", String(3), nullable=False),
+    UniqueConstraint(
+        "runtime_config_version_id",
+        "priority",
+        name="uq_ai_runtime_routes_priority",
+    ),
+    UniqueConstraint(
+        "runtime_config_version_id",
+        "provider_id",
+        "model_id",
+        name="uq_ai_runtime_routes_provider_model",
+    ),
+    ForeignKeyConstraint(
+        ["runtime_config_version_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_config_versions.runtime_config_version_id"],
+        name="fk_ai_runtime_routes_config",
+    ),
+    ForeignKeyConstraint(
+        ["provider_id"],
+        [f"{SCHEMA_TOKEN}.model_provider_configurations.provider_id"],
+        name="fk_ai_runtime_routes_provider",
+    ),
+    CheckConstraint(
+        "provider_configuration_version >= 1", name="ck_ai_runtime_routes_provider_version"
+    ),
+    CheckConstraint("priority BETWEEN 1 AND 8", name="ck_ai_runtime_routes_priority"),
+    CheckConstraint("location IN ('external', 'private')", name="ck_ai_runtime_routes_location"),
+    CheckConstraint("currency = 'CNY'", name="ck_ai_runtime_routes_currency"),
+    CheckConstraint(
+        "input_price_microunits_per_million_tokens BETWEEN 0 AND 1000000000000 "
+        "AND output_price_microunits_per_million_tokens BETWEEN 0 AND 1000000000000",
+        name="ck_ai_runtime_routes_prices",
+    ),
+)
+
+ai_runtime_config_publication = Table(
+    "ai_runtime_config_publication",
+    metadata,
+    Column("publication_key", String(32), primary_key=True),
+    Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
+    Column("generation", Integer, nullable=False),
+    Column("published_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["runtime_config_version_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_config_versions.runtime_config_version_id"],
+        name="fk_ai_runtime_publication_config",
+    ),
+    ForeignKeyConstraint(
+        ["published_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_ai_runtime_publication_publisher",
+    ),
+    CheckConstraint("publication_key = 'current'", name="ck_ai_runtime_publication_key"),
+    CheckConstraint("generation >= 1", name="ck_ai_runtime_publication_generation"),
+)
+
 platform_audit_records = Table(
     "platform_audit_records",
     metadata,
     Column("audit_id", UUID(as_uuid=True), primary_key=True),
     Column("account_id", UUID(as_uuid=True), nullable=False),
-    Column("provider_id", UUID(as_uuid=True), nullable=False),
+    Column("provider_id", UUID(as_uuid=True), nullable=True),
+    Column("runtime_config_version_id", UUID(as_uuid=True), nullable=True),
     Column("action", String(128), nullable=False),
     Column("request_id", UUID(as_uuid=True), nullable=False),
     Column("trace_id", String(32), nullable=False),
@@ -231,12 +353,163 @@ platform_audit_records = Table(
         name="fk_platform_audit_records_provider",
         ondelete="CASCADE",
     ),
+    ForeignKeyConstraint(
+        ["runtime_config_version_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_config_versions.runtime_config_version_id"],
+        name="fk_platform_audit_records_runtime_config",
+    ),
+    CheckConstraint(
+        "(provider_id IS NOT NULL)::integer + (runtime_config_version_id IS NOT NULL)::integer = 1",
+        name="ck_platform_audit_subject",
+    ),
     CheckConstraint("trace_id ~ '^[0-9a-f]{32}$'", name="ck_platform_audit_trace_id"),
 )
 Index(
     "ix_platform_audit_provider_time",
     platform_audit_records.c.provider_id,
     platform_audit_records.c.occurred_at,
+)
+Index(
+    "ix_platform_audit_runtime_config_time",
+    platform_audit_records.c.runtime_config_version_id,
+    platform_audit_records.c.occurred_at,
+)
+
+model_invocations = Table(
+    "model_invocations",
+    metadata,
+    Column("invocation_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
+    Column("task_type", String(128), nullable=False),
+    Column("security_level", String(32), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("external_data_allowed", Boolean, nullable=False),
+    Column("requested_max_output_tokens", Integer, nullable=False),
+    Column("selected_route_id", UUID(as_uuid=True), nullable=True),
+    Column("selected_provider_id", UUID(as_uuid=True), nullable=True),
+    Column("selected_model_id", String(255), nullable=True),
+    Column("input_tokens", BigInteger, nullable=False),
+    Column("output_tokens", BigInteger, nullable=False),
+    Column("estimated_cost_microunits", BigInteger, nullable=False),
+    Column("currency", String(3), nullable=False),
+    Column("finish_reason", String(128), nullable=True),
+    Column("degradation_reason", String(128), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_model_invocations_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["runtime_config_version_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_config_versions.runtime_config_version_id"],
+        name="fk_model_invocations_runtime_config",
+    ),
+    ForeignKeyConstraint(
+        ["selected_route_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_model_routes.route_id"],
+        name="fk_model_invocations_selected_route",
+    ),
+    ForeignKeyConstraint(
+        ["selected_provider_id"],
+        [f"{SCHEMA_TOKEN}.model_provider_configurations.provider_id"],
+        name="fk_model_invocations_selected_provider",
+    ),
+    CheckConstraint(
+        "security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
+        name="ck_model_invocations_security_level",
+    ),
+    CheckConstraint(
+        "status IN ('running', 'succeeded', 'degraded', 'failed', 'rejected')",
+        name="ck_model_invocations_status",
+    ),
+    CheckConstraint(
+        "(status = 'running' AND completed_at IS NULL) OR "
+        "(status <> 'running' AND completed_at IS NOT NULL)",
+        name="ck_model_invocations_completion",
+    ),
+    CheckConstraint(
+        "input_tokens >= 0 AND output_tokens >= 0 AND estimated_cost_microunits >= 0",
+        name="ck_model_invocations_usage",
+    ),
+    CheckConstraint("currency = 'CNY'", name="ck_model_invocations_currency"),
+    CheckConstraint("trace_id ~ '^[0-9a-f]{32}$'", name="ck_model_invocations_trace_id"),
+)
+Index(
+    "ix_model_invocations_workspace_time",
+    model_invocations.c.workspace_id,
+    model_invocations.c.started_at,
+)
+Index(
+    "ix_model_invocations_runtime_config",
+    model_invocations.c.runtime_config_version_id,
+    model_invocations.c.started_at,
+)
+
+model_invocation_attempts = Table(
+    "model_invocation_attempts",
+    metadata,
+    Column("invocation_id", UUID(as_uuid=True), primary_key=True),
+    Column("attempt_index", Integer, primary_key=True),
+    Column("route_id", UUID(as_uuid=True), nullable=False),
+    Column("provider_id", UUID(as_uuid=True), nullable=False),
+    Column("model_id", String(255), nullable=False),
+    Column("credential_version", Integer, nullable=True),
+    Column("attempt_no", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("duration_ms", Integer, nullable=False),
+    Column("failure_kind", String(64), nullable=True),
+    Column("provider_request_id", String(255), nullable=True),
+    Column("input_tokens", BigInteger, nullable=True),
+    Column("output_tokens", BigInteger, nullable=True),
+    Column("estimated_cost_microunits", BigInteger, nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    ForeignKeyConstraint(
+        ["invocation_id"],
+        [f"{SCHEMA_TOKEN}.model_invocations.invocation_id"],
+        name="fk_model_invocation_attempts_invocation",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["route_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_model_routes.route_id"],
+        name="fk_model_invocation_attempts_route",
+    ),
+    ForeignKeyConstraint(
+        ["provider_id"],
+        [f"{SCHEMA_TOKEN}.model_provider_configurations.provider_id"],
+        name="fk_model_invocation_attempts_provider",
+    ),
+    ForeignKeyConstraint(
+        ["provider_id", "credential_version"],
+        [
+            f"{SCHEMA_TOKEN}.model_provider_credentials.provider_id",
+            f"{SCHEMA_TOKEN}.model_provider_credentials.credential_version",
+        ],
+        name="fk_model_invocation_attempts_credential",
+    ),
+    CheckConstraint("attempt_index >= 1", name="ck_model_attempts_index"),
+    CheckConstraint("attempt_no >= 0", name="ck_model_attempts_number"),
+    CheckConstraint(
+        "status IN ('succeeded', 'failed', 'circuit_open')",
+        name="ck_model_attempts_status",
+    ),
+    CheckConstraint(
+        "duration_ms >= 0 AND estimated_cost_microunits >= 0",
+        name="ck_model_attempts_usage",
+    ),
+    CheckConstraint(
+        "(input_tokens IS NULL AND output_tokens IS NULL) OR "
+        "(input_tokens >= 0 AND output_tokens >= 0)",
+        name="ck_model_attempts_tokens",
+    ),
+    CheckConstraint("trace_id ~ '^[0-9a-f]{32}$'", name="ck_model_attempts_trace_id"),
 )
 
 workspaces = Table(

@@ -7,16 +7,24 @@ import socket
 import ssl
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Protocol, cast
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from ai_platform_api.modules.model_gateway.domain.configuration import (
     CapabilityProbeResult,
+    RuntimeProviderAccess,
 )
 from ai_platform_api.modules.model_gateway.domain.configuration_errors import (
     ModelProviderConfigurationInvalidError,
 )
-from ai_platform_api.modules.model_gateway.domain.models import ModelCapability
+from ai_platform_api.modules.model_gateway.domain.errors import ProviderInvocationError
+from ai_platform_api.modules.model_gateway.domain.models import (
+    ModelCapability,
+    ModelProvider,
+    ModelRequest,
+    ProviderResponse,
+    TokenUsage,
+)
 
 DnsResolver = Callable[..., list[tuple[Any, ...]]]
 
@@ -28,6 +36,10 @@ class ValidatedProviderTarget:
     port: int
     path_prefix: str
     addresses: tuple[str, ...]
+
+
+class ProviderTargetResolver(Protocol):
+    def resolve(self, value: str) -> ValidatedProviderTarget: ...
 
 
 class StrictProviderBaseUrlPolicy:
@@ -198,6 +210,129 @@ class OpenAiCompatibleCapabilityProbe:
             return response.status, response.getheader("Content-Type", "").casefold()
         finally:
             connection.close()
+
+
+class OpenAiCompatibleRuntimeProviderFactory:
+    """按已治理的短时凭证创建单次 Provider，不缓存或暴露明文 Key。"""
+
+    def __init__(self, base_url_policy: StrictProviderBaseUrlPolicy) -> None:
+        self._base_url_policy = base_url_policy
+
+    def create(self, access: RuntimeProviderAccess) -> ModelProvider:
+        return OpenAiCompatibleRuntimeProvider(access, self._base_url_policy)
+
+
+class OpenAiCompatibleRuntimeProvider:
+    """执行非流式 OpenAI-compatible 调用，原始供应商错误不得越过 Adapter。"""
+
+    def __init__(
+        self,
+        access: RuntimeProviderAccess,
+        base_url_policy: ProviderTargetResolver,
+    ) -> None:
+        self._access = access
+        self._base_url_policy = base_url_policy
+        self.provider_id = str(access.configuration.provider_id)
+
+    def invoke(
+        self,
+        request: ModelRequest,
+        model_id: str,
+        timeout_ms: int,
+    ) -> ProviderResponse:
+        try:
+            target = self._base_url_policy.resolve(self._access.configuration.base_url)
+            connection = _PinnedHttpsConnection(
+                target.hostname,
+                target.addresses[0],
+                port=target.port,
+                timeout=max(timeout_ms, 1) / 1000,
+                context=ssl.create_default_context(),
+            )
+            try:
+                connection.request(
+                    "POST",
+                    f"{target.path_prefix}/chat/completions",
+                    body=json.dumps(
+                        {
+                            "model": model_id,
+                            "messages": [
+                                {"role": message.role, "content": message.content}
+                                for message in request.messages
+                            ],
+                            "max_tokens": request.max_output_tokens,
+                            "stream": False,
+                        },
+                        ensure_ascii=False,
+                    ).encode(),
+                    headers={
+                        "Authorization": f"Bearer {self._access.api_key}",
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "User-Agent": "ai-platform-runtime/1",
+                    },
+                )
+                response = connection.getresponse()
+                payload = response.read(4_194_305)
+                if len(payload) > 4_194_304:
+                    raise ProviderInvocationError(
+                        "invalid_response", False, True, response.getheader("x-request-id")
+                    )
+                self._raise_for_status(response.status, response.getheader("x-request-id"))
+            finally:
+                connection.close()
+        except ProviderInvocationError:
+            raise
+        except TimeoutError as error:
+            raise ProviderInvocationError("timeout", True, True) from error
+        except (OSError, ssl.SSLError, http.client.HTTPException, ValueError) as error:
+            raise ProviderInvocationError("unavailable", True, True) from error
+        return self._parse_response(payload, response.getheader("x-request-id"))
+
+    @staticmethod
+    def _raise_for_status(status: int, provider_request_id: str | None) -> None:
+        if 200 <= status < 300:
+            return
+        if status in {401, 403}:
+            raise ProviderInvocationError("authentication", False, False, provider_request_id)
+        if status == 429:
+            raise ProviderInvocationError("rate_limited", True, True, provider_request_id)
+        if status in {400, 422}:
+            raise ProviderInvocationError("invalid_request", False, False, provider_request_id)
+        if status == 404:
+            raise ProviderInvocationError(
+                "capability_unsupported", False, False, provider_request_id
+            )
+        if status >= 500:
+            raise ProviderInvocationError("unavailable", True, True, provider_request_id)
+        # 3xx 不跟随重定向，其他未知状态同样按不可信响应处理。
+        raise ProviderInvocationError("invalid_response", False, True, provider_request_id)
+
+    @staticmethod
+    def _parse_response(payload: bytes, provider_request_id: str | None) -> ProviderResponse:
+        try:
+            document = json.loads(payload)
+            choice = document["choices"][0]
+            content = choice["message"]["content"]
+            finish_reason = choice.get("finish_reason") or "unknown"
+            usage_document = document.get("usage")
+            usage = (
+                TokenUsage(
+                    input_tokens=int(usage_document["prompt_tokens"]),
+                    output_tokens=int(usage_document["completion_tokens"]),
+                )
+                if isinstance(usage_document, dict)
+                else None
+            )
+            if not isinstance(content, str) or not isinstance(finish_reason, str):
+                raise TypeError
+        except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ProviderInvocationError(
+                "invalid_response", False, True, provider_request_id
+            ) from error
+        if finish_reason == "content_filter":
+            raise ProviderInvocationError("content_policy", False, False, provider_request_id)
+        return ProviderResponse(content, finish_reason, usage, provider_request_id)
 
 
 class _PinnedHttpsConnection(http.client.HTTPSConnection):

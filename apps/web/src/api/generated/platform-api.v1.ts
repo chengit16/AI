@@ -106,6 +106,58 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/platform/ai-runtime-configs": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /** List Ai Runtime Configs */
+    readonly get: operations["listPlatformAiRuntimeConfigs"];
+    readonly put?: never;
+    /** Create Ai Runtime Config */
+    readonly post: operations["createPlatformAiRuntimeConfig"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/platform/ai-runtime-configs/{runtime_config_version_id}/activate": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Activate Ai Runtime Config */
+    readonly post: operations["activatePlatformAiRuntimeConfig"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/platform/ai-runtime-configs/current": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /** Get Current Ai Runtime Config */
+    readonly get: operations["getCurrentPlatformAiRuntimeConfig"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/platform/model-providers": {
     readonly parameters: {
       readonly query?: never;
@@ -884,6 +936,63 @@ export type paths = {
 export type webhooks = Record<string, never>;
 export type components = {
   schemas: {
+    /** AiRuntimeConfigListResponse */
+    readonly AiRuntimeConfigListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["AiRuntimeConfigResponse"][];
+    };
+    /** AiRuntimeConfigPublicationResponse */
+    readonly AiRuntimeConfigPublicationResponse: {
+      /** Generation */
+      readonly generation: number;
+      /**
+       * Published At
+       * Format: date-time
+       */
+      readonly published_at: string;
+      /**
+       * Published By Account Id
+       * Format: uuid
+       */
+      readonly published_by_account_id: string;
+      /**
+       * Runtime Config Version Id
+       * Format: uuid
+       */
+      readonly runtime_config_version_id: string;
+    };
+    /** AiRuntimeConfigResponse */
+    readonly AiRuntimeConfigResponse: {
+      readonly components: components["schemas"]["RuntimeComponentVersionsSchema"];
+      /** Content Hash */
+      readonly content_hash: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Created By Account Id
+       * Format: uuid
+       */
+      readonly created_by_account_id: string;
+      /** Display Name */
+      readonly display_name: string;
+      readonly policy: components["schemas"]["GatewayPolicySchema"];
+      /** Routes */
+      readonly routes: readonly components["schemas"]["RuntimeRouteResponse"][];
+      /**
+       * Runtime Config Version Id
+       * Format: uuid
+       */
+      readonly runtime_config_version_id: string;
+      /** System Prompt Hash */
+      readonly system_prompt_hash: string;
+      /** System Prompt Template */
+      readonly system_prompt_template: string;
+      /** Version Number */
+      readonly version_number: number;
+    };
     /** AssignMemberOrganizationRequest */
     readonly AssignMemberOrganizationRequest: {
       /** Department Ids */
@@ -944,6 +1053,17 @@ export type components = {
        * @description 待安全检查的新版本原件
        */
       readonly file: string;
+    };
+    /** CreateAiRuntimeConfigRequest */
+    readonly CreateAiRuntimeConfigRequest: {
+      readonly components: components["schemas"]["RuntimeComponentVersionsSchema"];
+      /** Display Name */
+      readonly display_name: string;
+      readonly policy: components["schemas"]["GatewayPolicySchema"];
+      /** Routes */
+      readonly routes: readonly components["schemas"]["RuntimeRouteRequest"][];
+      /** System Prompt Template */
+      readonly system_prompt_template: string;
     };
     /** CreateDepartmentRequest */
     readonly CreateDepartmentRequest: {
@@ -1101,6 +1221,10 @@ export type components = {
       readonly name: string;
       /** Role Key */
       readonly role_key: string;
+    };
+    /** CurrentAiRuntimeConfigResponse */
+    readonly CurrentAiRuntimeConfigResponse: {
+      readonly item: components["schemas"]["AiRuntimeConfigResponse"] | null;
     };
     /** CurrentMenuReleaseResponse */
     readonly CurrentMenuReleaseResponse: {
@@ -1364,6 +1488,29 @@ export type components = {
       readonly retryable: boolean;
       /** Trace Id */
       readonly trace_id: string;
+    };
+    /** GatewayPolicySchema */
+    readonly GatewayPolicySchema: {
+      /** Attempt Timeout Ms */
+      readonly attempt_timeout_ms: number;
+      /** Circuit Failure Threshold */
+      readonly circuit_failure_threshold: number;
+      /** Circuit Recovery Ms */
+      readonly circuit_recovery_ms: number;
+      /** Max Attempts Per Route */
+      readonly max_attempts_per_route: number;
+      /** Max Estimated Cost Microunits */
+      readonly max_estimated_cost_microunits: number;
+      /** Max Output Tokens */
+      readonly max_output_tokens: number;
+      /** Max Prompt Characters */
+      readonly max_prompt_characters: number;
+      /** Max Response Characters */
+      readonly max_response_characters: number;
+      /** Rule Degradation Message */
+      readonly rule_degradation_message?: string | null;
+      /** Total Timeout Ms */
+      readonly total_timeout_ms: number;
     };
     /** HealthResponse */
     readonly HealthResponse: {
@@ -1981,6 +2128,86 @@ export type components = {
        */
       readonly api_key: string;
     };
+    /** RuntimeComponentVersionsSchema */
+    readonly RuntimeComponentVersionsSchema: {
+      /** Chunking */
+      readonly chunking: string;
+      /** Data Source Interface */
+      readonly data_source_interface: string;
+      /** Embedding */
+      readonly embedding: string;
+      /** Index Schema */
+      readonly index_schema: string;
+      /** Multimodal Router Interface */
+      readonly multimodal_router_interface: string;
+      /** Relevance Grader Interface */
+      readonly relevance_grader_interface: string;
+      /** Reranker */
+      readonly reranker: string;
+      /** Retrieval */
+      readonly retrieval: string;
+      /** Safety */
+      readonly safety: string;
+      /** Source Ranking */
+      readonly source_ranking: string;
+    };
+    /** RuntimeRouteRequest */
+    readonly RuntimeRouteRequest: {
+      /** Capabilities */
+      readonly capabilities: readonly (
+        "generation" | "streaming" | "tools" | "structured_output"
+      )[];
+      /** Input Price Microunits Per Million Tokens */
+      readonly input_price_microunits_per_million_tokens: number;
+      /** Model Id */
+      readonly model_id: string;
+      /** Output Price Microunits Per Million Tokens */
+      readonly output_price_microunits_per_million_tokens: number;
+      /** Priority */
+      readonly priority: number;
+      /**
+       * Provider Id
+       * Format: uuid
+       */
+      readonly provider_id: string;
+    };
+    /** RuntimeRouteResponse */
+    readonly RuntimeRouteResponse: {
+      /** Capabilities */
+      readonly capabilities: readonly (
+        "generation" | "streaming" | "tools" | "structured_output"
+      )[];
+      /**
+       * Currency
+       * @constant
+       */
+      readonly currency: "CNY";
+      /** Input Price Microunits Per Million Tokens */
+      readonly input_price_microunits_per_million_tokens: number;
+      /**
+       * Location
+       * @enum {string}
+       */
+      readonly location: "external" | "private";
+      /** Model Id */
+      readonly model_id: string;
+      /** Output Price Microunits Per Million Tokens */
+      readonly output_price_microunits_per_million_tokens: number;
+      /** Priority */
+      readonly priority: number;
+      /** Provider Configuration Version */
+      readonly provider_configuration_version: number;
+      /**
+       * Provider Id
+       * Format: uuid
+       */
+      readonly provider_id: string;
+      /**
+       * Route Id
+       * Format: uuid
+       */
+      readonly route_id: string;
+    };
     /** UploadMetadataResponse */
     readonly UploadMetadataResponse: {
       /** Content Hash */
@@ -2458,6 +2685,271 @@ export interface operations {
         };
         content: {
           readonly "application/json": components["schemas"]["HealthResponse"];
+        };
+      };
+    };
+  };
+  readonly listPlatformAiRuntimeConfigs: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AiRuntimeConfigListResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createPlatformAiRuntimeConfig: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateAiRuntimeConfigRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AiRuntimeConfigResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly activatePlatformAiRuntimeConfig: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path: {
+        readonly runtime_config_version_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AiRuntimeConfigPublicationResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getCurrentPlatformAiRuntimeConfig: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["CurrentAiRuntimeConfigResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
     };
