@@ -20,37 +20,72 @@ import { usePlatformAdministration } from "@/hooks/usePlatformAdministration";
 import { useWorkspaceMenuNavigation } from "@/hooks/useWorkspaceMenuNavigation";
 import { useSessionStore } from "@/store/session";
 import { useUiStore } from "@/store/ui";
-
-import styles from "./AppShell.module.css";
+import { cn } from "@/utils/cn";
 
 function Navigation({
   items,
   label,
   onNavigate,
+  surface = "dark",
 }: {
   items: ReturnType<typeof useWorkspaceMenuNavigation>["navigation"];
   label: string;
   onNavigate?: () => void;
+  surface?: "dark" | "light";
 }) {
+  const isLightSurface = surface === "light";
   return (
-    <nav className={styles.navigation} aria-label="平台主导航">
-      <p className={styles.navigationLabel}>{label}</p>
-      {items.length === 0 && <span className={styles.navigationEmpty}>暂无可用页面</span>}
+    <nav className="flex-none px-3 py-5" aria-label={label}>
+      <p
+        className={cn(
+          "navigation-copy mx-3 mb-2 mt-0 whitespace-nowrap text-[11px] font-700",
+          isLightSurface ? "text-text-muted" : "text-nav-muted",
+        )}
+      >
+        {label}
+      </p>
+      {items.length === 0 && (
+        <span
+          className={cn(
+            "navigation-copy m-3 block text-xs leading-[1.5]",
+            isLightSurface ? "text-text-muted" : "text-nav-muted",
+          )}
+        >
+          暂无可用页面
+        </span>
+      )}
       {items.map(({ key, to, label, icon: Icon }) => (
         <NavLink
           key={key}
           to={to}
-          className={({ isActive }) => `${styles.navigationItem} ${isActive ? styles.active : ""}`}
+          className={({ isActive }) =>
+            cn(
+              "my-0.5 flex min-h-11 items-center gap-3 whitespace-nowrap rounded-ui px-[13px] no-underline",
+              isLightSurface
+                ? "text-text hover:bg-brand-soft hover:text-brand"
+                : "text-nav-text hover:bg-nav-hover hover:text-nav-text-strong",
+              isActive &&
+                (isLightSurface
+                  ? "bg-brand-soft text-brand shadow-[inset_3px_0_0_var(--color-brand)]"
+                  : "bg-nav-active text-nav-text-strong shadow-[inset_3px_0_0_var(--color-accent)]"),
+            )
+          }
           onClick={onNavigate}
         >
           <Icon size={18} aria-hidden="true" />
-          <span>{label}</span>
+          <span className="navigation-copy">{label}</span>
         </NavLink>
       ))}
     </nav>
   );
 }
 
+/**
+ * 平台登录态应用壳层，统一组织动态菜单、工作空间、账号入口和响应式导航。
+ *
+ * 空间菜单来自已发布快照，平台治理菜单来自静态注册表；两者的隐藏和路由守卫
+ * 只改善前端体验，接口与字段权限仍由后端 PDP 独立执行。
+ */
 export function AppShell() {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -85,18 +120,30 @@ export function AppShell() {
   ];
 
   return (
-    <div className={`${styles.shell} ${collapsed ? styles.collapsed : ""}`}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
+    <div
+      className={cn(
+        "grid min-h-[100dvh] bg-canvas [transition:grid-template-columns_var(--motion-fast)] nav-mobile:block landscape-mobile:block",
+        collapsed ? "grid-cols-[72px_minmax(0,1fr)]" : "grid-cols-[240px_minmax(0,1fr)]",
+      )}
+    >
+      <aside className="sticky top-0 z-10 flex h-[100dvh] flex-col overflow-hidden border-r border-nav-divider bg-nav-bg text-nav-text nav-mobile:hidden landscape-mobile:hidden">
+        <div className="flex h-16 items-center border-b border-nav-divider px-[18px]">
           <PlatformMark compact={collapsed} />
         </div>
-        <Navigation items={navigation} label="空间管理" />
-        {isPlatformAdministrator && (
-          <Navigation items={staticPlatformNavigation} label="平台治理" />
-        )}
+        <div
+          className={cn(
+            "[&_.navigation-copy]:[transition:opacity_var(--motion-fast)]",
+            collapsed && "[&_.navigation-copy]:pointer-events-none [&_.navigation-copy]:opacity-0",
+          )}
+        >
+          <Navigation items={navigation} label="空间管理" />
+          {isPlatformAdministrator && (
+            <Navigation items={staticPlatformNavigation} label="平台治理" />
+          )}
+        </div>
         <Tooltip title={collapsed ? "展开侧栏" : "收起侧栏"} placement="right">
           <Button
-            className={styles.collapseButton}
+            className="!mb-3 !ml-3 !mt-auto !h-11 !w-11 !text-nav-text"
             type="text"
             aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
             icon={collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
@@ -105,17 +152,17 @@ export function AppShell() {
         </Tooltip>
       </aside>
 
-      <div className={styles.workspace}>
-        <header className={styles.topbar}>
+      <div className="min-w-0">
+        <header className="sticky top-0 z-8 flex min-h-16 items-center justify-between gap-4 border-b border-border bg-topbar px-[clamp(18px,3vw,40px)] py-2.5 nav-mobile:min-h-15 nav-mobile:px-3 nav-mobile:py-2 landscape-mobile:min-h-15 landscape-mobile:px-3 landscape-mobile:py-2">
           <Button
-            className={styles.mobileMenu}
+            className="hidden flex-none nav-mobile:!inline-flex nav-mobile:basis-10 landscape-mobile:!inline-flex landscape-mobile:basis-11"
             aria-label="打开主导航"
             icon={<Menu size={19} />}
             onClick={() => setMobileOpen(true)}
           />
           <WorkspaceSwitcher />
-          <div className={styles.topbarEnd}>
-            <span className={styles.routeLabel}>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-3 text-[13px] text-text-muted nav-mobile:hidden landscape-mobile:hidden">
               <Building2 size={16} />
               {allNavigation.find((item) => location.pathname.startsWith(item.to))?.label ??
                 "空间管理"}
@@ -128,24 +175,33 @@ export function AppShell() {
             </Dropdown>
           </div>
         </header>
-        <main className={styles.content} id="main-content" tabIndex={-1}>
+        <main
+          className="mx-auto w-[min(1280px,100%)] px-[clamp(18px,3vw,40px)] pb-12 pt-8 outline-none nav-mobile:pt-6 landscape-mobile:pt-6"
+          id="main-content"
+          tabIndex={-1}
+        >
           <Outlet />
         </main>
       </div>
 
       <Drawer
-        className={styles.mobileDrawer}
-        title={<PlatformMark />}
+        title={<PlatformMark surface="light" />}
         placement="left"
         size="default"
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
       >
-        <Navigation items={navigation} label="空间管理" onNavigate={() => setMobileOpen(false)} />
+        <Navigation
+          items={navigation}
+          label="空间管理"
+          surface="light"
+          onNavigate={() => setMobileOpen(false)}
+        />
         {isPlatformAdministrator && (
           <Navigation
             items={staticPlatformNavigation}
             label="平台治理"
+            surface="light"
             onNavigate={() => setMobileOpen(false)}
           />
         )}

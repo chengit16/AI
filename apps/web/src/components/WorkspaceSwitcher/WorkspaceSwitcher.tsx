@@ -12,12 +12,16 @@ import {
 } from "@/api/services/workspaces";
 import { useSessionStore } from "@/store/session";
 
-import styles from "./WorkspaceSwitcher.module.css";
-
 interface CreateWorkspaceForm {
   name: string;
 }
 
+/**
+ * 管理当前工作空间切换和企业空间创建入口。
+ *
+ * 工作空间决定后续查询的隔离上下文，因此切换成功后会失效全部查询缓存；
+ * 前端选项只提供体验层入口，成员资格和空间权限仍由服务端逐请求校验。
+ */
 export function WorkspaceSwitcher() {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -35,6 +39,7 @@ export function WorkspaceSwitcher() {
     mutationFn: switchWorkspace,
     onSuccess: async (workspace) => {
       setWorkspaceId(workspace.workspace_id);
+      // 工作空间属于所有业务 Query 的隐式隔离维度，切换后必须清除旧空间缓存。
       await queryClient.invalidateQueries();
       navigate("/workspace/overview");
     },
@@ -55,7 +60,7 @@ export function WorkspaceSwitcher() {
   const options = (workspaces.data ?? []).map((workspace) => ({
     value: workspace.workspace_id,
     label: (
-      <span className={styles.option}>
+      <span className="inline-flex items-center gap-2">
         {workspace.workspace_type === "personal" ? (
           <UserRound size={15} />
         ) : (
@@ -67,10 +72,11 @@ export function WorkspaceSwitcher() {
   }));
 
   return (
-    <div className={styles.root}>
+    <div className="flex min-w-0 items-center gap-2">
+      {/* 移动态需为菜单、账号、创建按钮和两级间距预留空间，并留出 4px 取整余量。 */}
       <Select
         aria-label="切换工作空间"
-        className={styles.select}
+        className="w-[min(260px,28vw)] nav-mobile:w-[min(210px,calc(100vw-196px))]"
         loading={workspaces.isLoading || switchMutation.isPending}
         options={options}
         value={workspaceId ?? undefined}
