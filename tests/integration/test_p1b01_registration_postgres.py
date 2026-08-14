@@ -31,6 +31,8 @@ from ai_platform_api.persistence.tables import (
     accounts,
     audit_records,
     outbox_events,
+    role_permission_grants,
+    roles,
     workspace_memberships,
     workspaces,
 )
@@ -144,6 +146,31 @@ def test_registration_creates_exactly_one_personal_workspace_with_audit_and_even
         event = connection.execute(
             select(outbox_events).where(outbox_events.c.request_id == request_id)
         ).one()
+        owner_permissions = set(
+            connection.execute(
+                select(role_permission_grants.c.permission_code)
+                .select_from(
+                    role_permission_grants.join(
+                        roles,
+                        (roles.c.workspace_id == role_permission_grants.c.workspace_id)
+                        & (roles.c.role_id == role_permission_grants.c.role_id),
+                    )
+                )
+                .where(
+                    roles.c.workspace_id == result.personal_workspace_id,
+                    roles.c.role_key == "workspace_owner",
+                    role_permission_grants.c.permission_code.in_(
+                        (
+                            "knowledge.base.read",
+                            "knowledge.document.read",
+                            "knowledge.ingestion.read",
+                            "knowledge.ingestion.retry",
+                            "knowledge.production.access",
+                        )
+                    ),
+                )
+            ).scalars()
+        )
 
     assert account.login_name == "synthetic.p1b01@example.com"
     assert account.password_hash.startswith("$argon2id$")
@@ -154,6 +181,13 @@ def test_registration_creates_exactly_one_personal_workspace_with_audit_and_even
     assert memberships[0].status == "active"
     assert audit.attributes == {"workspace_type": "personal"}
     assert event.payload == {"personal_workspace_id": str(result.personal_workspace_id)}
+    assert owner_permissions == {
+        "knowledge.base.read",
+        "knowledge.document.read",
+        "knowledge.ingestion.read",
+        "knowledge.ingestion.retry",
+        "knowledge.production.access",
+    }
 
     login = registration_database.authentication.login(
         "synthetic.p1b01@example.com",

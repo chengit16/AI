@@ -93,7 +93,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260814_0023"
+    assert current_revision(connection, schema) == "20260814_0024"
     assert business_tables(connection, schema) == {
         "accounts",
         "ai_runtime_config_publication",
@@ -153,8 +153,83 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260814_0023"
+    assert current_revision(connection, schema) == "20260814_0024"
     assert schema_snapshot(connection, schema) == first_head
+
+
+def test_owner_knowledge_permissions_are_backfilled_for_existing_spaces(
+    migration_database: tuple[Config, Connection, str],
+) -> None:
+    config, connection, schema = migration_database
+    command.upgrade(config, "20260814_0023")
+    connection.commit()
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".workspaces (
+              workspace_id, workspace_type, name, owner_account_id, entitlement_version,
+              role_version, menu_version, status, created_at, created_by_actor_id,
+              updated_at, updated_by_actor_id, version
+            ) VALUES (
+              '20000000-0000-4000-8000-000000000424', 'enterprise', '合成历史企业空间', NULL, 1,
+              1, 1, 'active', '2026-08-14T00:00:00Z',
+              '10000000-0000-4000-8000-000000000424', '2026-08-14T00:00:00Z',
+              '10000000-0000-4000-8000-000000000424', 1
+            );
+            INSERT INTO "{schema}".roles (
+              role_id, workspace_id, role_key, name, status, system_managed,
+              created_at, updated_at, version
+            ) VALUES (
+              '70000000-0000-4000-8000-000000000424',
+              '20000000-0000-4000-8000-000000000424', 'workspace_owner', '空间所有者',
+              'active', true, '2026-08-14T00:00:00Z', '2026-08-14T00:00:00Z', 1
+            );
+            """
+        )
+    )
+    connection.commit()
+
+    command.upgrade(config, "head")
+    connection.commit()
+    permission_codes = set(
+        connection.execute(
+            text(
+                f"""
+                SELECT permission_code
+                FROM "{schema}".role_permission_grants
+                WHERE workspace_id = '20000000-0000-4000-8000-000000000424'::uuid
+                  AND role_id = '70000000-0000-4000-8000-000000000424'::uuid
+                """
+            )
+        ).scalars()
+    )
+    assert permission_codes >= {
+        "knowledge.base.read",
+        "knowledge.document.read",
+        "knowledge.ingestion.read",
+        "knowledge.ingestion.retry",
+        "knowledge.production.access",
+    }
+    command.downgrade(config, "20260814_0023")
+    connection.commit()
+    assert (
+        connection.scalar(
+            text(
+                f"""
+                SELECT count(*)
+                FROM "{schema}".role_permission_grants
+                WHERE workspace_id = '20000000-0000-4000-8000-000000000424'::uuid
+                  AND role_id = '70000000-0000-4000-8000-000000000424'::uuid
+                  AND permission_code IN (
+                    'knowledge.base.read', 'knowledge.document.read',
+                    'knowledge.ingestion.read', 'knowledge.ingestion.retry',
+                    'knowledge.production.access'
+                  )
+                """
+            )
+        )
+        == 5
+    )
 
 
 def test_existing_clean_upload_is_backfilled_as_queued_ingestion_job(
