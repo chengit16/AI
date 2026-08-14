@@ -6,7 +6,6 @@ import type { IngestionJob } from "@/api/services/knowledge";
 import { StateView } from "@/components/StateView/StateView";
 
 import { formatTimestamp, ingestionStatus } from "../config";
-import styles from "../KnowledgeProductionPage.module.css";
 
 interface IngestionTableProps {
   items: readonly IngestionJob[];
@@ -16,6 +15,7 @@ interface IngestionTableProps {
   onRetry: (ingestionJobId: string) => void;
 }
 
+/** 展示解析任务状态、脱敏失败定位和后端允许的人工重试入口。 */
 export function IngestionTable({
   items,
   isLoading,
@@ -28,9 +28,13 @@ export function IngestionTable({
       title: "来源",
       key: "source",
       render: (_, record) => (
-        <div className={styles.primaryCell}>
-          <strong>{record.source_name}</strong>
-          <span>{record.source_media_type}</span>
+        <div className="grid min-w-0 gap-[3px]">
+          <strong className="overflow-hidden text-ellipsis whitespace-nowrap">
+            {record.source_name}
+          </strong>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
+            {record.source_media_type}
+          </span>
         </div>
       ),
     },
@@ -55,12 +59,14 @@ export function IngestionTable({
       key: "result",
       render: (_, record) =>
         record.status === "failed" ? (
-          <div className={styles.failureCell}>
-            <strong>{record.error_code ?? "UNKNOWN"}</strong>
-            <span>{record.error_message ?? "未提供错误详情"}</span>
+          <div className="grid max-w-[360px] min-w-0 gap-[3px]">
+            <strong className="text-xs text-danger-text">{record.error_code ?? "UNKNOWN"}</strong>
+            <span className="overflow-hidden text-ellipsis whitespace-normal text-xs text-text-muted">
+              {record.error_message ?? "未提供错误详情"}
+            </span>
           </div>
         ) : (
-          <span className={styles.muted}>
+          <span className="text-xs text-text-muted">
             {record.block_count === null ? "等待处理" : `${record.block_count} 个内容块`}
           </span>
         ),
@@ -88,7 +94,7 @@ export function IngestionTable({
           </Button>
         ) : record.status === "failed" ? (
           <Tooltip title="内容或格式错误需要修复后上传新版本">
-            <span className={styles.muted}>不可重试</span>
+            <span className="text-xs text-text-muted">不可重试</span>
           </Tooltip>
         ) : null,
     },

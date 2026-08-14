@@ -4,8 +4,6 @@ import { Plus, Trash2 } from "lucide-react";
 import type { components } from "@/api/generated/platform-api.v1";
 import type { CreateAiRuntimeConfigRequest, ModelProvider } from "@/api/services/platformModels";
 
-import styles from "../PlatformModelsPage.module.css";
-
 type RuntimeComponents = components["schemas"]["RuntimeComponentVersionsSchema"];
 type GatewayPolicy = components["schemas"]["GatewayPolicySchema"];
 type RuntimeRoute = components["schemas"]["RuntimeRouteRequest"];
@@ -52,6 +50,11 @@ const initialPolicy: GatewayPolicy = {
   max_estimated_cost_microunits: 5_000_000,
 };
 
+/**
+ * 创建新的不可变运行配置版本。
+ *
+ * 路由、成本策略与组件版本在提交后由服务端冻结；弹窗关闭只代表本地表单流程结束。
+ */
 export function RuntimeDialog({
   open,
   providers,
@@ -97,7 +100,7 @@ export function RuntimeDialog({
           ],
         }}
       >
-        <div className={styles.formGrid}>
+        <div className="grid grid-cols-2 gap-x-4 form-down:grid-cols-1">
           <Form.Item
             label="版本名称"
             name="display_name"
@@ -106,7 +109,7 @@ export function RuntimeDialog({
             <Input autoFocus placeholder="例如：本地 MVP 主备路由" />
           </Form.Item>
           <Form.Item
-            className={styles.formWide}
+            className="col-span-full form-down:col-auto"
             label="系统 Prompt 模板"
             name="system_prompt_template"
             rules={[{ required: true }, { max: 16000 }]}
@@ -117,8 +120,8 @@ export function RuntimeDialog({
 
         <Form.List name="routes">
           {(fields, { add, remove }) => (
-            <section className={styles.formSection} aria-label="模型路由">
-              <div className={styles.formSectionHeading}>
+            <section className="mb-4 border-t border-t-solid border-border" aria-label="模型路由">
+              <div className="flex min-h-[52px] items-center justify-between gap-3">
                 <strong>模型路由</strong>
                 <Button
                   type="text"
@@ -137,7 +140,10 @@ export function RuntimeDialog({
                 </Button>
               </div>
               {fields.map((field) => (
-                <div className={styles.routeRow} key={field.key}>
+                <div
+                  className="relative grid grid-cols-[1.1fr_1.1fr_88px_1.25fr_1fr_1fr_44px] gap-3 border-t border-t-solid border-border-soft pt-3 compact-down:grid-cols-2 form-down:!grid-cols-1"
+                  key={field.key}
+                >
                   <Form.Item
                     label="供应商"
                     name={[field.name, "provider_id"]}
@@ -157,7 +163,7 @@ export function RuntimeDialog({
                     name={[field.name, "priority"]}
                     rules={[{ required: true }]}
                   >
-                    <InputNumber min={1} max={8} precision={0} />
+                    <InputNumber className="!w-full" min={1} max={8} precision={0} />
                   </Form.Item>
                   <Form.Item
                     label="能力"
@@ -178,13 +184,13 @@ export function RuntimeDialog({
                     label="输入价（微元/百万 Token）"
                     name={[field.name, "input_price_microunits_per_million_tokens"]}
                   >
-                    <InputNumber min={0} precision={0} />
+                    <InputNumber className="!w-full" min={0} precision={0} />
                   </Form.Item>
                   <Form.Item
                     label="输出价（微元/百万 Token）"
                     name={[field.name, "output_price_microunits_per_million_tokens"]}
                   >
-                    <InputNumber min={0} precision={0} />
+                    <InputNumber className="!w-full" min={0} precision={0} />
                   </Form.Item>
                   <Button
                     type="text"
@@ -207,7 +213,7 @@ export function RuntimeDialog({
               key: "policy",
               label: "超时、熔断与成本策略",
               children: (
-                <div className={styles.policyGrid}>
+                <div className="grid grid-cols-2 gap-x-4 form-down:grid-cols-1">
                   {[
                     ["attempt_timeout_ms", "单次超时（ms）"],
                     ["total_timeout_ms", "总超时（ms）"],
@@ -225,11 +231,11 @@ export function RuntimeDialog({
                       name={["policy", key]}
                       rules={[{ required: true }]}
                     >
-                      <InputNumber min={1} precision={0} />
+                      <InputNumber className="!w-full" min={1} precision={0} />
                     </Form.Item>
                   ))}
                   <Form.Item
-                    className={styles.formWide}
+                    className="col-span-full form-down:col-auto"
                     label="规则降级文案"
                     name={["policy", "rule_degradation_message"]}
                   >
@@ -242,7 +248,7 @@ export function RuntimeDialog({
               key: "components",
               label: "知识运行组件版本",
               children: (
-                <div className={styles.policyGrid}>
+                <div className="grid grid-cols-2 gap-x-4 form-down:grid-cols-1">
                   {[
                     ["chunking", "切片"],
                     ["embedding", "Embedding"],

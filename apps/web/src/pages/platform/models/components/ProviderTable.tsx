@@ -6,7 +6,6 @@ import type { ModelProvider } from "@/api/services/platformModels";
 import { StateView } from "@/components/StateView/StateView";
 
 import { capabilityLabels, policyStatus, probeStatus, providerStatus } from "../config";
-import styles from "../PlatformModelsPage.module.css";
 
 interface ProviderTableProps {
   items: readonly ModelProvider[];
@@ -17,6 +16,7 @@ interface ProviderTableProps {
   onAction: (providerId: string, action: "probe" | "activate" | "disable") => void;
 }
 
+/** 展示供应商接入、政策、探测与启停事实，并分发管理员治理动作。 */
 export function ProviderTable({
   items,
   isLoading,
@@ -30,9 +30,13 @@ export function ProviderTable({
       title: "供应商",
       key: "provider",
       render: (_, record) => (
-        <div className={styles.primaryCell}>
-          <strong>{record.display_name}</strong>
-          <span>{record.provider_key}</span>
+        <div className="grid min-w-0 gap-[3px]">
+          <strong className="overflow-hidden text-ellipsis whitespace-nowrap">
+            {record.display_name}
+          </strong>
+          <span className="max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
+            {record.provider_key}
+          </span>
         </div>
       ),
     },
@@ -40,9 +44,13 @@ export function ProviderTable({
       title: "接入",
       key: "endpoint",
       render: (_, record) => (
-        <div className={styles.primaryCell}>
-          <span>{record.base_url}</span>
-          <small>{record.probe_model_id}</small>
+        <div className="grid min-w-0 gap-[3px]">
+          <span className="max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
+            {record.base_url}
+          </span>
+          <small className="max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
+            {record.probe_model_id}
+          </small>
         </div>
       ),
     },
@@ -52,7 +60,7 @@ export function ProviderTable({
       key: "capabilities",
       width: 190,
       render: (values: ModelProvider["declared_capabilities"]) => (
-        <div className={styles.tags}>
+        <div className="flex flex-wrap items-center gap-1">
           {values.map((value) => (
             <Tag key={value}>{capabilityLabels[value]}</Tag>
           ))}
@@ -64,7 +72,7 @@ export function ProviderTable({
       key: "governance",
       width: 210,
       render: (_, record) => (
-        <div className={styles.tags}>
+        <div className="flex flex-wrap items-center gap-1">
           <Tag color={providerStatus[record.status].color}>
             {providerStatus[record.status].label}
           </Tag>

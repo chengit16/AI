@@ -1,3 +1,4 @@
+/** 知识生产页面编排，组合知识库导航、文档版本、入库任务和权限化操作入口。 */
 import { Button, Tabs } from "antd";
 import { Plus, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -13,9 +14,13 @@ import { DocumentTable } from "./components/DocumentTable";
 import { IngestionTable } from "./components/IngestionTable";
 import { KnowledgeBaseRail } from "./components/KnowledgeBaseRail";
 import { KnowledgeDialogs } from "./components/KnowledgeDialogs";
-import styles from "./KnowledgeProductionPage.module.css";
 import { useKnowledgeProduction } from "./useKnowledgeProduction";
 
+/**
+ * 展示当前空间的知识生产事实与可执行动作。
+ *
+ * 菜单权限只裁剪页面入口；文档范围、密级、状态流转和每个写操作仍由后端策略与事实状态校验。
+ */
 export default function KnowledgeProductionPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("base");
@@ -61,7 +66,7 @@ export default function KnowledgeProductionPage() {
           ) : undefined
         }
       />
-      <div className={styles.workspace}>
+      <div className="ui-surface-panel grid min-h-[540px] grid-cols-[minmax(220px,280px)_minmax(0,1fr)] overflow-hidden tablet-down:grid-cols-1">
         <KnowledgeBaseRail
           items={model.bases.data ?? []}
           selectedId={selectedId}
@@ -70,7 +75,10 @@ export default function KnowledgeProductionPage() {
           onCreate={() => setCreateOpen(true)}
           onSelect={(base) => setSearchParams({ base, view: activeTab })}
         />
-        <section className={styles.main} aria-label="知识库生产状态">
+        <section
+          className="min-w-0 px-5 pb-5 phone-down:px-3 phone-down:pb-3"
+          aria-label="知识库生产状态"
+        >
           {!selectedId ? (
             <StateView
               kind="empty"

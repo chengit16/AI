@@ -6,7 +6,6 @@ import type { AiRuntimeConfig } from "@/api/services/platformModels";
 import { StateView } from "@/components/StateView/StateView";
 
 import { formatTimestamp } from "../config";
-import styles from "../PlatformModelsPage.module.css";
 
 interface RuntimeTableProps {
   items: readonly AiRuntimeConfig[];
@@ -16,6 +15,7 @@ interface RuntimeTableProps {
   onActivate: (runtimeConfigVersionId: string) => void;
 }
 
+/** 展示不可变运行配置版本，并只对非当前版本提供发布入口。 */
 export function RuntimeTable({
   items,
   currentId,
@@ -28,9 +28,13 @@ export function RuntimeTable({
       title: "运行配置",
       key: "runtime",
       render: (_, record) => (
-        <div className={styles.primaryCell}>
-          <strong>{record.display_name}</strong>
-          <span>{record.runtime_config_version_id}</span>
+        <div className="grid min-w-0 gap-[3px]">
+          <strong className="overflow-hidden text-ellipsis whitespace-nowrap">
+            {record.display_name}
+          </strong>
+          <span className="max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
+            {record.runtime_config_version_id}
+          </span>
         </div>
       ),
     },
@@ -40,7 +44,7 @@ export function RuntimeTable({
       key: "version_number",
       width: 90,
       render: (value, record) => (
-        <div className={styles.tags}>
+        <div className="flex flex-wrap items-center gap-1">
           <span>V{value}</span>
           {record.runtime_config_version_id === currentId && <Tag color="success">当前</Tag>}
         </div>

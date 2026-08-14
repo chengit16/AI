@@ -7,8 +7,10 @@ import unoConfig from "../../uno.config";
 describe("UnoCSS 项目 Variant", () => {
   it.each([
     ["phone-down", 560],
+    ["form-down", 600],
     ["nav-mobile", 720],
     ["tablet-down", 820],
+    ["compact-down", 900],
     ["desktop-down", 1024],
   ])("为 %s 保留包含 %i px 的旧断点边界", async (variant, width) => {
     const generator = await createGenerator(unoConfig);

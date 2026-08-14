@@ -1,3 +1,4 @@
+/** 平台模型治理页面编排，组合供应商生命周期和不可变运行配置发布入口。 */
 import { Button, Tabs } from "antd";
 import { Cpu, Plus } from "lucide-react";
 import { useState } from "react";
@@ -11,9 +12,13 @@ import { ProviderDialogs } from "./components/ProviderDialogs";
 import { ProviderTable } from "./components/ProviderTable";
 import { RuntimeDialog } from "./components/RuntimeDialog";
 import { RuntimeTable } from "./components/RuntimeTable";
-import styles from "./PlatformModelsPage.module.css";
 import { usePlatformModels } from "./usePlatformModels";
 
+/**
+ * 展示平台级模型供应商和运行配置治理能力。
+ *
+ * 页面依赖平台管理员上下文改善体验，凭证、政策、探测和发布动作仍由服务端逐请求授权。
+ */
 export default function PlatformModelsPage() {
   const model = usePlatformModels();
   const [activeTab, setActiveTab] = useState("providers");
@@ -66,7 +71,10 @@ export default function PlatformModelsPage() {
           )
         }
       />
-      <section className={styles.tableSection} aria-label="平台模型治理">
+      <section
+        className="ui-surface-panel overflow-hidden px-5 pb-5 form-down:px-3 form-down:pb-3"
+        aria-label="平台模型治理"
+      >
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}

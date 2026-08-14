@@ -6,7 +6,6 @@ import type { IngestionJob, KnowledgeDocumentSummary } from "@/api/services/know
 import { StateView } from "@/components/StateView/StateView";
 
 import { documentStatus, formatTimestamp, securityLevelLabels, visibilityLabels } from "../config";
-import styles from "../KnowledgeProductionPage.module.css";
 
 interface DocumentTableProps {
   items: readonly KnowledgeDocumentSummary[];
@@ -21,6 +20,11 @@ interface DocumentTableProps {
   onPublish: (document: KnowledgeDocumentSummary) => void;
 }
 
+/**
+ * 展示文档最新版本及允许的发布动作。
+ *
+ * 操作按钮只依据页面权限和服务端状态快照裁剪，后端仍需校验版本状态、内容摘要和资源范围。
+ */
 export function DocumentTable({
   items,
   jobs,
@@ -39,9 +43,13 @@ export function DocumentTable({
       title: "文档",
       key: "document",
       render: (_, record) => (
-        <div className={styles.primaryCell}>
-          <strong>{record.title}</strong>
-          <span>{record.source_name}</span>
+        <div className="grid min-w-0 gap-[3px]">
+          <strong className="overflow-hidden text-ellipsis whitespace-nowrap">
+            {record.title}
+          </strong>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
+            {record.source_name}
+          </span>
         </div>
       ),
     },
@@ -52,9 +60,9 @@ export function DocumentTable({
       render: (_, record) => {
         const status = documentStatus[record.latest_version.status];
         return (
-          <div className={styles.versionCell}>
+          <div className="flex items-center gap-2">
             <Tag color={status.color}>{status.label}</Tag>
-            <span>V{record.latest_version.version_number}</span>
+            <span className="text-xs text-text-muted">V{record.latest_version.version_number}</span>
           </div>
         );
       },
@@ -64,9 +72,11 @@ export function DocumentTable({
       key: "scope",
       width: 150,
       render: (_, record) => (
-        <div className={styles.compactCell}>
+        <div className="grid min-w-0 gap-[3px]">
           <span>{visibilityLabels[record.visibility]}</span>
-          <small>{securityLevelLabels[record.security_level]}</small>
+          <small className="text-xs text-text-muted">
+            {securityLevelLabels[record.security_level]}
+          </small>
         </div>
       ),
     },
@@ -95,7 +105,7 @@ export function DocumentTable({
             ]
           : [];
         return (
-          <div className={styles.rowActions}>
+          <div className="flex items-center gap-2">
             {record.latest_version.status === "draft" && readyHash && canMarkReady && (
               <Button
                 type="text"

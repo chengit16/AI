@@ -24,6 +24,9 @@
   --color-status-foreground: #f5fbf8;
   --color-status-label: #bed1ca;
   --color-status-detail: #d5e1dc;
+  --color-surface-subtle: #f8faf9;
+  --color-brand-border: #bad6ca;
+  --color-danger-text: #a43c32;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
