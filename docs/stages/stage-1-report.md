@@ -371,6 +371,17 @@
 - 建设顺序：新增 `P1S-01`～`P1S-05`，依次完成工具与 Token、公共壳层、普通页面、复杂页面和最终清理验收。迁移轨道可与 `P1E-01`～`P1E-05` 后端建设并行，但必须在 `P1E-06` 和 `P1F-05` 新页面前完成。
 - 验收：ADR、总体设计、前端规范、UI/UX 基线、阶段计划、进度看板和协作规则已同步；`git diff --check` 通过。本节点不安装依赖、不修改 Vite 配置和运行时代码，因此不宣称 UnoCSS 集成或页面迁移已经通过。
 - 当前边界：本节点不改变主色调、字体、暗色模式、页面业务、菜单权限、接口或后端实现；实施和视觉结果进入 `P1S-01`～`P1S-05`。
+- 提交：`31cd699`。
+
+### P1S-01 UnoCSS 工具链与 Token
+
+- 状态：通过。
+- 依赖与装配：固定 UnoCSS `66.7.5` 和 clsx `2.1.1`；Vite 统一加载 UnoCSS 官方插件，浏览器入口在 Token 与全局规则后装载 `virtual:uno.css`。本节点保留全部既有 CSS Module，不改变页面 DOM、业务或视觉样式。
+- 配置边界：新增唯一 `apps/web/uno.config.ts`，使用 `presetWind3({ preflight: false })`；固定 `560/600/720/820/900/1024px` 项目断点、移动横屏复合 Variant、语义颜色/圆角和三个基础 Shortcut。不启用 Attributify 或 UnoCSS 图标预设，Safelist 当前为空。
+- 条件类名：新增 `cn()` 统一组合静态与条件类名，并在 JSDoc 中明确禁止运行时拼接 Utility。单元测试覆盖静态、条件和嵌套类名组合。
+- 自动门禁：新增 `scripts/check-frontend-styles.mjs` 及 `3/3` 反例测试，检查唯一配置、Preflight、禁用预设、Vite/虚拟样式入口和 TypeScript AST 中的动态 Utility 模板；检查已经接入 `./scripts/verify`，不会把注释中的反例误判为代码。
+- 验收：Prettier、ESLint、TypeScript、Vitest `12/12`、Vite 生产构建及 Python `306/306` 统一门禁通过；PostgreSQL、MinIO、Tika 等真实本地依赖集成测试均通过。由于尚未使用 Utility，生产 CSS 文件名和体积保持旧页面基线，证明仅接入插件没有改写现有页面样式。
+- 当前边界：本节点不迁移公共组件或页面，不删除 CSS Module，不调整主色调、字体和 Ant Design Theme；这些分别进入 `P1S-02`～`P1S-05`。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制

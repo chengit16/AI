@@ -64,6 +64,10 @@ log "检查 Python 与 React 模块依赖"
 node scripts/check-frontend-architecture.mjs
 node --test scripts/check-frontend-architecture.test.mjs
 
+log "检查 UnoCSS 样式架构"
+node scripts/check-frontend-styles.mjs
+node --test scripts/check-frontend-styles.test.mjs
+
 log "检查契约兼容性"
 "${PYTHON[@]}" scripts/check_contract_compatibility.py "${AI_PLATFORM_CONTRACT_BASE_REF:-HEAD}"
 

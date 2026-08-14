@@ -20,18 +20,19 @@ pnpm verify
 
 ## 2. 当前自动门禁
 
-| 检查 | 实现 | 当前能力 |
-| --- | --- | --- |
-| Git Diff | `git diff --check`、`git diff --cached --check` | 同时检查未暂存与已暂存改动，阻止空白错误和冲突标记进入节点提交 |
-| 仓库安全 | `scripts/check_repository_policy.py` | 检查跟踪/待跟踪文件及完整 Git 历史中的敏感后缀、私钥头和常见真实令牌模式，定位时不输出凭证正文 |
-| 契约生成 | `scripts/generate_contract_types.py --check` | 固定生成 React TypeScript 与 Python `TypedDict` 消费类型，拒绝生成产物漂移 |
-| 供应链状态 | `scripts/check_release_readiness.py` | 开发门禁校验本地可执行项；正式发布门禁额外要求镜像扫描和 Linux 验收证据 |
-| Python 架构 | `scripts/check_architecture.py` | 正式领域分层目录出现后自动检查 Domain、Application、API 与 Infrastructure 依赖方向 |
-| React 架构 | `scripts/check-frontend-architecture.mjs` | 解析静态 Import、再导出和字符串动态 Import，阻止公共层反向依赖页面等违规关系 |
-| 契约漂移 | `tests/contract/test_contracts.py` | FastAPI 完整 OpenAPI 输出必须与仓库基线一致；JSON Schema 和 Golden Fixtures 必须有效 |
-| 契约兼容 | `scripts/check_contract_compatibility.py` | 相对指定 Git 基线检查文件删除、路径/操作/响应删除、属性删除、类型变化、枚举收紧和新增必填字段 |
-| Web 质量 | pnpm scripts | Prettier、ESLint、TypeScript、Vitest 和生产构建 |
-| Python 质量 | uv tools | Ruff 格式、Ruff Lint、mypy strict 和完整 pytest |
+| 检查            | 实现                                            | 当前能力                                                                                       |
+| --------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Git Diff        | `git diff --check`、`git diff --cached --check` | 同时检查未暂存与已暂存改动，阻止空白错误和冲突标记进入节点提交                                 |
+| 仓库安全        | `scripts/check_repository_policy.py`            | 检查跟踪/待跟踪文件及完整 Git 历史中的敏感后缀、私钥头和常见真实令牌模式，定位时不输出凭证正文 |
+| 契约生成        | `scripts/generate_contract_types.py --check`    | 固定生成 React TypeScript 与 Python `TypedDict` 消费类型，拒绝生成产物漂移                     |
+| 供应链状态      | `scripts/check_release_readiness.py`            | 开发门禁校验本地可执行项；正式发布门禁额外要求镜像扫描和 Linux 验收证据                        |
+| Python 架构     | `scripts/check_architecture.py`                 | 正式领域分层目录出现后自动检查 Domain、Application、API 与 Infrastructure 依赖方向             |
+| React 架构      | `scripts/check-frontend-architecture.mjs`       | 解析静态 Import、再导出和字符串动态 Import，阻止公共层反向依赖页面等违规关系                   |
+| UnoCSS 样式架构 | `scripts/check-frontend-styles.mjs`             | 固定唯一配置、关闭 Preflight、禁止额外预设和动态 Utility 拼接，保证生产构建可静态提取          |
+| 契约漂移        | `tests/contract/test_contracts.py`              | FastAPI 完整 OpenAPI 输出必须与仓库基线一致；JSON Schema 和 Golden Fixtures 必须有效           |
+| 契约兼容        | `scripts/check_contract_compatibility.py`       | 相对指定 Git 基线检查文件删除、路径/操作/响应删除、属性删除、类型变化、枚举收紧和新增必填字段  |
+| Web 质量        | pnpm scripts                                    | Prettier、ESLint、TypeScript、Vitest 和生产构建                                                |
+| Python 质量     | uv tools                                        | Ruff 格式、Ruff Lint、mypy strict 和完整 pytest                                                |
 
 架构检查采用渐进生效：当前阶段 0 的过渡文件不会因为目标目录尚未建立而被迫重排；阶段 1 创建正式目录后，新增违规 Import 会立即失败。
 
