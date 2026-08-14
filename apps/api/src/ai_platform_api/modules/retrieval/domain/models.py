@@ -21,6 +21,8 @@ class AuthorizedSearchScope:
     visibilities: frozenset[Visibility]
     security_levels: frozenset[SecurityLevel]
     field_mask: frozenset[str] = frozenset()
+    private_document_ids: frozenset[UUID] = frozenset()
+    allow_all_departments: bool = False
 
     def __post_init__(self) -> None:
         if not self.index_version_ids:
@@ -28,7 +30,7 @@ class AuthorizedSearchScope:
         if not self.visibilities or not self.security_levels:
             raise ValueError("授权检索范围必须包含可见性和密级条件")
         # 私有文档不能只依赖工作空间隔离，策略必须明确给出当前主体可读的文档集合。
-        if "private" in self.visibilities and self.document_ids is None:
+        if "private" in self.visibilities and not self.private_document_ids:
             raise ValueError("私有文档检索必须包含明确的文档授权范围")
 
     @property
@@ -72,6 +74,9 @@ class StoredChunk:
     content: str
     content_hash: str
     source_position: dict[str, object]
+    department_ids: tuple[UUID, ...] = ()
+    visibility: Visibility = "workspace"
+    security_level: SecurityLevel = "INTERNAL"
 
     def apply_field_mask(self, field_mask: frozenset[str]) -> "StoredChunk":
         """正文受限时由调用方整体拒绝；可独立隐藏的来源元数据在离开责任模块前清空。"""

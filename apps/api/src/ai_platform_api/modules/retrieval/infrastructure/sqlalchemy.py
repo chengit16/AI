@@ -23,19 +23,33 @@ def scope_conditions(scope: AuthorizedSearchScope) -> tuple[ColumnElement[bool],
         retrieval_chunks.c.workspace_id == scope.workspace_id,
         retrieval_chunks.c.active.is_(True),
         retrieval_chunks.c.index_version_id.in_(scope.index_version_ids),
-        retrieval_chunks.c.visibility.in_(scope.visibilities),
         retrieval_chunks.c.security_level.in_(scope.security_levels),
     ]
     if scope.knowledge_base_ids is not None:
         conditions.append(retrieval_chunks.c.knowledge_base_id.in_(scope.knowledge_base_ids))
     if scope.document_ids is not None:
         conditions.append(retrieval_chunks.c.document_id.in_(scope.document_ids))
-    conditions.append(
-        or_(
-            retrieval_chunks.c.visibility != "departments",
-            retrieval_chunks.c.department_ids.overlap(list(scope.department_ids)),
+    visibility_conditions: list[ColumnElement[bool]] = []
+    if "public" in scope.visibilities:
+        visibility_conditions.append(retrieval_chunks.c.visibility == "public")
+    if "workspace" in scope.visibilities:
+        visibility_conditions.append(retrieval_chunks.c.visibility == "workspace")
+    if "departments" in scope.visibilities:
+        department_condition = retrieval_chunks.c.visibility == "departments"
+        if not scope.allow_all_departments:
+            department_condition = and_(
+                department_condition,
+                retrieval_chunks.c.department_ids.overlap(list(scope.department_ids)),
+            )
+        visibility_conditions.append(department_condition)
+    if "private" in scope.visibilities:
+        visibility_conditions.append(
+            and_(
+                retrieval_chunks.c.visibility == "private",
+                retrieval_chunks.c.document_id.in_(scope.private_document_ids),
+            )
         )
-    )
+    conditions.append(or_(*visibility_conditions))
     return tuple(conditions)
 
 
@@ -53,6 +67,9 @@ def stored_chunk(mapping: RowMapping) -> StoredChunk:
         content=mapping["content"],
         content_hash=mapping["content_hash"],
         source_position=mapping["source_position"],
+        department_ids=tuple(mapping["department_ids"]),
+        visibility=mapping["visibility"],
+        security_level=mapping["security_level"],
     )
 
 
@@ -115,6 +132,9 @@ class SqlAlchemySearchIndex:
         keyword_query: str,
         limit: int,
     ) -> tuple[ChannelCandidate, ...]:
+        # 标点等无有效 Token 的问题仍可进入向量通道，不把空字符串交给 PostgreSQL 解析。
+        if not keyword_query:
+            return ()
         parsed_query = func.to_tsquery("simple", keyword_query)
         rank_score = func.ts_rank_cd(retrieval_chunks.c.keyword_vector, parsed_query).label("score")
         rows = (

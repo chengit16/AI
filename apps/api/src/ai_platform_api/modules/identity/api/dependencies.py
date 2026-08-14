@@ -211,6 +211,7 @@ def _authorize_registered_operation(request: Request, context: RequestContext) -
         authorized_account_ids=decision.resource_scope.account_ids,
         authorized_resource_ids=decision.resource_scope.resource_ids,
         authorized_field_mask=decision.field_mask,
+        authorized_maximum_security_level=decision.maximum_security_level,
     )
 
 

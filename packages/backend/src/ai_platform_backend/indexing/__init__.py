@@ -7,10 +7,12 @@ from ai_platform_backend.indexing.domain import (
     IndexArtifactStorage,
     IndexVersionStore,
 )
+from ai_platform_backend.indexing.embeddings import DeterministicHashEmbeddingAdapter
 
 __all__ = [
     "BuiltIndexChunk",
     "ClaimedIndexVersion",
+    "DeterministicHashEmbeddingAdapter",
     "EmbeddingAdapter",
     "IndexArtifactStorage",
     "IndexVersionStore",

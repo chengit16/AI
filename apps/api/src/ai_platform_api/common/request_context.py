@@ -1,9 +1,15 @@
 """承载认证层建立的可信主体、工作空间、策略范围和 Trace 上下文。"""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from ai_platform_api.common.trace import TraceContext
+
+if TYPE_CHECKING:
+    from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 
 
 @dataclass(frozen=True)
@@ -23,6 +29,7 @@ class RequestContext:
     authorized_account_ids: frozenset[UUID] = frozenset()
     authorized_resource_ids: frozenset[UUID] = frozenset()
     authorized_field_mask: frozenset[str] = frozenset()
+    authorized_maximum_security_level: SecurityLevel = "PUBLIC"
 
     @classmethod
     def trusted(
@@ -35,7 +42,7 @@ class RequestContext:
         authentication_method: str = "test",
         credential_scopes: frozenset[str] | None = None,
         request_id: UUID | None = None,
-    ) -> "RequestContext":
+    ) -> RequestContext:
         return cls(
             request_id=request_id or uuid4(),
             trace=trace,

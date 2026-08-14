@@ -5,6 +5,7 @@ from typing import Literal, Protocol
 from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 
 Decision = Literal["allow", "deny", "approval_required"]
 DataScopeType = Literal["workspace", "department_tree", "self", "resource"]
@@ -56,6 +57,7 @@ class PolicyDecision:
     policy_version: int
     cache_ttl_seconds: int
     reason: str
+    maximum_security_level: SecurityLevel = "PUBLIC"
 
     @property
     def allowed(self) -> bool:

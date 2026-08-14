@@ -143,6 +143,7 @@ class RbacPolicyDecisionPoint:
             policy_version=subject.role_version,
             cache_ttl_seconds=0 if high_risk or sensitive else 30,
             reason="role_permission_granted",
+            maximum_security_level=maximum_security_level,
         )
 
     def _field_access(
@@ -216,6 +217,7 @@ class RbacPolicyDecisionPoint:
             policy_version=policy_version,
             cache_ttl_seconds=0,
             reason=reason,
+            maximum_security_level="PUBLIC",
         )
 
 

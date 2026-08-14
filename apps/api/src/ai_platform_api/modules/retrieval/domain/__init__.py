@@ -9,6 +9,11 @@ from ai_platform_api.modules.retrieval.domain.models import (
     RetrievalResult,
     SearchCandidate,
 )
+from ai_platform_api.modules.retrieval.domain.planning import (
+    RetrievalCandidateSnapshot,
+    RetrievalPlannerBudget,
+    RetrievalPlanSnapshot,
+)
 
 __all__ = [
     "AuthorizedSearchScope",
@@ -16,6 +21,9 @@ __all__ = [
     "Evidence",
     "IndexedChunk",
     "RetrievalBudget",
+    "RetrievalCandidateSnapshot",
+    "RetrievalPlanSnapshot",
+    "RetrievalPlannerBudget",
     "RetrievalResult",
     "SearchCandidate",
 ]

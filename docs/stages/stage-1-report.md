@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1E-02` 权限前过滤与混合检索待开始 |
+| 当前节点 | `P1E-03` 重排精读与引用验证待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -476,6 +476,19 @@
 - 自动验收：P1E PostgreSQL/HTTP 专项 `2/2`，Migration、资源注册表、Worker Revision 与应用装配联合回归 `25/25`。统一 `./scripts/verify` 全部通过，包括 React `21/21`、Python `322/322`、Ruff、mypy strict（347 个源文件）、格式、类型、生产构建、注释、UnoCSS、架构、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链和契约兼容检查。
 - 容器验收：重建 API、Worker、Web 与 Migration 镜像后，公共数据库从 `20260815_0025` 正常推进到 `20260815_0026`；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项诊断全部通过。
 - 当前边界：模型调用、权限前过滤、查询改写、混合检索、重排、精读、引用验证和 SSE 仍按计划进入 `P1E-02`～`P1E-05`；不引入 Durable Run、Channel Gateway、多模态图片问答或真实多源连接器。
+- 提交：`4636658`。
+
+### P1E-02 权限前过滤与有界混合检索
+
+- 状态：通过。
+- 共享组件：将 Worker 原有确定性 Hash Embedding Adapter 上移到共享后端包，固定 `deterministic-hash-1024-v1` 与 1024 维；API 和 Worker 通过同一实现生成索引/查询向量，保留后续替换真实 Embedding 服务的端口。
+- 查询规划：新增确定性查询分类（`exact_lookup`、`summary`、`comparison`、`knowledge`）和 NFKC/空白规范化；原问题最多追加两个聚焦变体，预算固定为最多 3 个变体、6 次搜索操作、每通道 10 个候选、最终 20 个候选和 2 秒总耗时。变体生成不调用模型，保证本地可复现并便于后续替换。
+- 权限前过滤：可信 `RequestContext` 增加 PDP 返回的最高密级；检索范围先按当前工作空间、活动索引、冻结 Embedding 版本、活动文档、可见性、私有文档创建者、部门/资源范围和密级收敛，再执行关键词与向量搜索。不同授权 Grant 组成并集时使用精确索引 ID，避免资源范围被错误做成交集；候选融合后再次校验工作空间、索引、文档、可见性、部门和密级条件。
+- 混合检索与快照：每个变体固定执行关键词和向量两个通道，沿用 `hybrid-rrf-v1` 的 RRF；超出候选、操作或时间预算时失败关闭，不返回宽松的部分结果。计划、查询变体和候选快照只追加，候选只保存 Chunk/文档/版本标识、Hash、来源位置和分数，不复制正文；字段策略在快照前投影，正文被遮罩时整体拒绝。数据库触发器拒绝计划、变体和候选的更新/删除。
+- 数据与装配：新增 `retrieval_plans`、`retrieval_query_variants`、`retrieval_candidate_snapshots`，Revision 推进至 `20260815_0027`；应用容器装配检索规划服务、共享 Embedding Adapter 和 PostgreSQL Unit of Work，FastAPI 状态暴露内部服务供后续 `P1E-06` 问答页面接入。本节点不新增 HTTP 问答接口。
+- 自动验收：P1E-02 单元专项 `6/6`；PostgreSQL 权限前过滤、跨空间隔离、私有/密级过滤、字段投影、重试稳定性和不可变触发器专项 `1/1`；Migration 往返 `3/3`，既有 P0-08 检索回归 `5/5`。统一 `./scripts/verify` 全部通过，React `21/21`、Python `329/329`、Ruff、mypy strict（354 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建均通过。
+- 容器与环境：本地 PostgreSQL 集成使用随机 Schema 和全合成个人空间数据；重建 API、Worker、Web 与 Migration 镜像后，公共数据库正常推进至 `20260815_0027`，Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项诊断全部通过。没有真实模型供应商、Linux 宿主机或容量压测机，因此真实语义质量、百万 Chunk 和完整并发认证继续保持 `not_configured`/`not_run`。
+- 当前边界：本节点不实现 Reranker、FastPass、来源排序、受控全文精读、引用验证、SSE 问答输出或模型调用；这些按 `P1E-03`～`P1E-05` 进入。仍不引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -487,4 +500,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-01`，当前进入 `P1E-02`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-02`，当前进入 `P1E-03`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。

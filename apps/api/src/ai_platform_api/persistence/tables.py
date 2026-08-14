@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
+    Float,
     ForeignKeyConstraint,
     Index,
     Integer,
@@ -1872,6 +1873,138 @@ Index(
     assistant_runs.c.conversation_id,
     unique=True,
     postgresql_where=assistant_runs.c.status.in_(("queued", "running")),
+)
+
+retrieval_plans = Table(
+    "retrieval_plans",
+    metadata,
+    Column("retrieval_plan_id", UUID(as_uuid=True), primary_key=True),
+    Column("run_id", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("original_query_hash", String(64), nullable=False),
+    Column("classification", String(32), nullable=False),
+    Column("strategy_version", String(128), nullable=False),
+    Column("policy_decision_id", UUID(as_uuid=True), nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("maximum_security_level", String(32), nullable=False),
+    Column("field_mask", ARRAY(String(128)), nullable=False),
+    Column("embedding_model_version", String(255), nullable=False),
+    Column("tokenizer_version", String(128), nullable=False),
+    Column("max_query_characters", Integer, nullable=False),
+    Column("max_query_variants", Integer, nullable=False),
+    Column("max_search_operations", Integer, nullable=False),
+    Column("per_channel_candidates", Integer, nullable=False),
+    Column("final_candidate_limit", Integer, nullable=False),
+    Column("rrf_constant", Integer, nullable=False),
+    Column("max_elapsed_ms", Integer, nullable=False),
+    Column("search_operation_count", Integer, nullable=False),
+    Column("keyword_candidate_count", Integer, nullable=False),
+    Column("vector_candidate_count", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    Column("duration_ms", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["run_id"],
+        [f"{SCHEMA_TOKEN}.assistant_runs.run_id"],
+        name="fk_retrieval_plans_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_retrieval_plans_requester",
+    ),
+    CheckConstraint(
+        "original_query_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_retrieval_plans_query_hash",
+    ),
+    CheckConstraint(
+        "classification IN ('exact_lookup', 'summary', 'comparison', 'knowledge')",
+        name="ck_retrieval_plans_classification",
+    ),
+    CheckConstraint(
+        "maximum_security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
+        name="ck_retrieval_plans_security_level",
+    ),
+    CheckConstraint("policy_version >= 1", name="ck_retrieval_plans_policy_version"),
+    CheckConstraint(
+        "max_query_characters >= 1 AND max_query_variants >= 1 "
+        "AND max_search_operations >= 1 AND per_channel_candidates >= 1 "
+        "AND final_candidate_limit >= 1 AND rrf_constant >= 1 AND max_elapsed_ms >= 1",
+        name="ck_retrieval_plans_budget",
+    ),
+    CheckConstraint(
+        "search_operation_count >= 0 AND keyword_candidate_count >= 0 "
+        "AND vector_candidate_count >= 0 AND duration_ms >= 0",
+        name="ck_retrieval_plans_metrics",
+    ),
+    CheckConstraint("status = 'completed'", name="ck_retrieval_plans_status"),
+)
+Index(
+    "ix_retrieval_plans_workspace_time",
+    retrieval_plans.c.workspace_id,
+    retrieval_plans.c.created_at,
+)
+
+retrieval_query_variants = Table(
+    "retrieval_query_variants",
+    metadata,
+    Column("retrieval_plan_id", UUID(as_uuid=True), primary_key=True),
+    Column("sequence_no", Integer, primary_key=True),
+    Column("kind", String(32), nullable=False),
+    Column("query_text", Text, nullable=False),
+    Column("query_hash", String(64), nullable=False),
+    ForeignKeyConstraint(
+        ["retrieval_plan_id"],
+        [f"{SCHEMA_TOKEN}.retrieval_plans.retrieval_plan_id"],
+        name="fk_retrieval_query_variants_plan",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("sequence_no >= 1", name="ck_retrieval_query_variants_sequence"),
+    CheckConstraint("kind IN ('original', 'focused')", name="ck_retrieval_query_variants_kind"),
+    CheckConstraint(
+        "char_length(btrim(query_text)) BETWEEN 1 AND 4000",
+        name="ck_retrieval_query_variants_text",
+    ),
+    CheckConstraint(
+        "query_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_retrieval_query_variants_hash",
+    ),
+)
+
+retrieval_candidate_snapshots = Table(
+    "retrieval_candidate_snapshots",
+    metadata,
+    Column("retrieval_plan_id", UUID(as_uuid=True), primary_key=True),
+    Column("rank", Integer, primary_key=True),
+    Column("chunk_id", UUID(as_uuid=True), nullable=False),
+    Column("index_version_id", UUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", UUID(as_uuid=True), nullable=False),
+    Column("document_id", UUID(as_uuid=True), nullable=False),
+    Column("document_version_id", UUID(as_uuid=True), nullable=False),
+    Column("content_hash", String(64), nullable=False),
+    Column("source_position", JSONB, nullable=False),
+    Column("score", Float, nullable=False),
+    Column("query_hit_count", Integer, nullable=False),
+    Column("keyword_hit_count", Integer, nullable=False),
+    Column("vector_hit_count", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["retrieval_plan_id"],
+        [f"{SCHEMA_TOKEN}.retrieval_plans.retrieval_plan_id"],
+        name="fk_retrieval_candidate_snapshots_plan",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("rank >= 1", name="ck_retrieval_candidate_snapshots_rank"),
+    CheckConstraint(
+        "content_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_retrieval_candidate_snapshots_hash",
+    ),
+    CheckConstraint(
+        "score >= 0 AND query_hit_count >= 1 AND keyword_hit_count >= 0 AND vector_hit_count >= 0",
+        name="ck_retrieval_candidate_snapshots_metrics",
+    ),
 )
 
 stream_runs = Table(

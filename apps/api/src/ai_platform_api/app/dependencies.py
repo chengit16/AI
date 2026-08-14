@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ai_platform_backend.indexing.embeddings import DeterministicHashEmbeddingAdapter
+
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.config import Settings
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
@@ -98,6 +100,12 @@ from ai_platform_api.modules.model_gateway.infrastructure.runtime_sqlalchemy imp
     SqlAlchemyRuntimeInvocationStore,
 )
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
+from ai_platform_api.modules.retrieval.application.planning import (
+    BoundedRetrievalPlanningService,
+)
+from ai_platform_api.modules.retrieval.infrastructure.planning_sqlalchemy import (
+    SqlAlchemyRetrievalPlanningUnitOfWork,
+)
 from ai_platform_api.persistence.database import PlatformDatabase
 
 
@@ -130,6 +138,7 @@ class ApplicationContainer:
     ai_runtime_configurations: AiRuntimeConfigurationService | None = None
     model_runtime: RuntimeModelGatewayService | None = None
     assistant_conversations: AssistantConversationService | None = None
+    retrieval_planning: BoundedRetrievalPlanningService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -211,6 +220,13 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     assistant_conversations = AssistantConversationService(
         SqlAlchemyAssistantUnitOfWork(database.sessions)
     )
+    policy = RbacPolicyDecisionPoint(resource_registry, policy_reader, field_registry)
+    retrieval_planning = BoundedRetrievalPlanningService(
+        SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
+        policy,
+        field_registry,
+        DeterministicHashEmbeddingAdapter(),
+    )
     # 3. 容器接管全部资源；构造中途失败时按依赖逆序关闭，避免泄漏连接和缓存客户端。
     try:
         return ApplicationContainer(
@@ -220,7 +236,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             resource_registry=resource_registry,
             field_policy_registry=field_registry,
             field_projection=FieldProjectionService(field_registry),
-            policy=RbacPolicyDecisionPoint(resource_registry, policy_reader, field_registry),
+            policy=policy,
             role_permissions=RolePermissionService(
                 resource_registry,
                 SqlAlchemyRolePermissionUnitOfWork(database.sessions),
@@ -245,6 +261,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 OpenAiCompatibleRuntimeProviderFactory(provider_url_policy),
             ),
             assistant_conversations=assistant_conversations,
+            retrieval_planning=retrieval_planning,
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,
