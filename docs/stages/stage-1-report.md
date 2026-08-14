@@ -551,7 +551,7 @@
 - 自动验收：工作流图、应用服务和 PostgreSQL/HTTP 测试覆盖非法图、草稿修订冲突、载荷上限、幂等冲突、旧版本拒绝新运行、历史运行冻结、跨空间不可见、字段遮罩和数据库不可变触发器。统一 `./scripts/verify` 全部通过，包括 React `28/28`、Python `376/376`、Ruff、mypy strict（391 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建。
 - 数据库与 HTTP：Migration `base → head → base → head` 通过；`./platform restart` 后平台就绪，`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260815_0031`、Valkey 和 Worker 八项诊断通过。使用全合成账号完成注册、登录、创建工作流、发布、创建运行和读取运行的真实认证 HTTP 闭环，最终运行状态为 `queued`。
 - 当前边界：本节点只建立定义、版本、发布和运行事实，不执行节点、不实现审批链或页面。`P1F-02` 继续实现受限节点执行器；不引入用户脚本、外部写操作、SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
-- 提交：待提交。
+- 提交：`ad51fca`。
 
 ## 4. 当前限制
 
