@@ -132,6 +132,10 @@ from ai_platform_api.modules.streaming.domain.models import StreamPolicy
 from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
     SqlAlchemyStreamUnitOfWork,
 )
+from ai_platform_api.modules.workflow.application.service import WorkflowDefinitionService
+from ai_platform_api.modules.workflow.infrastructure.sqlalchemy import (
+    SqlAlchemyWorkflowUnitOfWork,
+)
 from ai_platform_api.persistence.database import PlatformDatabase
 
 
@@ -169,6 +173,7 @@ class ApplicationContainer:
     streaming: TransactionalStreamService | None = None
     retrieval_planning: BoundedRetrievalPlanningService | None = None
     retrieval_evidence: RetrievalEvidenceService | None = None
+    workflows: WorkflowDefinitionService | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
@@ -259,6 +264,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         SqlAlchemyAssistantUnitOfWork(database.sessions),
         runtime_bootstrap=runtime_bootstrap,
     )
+    workflows = WorkflowDefinitionService(SqlAlchemyWorkflowUnitOfWork(database.sessions))
     policy = RbacPolicyDecisionPoint(resource_registry, policy_reader, field_registry)
     retrieval_planning = BoundedRetrievalPlanningService(
         SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
@@ -346,6 +352,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             streaming=streaming,
             retrieval_planning=retrieval_planning,
             retrieval_evidence=retrieval_evidence,
+            workflows=workflows,
             rag_safety=rag_safety,
             authentication=AuthenticationService(
                 repository=reader,

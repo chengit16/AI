@@ -1304,6 +1304,150 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/workflows": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Workflows
+     * @description 列出当前 PDP 数据范围内的工作流定义。
+     */
+    readonly get: operations["listWorkflowDefinitions"];
+    readonly put?: never;
+    /**
+     * Create Workflow
+     * @description 创建定义和首个草稿，草稿可以携带待修复的图校验错误。
+     */
+    readonly post: operations["createWorkflowDefinition"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Workflow
+     * @description 读取定义、当前草稿和发布指针。
+     */
+    readonly get: operations["getWorkflowDefinition"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/draft": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /**
+     * Update Workflow Draft
+     * @description 按修订号替换草稿并返回最新图校验结果。
+     */
+    readonly put: operations["updateWorkflowDraft"];
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/draft/validate": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Validate Workflow Draft
+     * @description 按当前图规则重新校验草稿，不改变草稿修订号。
+     */
+    readonly post: operations["validateWorkflowDraft"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/publish": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Publish Workflow
+     * @description 冻结有效草稿为不可变版本并切换当前发布指针。
+     */
+    readonly post: operations["publishWorkflowVersion"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Create Workflow Run
+     * @description 幂等创建当前发布版本的排队运行；节点执行在 P1F-02 接入。
+     */
+    readonly post: operations["createWorkflowRun"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs/{workflow_run_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Workflow Run
+     * @description 读取冻结版本和当前状态，不从当前草稿反推历史运行。
+     */
+    readonly get: operations["getWorkflowRun"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/enterprise": {
     readonly parameters: {
       readonly query?: never;
@@ -1872,6 +2016,32 @@ export type components = {
     readonly CreateUserMessageRequest: {
       /** Parts */
       readonly parts: readonly components["schemas"]["CreateMessagePartRequest"][];
+    };
+    /**
+     * CreateWorkflowRequest
+     * @description 创建工作流定义及首个草稿。
+     */
+    readonly CreateWorkflowRequest: {
+      /** Description */
+      readonly description?: string | null;
+      readonly graph: components["schemas"]["WorkflowGraphDocument"];
+      /** Name */
+      readonly name: string;
+    };
+    /**
+     * CreateWorkflowRunRequest
+     * @description 为当前发布版本创建排队运行事实。
+     */
+    readonly CreateWorkflowRunRequest: {
+      /** Input Payload */
+      readonly input_payload?: {
+        readonly [key: string]: unknown;
+      };
+      /**
+       * Workflow Version Id
+       * Format: uuid
+       */
+      readonly workflow_version_id: string;
     };
     /**
      * CurrentAiRuntimeConfigResponse
@@ -3024,6 +3194,14 @@ export type components = {
       readonly version: number;
     };
     /**
+     * PublishWorkflowRequest
+     * @description 发布指定修订的已校验草稿。
+     */
+    readonly PublishWorkflowRequest: {
+      /** Expected Revision */
+      readonly expected_revision: number;
+    };
+    /**
      * QuotaResponse
      * @description 定义额度操作的稳定响应结构。
      */
@@ -3372,6 +3550,15 @@ export type components = {
       readonly rating: "helpful" | "unhelpful";
     };
     /**
+     * UpdateWorkflowDraftRequest
+     * @description 按乐观锁修订号整体替换工作流草稿。
+     */
+    readonly UpdateWorkflowDraftRequest: {
+      /** Expected Revision */
+      readonly expected_revision: number;
+      readonly graph: components["schemas"]["WorkflowGraphDocument"];
+    };
+    /**
      * UploadMetadataResponse
      * @description 定义上传元数据操作的稳定响应结构。
      */
@@ -3396,6 +3583,299 @@ export type components = {
     readonly UserMessageCreatedResponse: {
       readonly message: components["schemas"]["MessageResponse"];
       readonly run: components["schemas"]["AssistantRunResponse"];
+    };
+    /**
+     * WorkflowDefinitionResponse
+     * @description 返回工作流定义和当前发布版本指针。
+     */
+    readonly WorkflowDefinitionResponse: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Created By Account Id
+       * Format: uuid
+       */
+      readonly created_by_account_id: string;
+      /** Current Version Id */
+      readonly current_version_id: string | null;
+      /** Description */
+      readonly description: string | null;
+      /** Name */
+      readonly name: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "archived";
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      readonly workflow_id: string;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * WorkflowDetailResponse
+     * @description 聚合定义、当前草稿和可选发布指针。
+     */
+    readonly WorkflowDetailResponse: {
+      readonly draft: components["schemas"]["WorkflowDraftResponse"];
+      readonly publication: components["schemas"]["WorkflowPublicationResponse"] | null;
+      readonly workflow: components["schemas"]["WorkflowDefinitionResponse"];
+    };
+    /**
+     * WorkflowDraftResponse
+     * @description 返回当前可编辑草稿、摘要和确定性校验结果。
+     */
+    readonly WorkflowDraftResponse: {
+      readonly graph: components["schemas"]["WorkflowGraphDocument"];
+      /** Graph Digest */
+      readonly graph_digest: string;
+      /** Revision */
+      readonly revision: number;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /**
+       * Updated By Account Id
+       * Format: uuid
+       */
+      readonly updated_by_account_id: string;
+      /** Validation Errors */
+      readonly validation_errors: readonly components["schemas"]["WorkflowGraphViolationResponse"][];
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      readonly workflow_id: string;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * WorkflowEdgeDocument
+     * @description 表示工作流图中的有向边文档。
+     */
+    readonly WorkflowEdgeDocument: {
+      /** Condition Key */
+      readonly condition_key?: string | null;
+      /** Edge Id */
+      readonly edge_id: string;
+      /** Source Node Id */
+      readonly source_node_id: string;
+      /** Target Node Id */
+      readonly target_node_id: string;
+    };
+    /**
+     * WorkflowGraphDocument
+     * @description 表示首期可序列化工作流图，允许先保存无效草稿再显式校验。
+     */
+    readonly WorkflowGraphDocument: {
+      /** Edges */
+      readonly edges: readonly components["schemas"]["WorkflowEdgeDocument"][];
+      /** Entry Node Id */
+      readonly entry_node_id: string;
+      /** Nodes */
+      readonly nodes: readonly components["schemas"]["WorkflowNodeDocument"][];
+      /**
+       * Schema Version
+       * @default 1
+       */
+      readonly schema_version: number;
+    };
+    /**
+     * WorkflowGraphViolationResponse
+     * @description 返回稳定图校验码及可选节点或边定位。
+     */
+    readonly WorkflowGraphViolationResponse: {
+      /** Code */
+      readonly code: string;
+      /** Edge Id */
+      readonly edge_id: string | null;
+      /** Node Id */
+      readonly node_id: string | null;
+    };
+    /**
+     * WorkflowListResponse
+     * @description 返回当前授权范围内的工作流定义。
+     */
+    readonly WorkflowListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["WorkflowDefinitionResponse"][];
+    };
+    /**
+     * WorkflowNodeDocument
+     * @description 表示工作流图中的单个节点文档。
+     */
+    readonly WorkflowNodeDocument: {
+      /** Config */
+      readonly config?: {
+        readonly [key: string]: unknown;
+      };
+      /** Name */
+      readonly name: string;
+      /** Node Id */
+      readonly node_id: string;
+      /**
+       * Node Type
+       * @enum {string}
+       */
+      readonly node_type:
+        "trigger" | "condition" | "knowledge_retrieval" | "model" | "approval" | "result";
+    };
+    /**
+     * WorkflowPublicationResponse
+     * @description 返回当前发布指针和单调发布代次。
+     */
+    readonly WorkflowPublicationResponse: {
+      /** Generation */
+      readonly generation: number;
+      /**
+       * Published At
+       * Format: date-time
+       */
+      readonly published_at: string;
+      /**
+       * Published By Account Id
+       * Format: uuid
+       */
+      readonly published_by_account_id: string;
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      readonly workflow_id: string;
+      /**
+       * Workflow Version Id
+       * Format: uuid
+       */
+      readonly workflow_version_id: string;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * WorkflowPublishResponse
+     * @description 聚合发布后的定义、不可变版本和当前指针。
+     */
+    readonly WorkflowPublishResponse: {
+      readonly publication: components["schemas"]["WorkflowPublicationResponse"];
+      readonly version: components["schemas"]["WorkflowVersionResponse"];
+      readonly workflow: components["schemas"]["WorkflowDefinitionResponse"];
+    };
+    /**
+     * WorkflowRunResponse
+     * @description 返回冻结版本的工作流运行事实。
+     */
+    readonly WorkflowRunResponse: {
+      /** Completed At */
+      readonly completed_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Error Code */
+      readonly error_code: string | null;
+      /** Input Payload */
+      readonly input_payload: {
+        readonly [key: string]: unknown;
+      } | null;
+      /**
+       * Requested By Account Id
+       * Format: uuid
+       */
+      readonly requested_by_account_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      readonly workflow_id: string;
+      /**
+       * Workflow Run Id
+       * Format: uuid
+       */
+      readonly workflow_run_id: string;
+      /**
+       * Workflow Version Id
+       * Format: uuid
+       */
+      readonly workflow_version_id: string;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * WorkflowVersionResponse
+     * @description 返回不可变发布版本及其来源草稿修订。
+     */
+    readonly WorkflowVersionResponse: {
+      readonly graph: components["schemas"]["WorkflowGraphDocument"];
+      /** Graph Digest */
+      readonly graph_digest: string;
+      /**
+       * Published At
+       * Format: date-time
+       */
+      readonly published_at: string;
+      /**
+       * Published By Account Id
+       * Format: uuid
+       */
+      readonly published_by_account_id: string;
+      /** Source Draft Revision */
+      readonly source_draft_revision: number;
+      /** Version Number */
+      readonly version_number: number;
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      readonly workflow_id: string;
+      /**
+       * Workflow Version Id
+       * Format: uuid
+       */
+      readonly workflow_version_id: string;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
     };
     /**
      * WorkspaceInvitationResponse
@@ -10008,6 +10488,690 @@ export interface operations {
       };
       /** @description 请求未获授权 */
       readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listWorkflowDefinitions: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkflowListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createWorkflowDefinition: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateWorkflowRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkflowDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getWorkflowDefinition: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workflow_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkflowDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly updateWorkflowDraft: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workflow_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["UpdateWorkflowDraftRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkflowDraftResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly validateWorkflowDraft: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workflow_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkflowDraftResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly publishWorkflowVersion: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workflow_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["PublishWorkflowRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkflowPublishResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createWorkflowRun: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workflow_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateWorkflowRunRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkflowRunResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getWorkflowRun: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workflow_id: string;
+        readonly workflow_run_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkflowRunResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
         headers: {
           readonly [name: string]: unknown;
         };

@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1F-01` 工作流草稿、不可变版本、发布和运行事实模型待开始 |
+| 当前节点 | `P1F-02` 受限工作流节点执行器待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -541,6 +541,18 @@
 - 当前边界：内置 Mock 只证明本地功能与协议闭环，不代替真实供应商兼容性和 AI 质量验收。真实供应商、Linux、容量、镜像扫描和 AI 质量继续保持 `not_configured`/`not_run`；不引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：`2175d3e`。
 
+### P1F-01 工作流定义、版本与运行事实
+
+- 状态：通过。
+- 定义与校验：新增工作流、可编辑草稿和确定性 DAG 校验。首期只接受唯一 Trigger、至少一个 Result、最多 100 个节点和 200 条边；发布前拒绝重复节点、循环、悬空边、不可达节点、无法通向 Result 的路径和不受支持的节点类型，避免把非法拓扑带入运行期。
+- 版本与运行：发布产生只增不改的 `WorkflowVersion` 和当前发布指针，数据库触发器拒绝历史版本更新或删除。新运行只接受当前发布版本，并冻结版本、输入、状态和创建者事实；后续重新发布不会改变历史运行，旧版本不能继续创建新运行。创建运行支持幂等键，相同键不同输入稳定返回冲突。
+- 授权与字段：新增 7 项 Permission、8 项 API、工作流页面与动作菜单及 8 项菜单接口绑定。所有者默认具备设计、发布、运行和读取权限，成员默认只具备读取与运行权限；运行读取按 `workflow_run_id` 独立复核资源范围，不沿用父工作流资源判断，输入载荷在响应序列化前执行字段级 ABAC，受限时返回 `input_payload: null`。页面及入口菜单暂时保持停用，只注册契约和授权事实，必须等 `P1F-05` 页面完成后再启用并授予 `workflow.page.access`。
+- 契约与数据：Revision `20260815_0031` 新增 `workflows`、`workflow_drafts`、`workflow_versions`、`workflow_publications` 和 `workflow_runs`；资源注册表升级至版本 12，共 65 项 Permission、9 个 Page、87 个 API、82 个 Menu 和 80 个 Binding。OpenAPI、React/Python 生成类型、ReleaseManifest、兼容矩阵和平台 Revision 期望同步更新；错误目录新增 `WORKFLOW_GRAPH_INVALID` 和 `WORKFLOW_CONFLICT`。
+- 自动验收：工作流图、应用服务和 PostgreSQL/HTTP 测试覆盖非法图、草稿修订冲突、载荷上限、幂等冲突、旧版本拒绝新运行、历史运行冻结、跨空间不可见、字段遮罩和数据库不可变触发器。统一 `./scripts/verify` 全部通过，包括 React `28/28`、Python `376/376`、Ruff、mypy strict（391 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建。
+- 数据库与 HTTP：Migration `base → head → base → head` 通过；`./platform restart` 后平台就绪，`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260815_0031`、Valkey 和 Worker 八项诊断通过。使用全合成账号完成注册、登录、创建工作流、发布、创建运行和读取运行的真实认证 HTTP 闭环，最终运行状态为 `queued`。
+- 当前边界：本节点只建立定义、版本、发布和运行事实，不执行节点、不实现审批链或页面。`P1F-02` 继续实现受限节点执行器；不引入用户脚本、外部写操作、SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：待提交。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -551,4 +563,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-06`，当前进入 `P1F-01`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前统一门禁与 Revision `20260815_0030` 八项容器诊断均通过，本地 Mock 问答集成缺口已经关闭；阶段整体结论仍等待后续工作流、审批、联合验收等业务节点和阶段端到端门禁完成。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1F-01`，当前进入 `P1F-02`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前统一门禁与 Revision `20260815_0031` 八项容器诊断均通过，工作流定义、不可变版本、发布和运行事实已经闭环；阶段整体结论仍等待节点执行器、多级审批、联合验收等业务节点和阶段端到端门禁完成。

@@ -1563,6 +1563,237 @@ Index(
     workspace_resources.c.resource_id,
 )
 
+workflows = Table(
+    "workflows",
+    metadata,
+    Column("workflow_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("description", String(1000), nullable=True),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("workflow_id", "workspace_id", name="uq_workflows_id_workspace"),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workflows_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_workflows_creator",
+    ),
+    CheckConstraint("status IN ('active', 'archived')", name="ck_workflows_status"),
+    CheckConstraint("version >= 1", name="ck_workflows_version"),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_workflows_name",
+    ),
+)
+Index(
+    "ix_workflows_workspace_time",
+    workflows.c.workspace_id,
+    workflows.c.updated_at,
+)
+
+workflow_drafts = Table(
+    "workflow_drafts",
+    metadata,
+    Column("workflow_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("revision", Integer, nullable=False),
+    Column("graph", JSONB, nullable=False),
+    Column("graph_digest", String(64), nullable=False),
+    Column("validation_errors", JSONB, nullable=False),
+    Column("updated_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workflow_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.workflows.workflow_id", f"{SCHEMA_TOKEN}.workflows.workspace_id"],
+        name="fk_workflow_drafts_workflow",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["updated_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_workflow_drafts_updater",
+    ),
+    CheckConstraint("revision >= 1", name="ck_workflow_drafts_revision"),
+    CheckConstraint(
+        "graph_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_workflow_drafts_digest",
+    ),
+)
+
+workflow_versions = Table(
+    "workflow_versions",
+    metadata,
+    Column("workflow_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("workflow_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("version_number", Integer, nullable=False),
+    Column("source_draft_revision", Integer, nullable=False),
+    Column("graph", JSONB, nullable=False),
+    Column("graph_digest", String(64), nullable=False),
+    Column("published_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workflow_version_id",
+        "workspace_id",
+        name="uq_workflow_versions_id_workspace",
+    ),
+    UniqueConstraint(
+        "workflow_id",
+        "workspace_id",
+        "workflow_version_id",
+        name="uq_workflow_versions_workflow_version",
+    ),
+    UniqueConstraint(
+        "workflow_id",
+        "version_number",
+        name="uq_workflow_versions_number",
+    ),
+    UniqueConstraint(
+        "workflow_id",
+        "source_draft_revision",
+        name="uq_workflow_versions_draft_revision",
+    ),
+    ForeignKeyConstraint(
+        ["workflow_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.workflows.workflow_id", f"{SCHEMA_TOKEN}.workflows.workspace_id"],
+        name="fk_workflow_versions_workflow",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["published_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_workflow_versions_publisher",
+    ),
+    CheckConstraint("version_number >= 1", name="ck_workflow_versions_number"),
+    CheckConstraint(
+        "source_draft_revision >= 1",
+        name="ck_workflow_versions_draft_revision",
+    ),
+    CheckConstraint(
+        "graph_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_workflow_versions_digest",
+    ),
+)
+Index(
+    "ix_workflow_versions_workflow_time",
+    workflow_versions.c.workspace_id,
+    workflow_versions.c.workflow_id,
+    workflow_versions.c.published_at,
+)
+
+workflow_publications = Table(
+    "workflow_publications",
+    metadata,
+    Column("workflow_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("workflow_version_id", UUID(as_uuid=True), nullable=False),
+    Column("generation", Integer, nullable=False),
+    Column("published_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workflow_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.workflows.workflow_id", f"{SCHEMA_TOKEN}.workflows.workspace_id"],
+        name="fk_workflow_publications_workflow",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workflow_id", "workspace_id", "workflow_version_id"],
+        [
+            f"{SCHEMA_TOKEN}.workflow_versions.workflow_id",
+            f"{SCHEMA_TOKEN}.workflow_versions.workspace_id",
+            f"{SCHEMA_TOKEN}.workflow_versions.workflow_version_id",
+        ],
+        name="fk_workflow_publications_version",
+    ),
+    ForeignKeyConstraint(
+        ["published_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_workflow_publications_publisher",
+    ),
+    CheckConstraint("generation >= 1", name="ck_workflow_publications_generation"),
+)
+
+workflow_runs = Table(
+    "workflow_runs",
+    metadata,
+    Column("workflow_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("workflow_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("workflow_version_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("input_payload", JSONB, nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(128), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workflow_run_id",
+        "workspace_id",
+        name="uq_workflow_runs_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "requested_by_account_id",
+        "idempotency_key",
+        name="uq_workflow_runs_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workflow_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.workflows.workflow_id", f"{SCHEMA_TOKEN}.workflows.workspace_id"],
+        name="fk_workflow_runs_workflow",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workflow_id", "workspace_id", "workflow_version_id"],
+        [
+            f"{SCHEMA_TOKEN}.workflow_versions.workflow_id",
+            f"{SCHEMA_TOKEN}.workflow_versions.workspace_id",
+            f"{SCHEMA_TOKEN}.workflow_versions.workflow_version_id",
+        ],
+        name="fk_workflow_runs_version",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_workflow_runs_requester",
+    ),
+    CheckConstraint(
+        "status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')",
+        name="ck_workflow_runs_status",
+    ),
+    CheckConstraint(
+        "request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_workflow_runs_request_hash",
+    ),
+    CheckConstraint("version >= 1", name="ck_workflow_runs_version"),
+    CheckConstraint(
+        "(status IN ('queued', 'running') AND completed_at IS NULL) OR "
+        "(status IN ('succeeded', 'failed', 'cancelled') AND completed_at IS NOT NULL)",
+        name="ck_workflow_runs_completion",
+    ),
+)
+Index(
+    "ix_workflow_runs_workflow_time",
+    workflow_runs.c.workspace_id,
+    workflow_runs.c.workflow_id,
+    workflow_runs.c.created_at,
+)
+
 index_versions = indexing_tables.index_versions.to_metadata(metadata)
 document_index_publications = indexing_tables.document_index_publications.to_metadata(metadata)
 retrieval_chunks = indexing_tables.retrieval_chunks.to_metadata(metadata)

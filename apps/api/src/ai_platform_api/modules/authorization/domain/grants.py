@@ -72,6 +72,12 @@ OWNER_PERMISSION_CODES = (
     "workspace.membership.leave",
     "workspace.open_api.manage",
     "workspace.overview.access",
+    "workflow.definition.create",
+    "workflow.definition.publish",
+    "workflow.definition.read",
+    "workflow.definition.update",
+    "workflow.run.create",
+    "workflow.run.read",
 )
 MEMBER_PERMISSION_CODES = (
     "authorization.effective_role.read",
@@ -88,6 +94,9 @@ MEMBER_PERMISSION_CODES = (
     "assistant.run.cancel",
     "assistant.source.read",
     "assistant.feedback.manage",
+    "workflow.definition.read",
+    "workflow.run.create",
+    "workflow.run.read",
 )
 
 

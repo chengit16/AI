@@ -237,6 +237,8 @@ def _resource_reference(
                 "knowledge_base_id",
                 "ingestion_job_id",
                 "conversation_id",
+                "workflow_run_id",
+                "workflow_id",
             )
             if (value := values.get(key)) is not None
         ),
@@ -255,6 +257,8 @@ def _resource_reference(
             "document_version_id",
             "ingestion_job_id",
             "conversation_id",
+            "workflow_run_id",
+            "workflow_id",
         )
         if (value := values.get(key)) is not None
     }

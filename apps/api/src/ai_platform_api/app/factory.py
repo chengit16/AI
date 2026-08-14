@@ -33,6 +33,7 @@ from ai_platform_api.modules.model_gateway.api.routes import (
     runtime_router as ai_runtime_router,
 )
 from ai_platform_api.modules.system.api.health import router as health_router
+from ai_platform_api.modules.workflow.api.routes import router as workflow_router
 
 
 def create_app(
@@ -91,6 +92,7 @@ def create_app(
     application.state.streaming_service = dependencies.streaming
     application.state.retrieval_planning_service = dependencies.retrieval_planning
     application.state.retrieval_evidence_service = dependencies.retrieval_evidence
+    application.state.workflow_definition_service = dependencies.workflows
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)
@@ -106,4 +108,5 @@ def create_app(
     application.include_router(model_provider_router, prefix="/api/v1")
     application.include_router(ai_runtime_router, prefix="/api/v1")
     application.include_router(assistant_router, prefix="/api/v1")
+    application.include_router(workflow_router, prefix="/api/v1")
     return application

@@ -211,6 +211,17 @@ class CreateUserMessageRequest(typing.TypedDict):
     parts: list[CreateMessagePartRequest]
 
 
+class CreateWorkflowRequest(typing.TypedDict):
+    description: typing.NotRequired[str | None]
+    graph: WorkflowGraphDocument
+    name: str
+
+
+class CreateWorkflowRunRequest(typing.TypedDict):
+    input_payload: typing.NotRequired[dict[str, object]]
+    workflow_version_id: str
+
+
 class CurrentAiRuntimeConfigResponse(typing.TypedDict):
     item: AiRuntimeConfigResponse | None
 
@@ -639,6 +650,10 @@ class PositionResponse(typing.TypedDict):
     version: int
 
 
+class PublishWorkflowRequest(typing.TypedDict):
+    expected_revision: int
+
+
 class QuotaResponse(typing.TypedDict):
     limit_value: int
     metric: typing.Literal[
@@ -782,6 +797,11 @@ class SubmitMessageFeedbackRequest(typing.TypedDict):
     rating: typing.Literal["helpful", "unhelpful"]
 
 
+class UpdateWorkflowDraftRequest(typing.TypedDict):
+    expected_revision: int
+    graph: WorkflowGraphDocument
+
+
 class UploadMetadataResponse(typing.TypedDict):
     content_hash: str
     media_type: str
@@ -792,6 +812,111 @@ class UploadMetadataResponse(typing.TypedDict):
 class UserMessageCreatedResponse(typing.TypedDict):
     message: MessageResponse
     run: AssistantRunResponse
+
+
+class WorkflowDefinitionResponse(typing.TypedDict):
+    created_at: str
+    created_by_account_id: str
+    current_version_id: str | None
+    description: str | None
+    name: str
+    status: typing.Literal["active", "archived"]
+    updated_at: str
+    version: int
+    workflow_id: str
+    workspace_id: str
+
+
+class WorkflowDetailResponse(typing.TypedDict):
+    draft: WorkflowDraftResponse
+    publication: WorkflowPublicationResponse | None
+    workflow: WorkflowDefinitionResponse
+
+
+class WorkflowDraftResponse(typing.TypedDict):
+    graph: WorkflowGraphDocument
+    graph_digest: str
+    revision: int
+    updated_at: str
+    updated_by_account_id: str
+    validation_errors: list[WorkflowGraphViolationResponse]
+    workflow_id: str
+    workspace_id: str
+
+
+class WorkflowEdgeDocument(typing.TypedDict):
+    condition_key: typing.NotRequired[str | None]
+    edge_id: str
+    source_node_id: str
+    target_node_id: str
+
+
+class WorkflowGraphDocument(typing.TypedDict):
+    edges: list[WorkflowEdgeDocument]
+    entry_node_id: str
+    nodes: list[WorkflowNodeDocument]
+    schema_version: typing.NotRequired[int]
+
+
+class WorkflowGraphViolationResponse(typing.TypedDict):
+    code: str
+    edge_id: str | None
+    node_id: str | None
+
+
+class WorkflowListResponse(typing.TypedDict):
+    items: list[WorkflowDefinitionResponse]
+
+
+class WorkflowNodeDocument(typing.TypedDict):
+    config: typing.NotRequired[dict[str, object]]
+    name: str
+    node_id: str
+    node_type: typing.Literal[
+        "trigger", "condition", "knowledge_retrieval", "model", "approval", "result"
+    ]
+
+
+class WorkflowPublicationResponse(typing.TypedDict):
+    generation: int
+    published_at: str
+    published_by_account_id: str
+    workflow_id: str
+    workflow_version_id: str
+    workspace_id: str
+
+
+class WorkflowPublishResponse(typing.TypedDict):
+    publication: WorkflowPublicationResponse
+    version: WorkflowVersionResponse
+    workflow: WorkflowDefinitionResponse
+
+
+class WorkflowRunResponse(typing.TypedDict):
+    completed_at: str | None
+    created_at: str
+    error_code: str | None
+    input_payload: dict[str, object] | None
+    requested_by_account_id: str
+    status: typing.Literal["queued", "running", "succeeded", "failed", "cancelled"]
+    updated_at: str
+    version: int
+    workflow_id: str
+    workflow_run_id: str
+    workflow_version_id: str
+    workspace_id: str
+
+
+class WorkflowVersionResponse(typing.TypedDict):
+    graph: WorkflowGraphDocument
+    graph_digest: str
+    published_at: str
+    published_by_account_id: str
+    source_draft_revision: int
+    version_number: int
+    workflow_id: str
+    workflow_version_id: str
+    workspace_id: str
 
 
 class WorkspaceInvitationResponse(typing.TypedDict):
