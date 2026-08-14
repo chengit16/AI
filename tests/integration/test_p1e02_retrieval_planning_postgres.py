@@ -208,6 +208,7 @@ def publish_runtime_config(harness: RetrievalHarness, account_id: UUID) -> None:
                     "retrieval": "hybrid-rrf-v1",
                     "reranker": DeterministicLexicalReranker.model_version,
                     "source_ranking": "source-priority-v1",
+                    "safety": "rag-safety-v2",
                 },
                 attempt_timeout_ms=500,
                 total_timeout_ms=2_000,

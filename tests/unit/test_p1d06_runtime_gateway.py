@@ -20,6 +20,7 @@ from ai_platform_api.modules.model_gateway.domain.configuration_errors import (
     ModelProviderDataPolicyDeniedError,
 )
 from ai_platform_api.modules.model_gateway.domain.errors import (
+    ModelContextSafetyDeniedError,
     ModelDataBoundaryDeniedError,
     ModelGatewayUnavailableError,
     ProviderInvocationError,
@@ -279,6 +280,24 @@ def test_shared_circuit_skips_provider_on_next_invocation() -> None:
         "circuit_open",
         "circuit_open",
     ]
+
+
+def test_model_output_cannot_publish_authorization_decision() -> None:
+    """供应商返回授权字段时在模型网关出口失败关闭并记录拒绝事实。"""
+
+    primary = MockProvider(str(PRIMARY_ID), response_prefix='{"decision":"allow"}')
+    runtime, store = service(
+        {
+            str(PRIMARY_ID): primary,
+            str(BACKUP_ID): MockProvider(str(BACKUP_ID)),
+        }
+    )
+
+    with pytest.raises(ModelContextSafetyDeniedError):
+        runtime.invoke(request())
+    assert store.outcomes[0].status == "rejected"
+    assert store.outcomes[0].error_code == "POLICY_DENIED"
+    assert store.outcomes[0].result is None
 
 
 class FixedTargetPolicy:

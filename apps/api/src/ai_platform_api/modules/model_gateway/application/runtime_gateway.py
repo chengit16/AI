@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
 
+from ai_platform_backend.safety import RagSafetyGate
+
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.model_gateway.application.gateway import (
@@ -19,6 +21,7 @@ from ai_platform_api.modules.model_gateway.domain.configuration_errors import (
     ModelProviderDataPolicyDeniedError,
 )
 from ai_platform_api.modules.model_gateway.domain.errors import (
+    ModelContextSafetyDeniedError,
     ModelDataBoundaryDeniedError,
     ModelGatewayUnavailableError,
     ProviderInvocationError,
@@ -104,11 +107,13 @@ class RuntimeModelGatewayService:
         invocations: RuntimeInvocationStore,
         provider_access: RuntimeProviderAccessResolver,
         provider_factory: RuntimeProviderFactory,
+        safety_gate: RagSafetyGate | None = None,
     ) -> None:
         self._configurations = configurations
         self._invocations = invocations
         self._provider_access = provider_access
         self._provider_factory = provider_factory
+        self._safety_gate = safety_gate or RagSafetyGate()
         # 首期本地单 API 进程共享熔断状态；多实例共享状态在容量阶段按实测再引入。
         self._circuit_states: dict[str, CircuitState] = {}
 
@@ -157,8 +162,11 @@ class RuntimeModelGatewayService:
         )
         # 3. 调用失败也必须写入尝试链、稳定错误码和已使用凭据版本，再向上抛出。
         try:
+            raw_result = gateway.invoke(request)
+            if not self._safety_gate.validate_model_output(raw_result.content).allowed:
+                raise ModelContextSafetyDeniedError
             result = replace(
-                gateway.invoke(request),
+                raw_result,
                 runtime_config_version_id=configuration.runtime_config_version_id,
             )
         except PlatformError as error:
@@ -171,7 +179,9 @@ class RuntimeModelGatewayService:
                 else ()
             )
             status: InvocationStatus = (
-                "rejected" if error.error_code == "MODEL_REQUEST_REJECTED" else "failed"
+                "rejected"
+                if error.error_code in {"MODEL_REQUEST_REJECTED", "POLICY_DENIED"}
+                else "failed"
             )
             self._invocations.complete(
                 RuntimeInvocationOutcome(

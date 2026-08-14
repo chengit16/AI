@@ -181,7 +181,7 @@ def components() -> RuntimeComponentVersions:
         "bge-reranker-v1",
         "hybrid-rrf-v1",
         "source-priority-v1",
-        "rag-safety-v1",
+        "rag-safety-v2",
         "data-source-v1",
         "relevance-grader-v1",
         "multimodal-router-v1",

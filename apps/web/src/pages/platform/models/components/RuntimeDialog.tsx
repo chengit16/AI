@@ -37,7 +37,7 @@ const initialComponents: RuntimeComponents = {
   reranker: "bge-reranker-v1",
   retrieval: "hybrid-rrf-v1",
   source_ranking: "source-priority-v1",
-  safety: "rag-safety-v1",
+  safety: "rag-safety-v2",
   data_source_interface: "data-source-v1",
   relevance_grader_interface: "relevance-grader-v1",
   multimodal_router_interface: "multimodal-router-v1",

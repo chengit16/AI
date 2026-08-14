@@ -164,7 +164,7 @@ def components() -> RuntimeComponentVersions:
         reranker="bge-reranker-v1",
         retrieval="hybrid-rrf-v1",
         source_ranking="source-priority-v1",
-        safety="rag-safety-v1",
+        safety="rag-safety-v2",
         data_source_interface="data-source-v1",
         relevance_grader_interface="relevance-grader-v1",
         multimodal_router_interface="multimodal-router-v1",
@@ -283,6 +283,21 @@ def test_duplicate_invalid_and_unapproved_routes_are_rejected() -> None:
             components=components(),
             policy=policy(),
             routes=(routes()[0],),
+        )
+
+
+def test_stale_rag_safety_component_is_rejected() -> None:
+    """运行配置不能发布低于当前 RAG 安全门版本的组件快照。"""
+
+    service = AiRuntimeConfigurationService(MemoryUnitOfWork())
+    with pytest.raises(AiRuntimeConfigInvalidError):
+        service.create(
+            context(),
+            display_name="旧安全门配置",
+            system_prompt_template="合成提示",
+            components=replace(components(), safety="rag-safety-v1"),
+            policy=policy(),
+            routes=routes(),
         )
 
 

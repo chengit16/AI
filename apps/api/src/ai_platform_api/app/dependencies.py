@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ai_platform_backend.indexing.embeddings import DeterministicHashEmbeddingAdapter
+from ai_platform_backend.safety import RagSafetyGate
 
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.config import Settings
@@ -147,6 +148,7 @@ class ApplicationContainer:
     assistant_conversations: AssistantConversationService | None = None
     retrieval_planning: BoundedRetrievalPlanningService | None = None
     retrieval_evidence: RetrievalEvidenceService | None = None
+    rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -183,6 +185,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     # 2. 从冻结注册表装配授权与领域服务，所有服务共享同一数据库 SessionFactory。
     resource_registry = load_resource_registry(Path(settings.resource_registry_path))
     field_registry = load_field_policy_registry(Path(settings.field_policy_registry_path))
+    rag_safety = RagSafetyGate()
     policy_reader = SqlAlchemyPolicyGrantRepository(database.sessions)
     menu_configuration = MenuConfigurationService(
         resource_registry,
@@ -234,6 +237,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         policy,
         field_registry,
         DeterministicHashEmbeddingAdapter(),
+        safety_gate=rag_safety,
     )
     retrieval_evidence = RetrievalEvidenceService(
         SqlAlchemyEvidenceProcessingUnitOfWork(database.sessions),
@@ -273,10 +277,12 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 SqlAlchemyRuntimeInvocationStore(database.sessions),
                 model_provider_configurations,
                 OpenAiCompatibleRuntimeProviderFactory(provider_url_policy),
+                rag_safety,
             ),
             assistant_conversations=assistant_conversations,
             retrieval_planning=retrieval_planning,
             retrieval_evidence=retrieval_evidence,
+            rag_safety=rag_safety,
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,

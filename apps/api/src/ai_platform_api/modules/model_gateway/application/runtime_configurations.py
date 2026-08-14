@@ -9,6 +9,8 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from ai_platform_backend.safety import RAG_SAFETY_VERSION
+
 from ai_platform_api.common.request_context import PlatformRequestContext
 from ai_platform_api.modules.model_gateway.domain.configuration_errors import (
     PlatformAdministratorRequiredError,
@@ -230,6 +232,7 @@ class AiRuntimeConfigurationService:
         version_values = asdict(components).values()
         priorities = sorted(route.priority for route in routes)
         route_keys = {(route.provider_id, route.model_id.strip()) for route in routes}
+        # 安全门版本必须与当前后端实现一致，旧配置不能绕过最新的模型前置防护。
         if (
             not display_name
             or len(display_name) > 120
@@ -239,6 +242,7 @@ class AiRuntimeConfigurationService:
                 not isinstance(value, str) or VERSION_PATTERN.fullmatch(value) is None
                 for value in version_values
             )
+            or components.safety != RAG_SAFETY_VERSION
             or not 1 <= len(routes) <= 8
             or priorities != list(range(1, len(routes) + 1))
             or len(route_keys) != len(routes)

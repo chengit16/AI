@@ -40,6 +40,12 @@ class ModelRequestRejectedError(PlatformError):
     error_code = "MODEL_REQUEST_REJECTED"
 
 
+class ModelContextSafetyDeniedError(PlatformError):
+    """模型上下文命中 RAG 安全门时拒绝继续生成，避免把内部原因暴露给调用方。"""
+
+    error_code = "POLICY_DENIED"
+
+
 @dataclass
 class ModelDataBoundaryDeniedError(PlatformError):
     """当前数据禁止外发且没有可用的私有模型路由。"""

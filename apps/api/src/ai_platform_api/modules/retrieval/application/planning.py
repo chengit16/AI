@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from time import monotonic
 from uuid import UUID, uuid4
 
+from ai_platform_backend.safety import RagSafetyGate
+
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import FieldPolicyRegistry
 from ai_platform_api.modules.authorization.domain.policy import PolicyDecisionPoint
@@ -119,6 +121,7 @@ class BoundedRetrievalPlanningService:
         *,
         budget: RetrievalPlannerBudget | None = None,
         query_rewriter: DeterministicQueryRewriter | None = None,
+        safety_gate: RagSafetyGate | None = None,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._policy = policy
@@ -126,6 +129,7 @@ class BoundedRetrievalPlanningService:
         self._embedding_provider = embedding_provider
         self._budget = budget or RetrievalPlannerBudget()
         self._query_rewriter = query_rewriter or DeterministicQueryRewriter()
+        self._safety_gate = safety_gate or RagSafetyGate()
 
     def retrieve(self, context: RequestContext, run_id: UUID) -> RetrievalPlanSnapshot:
         """在冻结 Run 与当前授权同时有效时执行检索；重复调用返回同一快照。"""
@@ -136,6 +140,8 @@ class BoundedRetrievalPlanningService:
             if run is None or not same_retrieval_requester(context, run):
                 raise RetrievalScopeDeniedError
             _require_runtime_compatibility(run, self._embedding_provider)
+            if not self._safety_gate.inspect_user_query(run.query).allowed:
+                raise RetrievalScopeDeniedError
             decision = self._policy.decide(retrieval_policy_request(context))
             authorization = resolve_retrieval_authorization(decision, self._field_registry)
             existing = unit_of_work.planning.get_plan(run_id)
@@ -149,6 +155,15 @@ class BoundedRetrievalPlanningService:
             created_at = datetime.now(UTC)
             classification, variants = self._query_rewriter.rewrite(run.query, self._budget)
             scope = unit_of_work.planning.resolve_search_scope(run, authorization)
+            rewrite_decision = self._safety_gate.validate_rewrite_scope(
+                variants[0].text,
+                tuple(variant.text for variant in variants[1:]),
+                None
+                if scope is None or scope.document_ids is None
+                else frozenset(str(document_id) for document_id in scope.document_ids),
+            )
+            if not rewrite_decision.allowed:
+                raise RetrievalScopeDeniedError
             candidates, operations, keyword_count, vector_count = self._search(
                 unit_of_work,
                 variants,
