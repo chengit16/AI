@@ -296,6 +296,23 @@ class KnowledgeRepository(Protocol):
         published_at: datetime,
     ) -> None: ...
 
+    def switch_document_index(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        *,
+        activated_at: datetime,
+    ) -> UUID | None: ...
+
+    def deactivate_document_indexes(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        *,
+        deactivated_at: datetime,
+    ) -> None: ...
+
 
 class KnowledgeUnitOfWork(Protocol):
     @property

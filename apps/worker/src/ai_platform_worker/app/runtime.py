@@ -4,6 +4,7 @@ import socket
 from dataclasses import dataclass
 
 from ai_platform_backend.database import PlatformDatabase
+from ai_platform_backend.indexing.tokenization import TOKENIZER_VERSION
 from ai_platform_backend.integration.application import OutboxDispatcher
 from ai_platform_backend.integration.envelope import HmacTaskEnvelopeSigner, SigningKeyFile
 from ai_platform_backend.integration.sqlalchemy import (
@@ -13,6 +14,17 @@ from ai_platform_backend.integration.sqlalchemy import (
 
 from ai_platform_worker.config import WorkerSettings, get_worker_settings
 from ai_platform_worker.consumers.publisher import CeleryTaskPublisher
+from ai_platform_worker.modules.indexing.application.build import IndexBuildProcessor
+from ai_platform_worker.modules.indexing.infrastructure.embeddings import (
+    DeterministicHashEmbeddingAdapter,
+)
+from ai_platform_worker.modules.indexing.infrastructure.object_storage import (
+    MinioIndexArtifactStorage,
+)
+from ai_platform_worker.modules.indexing.infrastructure.sqlalchemy import (
+    SqlAlchemyIndexVersionStore,
+)
+from ai_platform_worker.modules.ingestion.application.chunking import StructuralChunker
 from ai_platform_worker.modules.ingestion.application.ingest import ParseDocument
 from ai_platform_worker.modules.ingestion.application.jobs import IngestionJobProcessor
 from ai_platform_worker.modules.ingestion.domain.documents import IngestionLimits
@@ -36,6 +48,7 @@ class WorkerRuntime:
     dispatcher: OutboxDispatcher
     consumers: SqlAlchemyConsumerUnitOfWork
     ingestion: IngestionJobProcessor
+    indexing: IndexBuildProcessor
 
     def close(self) -> None:
         self.database.close()
@@ -84,5 +97,28 @@ def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntim
             worker_id=worker_id,
             lease_seconds=resolved.ingestion_lease_seconds,
             retry_base_seconds=resolved.ingestion_retry_base_seconds,
+        ),
+        indexing=IndexBuildProcessor(
+            SqlAlchemyIndexVersionStore(database.sessions),
+            MinioIndexArtifactStorage(
+                endpoint=resolved.minio_endpoint,
+                access_key=resolved.minio_access_key,
+                secret_key=resolved.minio_secret_key.get_secret_value(),
+                bucket=resolved.minio_bucket,
+            ),
+            StructuralChunker(),
+            DeterministicHashEmbeddingAdapter(),
+            IngestionLimits(
+                max_file_size_bytes=resolved.ingestion_max_file_size_bytes,
+                max_page_count=resolved.ingestion_max_page_count,
+                max_chunk_chars=resolved.indexing_max_chunk_chars,
+                chunk_overlap_chars=resolved.indexing_chunk_overlap_chars,
+            ),
+            worker_id=worker_id,
+            lease_seconds=resolved.indexing_lease_seconds,
+            retry_base_seconds=resolved.indexing_retry_base_seconds,
+            max_attempts=resolved.indexing_max_attempts,
+            chunker_version=resolved.indexing_chunker_version,
+            tokenizer_version=TOKENIZER_VERSION,
         ),
     )

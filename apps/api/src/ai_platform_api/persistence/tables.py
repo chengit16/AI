@@ -1,12 +1,11 @@
+from ai_platform_backend.indexing import persistence as indexing_tables
 from ai_platform_backend.ingestion import persistence as ingestion_tables
 from ai_platform_backend.integration import persistence as integration_tables
-from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
     Column,
-    Computed,
     DateTime,
     ForeignKeyConstraint,
     Index,
@@ -14,11 +13,10 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
-    Text,
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 
 from ai_platform_api.persistence.database import SCHEMA_TOKEN
 
@@ -1099,47 +1097,9 @@ Index(
     workspace_resources.c.resource_id,
 )
 
-retrieval_chunks = Table(
-    "retrieval_chunks",
-    metadata,
-    Column("index_version_id", UUID(as_uuid=True), primary_key=True),
-    Column("chunk_id", UUID(as_uuid=True), primary_key=True),
-    Column("workspace_id", UUID(as_uuid=True), nullable=False),
-    Column("knowledge_base_id", UUID(as_uuid=True), nullable=False),
-    Column("document_id", UUID(as_uuid=True), nullable=False),
-    Column("document_version_id", UUID(as_uuid=True), nullable=False),
-    Column("sequence_no", Integer, nullable=False),
-    Column("content", Text, nullable=False),
-    Column("content_hash", String(64), nullable=False),
-    Column("embedding", VECTOR(1024), nullable=False),
-    Column("keyword_text", Text, nullable=False),
-    Column(
-        "keyword_vector",
-        TSVECTOR,
-        Computed("to_tsvector('simple', keyword_text)", persisted=True),
-    ),
-    Column("department_ids", ARRAY(UUID(as_uuid=True)), nullable=False),
-    Column("visibility", String(32), nullable=False),
-    Column("security_level", String(32), nullable=False),
-    Column("source_position", JSONB, nullable=False),
-    Column("active", Boolean, nullable=False),
-    CheckConstraint("sequence_no >= 1", name="ck_retrieval_chunks_sequence_no"),
-    CheckConstraint(
-        "visibility IN ('private', 'workspace', 'departments', 'public')",
-        name="ck_retrieval_chunks_visibility",
-    ),
-    CheckConstraint(
-        "security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
-        name="ck_retrieval_chunks_security_level",
-    ),
-)
-Index(
-    "ix_retrieval_chunks_scope",
-    retrieval_chunks.c.workspace_id,
-    retrieval_chunks.c.index_version_id,
-    retrieval_chunks.c.knowledge_base_id,
-    retrieval_chunks.c.document_id,
-)
+index_versions = indexing_tables.index_versions.to_metadata(metadata)
+document_index_publications = indexing_tables.document_index_publications.to_metadata(metadata)
+retrieval_chunks = indexing_tables.retrieval_chunks.to_metadata(metadata)
 
 stream_runs = Table(
     "stream_runs",

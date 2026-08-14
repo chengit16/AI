@@ -7,6 +7,10 @@ from types import TracebackType
 from typing import Any, cast
 from uuid import UUID
 
+from ai_platform_backend.indexing.sqlalchemy import (
+    deactivate_document_indexes,
+    switch_active_document_index,
+)
 from ai_platform_backend.ingestion.domain import IngestionJob
 from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
@@ -267,6 +271,36 @@ class SqlAlchemyKnowledgeRepository:
                     published_at=published_at,
                 )
             )
+
+    def switch_document_index(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        *,
+        activated_at: datetime,
+    ) -> UUID | None:
+        return switch_active_document_index(
+            self._session,
+            workspace_id=workspace_id,
+            document_id=document_id,
+            document_version_id=document_version_id,
+            activated_at=activated_at,
+        )
+
+    def deactivate_document_indexes(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        *,
+        deactivated_at: datetime,
+    ) -> None:
+        deactivate_document_indexes(
+            self._session,
+            workspace_id=workspace_id,
+            document_id=document_id,
+            deactivated_at=deactivated_at,
+        )
 
 
 class SqlAlchemyKnowledgeUnitOfWork:

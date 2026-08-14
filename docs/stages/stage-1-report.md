@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1D-04` 待开始 |
+| 当前节点 | `P1D-05` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -308,6 +308,19 @@
 - 自动化验收：统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `276/276`，Ruff、mypy strict、架构、契约兼容与生成漂移、供应链门禁均通过；Migration 回填与 `base → head → base → head` 往返 `2/2` 通过。
 - 容器与真实闭环：重建 API、Worker、Web、Migration 和自定义 Tika 镜像后，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0019`，Worker 注册 `platform.outbox.dispatch.v1`、`platform.integration.consume.v1` 和 `platform.ingestion.process.v1`。Markdown 上传第一次执行产生两个 Block；中文 PNG 第一次执行完成 OCR，两类产物均不含 `source_object_key`。
 - 当前边界：本节点不增加任务查询页面或手动重试 API，它们属于 `P1D-07`；不执行 Chunk、Embedding 或索引切换。未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`ac9e83b`。
+
+### P1D-04 Chunk 与索引版本切换
+
+- 状态：通过。
+- 索引事实：新增 Migration `20260814_0020`，建立持久化 `IndexVersion`、当前索引发布指针和 Chunk 追溯字段。索引版本冻结文档、来源、入库任务、解析摘要、Chunker、Tokenizer、Embedding 模型及权限元数据，按 `queued → running → retry_wait → ready → active/retired` 或 `failed` 转换；PostgreSQL 仍是任务状态唯一事实源。
+- 构建与失败边界：索引 Worker 从已成功的 `IngestionJob` 幂等排队，使用行锁、`SKIP LOCKED`、短租约、最多三次执行和有界指数退避。读取 Artifact 后复核 SHA-256 与工作空间身份；格式、空 Chunk、Embedding 数量、1024 维度和有限数值均失败关闭，错误事实只保存稳定 `INDEX_*` 错误码和脱敏消息。
+- 权限与追溯：结构化 Chunk 固化部门、可见性、密级和权限标签，并记录 `document_version_id`、`ingestion_job_id`、`source_id`、Parser、OCR 标记和解析摘要。关键词索引复用版本化 `cjk-bigram-v1` Tokenizer；构建期 Chunk 始终 `active=false`，因此未发布内容不会进入检索候选。
+- 发布与撤权：文档发布和索引指针切换位于同一数据库事务。新文档版本已经发布但目标索引未就绪时，系统立即停用旧 Chunk，宁可暂时无结果也不暴露旧版本；目标索引完成后自动激活。同一文档版本重建会生成递增 `build_no` 并原子退役旧索引。删除文档会立即停用全部 Chunk、删除发布指针，并以 `INDEX_DOCUMENT_REVOKED` 终止在途构建。
+- Embedding 边界：首期实现可替换 `EmbeddingAdapter`，本地默认 `deterministic-hash-1024-v1` 只用于确定性功能闭环和 pgvector 契约验证，不代表语义质量、真实供应商兼容性或成本验收；真实模型配置仍保持 `not_configured`。
+- 自动化验收：统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `283/283`，Ruff、mypy strict、架构、契约兼容、生成漂移和开发级供应链门禁均通过；索引构建单元测试 `6/6`、PostgreSQL 发布/重建/撤权生命周期 `1/1`、知识回归和 Migration 往返合计 `7/7` 通过。
+- 容器与真实闭环：重建 API、Worker、Web 和 Migration 镜像后，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0020`。Worker 注册四个版本化任务并持续执行 `platform.indexing.process.v1`；本地三个历史 Artifact 均形成 `ready` 索引和完整追溯 Chunk，因文档未发布保持 `active=false`。
+- 当前边界：本节点不增加检索与问答 API、任务查询页面或真实语义 Embedding 质量结论；供应商配置与密钥进入 `P1D-05`，主备路由和不可变运行配置进入 `P1D-06`，知识管理页面进入 `P1D-07`。未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -319,4 +332,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-03`，当前进入 `P1D-04`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-04`，当前进入 `P1D-05`。

@@ -41,6 +41,7 @@ class DocumentIdentity:
     department_ids: tuple[UUID, ...]
     visibility: Visibility
     security_level: SecurityLevel
+    permission_labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,7 @@ class Chunk:
     sequence_no: int
     parser_name: str
     ocr_used: bool
+    permission_labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

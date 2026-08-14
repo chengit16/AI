@@ -535,6 +535,12 @@ class KnowledgeFactService:
                     document_version_id,
                     published_at=now,
                 )
+                unit_of_work.knowledge.switch_document_index(
+                    context.workspace_id,
+                    document_id,
+                    document_version_id,
+                    activated_at=now,
+                )
                 _record(
                     unit_of_work,
                     context,
@@ -574,6 +580,11 @@ class KnowledgeFactService:
                     raise KnowledgeNotFoundError
                 deleted = document.delete(occurred_at=now)
                 unit_of_work.knowledge.save_document(deleted)
+                unit_of_work.knowledge.deactivate_document_indexes(
+                    context.workspace_id,
+                    document_id,
+                    deactivated_at=now,
+                )
                 _record(
                     unit_of_work,
                     context,

@@ -149,6 +149,7 @@ class StructuralChunker:
                     sequence_no=sequence_no,
                     parser_name=document.parser_name,
                     ocr_used=document.used_ocr,
+                    permission_labels=identity.permission_labels,
                 )
             )
             previous_tail = body

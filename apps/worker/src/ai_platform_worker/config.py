@@ -32,6 +32,14 @@ class WorkerSettings(BaseSettings):
     ingestion_dispatch_interval_seconds: float = 2.0
     ingestion_max_file_size_bytes: int = 20 * 1024 * 1024
     ingestion_max_page_count: int = 500
+    indexing_batch_size: int = 4
+    indexing_lease_seconds: int = 120
+    indexing_max_attempts: int = 3
+    indexing_retry_base_seconds: int = 5
+    indexing_dispatch_interval_seconds: float = 2.0
+    indexing_max_chunk_chars: int = 1_500
+    indexing_chunk_overlap_chars: int = 150
+    indexing_chunker_version: str = "structural-char-v1"
 
     @model_validator(mode="after")
     def validate_outbox_settings(self) -> "WorkerSettings":
@@ -56,6 +64,21 @@ class WorkerSettings(BaseSettings):
             raise ValueError("入库任务整数参数必须为正数")
         if not 0.5 <= self.ingestion_dispatch_interval_seconds <= 60:
             raise ValueError("入库任务调度间隔必须位于 0.5 到 60 秒之间")
+        indexing_values = (
+            self.indexing_batch_size,
+            self.indexing_lease_seconds,
+            self.indexing_max_attempts,
+            self.indexing_retry_base_seconds,
+            self.indexing_max_chunk_chars,
+        )
+        if any(value < 1 for value in indexing_values):
+            raise ValueError("索引任务整数参数必须为正数")
+        if not 0.5 <= self.indexing_dispatch_interval_seconds <= 60:
+            raise ValueError("索引任务调度间隔必须位于 0.5 到 60 秒之间")
+        if not 0 <= self.indexing_chunk_overlap_chars < self.indexing_max_chunk_chars:
+            raise ValueError("Chunk 重叠必须小于最大字符数")
+        if not self.indexing_chunker_version.strip():
+            raise ValueError("Chunker 版本不能为空")
         return self
 
 

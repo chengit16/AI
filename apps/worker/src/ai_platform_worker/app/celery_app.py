@@ -30,5 +30,9 @@ celery_app.conf.update(
             "task": "platform.ingestion.process.v1",
             "schedule": settings.ingestion_dispatch_interval_seconds,
         },
+        "process-index-versions": {
+            "task": "platform.indexing.process.v1",
+            "schedule": settings.indexing_dispatch_interval_seconds,
+        },
     },
 )

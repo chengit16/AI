@@ -47,6 +47,24 @@ def process_ingestion_jobs() -> dict[str, int]:
         runtime.close()
 
 
+@shared_task(name="platform.indexing.process.v1", ignore_result=True)
+def process_index_versions() -> dict[str, int]:
+    settings = get_worker_settings()
+    runtime = build_worker_runtime(settings)
+    try:
+        result = runtime.indexing.run_batch(limit=settings.indexing_batch_size)
+        return {
+            "enqueued": result.enqueued,
+            "claimed": result.claimed,
+            "succeeded": result.succeeded,
+            "retried": result.retried,
+            "failed": result.failed,
+            "lost_claims": result.lost_claims,
+        }
+    finally:
+        runtime.close()
+
+
 @shared_task(
     name="platform.integration.consume.v1",
     bind=True,

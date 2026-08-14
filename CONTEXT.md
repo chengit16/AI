@@ -122,12 +122,28 @@ _避免_：Chunk 集合、原始文件副本
 隔离中文扫描件识别实现的可替换边界；当前由 Tika 与 Tesseract `chi_sim+eng` 提供实现，后续替换 PaddleOCR 不影响入库状态机或解析产物契约。
 _避免_：固定 Tesseract 调用、多模态图片问答
 
+**索引版本（IndexVersion）**：
+对一个已成功解析的 DocumentVersion 执行一次不可变索引构建的持久化事实，冻结 Artifact 摘要、Chunker、Tokenizer、Embedding 模型和权限元数据；重建产生递增 `build_no`，不覆盖历史构建。
+_避免_：文档版本、Celery 任务、当前索引
+
+**可追溯 Chunk（TraceableChunk）**：
+由固定解析产物生成的最小检索单元，携带文档版本、入库任务、来源、Parser、OCR、权限范围和内容摘要；构建完成不代表可见，只有当前发布索引内的 Chunk 才能激活。
+_避免_：解析 Block、无权限元数据的文本片段
+
+**当前文档索引（CurrentDocumentIndex）**：
+某个 Document 当前允许检索的 IndexVersion 指针；文档发布、索引完成、重建和撤权通过数据库事务切换它，并同时更新 Chunk 可见性，任何时刻最多一个索引版本处于活动状态。
+_避免_：最新构建、文档发布指针
+
+**Embedding 适配器（EmbeddingAdapter）**：
+隔离文本向量实现、模型版本和维度契约的可替换边界；本地 `deterministic-hash-1024-v1` 只验证功能闭环，不代表真实语义质量。
+_避免_：固定供应商 SDK、质量评估结论
+
 **用量变更（UsageMutation）**：
 身份模块向可信业务模块提供的原子配额接口；业务模块声明计量项、变化量和幂等键，由权益模块在共享事务中完成额度检查、计数、审计与 Outbox，不允许跨模块直接写权益私有表。
 _避免_：直接更新计数器、业务模块自建配额
 
 ## 当前实施边界
 
-阶段 1 已完成账号、企业治理、复杂组织、RBAC/ABAC、字段投影、菜单注册与发布、动态应用壳层、知识事实模型、对象上传安全及持久化入库任务（`P1D-03`）。上传事实与任务同事务创建，Worker 以租约和有限重试执行解析与中文 OCR，并产生不含来源对象键的确定性 Artifact。
+阶段 1 已完成账号、企业治理、复杂组织、RBAC/ABAC、字段投影、菜单注册与发布、动态应用壳层，以及知识上传、解析、OCR、Chunk、Embedding 和索引版本切换（`P1D-04`）。构建期 Chunk 不可见，文档发布、索引重建和撤权均通过 PostgreSQL 原子切换当前索引。
 
-下一节点为 `P1D-04` 权限元数据 Chunk、Embedding、关键词索引和索引版本原子切换。当前仍不扩展 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+下一节点为 `P1D-05` 模型供应商配置、自定义 `base_url`、加密 Key、能力探测和数据政策。当前仍不扩展 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
