@@ -87,6 +87,7 @@ def create_app(
     application.state.model_runtime_service = dependencies.model_runtime
     application.state.assistant_conversation_service = dependencies.assistant_conversations
     application.state.retrieval_planning_service = dependencies.retrieval_planning
+    application.state.retrieval_evidence_service = dependencies.retrieval_evidence
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)

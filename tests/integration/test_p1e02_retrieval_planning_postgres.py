@@ -44,6 +44,9 @@ from ai_platform_api.modules.retrieval.application.planning import (
 from ai_platform_api.modules.retrieval.infrastructure.planning_sqlalchemy import (
     SqlAlchemyRetrievalPlanningUnitOfWork,
 )
+from ai_platform_api.modules.retrieval.infrastructure.reranking import (
+    DeterministicLexicalReranker,
+)
 from ai_platform_api.persistence.database import create_platform_engine, create_session_factory
 from ai_platform_api.persistence.tables import (
     ai_runtime_config_publication,
@@ -105,10 +108,11 @@ class AllowInternalWorkspacePolicy:
         )
 
 
-@pytest.fixture(scope="module")
-def retrieval_database() -> Iterator[RetrievalHarness]:
+def create_retrieval_harness(*, schema_prefix: str) -> Iterator[RetrievalHarness]:
+    """创建可由相邻检索节点复用且相互隔离的 PostgreSQL 测试环境。"""
+
     database_url = os.environ.get("AI_PLATFORM_TEST_DATABASE_URL", DEFAULT_DATABASE_URL)
-    schema = f"p1e02_test_{uuid4().hex}"
+    schema = f"{schema_prefix}_{uuid4().hex}"
     admin_engine = create_engine(database_url)
     with admin_engine.begin() as connection:
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
@@ -155,6 +159,13 @@ def retrieval_database() -> Iterator[RetrievalHarness]:
         admin_engine.dispose()
 
 
+@pytest.fixture(scope="module")
+def retrieval_database() -> Iterator[RetrievalHarness]:
+    """为 P1E-02 提供独占 Schema，避免并行节点共享可变测试事实。"""
+
+    yield from create_retrieval_harness(schema_prefix="p1e02_test")
+
+
 def register(harness: RetrievalHarness, identity: str) -> RegisteredAccount:
     result = harness.registration.register(
         login_name=f"synthetic.retrieval.{identity}.{uuid4().hex}@example.com",
@@ -182,6 +193,8 @@ def publish_runtime_config(harness: RetrievalHarness, account_id: UUID) -> None:
     runtime_config_version_id = uuid4()
     now = datetime.now(UTC)
     with harness.sessions.begin() as session:
+        if session.scalar(select(func.count()).select_from(ai_runtime_config_versions)):
+            return
         session.execute(
             insert(ai_runtime_config_versions).values(
                 runtime_config_version_id=runtime_config_version_id,
@@ -193,6 +206,8 @@ def publish_runtime_config(harness: RetrievalHarness, account_id: UUID) -> None:
                 component_versions={
                     "embedding": DeterministicHashEmbeddingAdapter.model_version,
                     "retrieval": "hybrid-rrf-v1",
+                    "reranker": DeterministicLexicalReranker.model_version,
+                    "source_ranking": "source-priority-v1",
                 },
                 attempt_timeout_ms=500,
                 total_timeout_ms=2_000,
@@ -335,6 +350,19 @@ def create_indexed_document(
                 active=True,
             )
         )
+    harness.knowledge.mark_document_version_ready(
+        request_context,
+        knowledge_base_id=knowledge_base_id,
+        document_id=document.document_id,
+        document_version_id=version.document_version_id,
+        content_hash=content_hash,
+    )
+    harness.knowledge.publish_document_version(
+        request_context,
+        knowledge_base_id=knowledge_base_id,
+        document_id=document.document_id,
+        document_version_id=version.document_version_id,
+    )
     return document.document_id
 
 

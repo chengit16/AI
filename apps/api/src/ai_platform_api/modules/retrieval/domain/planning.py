@@ -59,6 +59,8 @@ class RetrievalRunInput:
     embedding_model_version: str
     retrieval_strategy_version: str
     tokenizer_version: str
+    reranker_model_version: str = ""
+    source_ranking_version: str = ""
 
 
 @dataclass(frozen=True)

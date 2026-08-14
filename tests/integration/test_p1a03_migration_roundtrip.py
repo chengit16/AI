@@ -95,7 +95,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260815_0027"
+    assert current_revision(connection, schema) == "20260815_0028"
     assert business_tables(connection, schema) == {
         "accounts",
         "agent_publications",
@@ -154,6 +154,8 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "retrieval_plans",
         "retrieval_query_variants",
         "retrieval_candidate_snapshots",
+        "retrieval_evidence_items",
+        "retrieval_evidence_sets",
     }
 
     command.downgrade(config, "base")
@@ -165,7 +167,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260815_0027"
+    assert current_revision(connection, schema) == "20260815_0028"
     assert schema_snapshot(connection, schema) == first_head
 
 

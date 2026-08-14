@@ -99,6 +99,8 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             embedding_model_version=components.get("embedding", ""),
             retrieval_strategy_version=components.get("retrieval", ""),
             tokenizer_version=TOKENIZER_VERSION,
+            reranker_model_version=components.get("reranker", ""),
+            source_ranking_version=components.get("source_ranking", ""),
         )
 
     def get_plan(self, run_id: UUID) -> RetrievalPlanSnapshot | None:

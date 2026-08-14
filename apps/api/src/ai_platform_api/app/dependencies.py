@@ -100,11 +100,18 @@ from ai_platform_api.modules.model_gateway.infrastructure.runtime_sqlalchemy imp
     SqlAlchemyRuntimeInvocationStore,
 )
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
+from ai_platform_api.modules.retrieval.application.evidence import RetrievalEvidenceService
 from ai_platform_api.modules.retrieval.application.planning import (
     BoundedRetrievalPlanningService,
 )
+from ai_platform_api.modules.retrieval.infrastructure.evidence_sqlalchemy import (
+    SqlAlchemyEvidenceProcessingUnitOfWork,
+)
 from ai_platform_api.modules.retrieval.infrastructure.planning_sqlalchemy import (
     SqlAlchemyRetrievalPlanningUnitOfWork,
+)
+from ai_platform_api.modules.retrieval.infrastructure.reranking import (
+    DeterministicLexicalReranker,
 )
 from ai_platform_api.persistence.database import PlatformDatabase
 
@@ -139,6 +146,7 @@ class ApplicationContainer:
     model_runtime: RuntimeModelGatewayService | None = None
     assistant_conversations: AssistantConversationService | None = None
     retrieval_planning: BoundedRetrievalPlanningService | None = None
+    retrieval_evidence: RetrievalEvidenceService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -227,6 +235,12 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         field_registry,
         DeterministicHashEmbeddingAdapter(),
     )
+    retrieval_evidence = RetrievalEvidenceService(
+        SqlAlchemyEvidenceProcessingUnitOfWork(database.sessions),
+        policy,
+        field_registry,
+        DeterministicLexicalReranker(),
+    )
     # 3. 容器接管全部资源；构造中途失败时按依赖逆序关闭，避免泄漏连接和缓存客户端。
     try:
         return ApplicationContainer(
@@ -262,6 +276,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             assistant_conversations=assistant_conversations,
             retrieval_planning=retrieval_planning,
+            retrieval_evidence=retrieval_evidence,
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,

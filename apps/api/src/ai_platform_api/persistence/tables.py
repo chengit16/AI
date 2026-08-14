@@ -2007,6 +2007,143 @@ retrieval_candidate_snapshots = Table(
     ),
 )
 
+retrieval_evidence_sets = Table(
+    "retrieval_evidence_sets",
+    metadata,
+    Column("evidence_set_id", UUID(as_uuid=True), primary_key=True),
+    Column("retrieval_plan_id", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("run_id", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("degradation_reason", String(64), nullable=True),
+    Column("policy_decision_id", UUID(as_uuid=True), nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("reranker_model_version", String(255), nullable=False),
+    Column("source_ranking_version", String(128), nullable=False),
+    Column("fastpass_used", Boolean, nullable=False),
+    Column("reranker_used", Boolean, nullable=False),
+    Column("candidate_count", Integer, nullable=False),
+    Column("rejected_candidate_count", Integer, nullable=False),
+    Column("conflict_count", Integer, nullable=False),
+    Column("read_document_count", Integer, nullable=False),
+    Column("read_chunk_count", Integer, nullable=False),
+    Column("read_character_count", Integer, nullable=False),
+    Column("estimated_token_count", Integer, nullable=False),
+    Column("rerank_candidate_limit", Integer, nullable=False),
+    Column("final_evidence_limit", Integer, nullable=False),
+    Column("max_documents", Integer, nullable=False),
+    Column("surrounding_chunks", Integer, nullable=False),
+    Column("max_chunks", Integer, nullable=False),
+    Column("max_characters", Integer, nullable=False),
+    Column("max_tokens", Integer, nullable=False),
+    Column("max_elapsed_ms", Integer, nullable=False),
+    Column("fastpass_score_ratio", Float, nullable=False),
+    Column("minimum_final_score", Float, nullable=False),
+    Column("max_quote_characters", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    Column("duration_ms", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["retrieval_plan_id"],
+        [f"{SCHEMA_TOKEN}.retrieval_plans.retrieval_plan_id"],
+        name="fk_retrieval_evidence_sets_plan",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["run_id"],
+        [f"{SCHEMA_TOKEN}.assistant_runs.run_id"],
+        name="fk_retrieval_evidence_sets_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_retrieval_evidence_sets_requester",
+    ),
+    CheckConstraint(
+        "(status = 'sufficient' AND degradation_reason IS NULL) OR "
+        "(status = 'uncertain' AND degradation_reason IN "
+        "('no_candidates', 'no_current_evidence', 'insufficient_sources', "
+        "'conflicting_evidence'))",
+        name="ck_retrieval_evidence_sets_status",
+    ),
+    CheckConstraint("policy_version >= 1", name="ck_retrieval_evidence_sets_policy"),
+    CheckConstraint(
+        "candidate_count >= 0 AND rejected_candidate_count >= 0 "
+        "AND rejected_candidate_count <= candidate_count AND conflict_count >= 0 "
+        "AND read_document_count >= 0 AND read_chunk_count >= 0 "
+        "AND read_character_count >= 0 AND estimated_token_count >= 0 AND duration_ms >= 0",
+        name="ck_retrieval_evidence_sets_metrics",
+    ),
+    CheckConstraint(
+        "rerank_candidate_limit >= 1 AND final_evidence_limit >= 1 AND max_documents >= 1 "
+        "AND surrounding_chunks >= 0 AND max_chunks >= 1 AND max_characters >= 1 "
+        "AND max_tokens >= 1 AND max_elapsed_ms >= 1 AND fastpass_score_ratio >= 1 "
+        "AND minimum_final_score BETWEEN 0 AND 1 AND max_quote_characters >= 1",
+        name="ck_retrieval_evidence_sets_budget",
+    ),
+)
+Index(
+    "ix_retrieval_evidence_sets_workspace_time",
+    retrieval_evidence_sets.c.workspace_id,
+    retrieval_evidence_sets.c.created_at,
+)
+
+retrieval_evidence_items = Table(
+    "retrieval_evidence_items",
+    metadata,
+    Column("evidence_set_id", UUID(as_uuid=True), primary_key=True),
+    Column("rank", Integer, primary_key=True),
+    Column("chunk_id", UUID(as_uuid=True), nullable=False),
+    Column("index_version_id", UUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", UUID(as_uuid=True), nullable=False),
+    Column("document_id", UUID(as_uuid=True), nullable=False),
+    Column("document_version_id", UUID(as_uuid=True), nullable=False),
+    Column("content_hash", String(64), nullable=False),
+    Column("quote", Text, nullable=False),
+    Column("context_text", Text, nullable=False),
+    Column("context_hash", String(64), nullable=False),
+    Column("context_chunk_ids", ARRAY(UUID(as_uuid=True)), nullable=False),
+    Column("source_position", JSONB, nullable=False),
+    Column("document_title", String(255), nullable=False),
+    Column("source_kind", String(32), nullable=False),
+    Column("source_name", String(255), nullable=False),
+    Column("retrieval_score", Float, nullable=False),
+    Column("relevance_score", Float, nullable=False),
+    Column("authority_score", Float, nullable=False),
+    Column("freshness_score", Float, nullable=False),
+    Column("final_score", Float, nullable=False),
+    Column("conflict_detected", Boolean, nullable=False),
+    ForeignKeyConstraint(
+        ["evidence_set_id"],
+        [f"{SCHEMA_TOKEN}.retrieval_evidence_sets.evidence_set_id"],
+        name="fk_retrieval_evidence_items_set",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("rank >= 1", name="ck_retrieval_evidence_items_rank"),
+    CheckConstraint(
+        "content_hash ~ '^[0-9a-f]{64}$' AND context_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_retrieval_evidence_items_hashes",
+    ),
+    CheckConstraint(
+        "char_length(btrim(quote)) BETWEEN 1 AND 1000 "
+        "AND char_length(context_text) BETWEEN 1 AND 12000 "
+        "AND cardinality(context_chunk_ids) BETWEEN 1 AND 12",
+        name="ck_retrieval_evidence_items_content",
+    ),
+    CheckConstraint(
+        "source_kind IN ('manual', 'upload', 'web', 'data_source')",
+        name="ck_retrieval_evidence_items_source_kind",
+    ),
+    CheckConstraint(
+        "retrieval_score >= 0 AND relevance_score BETWEEN 0 AND 1 "
+        "AND authority_score BETWEEN 0 AND 1 AND freshness_score BETWEEN 0 AND 1 "
+        "AND final_score BETWEEN 0 AND 1",
+        name="ck_retrieval_evidence_items_scores",
+    ),
+)
+
 stream_runs = Table(
     "stream_runs",
     metadata,

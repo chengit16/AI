@@ -12,11 +12,12 @@ from uuid import UUID, uuid4
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import FieldPolicyRegistry
-from ai_platform_api.modules.authorization.domain.policy import (
-    PolicyDecision,
-    PolicyDecisionPoint,
-    PolicyRequest,
-    ResourceReference,
+from ai_platform_api.modules.authorization.domain.policy import PolicyDecisionPoint
+from ai_platform_api.modules.retrieval.application.authorization import (
+    resolve_retrieval_authorization,
+    retrieval_policy_request,
+    same_retrieval_authorization,
+    same_retrieval_requester,
 )
 from ai_platform_api.modules.retrieval.application.search import reciprocal_rank_fusion
 from ai_platform_api.modules.retrieval.application.tokenization import (
@@ -35,7 +36,6 @@ from ai_platform_api.modules.retrieval.domain.models import (
 from ai_platform_api.modules.retrieval.domain.planning import (
     QueryClassification,
     QueryVariant,
-    RetrievalAuthorization,
     RetrievalCandidateSnapshot,
     RetrievalPlannerBudget,
     RetrievalPlanningUnitOfWork,
@@ -133,14 +133,14 @@ class BoundedRetrievalPlanningService:
         # 1. 锁定 Run 并从服务端事实恢复用户、空间和组件版本，不接受调用方覆盖检索配置。
         with self._unit_of_work as unit_of_work:
             run = unit_of_work.planning.lock_run(run_id)
-            if run is None or not _same_requester(context, run):
+            if run is None or not same_retrieval_requester(context, run):
                 raise RetrievalScopeDeniedError
             _require_runtime_compatibility(run, self._embedding_provider)
-            decision = self._policy.decide(_policy_request(context))
-            authorization = _retrieval_authorization(decision, self._field_registry)
+            decision = self._policy.decide(retrieval_policy_request(context))
+            authorization = resolve_retrieval_authorization(decision, self._field_registry)
             existing = unit_of_work.planning.get_plan(run_id)
             if existing is not None:
-                if not _same_authorization(existing, authorization):
+                if not same_retrieval_authorization(existing, authorization):
                     raise RetrievalScopeDeniedError
                 return existing
 
@@ -256,58 +256,6 @@ class BoundedRetrievalPlanningService:
         )
 
 
-def _policy_request(context: RequestContext) -> PolicyRequest:
-    return PolicyRequest(
-        context=context,
-        permission_code="knowledge.document.read",
-        resource=ResourceReference(
-            resource_type="document",
-            resource_id=context.workspace_id,
-            workspace_id=context.workspace_id,
-            attributes={"risk_level": "high"},
-        ),
-    )
-
-
-def _retrieval_authorization(
-    decision: PolicyDecision,
-    field_registry: FieldPolicyRegistry,
-) -> RetrievalAuthorization:
-    if not decision.allowed:
-        raise RetrievalScopeDeniedError
-    chunk_mask = field_registry.field_mask(
-        "chunk",
-        decision.maximum_security_level,
-        {},
-    ) | frozenset(
-        field_name
-        for field_name in decision.field_mask
-        if field_name in field_registry.fields_for("chunk")
-    )
-    if "content" in chunk_mask:
-        raise RetrievalScopeDeniedError
-    return RetrievalAuthorization(
-        decision_id=decision.decision_id,
-        policy_version=decision.policy_version,
-        workspace_wide=decision.resource_scope.workspace,
-        department_ids=decision.resource_scope.department_ids,
-        account_ids=decision.resource_scope.account_ids,
-        resource_ids=decision.resource_scope.resource_ids,
-        maximum_security_level=decision.maximum_security_level,
-        field_mask=chunk_mask,
-    )
-
-
-def _same_requester(context: RequestContext, run: RetrievalRunInput) -> bool:
-    return (
-        context.workspace_id == run.workspace_id
-        and context.user_id == run.requested_by_account_id
-        and context.actor_id == run.requested_by_account_id
-        and context.authentication_method == "browser_session"
-        and run.status in {"queued", "running"}
-    )
-
-
 def _require_runtime_compatibility(
     run: RetrievalRunInput,
     embedding_provider: EmbeddingProvider,
@@ -319,17 +267,6 @@ def _require_runtime_compatibility(
         or embedding_provider.dimension != 1024
     ):
         raise RetrievalConfigurationError
-
-
-def _same_authorization(
-    existing: RetrievalPlanSnapshot,
-    authorization: RetrievalAuthorization,
-) -> bool:
-    return (
-        existing.policy_version == authorization.policy_version
-        and existing.maximum_security_level == authorization.maximum_security_level
-        and existing.field_mask == authorization.field_mask
-    )
 
 
 def _normalize_query(query: str) -> str:

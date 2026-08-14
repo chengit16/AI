@@ -1,6 +1,7 @@
 """检索、受控精读和引用验证应用服务的公开入口。"""
 
 from ai_platform_api.modules.retrieval.application.citations import CitationService
+from ai_platform_api.modules.retrieval.application.evidence import RetrievalEvidenceService
 from ai_platform_api.modules.retrieval.application.planning import (
     BoundedRetrievalPlanningService,
     DeterministicQueryRewriter,
@@ -14,4 +15,5 @@ __all__ = [
     "CitationService",
     "DeterministicQueryRewriter",
     "HybridRetriever",
+    "RetrievalEvidenceService",
 ]
