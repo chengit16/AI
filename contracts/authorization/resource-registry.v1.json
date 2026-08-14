@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 4,
+  "registry_version": 5,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -156,7 +156,9 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000048", "api_key": "knowledge.document.delete", "operation_id": "deleteKnowledgeDocument", "method": "DELETE", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}", "access_level": "authorized", "permission_code": "knowledge.document.delete", "risk_level": "critical", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000049", "api_key": "knowledge.document_version.create", "operation_id": "createKnowledgeDocumentVersion", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions", "access_level": "authorized", "permission_code": "knowledge.document.version.create", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000050", "api_key": "knowledge.document_version.ready", "operation_id": "markKnowledgeDocumentVersionReady", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/{document_version_id}/ready", "access_level": "authorized", "permission_code": "knowledge.document.version.ready", "risk_level": "high", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000051", "api_key": "knowledge.document_version.publish", "operation_id": "publishKnowledgeDocumentVersion", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/{document_version_id}/publish", "access_level": "authorized", "permission_code": "knowledge.document.version.publish", "risk_level": "critical", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000051", "api_key": "knowledge.document_version.publish", "operation_id": "publishKnowledgeDocumentVersion", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/{document_version_id}/publish", "access_level": "authorized", "permission_code": "knowledge.document.version.publish", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000052", "api_key": "knowledge.document.upload", "operation_id": "uploadKnowledgeDocument", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/upload", "access_level": "authorized", "permission_code": "knowledge.document.create", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000053", "api_key": "knowledge.document_version.upload", "operation_id": "uploadKnowledgeDocumentVersion", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/upload", "access_level": "authorized", "permission_code": "knowledge.document.version.create", "risk_level": "high", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -253,6 +255,8 @@
     { "menu_id": "82000000-0000-4000-8000-000000000141", "api_resource_id": "81000000-0000-4000-8000-000000000048", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000142", "api_resource_id": "81000000-0000-4000-8000-000000000049", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000143", "api_resource_id": "81000000-0000-4000-8000-000000000050", "action_type": "mutation" },
-    { "menu_id": "82000000-0000-4000-8000-000000000144", "api_resource_id": "81000000-0000-4000-8000-000000000051", "action_type": "publish" }
+    { "menu_id": "82000000-0000-4000-8000-000000000144", "api_resource_id": "81000000-0000-4000-8000-000000000051", "action_type": "publish" },
+    { "menu_id": "82000000-0000-4000-8000-000000000140", "api_resource_id": "81000000-0000-4000-8000-000000000052", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000142", "api_resource_id": "81000000-0000-4000-8000-000000000053", "action_type": "mutation" }
   ]
 }

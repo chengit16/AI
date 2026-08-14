@@ -1,10 +1,12 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 from ai_platform_api.common.api_errors import error_responses
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.config import Settings, get_settings
 from ai_platform_api.modules.identity.api.dependencies import trusted_request_context
 from ai_platform_api.modules.knowledge.api.schemas import (
     CreateDocumentRequest,
@@ -13,10 +15,13 @@ from ai_platform_api.modules.knowledge.api.schemas import (
     DocumentCreatedResponse,
     DocumentResponse,
     DocumentSourceResponse,
+    DocumentUploadResponse,
     DocumentVersionCreatedResponse,
     DocumentVersionResponse,
+    DocumentVersionUploadResponse,
     KnowledgeBaseResponse,
     MarkDocumentVersionReadyRequest,
+    UploadMetadataResponse,
 )
 from ai_platform_api.modules.knowledge.application.facts import (
     Document,
@@ -26,6 +31,10 @@ from ai_platform_api.modules.knowledge.application.facts import (
     KnowledgeDeniedError,
     KnowledgeFactService,
 )
+from ai_platform_api.modules.knowledge.application.uploads import (
+    KnowledgeUploadService,
+    UploadFileTooLargeError,
+)
 
 router = APIRouter(prefix="/workspaces/{workspace_id}", tags=["知识事实"])
 
@@ -34,6 +43,13 @@ def knowledge_fact_service(request: Request) -> KnowledgeFactService:
     service = getattr(request.app.state, "knowledge_fact_service", None)
     if not isinstance(service, KnowledgeFactService):
         raise RuntimeError("知识事实服务尚未完成装配")
+    return service
+
+
+def knowledge_upload_service(request: Request) -> KnowledgeUploadService:
+    service = getattr(request.app.state, "knowledge_upload_service", None)
+    if not isinstance(service, KnowledgeUploadService):
+        raise RuntimeError("知识上传服务尚未完成装配")
     return service
 
 
@@ -102,7 +118,7 @@ def create_document(
         title=body.title,
         source_kind=body.source_kind,
         source_name=body.source_name,
-        original_object_key=body.original_object_key,
+        original_object_key=None,
         source_path=body.source_path,
         source_url=body.source_url,
         external_source_id=body.external_source_id,
@@ -118,6 +134,54 @@ def create_document(
         document=_document(document),
         document_version=_document_version(version),
         source=_source(source),
+    )
+
+
+@router.post(
+    "/knowledge-bases/{knowledge_base_id}/documents/upload",
+    response_model=DocumentUploadResponse,
+    operation_id="uploadKnowledgeDocument",
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(400, 401, 403, 404, 409, 413, 415, 422, 500, 503),
+)
+async def upload_document(
+    workspace_id: UUID,
+    knowledge_base_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeUploadService, Depends(knowledge_upload_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    file: Annotated[UploadFile, File(description="待安全检查的文档原件")],
+    title: Annotated[str, Form(min_length=1, max_length=255)],
+    visibility: Annotated[Literal["private", "workspace", "departments"] | None, Form()] = None,
+    department_ids: Annotated[list[UUID] | None, Form()] = None,
+    security_level: Annotated[
+        Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"] | None, Form()
+    ] = None,
+    permission_labels: Annotated[list[str] | None, Form()] = None,
+) -> DocumentUploadResponse:
+    _require_workspace_path(context, workspace_id)
+    result = await run_in_threadpool(
+        service.upload_document,
+        context,
+        knowledge_base_id=knowledge_base_id,
+        title=title,
+        file_name=file.filename or "",
+        declared_media_type=file.content_type,
+        content=await _read_bounded_upload(file, settings.upload_max_file_size_bytes),
+        visibility=visibility,
+        department_ids=frozenset(department_ids) if department_ids is not None else None,
+        security_level=security_level,
+        permission_labels=frozenset(permission_labels or ()),
+    )
+    return DocumentUploadResponse(
+        document=_document(result.document),
+        document_version=_document_version(result.document_version),
+        source=_source(result.source),
+        upload=UploadMetadataResponse(
+            media_type=result.media_type,
+            size_bytes=result.size_bytes,
+            content_hash=result.content_hash,
+        ),
     )
 
 
@@ -166,7 +230,7 @@ def create_document_version(
         document_id=document_id,
         source_kind=body.source_kind,
         source_name=body.source_name,
-        original_object_key=body.original_object_key,
+        original_object_key=None,
         source_path=body.source_path,
         source_url=body.source_url,
         external_source_id=body.external_source_id,
@@ -175,6 +239,43 @@ def create_document_version(
     return DocumentVersionCreatedResponse(
         document_version=_document_version(version),
         source=_source(source),
+    )
+
+
+@router.post(
+    "/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/upload",
+    response_model=DocumentVersionUploadResponse,
+    operation_id="uploadKnowledgeDocumentVersion",
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(400, 401, 403, 404, 409, 413, 415, 422, 500, 503),
+)
+async def upload_document_version(
+    workspace_id: UUID,
+    knowledge_base_id: UUID,
+    document_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeUploadService, Depends(knowledge_upload_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    file: Annotated[UploadFile, File(description="待安全检查的新版本原件")],
+) -> DocumentVersionUploadResponse:
+    _require_workspace_path(context, workspace_id)
+    result = await run_in_threadpool(
+        service.upload_document_version,
+        context,
+        knowledge_base_id=knowledge_base_id,
+        document_id=document_id,
+        file_name=file.filename or "",
+        declared_media_type=file.content_type,
+        content=await _read_bounded_upload(file, settings.upload_max_file_size_bytes),
+    )
+    return DocumentVersionUploadResponse(
+        document_version=_document_version(result.document_version),
+        source=_source(result.source),
+        upload=UploadMetadataResponse(
+            media_type=result.media_type,
+            size_bytes=result.size_bytes,
+            content_hash=result.content_hash,
+        ),
     )
 
 
@@ -296,3 +397,16 @@ def _source(value: DocumentSource) -> DocumentSourceResponse:
 def _require_workspace_path(context: RequestContext, workspace_id: UUID) -> None:
     if workspace_id != context.workspace_id:
         raise KnowledgeDeniedError
+
+
+async def _read_bounded_upload(file: UploadFile, max_size_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    received = 0
+    while True:
+        chunk = await file.read(min(1024 * 1024, max_size_bytes + 1 - received))
+        if not chunk:
+            return b"".join(chunks)
+        received += len(chunk)
+        if received > max_size_bytes:
+            raise UploadFileTooLargeError
+        chunks.append(chunk)

@@ -23,6 +23,9 @@ def error_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
         409: "资源状态冲突",
         422: "请求参数无效",
         500: "平台内部错误",
+        503: "依赖服务暂时不可用",
+        413: "上传内容超过限制",
+        415: "上传内容类型不受支持",
     }
     return {
         status: {

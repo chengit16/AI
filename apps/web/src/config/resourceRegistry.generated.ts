@@ -1,7 +1,7 @@
 // 由 scripts/generate_resource_registry.py 自动生成, 请勿手工修改。
 export const resourceRegistry = {
   schema_version: 1,
-  registry_version: 4,
+  registry_version: 5,
   permissions: [
     {
       code: "workspace.overview.access",
@@ -945,6 +945,30 @@ export const resourceRegistry = {
       risk_level: "critical",
       status: "active",
     },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000052",
+      api_key: "knowledge.document.upload",
+      operation_id: "uploadKnowledgeDocument",
+      method: "POST",
+      path_pattern:
+        "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/upload",
+      access_level: "authorized",
+      permission_code: "knowledge.document.create",
+      risk_level: "high",
+      status: "active",
+    },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000053",
+      api_key: "knowledge.document_version.upload",
+      operation_id: "uploadKnowledgeDocumentVersion",
+      method: "POST",
+      path_pattern:
+        "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/upload",
+      access_level: "authorized",
+      permission_code: "knowledge.document.version.create",
+      risk_level: "high",
+      status: "active",
+    },
   ],
   menus: [
     {
@@ -1805,6 +1829,16 @@ export const resourceRegistry = {
       menu_id: "82000000-0000-4000-8000-000000000144",
       api_resource_id: "81000000-0000-4000-8000-000000000051",
       action_type: "publish",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000140",
+      api_resource_id: "81000000-0000-4000-8000-000000000052",
+      action_type: "mutation",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000142",
+      api_resource_id: "81000000-0000-4000-8000-000000000053",
+      action_type: "mutation",
     },
   ],
 } as const;

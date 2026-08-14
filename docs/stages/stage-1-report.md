@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1D-02` 待开始 |
+| 当前节点 | `P1D-03` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -281,6 +281,20 @@
 - 自动化验收：知识领域、权限、契约、配额和真实 PostgreSQL/Valkey 专项通过。统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python 全量 pytest `259/259`、Ruff、mypy strict、架构、契约兼容与生成漂移、供应链门禁均通过；Migration `base → head → base → head` 和知识/权益真实基础设施回归 `6/6` 通过。
 - 容器与 HTTP 验收：以当前工作树重建 API、Worker、Web 和 Migration 镜像，`platform doctor` 八项全部通过，数据库 Revision 为 `20260814_0016`。全合成 HTTP 闭环完成个人知识创建、文档版本发布、来源敏感字段保护、知识库用量 `1 → 0`；企业所有者可创建，普通成员写入稳定返回 `403 POLICY_DENIED`。
 - 当前边界：本节点只建立来源、版本和发布事实，不上传真实对象、不执行病毒扫描、解析、OCR、Embedding 或索引。对象上传和安全校验进入 `P1D-02`；真实多源连接器保持后置。未扩展 SaaS、Go 运行层、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
+- 提交：`9dead1c`。
+
+### P1D-02 对象存储与上传安全
+
+- 状态：通过。
+- 上传边界：新增创建文档上传和既有文档新版本上传两个 `multipart/form-data` 接口。服务端按 `max + 1` 有界读取，默认单文件上限为可配置的 20 MiB，不信任客户端 `Content-Length`；文件名去除路径，仅允许 TXT、Markdown、PDF、DOCX、PNG、JPEG 和 TIFF 对应扩展名。
+- 类型与扫描：扩展名、声明媒体类型与真实文件签名必须一致。确定性扫描 Adapter 拒绝 EICAR、可执行文件签名、PDF 主动内容、Office 宏/ActiveX/嵌入对象、路径穿越和异常压缩比；损坏容器或扫描器无法形成可信结论时返回稳定 `503` 并失败关闭。扫描接口保持可替换，后续可接独立 ClamAV 等引擎而不修改上传用例。
+- 对象存储：新增窄 `ObjectStorage` 接口和 MinIO 官方 SDK 实现，当前 Bucket 默认私有且按需创建。对象键只由服务端生成，固定为 `workspaces/{workspace_id}/uploads/{random}` 形态；客户端无法提交或读取 Bucket、对象键和来源路径。Adapter 在网络访问前验证工作空间前缀，MinIO 只是当前 S3-compatible 实现，可替换 AWS S3 或国内兼容对象存储。
+- 一致性与配额：上传前先用短事务确认所有者和目标存在，再执行扫描与对象写入，避免未授权请求消耗外部资源。数据库事实写入会再次校验主体和目标；事务失败时补偿删除已写对象。`DocumentSource` 记录媒体类型、字节数、SHA-256、扫描状态、扫描器版本和时间；存储字节配额、来源事实、审计与 Outbox 在同一数据库事务提交。
+- 权限与兼容：`ResourceRegistry` 推进至版本 5，保持 45 项 Permission 和 49 个菜单，新增两个 API 与既有“创建文档/创建版本”动作菜单绑定，合计 53 个 API 和 46 个绑定。OpenAPI V1 保留弃用的 `original_object_key` 可选字段以维持兼容，但任何非空值和 JSON `upload` 来源都稳定拒绝，只有受控 multipart 接口能生成对象事实。
+- 数据与供应链：新增 Migration `20260814_0017`，扩展 `document_sources` 六个上传安全字段及完整性约束。引入固定 `minio 7.2.15` 与 `python-multipart 0.0.20`，OpenAPI、React/Python 类型、ReleaseManifest、兼容矩阵、SBOM、许可证清单和平台诊断同步更新。
+- 自动化验收：上传检查、恶意样本、跨空间对象键、扫描不可用、授权前置、事务失败补偿、真实 MinIO put/get/delete、契约、资源注册和 Migration 往返专项通过。统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `269/269`、Ruff、mypy strict、架构、契约兼容、生成漂移和供应链门禁均通过。
+- 容器与 HTTP 验收：以当前工作树重建 API、Worker、Web 和 Migration 镜像，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0017`。全合成个人空间上传 58 字节 Markdown 后存储用量 `0 → 58`，响应不含对象定位信息；伪造 PDF 返回 `415 UPLOAD_TYPE_MISMATCH`，用量保持 58。
+- 当前边界：本节点不创建 `IngestionJob`，不执行 Tika 解析、中文 OCR、Chunk、Embedding 或索引。确定性扫描器是可替换的本地安全基线，不宣称等同完整商业恶意文件检测；独立扫描引擎可在部署时替换。上述入库任务和解析进入 `P1D-03`，未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态问答、Channel Gateway 或 Durable Run。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -292,4 +306,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-01`，当前进入 `P1D-02`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-02`，当前进入 `P1D-03`。

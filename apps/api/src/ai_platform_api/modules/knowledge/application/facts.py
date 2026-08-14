@@ -66,6 +66,34 @@ class KnowledgeFactService:
     def __init__(self, unit_of_work: KnowledgeUnitOfWork) -> None:
         self._unit_of_work = unit_of_work
 
+    def require_upload_target(
+        self,
+        context: RequestContext,
+        *,
+        knowledge_base_id: UUID,
+        document_id: UUID | None = None,
+    ) -> None:
+        """在外部扫描与对象写入前，以短事务确认主体和目标仍可写。"""
+
+        account_id = _account(context)
+        with self._unit_of_work as unit_of_work:
+            _require_owner(unit_of_work.knowledge, context.workspace_id, account_id)
+            knowledge_base = unit_of_work.knowledge.get_knowledge_base(
+                context.workspace_id,
+                knowledge_base_id,
+            )
+            if knowledge_base is None or knowledge_base.status != "active":
+                raise KnowledgeNotFoundError
+            if document_id is None:
+                return
+            document = unit_of_work.knowledge.get_document(context.workspace_id, document_id)
+            if (
+                document is None
+                or document.knowledge_base_id != knowledge_base_id
+                or document.status != "active"
+            ):
+                raise KnowledgeNotFoundError
+
     def create_knowledge_base(
         self,
         context: RequestContext,
@@ -152,9 +180,24 @@ class KnowledgeFactService:
         department_ids: frozenset[UUID] | None = None,
         security_level: SecurityLevel | None = None,
         permission_labels: frozenset[str] = frozenset(),
+        upload_media_type: str | None = None,
+        upload_size_bytes: int | None = None,
+        upload_content_hash: str | None = None,
+        upload_scan_status: str | None = None,
+        upload_scanner_version: str | None = None,
+        upload_scanned_at: datetime | None = None,
     ) -> tuple[Document, DocumentVersion, DocumentSource]:
         account_id = _account(context)
         now = datetime.now(UTC)
+        _require_upload_security(
+            source_kind,
+            upload_media_type,
+            upload_size_bytes,
+            upload_content_hash,
+            upload_scan_status,
+            upload_scanner_version,
+            upload_scanned_at,
+        )
         try:
             with self._unit_of_work as unit_of_work:
                 _require_owner(unit_of_work.knowledge, context.workspace_id, account_id)
@@ -204,6 +247,12 @@ class KnowledgeFactService:
                     external_source_id,
                     captured_at,
                     now,
+                    upload_media_type,
+                    upload_size_bytes,
+                    upload_content_hash,
+                    upload_scan_status,
+                    upload_scanner_version,
+                    upload_scanned_at,
                 )
                 document.assert_valid()
                 version.assert_valid()
@@ -215,6 +264,17 @@ class KnowledgeFactService:
                 )
                 unit_of_work.knowledge.add_document(document)
                 unit_of_work.knowledge.add_document_version(version, source)
+                if upload_size_bytes is not None:
+                    usage = consume_usage(
+                        unit_of_work.usage,
+                        context=context,
+                        workspace_id=context.workspace_id,
+                        metric="storage_bytes",
+                        delta_value=upload_size_bytes,
+                        idempotency_key=f"upload:{source.source_id}:storage",
+                        occurred_at=now,
+                    )
+                    _record_usage(unit_of_work, usage)
                 _record(
                     unit_of_work,
                     context,
@@ -233,6 +293,12 @@ class KnowledgeFactService:
                 unit_of_work.commit()
         except InvalidKnowledgeFactError as error:
             raise KnowledgeValidationError from error
+        except QuotaExceededError as error:
+            raise KnowledgeQuotaExceededError from error
+        except EntitlementGovernanceDeniedError as error:
+            raise KnowledgeDeniedError from error
+        except EntitlementConflictError as error:
+            raise KnowledgeConflictError from error
         except KnowledgeWriteConflictError as error:
             raise KnowledgeConflictError from error
         return document, version, source
@@ -250,9 +316,24 @@ class KnowledgeFactService:
         source_url: str | None = None,
         external_source_id: str | None = None,
         captured_at: datetime | None = None,
+        upload_media_type: str | None = None,
+        upload_size_bytes: int | None = None,
+        upload_content_hash: str | None = None,
+        upload_scan_status: str | None = None,
+        upload_scanner_version: str | None = None,
+        upload_scanned_at: datetime | None = None,
     ) -> tuple[DocumentVersion, DocumentSource]:
         account_id = _account(context)
         now = datetime.now(UTC)
+        _require_upload_security(
+            source_kind,
+            upload_media_type,
+            upload_size_bytes,
+            upload_content_hash,
+            upload_scan_status,
+            upload_scanner_version,
+            upload_scanned_at,
+        )
         try:
             with self._unit_of_work as unit_of_work:
                 _require_owner(unit_of_work.knowledge, context.workspace_id, account_id)
@@ -292,10 +373,27 @@ class KnowledgeFactService:
                     external_source_id,
                     captured_at,
                     now,
+                    upload_media_type,
+                    upload_size_bytes,
+                    upload_content_hash,
+                    upload_scan_status,
+                    upload_scanner_version,
+                    upload_scanned_at,
                 )
                 version.assert_valid()
                 source.assert_valid()
                 unit_of_work.knowledge.add_document_version(version, source)
+                if upload_size_bytes is not None:
+                    usage = consume_usage(
+                        unit_of_work.usage,
+                        context=context,
+                        workspace_id=context.workspace_id,
+                        metric="storage_bytes",
+                        delta_value=upload_size_bytes,
+                        idempotency_key=f"upload:{source.source_id}:storage",
+                        occurred_at=now,
+                    )
+                    _record_usage(unit_of_work, usage)
                 _record(
                     unit_of_work,
                     context,
@@ -310,6 +408,12 @@ class KnowledgeFactService:
                 unit_of_work.commit()
         except InvalidKnowledgeFactError as error:
             raise KnowledgeValidationError from error
+        except QuotaExceededError as error:
+            raise KnowledgeQuotaExceededError from error
+        except EntitlementGovernanceDeniedError as error:
+            raise KnowledgeDeniedError from error
+        except EntitlementConflictError as error:
+            raise KnowledgeConflictError from error
         except KnowledgeWriteConflictError as error:
             raise KnowledgeConflictError from error
         return version, source
@@ -559,6 +663,29 @@ def _account(context: RequestContext) -> UUID:
     ):
         raise KnowledgeDeniedError
     return context.user_id
+
+
+def _require_upload_security(
+    source_kind: DocumentSourceKind,
+    media_type: str | None,
+    size_bytes: int | None,
+    content_hash: str | None,
+    scan_status: str | None,
+    scanner_version: str | None,
+    scanned_at: datetime | None,
+) -> None:
+    security_fact = (
+        media_type,
+        size_bytes,
+        content_hash,
+        scan_status,
+        scanner_version,
+        scanned_at,
+    )
+    if source_kind == "upload" and any(value is None for value in security_fact):
+        raise KnowledgeValidationError
+    if source_kind != "upload" and any(value is not None for value in security_fact):
+        raise KnowledgeValidationError
 
 
 def _require_owner(repository: object, workspace_id: UUID, account_id: UUID) -> None:

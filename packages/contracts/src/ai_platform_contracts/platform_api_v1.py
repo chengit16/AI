@@ -21,6 +21,21 @@ class AuthenticationContextResponse(typing.TypedDict):
     workspace_id: str
 
 
+class Body_uploadKnowledgeDocument(typing.TypedDict):
+    department_ids: typing.NotRequired[list[str] | None]
+    file: str
+    permission_labels: typing.NotRequired[list[str] | None]
+    security_level: typing.NotRequired[
+        typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"] | None
+    ]
+    title: str
+    visibility: typing.NotRequired[typing.Literal["private", "workspace", "departments"] | None]
+
+
+class Body_uploadKnowledgeDocumentVersion(typing.TypedDict):
+    file: str
+
+
 class CreateDepartmentRequest(typing.TypedDict):
     name: str
     parent_department_id: typing.NotRequired[str | None]
@@ -134,6 +149,13 @@ class DocumentSourceResponse(typing.TypedDict):
     source_name: str
 
 
+class DocumentUploadResponse(typing.TypedDict):
+    document: DocumentResponse
+    document_version: DocumentVersionResponse
+    source: DocumentSourceResponse
+    upload: UploadMetadataResponse
+
+
 class DocumentVersionCreatedResponse(typing.TypedDict):
     document_version: DocumentVersionResponse
     source: DocumentSourceResponse
@@ -150,6 +172,12 @@ class DocumentVersionResponse(typing.TypedDict):
     status: typing.Literal["draft", "ready", "published", "superseded"]
     version_number: int
     workspace_id: str
+
+
+class DocumentVersionUploadResponse(typing.TypedDict):
+    document_version: DocumentVersionResponse
+    source: DocumentSourceResponse
+    upload: UploadMetadataResponse
 
 
 class EffectiveRoleResponse(typing.TypedDict):
@@ -424,6 +452,13 @@ class RoleResponse(typing.TypedDict):
 
 class RoleStatusRequest(typing.TypedDict):
     active: bool
+
+
+class UploadMetadataResponse(typing.TypedDict):
+    content_hash: str
+    media_type: str
+    scan_status: typing.NotRequired[str]
+    size_bytes: int
 
 
 class WorkspaceInvitationResponse(typing.TypedDict):

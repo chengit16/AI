@@ -21,6 +21,7 @@ from ai_platform_api.modules.identity.domain.entitlements import UsageRepository
 from ai_platform_api.modules.knowledge.domain.models import (
     Document,
     DocumentSource,
+    DocumentSourceKind,
     DocumentVersion,
     DocumentVersionStatus,
     DocumentVisibility,
@@ -421,6 +422,12 @@ def _source_values(value: DocumentSource) -> dict[str, object]:
         "external_source_id": value.external_source_id,
         "captured_at": value.captured_at,
         "created_at": value.created_at,
+        "media_type": value.media_type,
+        "size_bytes": value.size_bytes,
+        "content_hash": value.content_hash,
+        "scan_status": value.scan_status,
+        "scanner_version": value.scanner_version,
+        "scanned_at": value.scanned_at,
     }
 
 
@@ -473,4 +480,26 @@ def _version(value: Row[Any]) -> DocumentVersion:
         value.created_at,
         value.published_at,
         value.record_version,
+    )
+
+
+def _source(value: Row[Any]) -> DocumentSource:
+    return DocumentSource(
+        value.source_id,
+        value.workspace_id,
+        value.document_version_id,
+        cast(DocumentSourceKind, value.source_kind),
+        value.source_name,
+        value.original_object_key,
+        value.source_path,
+        value.source_url,
+        value.external_source_id,
+        value.captured_at,
+        value.created_at,
+        value.media_type,
+        value.size_bytes,
+        value.content_hash,
+        value.scan_status,
+        value.scanner_version,
+        value.scanned_at,
     )

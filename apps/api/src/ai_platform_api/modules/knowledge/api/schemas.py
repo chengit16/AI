@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CreateKnowledgeBaseRequest(BaseModel):
@@ -38,11 +38,23 @@ class DocumentSourceRequest(BaseModel):
 
     source_kind: Literal["manual", "upload", "web", "data_source"]
     source_name: str = Field(min_length=1, max_length=255)
-    original_object_key: str | None = Field(default=None, max_length=1024)
+    original_object_key: str | None = Field(
+        default=None,
+        max_length=1024,
+        deprecated=True,
+        description="V1 兼容占位, 对象键只能由受控 multipart 上传接口生成",
+    )
     source_path: str | None = Field(default=None, max_length=2048)
     source_url: str | None = Field(default=None, max_length=2048)
     external_source_id: str | None = Field(default=None, max_length=512)
     captured_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def reject_untrusted_upload_locator(self) -> "DocumentSourceRequest":
+        # 上传对象键只能由 multipart 上传用例生成，JSON 入口不能伪造对象存储事实。
+        if self.source_kind == "upload" or self.original_object_key is not None:
+            raise ValueError("upload 来源必须使用受控文件上传接口")
+        return self
 
 
 class CreateDocumentRequest(DocumentSourceRequest):
@@ -120,3 +132,20 @@ class DocumentVersionCreatedResponse(BaseModel):
 
     document_version: DocumentVersionResponse
     source: DocumentSourceResponse
+
+
+class UploadMetadataResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    media_type: str
+    size_bytes: int = Field(gt=0)
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    scan_status: Literal["clean"] = "clean"
+
+
+class DocumentUploadResponse(DocumentCreatedResponse):
+    upload: UploadMetadataResponse
+
+
+class DocumentVersionUploadResponse(DocumentVersionCreatedResponse):
+    upload: UploadMetadataResponse

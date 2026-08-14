@@ -67,6 +67,7 @@ def create_app(
     application.state.menu_configuration_service = dependencies.menu_configuration
     application.state.menu_release_service = dependencies.menu_releases
     application.state.knowledge_fact_service = dependencies.knowledge_facts
+    application.state.knowledge_upload_service = dependencies.knowledge_uploads
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)

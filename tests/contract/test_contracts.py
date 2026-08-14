@@ -380,11 +380,15 @@ def test_knowledge_openapi_covers_fact_and_publication_lifecycle() -> None:
         prefix: {"post": "createKnowledgeBase"},
         f"{prefix}/{{knowledge_base_id}}": {"delete": "deleteKnowledgeBase"},
         f"{prefix}/{{knowledge_base_id}}/documents": {"post": "createKnowledgeDocument"},
+        f"{prefix}/{{knowledge_base_id}}/documents/upload": {"post": "uploadKnowledgeDocument"},
         f"{prefix}/{{knowledge_base_id}}/documents/{{document_id}}": {
             "delete": "deleteKnowledgeDocument"
         },
         f"{prefix}/{{knowledge_base_id}}/documents/{{document_id}}/versions": {
             "post": "createKnowledgeDocumentVersion"
+        },
+        f"{prefix}/{{knowledge_base_id}}/documents/{{document_id}}/versions/upload": {
+            "post": "uploadKnowledgeDocumentVersion"
         },
         f"{prefix}/{{knowledge_base_id}}/documents/{{document_id}}/versions/"
         "{document_version_id}/ready": {"post": "markKnowledgeDocumentVersionReady"},
@@ -400,6 +404,13 @@ def test_knowledge_openapi_covers_fact_and_publication_lifecycle() -> None:
 
     schemas = baseline["components"]["schemas"]
     assert "original_object_key" not in schemas["DocumentSourceResponse"]["properties"]
+    assert (
+        schemas["CreateDocumentRequest"]["properties"]["original_object_key"]["deprecated"] is True
+    )
+    assert (
+        schemas["CreateDocumentVersionRequest"]["properties"]["original_object_key"]["deprecated"]
+        is True
+    )
     assert "source_url" not in schemas["DocumentSourceResponse"]["properties"]
     assert schemas["DocumentVersionResponse"]["properties"]["status"]["enum"] == [
         "draft",

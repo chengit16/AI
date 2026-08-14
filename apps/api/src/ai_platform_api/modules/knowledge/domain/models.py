@@ -185,6 +185,12 @@ class DocumentSource:
     external_source_id: str | None
     captured_at: datetime | None
     created_at: datetime
+    media_type: str | None = None
+    size_bytes: int | None = None
+    content_hash: str | None = None
+    scan_status: str | None = None
+    scanner_version: str | None = None
+    scanned_at: datetime | None = None
 
     def assert_valid(self) -> None:
         if not self.source_name.strip() or len(self.source_name) > 255:
@@ -198,6 +204,31 @@ class DocumentSource:
         if any(
             value is not None and (not value.strip() or len(value) > 2048) for value in locators
         ):
+            raise InvalidKnowledgeFactError
+        upload_metadata = (
+            self.media_type,
+            self.size_bytes,
+            self.content_hash,
+            self.scan_status,
+            self.scanner_version,
+            self.scanned_at,
+        )
+        has_upload_metadata = any(value is not None for value in upload_metadata)
+        complete_upload_metadata = (
+            isinstance(self.media_type, str)
+            and bool(self.media_type.strip())
+            and isinstance(self.size_bytes, int)
+            and self.size_bytes > 0
+            and isinstance(self.content_hash, str)
+            and len(self.content_hash) == 64
+            and all(character in "0123456789abcdef" for character in self.content_hash)
+            and self.scan_status == "clean"
+            and isinstance(self.scanner_version, str)
+            and bool(self.scanner_version.strip())
+            and self.scanned_at is not None
+        )
+        # P1D-01 已存在的合成 upload 事实允许无扫描元数据；新上传只允许完整安全事实。
+        if has_upload_metadata and (self.source_kind != "upload" or not complete_upload_metadata):
             raise InvalidKnowledgeFactError
         valid_shape = {
             "manual": all(value is None for value in locators),

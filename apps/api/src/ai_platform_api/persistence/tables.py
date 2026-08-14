@@ -857,6 +857,12 @@ document_sources = Table(
     Column("external_source_id", String(512), nullable=True),
     Column("captured_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("media_type", String(255), nullable=True),
+    Column("size_bytes", BigInteger, nullable=True),
+    Column("content_hash", String(64), nullable=True),
+    Column("scan_status", String(32), nullable=True),
+    Column("scanner_version", String(255), nullable=True),
+    Column("scanned_at", DateTime(timezone=True), nullable=True),
     UniqueConstraint(
         "workspace_id",
         "document_version_id",
@@ -885,6 +891,15 @@ document_sources = Table(
     CheckConstraint(
         "char_length(btrim(source_name)) BETWEEN 1 AND 255",
         name="ck_document_sources_name",
+    ),
+    CheckConstraint(
+        "(media_type IS NULL AND size_bytes IS NULL AND content_hash IS NULL "
+        "AND scan_status IS NULL AND scanner_version IS NULL AND scanned_at IS NULL) OR "
+        "(source_kind = 'upload' AND char_length(btrim(media_type)) > 0 "
+        "AND size_bytes > 0 AND content_hash ~ '^[0-9a-f]{64}$' "
+        "AND scan_status = 'clean' AND char_length(btrim(scanner_version)) > 0 "
+        "AND scanned_at IS NOT NULL)",
+        name="ck_document_sources_upload_security",
     ),
 )
 

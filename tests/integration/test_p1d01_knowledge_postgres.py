@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -61,6 +62,7 @@ DEFAULT_DATABASE_URL = (
 TRACE = TraceContext.continue_from("00-d123456789abcdef0123456789abcdef-d123456789abcdef-01")
 CONTENT_HASH_1 = "1" * 64
 CONTENT_HASH_2 = "2" * 64
+NOW = datetime(2026, 8, 14, 9, 30, tzinfo=UTC)
 
 
 @dataclass(frozen=True)
@@ -204,6 +206,12 @@ def test_personal_fact_lifecycle_publication_and_transaction_records(
         source_kind="upload",
         source_name="synthetic-policy.pdf",
         original_object_key="synthetic-only/policy.pdf",
+        upload_media_type="application/pdf",
+        upload_size_bytes=1024,
+        upload_content_hash=CONTENT_HASH_1,
+        upload_scan_status="clean",
+        upload_scanner_version="synthetic-scanner-v1",
+        upload_scanned_at=NOW,
     )
     first_ready = knowledge_database.knowledge.mark_document_version_ready(
         owner_context,

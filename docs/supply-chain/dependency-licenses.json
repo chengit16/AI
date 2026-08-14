@@ -439,6 +439,12 @@
     },
     {
       "direct": false,
+      "license": "MPL-2.0",
+      "name": "certifi",
+      "version": "2026.7.22"
+    },
+    {
+      "direct": false,
       "license": "MIT-0",
       "name": "cffi",
       "version": "2.1.1"
@@ -523,6 +529,12 @@
     },
     {
       "direct": false,
+      "license": "Apache-2.0",
+      "name": "minio",
+      "version": "7.2.15"
+    },
+    {
+      "direct": false,
       "license": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
       "name": "numpy",
       "version": "2.5.2"
@@ -571,6 +583,12 @@
     },
     {
       "direct": false,
+      "license": "BSD, Public Domain",
+      "name": "pycryptodome",
+      "version": "3.23.0"
+    },
+    {
+      "direct": false,
       "license": "MIT",
       "name": "pydantic",
       "version": "2.13.4"
@@ -598,6 +616,12 @@
       "license": "BSD-3-Clause",
       "name": "python-dotenv",
       "version": "1.2.2"
+    },
+    {
+      "direct": false,
+      "license": "Apache-2.0",
+      "name": "python-multipart",
+      "version": "0.0.20"
     },
     {
       "direct": false,
@@ -642,6 +666,12 @@
       "version": "2026.3"
     },
     {
+      "direct": false,
+      "license": "MIT",
+      "name": "urllib3",
+      "version": "2.7.0"
+    },
+    {
       "direct": true,
       "license": "BSD-3-Clause",
       "name": "uvicorn",
@@ -684,7 +714,7 @@
   },
   "summary": {
     "node_packages": 76,
-    "python_packages": 49,
+    "python_packages": 54,
     "unknown_python_licenses": []
   }
 }

@@ -59,8 +59,14 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyRegistrationUnitOfWork,
 )
 from ai_platform_api.modules.knowledge.application.facts import KnowledgeFactService
+from ai_platform_api.modules.knowledge.application.uploads import KnowledgeUploadService
+from ai_platform_api.modules.knowledge.infrastructure.object_storage import MinioObjectStorage
 from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
     SqlAlchemyKnowledgeUnitOfWork,
+)
+from ai_platform_api.modules.knowledge.infrastructure.upload_security import (
+    BoundedUploadInspector,
+    DeterministicUploadScanner,
 )
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
 from ai_platform_api.persistence.database import PlatformDatabase
@@ -89,6 +95,7 @@ class ApplicationContainer:
     menu_configuration: MenuConfigurationService | None = None
     menu_releases: MenuReleaseService | None = None
     knowledge_facts: KnowledgeFactService | None = None
+    knowledge_uploads: KnowledgeUploadService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -129,6 +136,18 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         resource_registry,
         SqlAlchemyMenuConfigurationUnitOfWork(database.sessions),
     )
+    knowledge_facts = KnowledgeFactService(
+        SqlAlchemyKnowledgeUnitOfWork(
+            database.sessions,
+            SqlAlchemyEntitlementRepository,
+        ),
+    )
+    object_storage = MinioObjectStorage(
+        endpoint=settings.minio_endpoint,
+        access_key=settings.minio_access_key,
+        secret_key=settings.minio_secret_key.get_secret_value(),
+        bucket=settings.minio_bucket,
+    )
     try:
         return ApplicationContainer(
             settings=settings,
@@ -145,11 +164,12 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             menu_configuration=menu_configuration,
             menu_releases=menu_releases,
-            knowledge_facts=KnowledgeFactService(
-                SqlAlchemyKnowledgeUnitOfWork(
-                    database.sessions,
-                    SqlAlchemyEntitlementRepository,
-                ),
+            knowledge_facts=knowledge_facts,
+            knowledge_uploads=KnowledgeUploadService(
+                knowledge_facts,
+                object_storage,
+                BoundedUploadInspector(settings.upload_max_file_size_bytes),
+                DeterministicUploadScanner(),
             ),
             authentication=AuthenticationService(
                 repository=reader,
