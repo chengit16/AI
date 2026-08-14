@@ -68,6 +68,16 @@ from ai_platform_api.modules.knowledge.infrastructure.upload_security import (
     BoundedUploadInspector,
     DeterministicUploadScanner,
 )
+from ai_platform_api.modules.model_gateway.application.configurations import (
+    ModelProviderConfigurationService,
+)
+from ai_platform_api.modules.model_gateway.infrastructure.configuration_sqlalchemy import (
+    SqlAlchemyModelProviderUnitOfWork,
+)
+from ai_platform_api.modules.model_gateway.infrastructure.provider_http import (
+    OpenAiCompatibleCapabilityProbe,
+    StrictProviderBaseUrlPolicy,
+)
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
 from ai_platform_api.persistence.database import PlatformDatabase
 
@@ -96,6 +106,7 @@ class ApplicationContainer:
     menu_releases: MenuReleaseService | None = None
     knowledge_facts: KnowledgeFactService | None = None
     knowledge_uploads: KnowledgeUploadService | None = None
+    model_provider_configurations: ModelProviderConfigurationService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -149,6 +160,8 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         secret_key=settings.minio_secret_key.get_secret_value(),
         bucket=settings.minio_bucket,
     )
+    secret_cipher = EnvelopeSecretCipher(MasterKeyFile(settings.master_key_path))
+    provider_url_policy = StrictProviderBaseUrlPolicy(settings.model_provider_allowed_hosts)
     try:
         return ApplicationContainer(
             settings=settings,
@@ -171,6 +184,15 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 object_storage,
                 BoundedUploadInspector(settings.upload_max_file_size_bytes),
                 DeterministicUploadScanner(),
+            ),
+            model_provider_configurations=ModelProviderConfigurationService(
+                SqlAlchemyModelProviderUnitOfWork(database.sessions),
+                secret_cipher,
+                provider_url_policy,
+                OpenAiCompatibleCapabilityProbe(
+                    provider_url_policy,
+                    timeout_seconds=settings.model_provider_probe_timeout_seconds,
+                ),
             ),
             authentication=AuthenticationService(
                 repository=reader,
@@ -205,7 +227,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 cache=role_cache,
             ),
             role_cache=role_cache,
-            secret_cipher=EnvelopeSecretCipher(MasterKeyFile(settings.master_key_path)),
+            secret_cipher=secret_cipher,
             sessions=sessions,
         )
     except Exception:

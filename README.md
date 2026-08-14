@@ -37,3 +37,12 @@ Docker Desktop 运行后执行：
 ```
 
 默认访问地址为 `http://127.0.0.1:3000/status`。停止服务使用 `./platform stop`，本地数据会保留在 `.env` 的 `AI_PLATFORM_ROOT` 目录中。
+
+平台管理员不依附个人或企业空间，只能由本地运维命令授予或撤销：
+
+```bash
+./platform admin grant user@example.com
+./platform admin revoke user@example.com
+```
+
+接入 GPT 中转或国内 OpenAI-compatible 模型时，先在 `.env` 的 JSON 数组中显式配置允许访问的公网 HTTPS 域名，例如 `MODEL_PROVIDER_ALLOWED_HOSTS=["relay.example.com"]`。默认空数组会阻止所有真实供应商连接；`MODEL_PROVIDER_PROBE_TIMEOUT_SECONDS` 控制能力探测超时，允许范围为 1～30 秒，默认 10 秒。平台拒绝内网地址、混合 DNS、非 443 端口、重定向及未经数据政策审核的外发，不应通过放宽网络校验接入本地测试服务。

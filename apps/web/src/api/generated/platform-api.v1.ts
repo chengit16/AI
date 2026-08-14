@@ -106,6 +106,109 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/platform/model-providers": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /** List Model Providers */
+    readonly get: operations["listPlatformModelProviders"];
+    readonly put?: never;
+    /** Create Model Provider */
+    readonly post: operations["createPlatformModelProvider"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/platform/model-providers/{provider_id}/activate": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Activate Model Provider */
+    readonly post: operations["activatePlatformModelProvider"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/platform/model-providers/{provider_id}/credentials/rotate": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Rotate Model Provider Credential */
+    readonly post: operations["rotatePlatformModelProviderCredential"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/platform/model-providers/{provider_id}/data-policy/review": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Review Model Provider Data Policy */
+    readonly post: operations["reviewPlatformModelProviderDataPolicy"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/platform/model-providers/{provider_id}/disable": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Disable Model Provider */
+    readonly post: operations["disablePlatformModelProvider"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/platform/model-providers/{provider_id}/probe": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /** Probe Model Provider */
+    readonly post: operations["probePlatformModelProviderCapabilities"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces": {
     readonly parameters: {
       readonly query?: never;
@@ -933,6 +1036,38 @@ export type components = {
       /** Name */
       readonly name: string;
     };
+    /** CreateModelProviderRequest */
+    readonly CreateModelProviderRequest: {
+      /**
+       * Adapter Kind
+       * @default openai_compatible
+       * @constant
+       */
+      readonly adapter_kind: "openai_compatible";
+      /**
+       * Api Key
+       * Format: password
+       */
+      readonly api_key: string;
+      /** Base Url */
+      readonly base_url: string;
+      /** Declared Capabilities */
+      readonly declared_capabilities: readonly (
+        "generation" | "streaming" | "tools" | "structured_output"
+      )[];
+      /** Display Name */
+      readonly display_name: string;
+      /**
+       * Location
+       * @default external
+       * @enum {string}
+       */
+      readonly location: "external" | "private";
+      /** Probe Model Id */
+      readonly probe_model_id: string;
+      /** Provider Key */
+      readonly provider_key: string;
+    };
     /** CreatePositionRequest */
     readonly CreatePositionRequest: {
       /**
@@ -1523,6 +1658,91 @@ export type components = {
       /** Visible */
       readonly visible: boolean;
     };
+    /** ModelProviderConfigurationListResponse */
+    readonly ModelProviderConfigurationListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["ModelProviderConfigurationResponse"][];
+    };
+    /** ModelProviderConfigurationResponse */
+    readonly ModelProviderConfigurationResponse: {
+      /**
+       * Adapter Kind
+       * @constant
+       */
+      readonly adapter_kind: "openai_compatible";
+      /** Base Url */
+      readonly base_url: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Declared Capabilities */
+      readonly declared_capabilities: readonly (
+        "generation" | "streaming" | "tools" | "structured_output"
+      )[];
+      /** Display Name */
+      readonly display_name: string;
+      /** Last Probe Error Code */
+      readonly last_probe_error_code: string | null;
+      /** Last Probed At */
+      readonly last_probed_at: string | null;
+      /**
+       * Location
+       * @enum {string}
+       */
+      readonly location: "external" | "private";
+      /**
+       * Max Security Level
+       * @enum {string}
+       */
+      readonly max_security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+      /**
+       * Policy Review Status
+       * @enum {string}
+       */
+      readonly policy_review_status: "pending" | "approved" | "rejected";
+      /** Policy Reviewed At */
+      readonly policy_reviewed_at: string | null;
+      /** Policy Url */
+      readonly policy_url: string | null;
+      /** Policy Version */
+      readonly policy_version: string | null;
+      /** Probe Model Id */
+      readonly probe_model_id: string;
+      /**
+       * Probe Status
+       * @enum {string}
+       */
+      readonly probe_status: "not_run" | "passed" | "failed";
+      /** Probed Capabilities */
+      readonly probed_capabilities: readonly (
+        "generation" | "streaming" | "tools" | "structured_output"
+      )[];
+      /**
+       * Provider Id
+       * Format: uuid
+       */
+      readonly provider_id: string;
+      /** Provider Key */
+      readonly provider_key: string;
+      /** Retention Days */
+      readonly retention_days: number | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "draft" | "active" | "disabled";
+      /** Training Usage Allowed */
+      readonly training_usage_allowed: boolean;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+    };
     /** MoveDepartmentRequest */
     readonly MoveDepartmentRequest: {
       /** Parent Department Id */
@@ -1623,6 +1843,28 @@ export type components = {
     readonly ReplaceWorkspaceMenuConfigurationRequest: {
       /** Items */
       readonly items: readonly components["schemas"]["WorkspaceMenuOverrideEntry"][];
+    };
+    /** ReviewModelProviderDataPolicyRequest */
+    readonly ReviewModelProviderDataPolicyRequest: {
+      /** Approved */
+      readonly approved: boolean;
+      /**
+       * Max Security Level
+       * @default PUBLIC
+       * @enum {string}
+       */
+      readonly max_security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+      /** Policy Url */
+      readonly policy_url?: string | null;
+      /** Policy Version */
+      readonly policy_version?: string | null;
+      /** Retention Days */
+      readonly retention_days?: number | null;
+      /**
+       * Training Usage Allowed
+       * @default false
+       */
+      readonly training_usage_allowed: boolean;
     };
     /** RoleBindingResponse */
     readonly RoleBindingResponse: {
@@ -1730,6 +1972,14 @@ export type components = {
     readonly RoleStatusRequest: {
       /** Active */
       readonly active: boolean;
+    };
+    /** RotateModelProviderCredentialRequest */
+    readonly RotateModelProviderCredentialRequest: {
+      /**
+       * Api Key
+       * Format: password
+       */
+      readonly api_key: string;
     };
     /** UploadMetadataResponse */
     readonly UploadMetadataResponse: {
@@ -2208,6 +2458,542 @@ export interface operations {
         };
         content: {
           readonly "application/json": components["schemas"]["HealthResponse"];
+        };
+      };
+    };
+  };
+  readonly listPlatformModelProviders: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ModelProviderConfigurationListResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createPlatformModelProvider: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateModelProviderRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ModelProviderConfigurationResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly activatePlatformModelProvider: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path: {
+        readonly provider_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ModelProviderConfigurationResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly rotatePlatformModelProviderCredential: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path: {
+        readonly provider_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["RotateModelProviderCredentialRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ModelProviderConfigurationResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly reviewPlatformModelProviderDataPolicy: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path: {
+        readonly provider_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["ReviewModelProviderDataPolicyRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ModelProviderConfigurationResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly disablePlatformModelProvider: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path: {
+        readonly provider_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ModelProviderConfigurationResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly probePlatformModelProviderCapabilities: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly "X-CSRF-Token"?: string | null;
+      };
+      readonly path: {
+        readonly provider_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ModelProviderConfigurationResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
     };

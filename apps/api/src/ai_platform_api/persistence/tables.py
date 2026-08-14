@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     String,
     Table,
@@ -47,6 +48,195 @@ accounts = Table(
         "login_name = lower(btrim(login_name)) AND char_length(login_name) >= 3",
         name="ck_accounts_normalized_login",
     ),
+)
+
+platform_administrators = Table(
+    "platform_administrators",
+    metadata,
+    Column("account_id", UUID(as_uuid=True), primary_key=True),
+    Column("status", String(32), nullable=False),
+    Column("granted_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("granted_at", DateTime(timezone=True), nullable=False),
+    Column("revoked_at", DateTime(timezone=True), nullable=True),
+    ForeignKeyConstraint(
+        ["account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_platform_administrators_account",
+    ),
+    ForeignKeyConstraint(
+        ["granted_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_platform_administrators_granter",
+    ),
+    CheckConstraint(
+        "status IN ('active', 'revoked')",
+        name="ck_platform_administrators_status",
+    ),
+    CheckConstraint(
+        "(status = 'active' AND revoked_at IS NULL) OR "
+        "(status = 'revoked' AND revoked_at IS NOT NULL)",
+        name="ck_platform_administrators_revocation",
+    ),
+)
+
+model_provider_configurations = Table(
+    "model_provider_configurations",
+    metadata,
+    Column("provider_id", UUID(as_uuid=True), primary_key=True),
+    Column("provider_key", String(64), nullable=False, unique=True),
+    Column("display_name", String(120), nullable=False),
+    Column("adapter_kind", String(32), nullable=False),
+    Column("base_url", String(2048), nullable=False),
+    Column("probe_model_id", String(255), nullable=False),
+    Column("location", String(32), nullable=False),
+    Column("declared_capabilities", ARRAY(String(32)), nullable=False),
+    Column("policy_review_status", String(32), nullable=False),
+    Column("max_security_level", String(32), nullable=False),
+    Column("retention_days", Integer, nullable=True),
+    Column("training_usage_allowed", Boolean, nullable=False),
+    Column("policy_url", String(2048), nullable=True),
+    Column("policy_version", String(128), nullable=True),
+    Column("policy_reviewed_by_account_id", UUID(as_uuid=True), nullable=True),
+    Column("policy_reviewed_at", DateTime(timezone=True), nullable=True),
+    Column("probe_status", String(32), nullable=False),
+    Column("probed_capabilities", ARRAY(String(32)), nullable=False),
+    Column("last_probe_error_code", String(128), nullable=True),
+    Column("last_probed_at", DateTime(timezone=True), nullable=True),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(
+        ["policy_reviewed_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_model_provider_configurations_policy_reviewer",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_model_provider_configurations_creator",
+    ),
+    ForeignKeyConstraint(
+        ["updated_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_model_provider_configurations_updater",
+    ),
+    CheckConstraint("adapter_kind = 'openai_compatible'", name="ck_model_providers_adapter"),
+    CheckConstraint("location IN ('external', 'private')", name="ck_model_providers_location"),
+    CheckConstraint(
+        "policy_review_status IN ('pending', 'approved', 'rejected')",
+        name="ck_model_providers_policy_status",
+    ),
+    CheckConstraint(
+        "max_security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
+        name="ck_model_providers_security_level",
+    ),
+    CheckConstraint(
+        "retention_days IS NULL OR retention_days BETWEEN 0 AND 3650",
+        name="ck_model_providers_retention",
+    ),
+    CheckConstraint(
+        "probe_status IN ('not_run', 'passed', 'failed')",
+        name="ck_model_providers_probe_status",
+    ),
+    CheckConstraint(
+        "status IN ('draft', 'active', 'disabled')",
+        name="ck_model_providers_status",
+    ),
+    CheckConstraint("version >= 1", name="ck_model_providers_version"),
+    CheckConstraint(
+        "(policy_review_status = 'pending' AND policy_reviewed_by_account_id IS NULL "
+        "AND policy_reviewed_at IS NULL) OR "
+        "(policy_review_status <> 'pending' AND policy_reviewed_by_account_id IS NOT NULL "
+        "AND policy_reviewed_at IS NOT NULL)",
+        name="ck_model_providers_policy_review",
+    ),
+    CheckConstraint(
+        "(probe_status = 'not_run' AND last_probed_at IS NULL) OR "
+        "(probe_status <> 'not_run' AND last_probed_at IS NOT NULL)",
+        name="ck_model_providers_probe_time",
+    ),
+)
+
+model_provider_credentials = Table(
+    "model_provider_credentials",
+    metadata,
+    Column("credential_id", UUID(as_uuid=True), primary_key=True),
+    Column("provider_id", UUID(as_uuid=True), nullable=False),
+    Column("credential_version", Integer, nullable=False),
+    Column("master_key_version", Integer, nullable=False),
+    Column("encrypted_data_key", LargeBinary, nullable=False),
+    Column("data_key_nonce", LargeBinary, nullable=False),
+    Column("ciphertext", LargeBinary, nullable=False),
+    Column("data_nonce", LargeBinary, nullable=False),
+    Column("last_four", String(4), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("revoked_at", DateTime(timezone=True), nullable=True),
+    UniqueConstraint(
+        "provider_id",
+        "credential_version",
+        name="uq_model_provider_credentials_version",
+    ),
+    ForeignKeyConstraint(
+        ["provider_id"],
+        [f"{SCHEMA_TOKEN}.model_provider_configurations.provider_id"],
+        name="fk_model_provider_credentials_provider",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_model_provider_credentials_creator",
+    ),
+    CheckConstraint("credential_version >= 1", name="ck_model_credentials_version"),
+    CheckConstraint("master_key_version >= 1", name="ck_model_credentials_master_key"),
+    CheckConstraint("char_length(last_four) = 4", name="ck_model_credentials_last_four"),
+    CheckConstraint("status IN ('active', 'revoked')", name="ck_model_credentials_status"),
+    CheckConstraint(
+        "(status = 'active' AND revoked_at IS NULL) OR "
+        "(status = 'revoked' AND revoked_at IS NOT NULL)",
+        name="ck_model_credentials_revocation",
+    ),
+)
+Index(
+    "uq_model_provider_credentials_active",
+    model_provider_credentials.c.provider_id,
+    unique=True,
+    postgresql_where=model_provider_credentials.c.status == "active",
+)
+
+platform_audit_records = Table(
+    "platform_audit_records",
+    metadata,
+    Column("audit_id", UUID(as_uuid=True), primary_key=True),
+    Column("account_id", UUID(as_uuid=True), nullable=False),
+    Column("provider_id", UUID(as_uuid=True), nullable=False),
+    Column("action", String(128), nullable=False),
+    Column("request_id", UUID(as_uuid=True), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    Column("details", JSONB, nullable=False),
+    ForeignKeyConstraint(
+        ["account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_platform_audit_records_account",
+    ),
+    ForeignKeyConstraint(
+        ["provider_id"],
+        [f"{SCHEMA_TOKEN}.model_provider_configurations.provider_id"],
+        name="fk_platform_audit_records_provider",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("trace_id ~ '^[0-9a-f]{32}$'", name="ck_platform_audit_trace_id"),
+)
+Index(
+    "ix_platform_audit_provider_time",
+    platform_audit_records.c.provider_id,
+    platform_audit_records.c.occurred_at,
 )
 
 workspaces = Table(

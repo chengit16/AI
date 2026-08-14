@@ -23,6 +23,7 @@ from ai_platform_api.modules.identity.api.organization_routes import router as o
 from ai_platform_api.modules.identity.api.role_routes import router as role_router
 from ai_platform_api.modules.identity.api.routes import router as identity_router
 from ai_platform_api.modules.knowledge.api.routes import router as knowledge_router
+from ai_platform_api.modules.model_gateway.api.routes import router as model_provider_router
 from ai_platform_api.modules.system.api.health import router as health_router
 
 
@@ -68,6 +69,9 @@ def create_app(
     application.state.menu_release_service = dependencies.menu_releases
     application.state.knowledge_fact_service = dependencies.knowledge_facts
     application.state.knowledge_upload_service = dependencies.knowledge_uploads
+    application.state.model_provider_configuration_service = (
+        dependencies.model_provider_configurations
+    )
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)
@@ -80,4 +84,5 @@ def create_app(
     application.include_router(authorization_router, prefix="/api/v1")
     application.include_router(menu_router, prefix="/api/v1")
     application.include_router(knowledge_router, prefix="/api/v1")
+    application.include_router(model_provider_router, prefix="/api/v1")
     return application

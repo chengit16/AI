@@ -234,6 +234,32 @@ def test_browser_session_requires_valid_csrf_and_active_workspace_membership() -
             request_id=REQUEST_ID,
             trace=TRACE,
         )
+
+
+def test_platform_browser_context_does_not_forge_workspace_membership() -> None:
+    service, identity, _, _ = authentication_fixture()
+    result = service.login("owner@example.com", "synthetic-password-123")
+    identity.accesses.clear()
+
+    platform_context = service.platform_browser_context(
+        session_token=result.session_token,
+        csrf_token=result.csrf_token,
+        require_csrf=True,
+        request_id=REQUEST_ID,
+        trace=TRACE,
+    )
+
+    assert platform_context.account_id == ACCOUNT_ID
+    assert platform_context.actor_id == ACCOUNT_ID
+    assert not hasattr(platform_context, "workspace_id")
+    with pytest.raises(CsrfValidationError):
+        service.platform_browser_context(
+            session_token=result.session_token,
+            csrf_token="forged-csrf",
+            require_csrf=True,
+            request_id=REQUEST_ID,
+            trace=TRACE,
+        )
     with pytest.raises(WorkspaceContextDeniedError):
         service.browser_context(
             session_token=result.session_token,

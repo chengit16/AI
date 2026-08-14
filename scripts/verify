@@ -41,6 +41,7 @@ log "检查仓库敏感文件与凭证模式"
 "${PYTHON[@]}" scripts/check_repository_policy.py
 
 log "检查 React 与 Python 契约消费类型"
+"${PYTHON[@]}" scripts/export_openapi.py --check
 "${PYTHON[@]}" scripts/generate_contract_types.py --check
 
 log "检查统一权限资源注册表"

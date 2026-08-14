@@ -5,7 +5,7 @@ import secrets
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.common.request_context import PlatformRequestContext, RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.modules.identity.application.entitlement_errors import (
     EntitlementFeatureDeniedError,
@@ -21,6 +21,7 @@ from ai_platform_api.modules.identity.application.errors import (
 )
 from ai_platform_api.modules.identity.domain.entitlements import EntitlementAccessReader
 from ai_platform_api.modules.identity.domain.models import (
+    AccountCredential,
     BrowserSession,
     IdentityReader,
     IdentityUnitOfWork,
@@ -85,24 +86,11 @@ class AuthenticationService:
         request_id: UUID,
         trace: TraceContext,
     ) -> RequestContext:
-        if session_token is None:
-            raise AuthenticationRequiredError
-        session = self._sessions.resolve(session_token)
-        if session is None:
-            raise AuthenticationRequiredError
-        if require_csrf and (
-            csrf_token is None or not self._secrets.matches(session.csrf_digest, csrf_token)
-        ):
-            raise CsrfValidationError
-
-        account = self._repository.get_account(session.account_id)
-        if (
-            account is None
-            or account.status != "active"
-            or account.auth_version != session.auth_version
-        ):
-            self._sessions.revoke(session_token)
-            raise AuthenticationRequiredError
+        account = self._browser_account(
+            session_token=session_token,
+            csrf_token=csrf_token,
+            require_csrf=require_csrf,
+        )
         self._require_workspace_access(account.account_id, workspace_id)
         return RequestContext.trusted(
             actor_id=account.account_id,
@@ -111,6 +99,29 @@ class AuthenticationService:
             trace=trace,
             request_id=request_id,
             authentication_method="browser_session",
+        )
+
+    def platform_browser_context(
+        self,
+        *,
+        session_token: str | None,
+        csrf_token: str | None,
+        require_csrf: bool,
+        request_id: UUID,
+        trace: TraceContext,
+    ) -> PlatformRequestContext:
+        """平台治理身份不携带虚构 workspace_id，且明确拒绝 Open API Key。"""
+
+        account = self._browser_account(
+            session_token=session_token,
+            csrf_token=csrf_token,
+            require_csrf=require_csrf,
+        )
+        return PlatformRequestContext(
+            request_id=request_id,
+            trace=trace,
+            actor_id=account.account_id,
+            account_id=account.account_id,
         )
 
     def api_key_context(
@@ -158,6 +169,32 @@ class AuthenticationService:
         access = self._repository.get_workspace_access(account_id, workspace_id)
         if access is None or not access.active:
             raise WorkspaceContextDeniedError
+
+    def _browser_account(
+        self,
+        *,
+        session_token: str | None,
+        csrf_token: str | None,
+        require_csrf: bool,
+    ) -> AccountCredential:
+        if session_token is None:
+            raise AuthenticationRequiredError
+        session = self._sessions.resolve(session_token)
+        if session is None:
+            raise AuthenticationRequiredError
+        if require_csrf and (
+            csrf_token is None or not self._secrets.matches(session.csrf_digest, csrf_token)
+        ):
+            raise CsrfValidationError
+        account = self._repository.get_account(session.account_id)
+        if (
+            account is None
+            or account.status != "active"
+            or account.auth_version != session.auth_version
+        ):
+            self._sessions.revoke(session_token)
+            raise AuthenticationRequiredError
+        return account
 
     @staticmethod
     def _parse_api_key(credential: str) -> tuple[UUID, str]:

@@ -43,3 +43,14 @@ class RequestContext:
             authentication_method=authentication_method,
             credential_scopes=credential_scopes,
         )
+
+
+@dataclass(frozen=True)
+class PlatformRequestContext:
+    """平台治理请求不伪造工作空间，且只接受已登录的浏览器账号。"""
+
+    request_id: UUID
+    trace: TraceContext
+    actor_id: UUID
+    account_id: UUID
+    authentication_method: str = "browser_session"

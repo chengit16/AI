@@ -82,6 +82,6 @@ def test_runtime_files_fix_shared_paths_and_health_checks() -> None:
     assert "PYTHONPATH=/app/apps/worker/src:/app/packages/backend/src" in worker_dockerfile
     assert 'CMD ["uv", "run", "--no-sync", "celery"' in worker_dockerfile
     assert "SELECT version_num FROM public.alembic_version" in platform_script
-    assert 'database_revision" == "20260814_0020"' in platform_script
+    assert 'database_revision" == "20260814_0021"' in platform_script
     assert "AI_PLATFORM_MIN_FREE_DISK_GB:-50" in platform_script
     assert 'inspect ping --destination "celery@$HOSTNAME" --timeout 3' in platform_script

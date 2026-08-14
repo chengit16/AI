@@ -165,6 +165,13 @@ def test_error_codes_are_unique_and_stable() -> None:
         "MODEL_DATA_BOUNDARY_DENIED",
         "MODEL_ROUTE_UNAVAILABLE",
         "MODEL_GATEWAY_UNAVAILABLE",
+        "PLATFORM_ADMIN_REQUIRED",
+        "MODEL_PROVIDER_CONFIGURATION_INVALID",
+        "MODEL_PROVIDER_NOT_FOUND",
+        "MODEL_PROVIDER_CONFLICT",
+        "MODEL_PROVIDER_PROBE_FAILED",
+        "MODEL_PROVIDER_DATA_POLICY_DENIED",
+        "MODEL_PROVIDER_CREDENTIAL_UNAVAILABLE",
         "SSE_EVENT_EXPIRED",
         "ORGANIZATION_CONFLICT",
         "ROLE_CONFLICT",
@@ -228,6 +235,32 @@ def test_identity_openapi_uses_stable_error_and_secret_schemas() -> None:
         assert responses["422"]["content"]["application/json"]["schema"] == {
             "$ref": "#/components/schemas/ErrorResponse"
         }
+
+
+def test_model_provider_openapi_keeps_credentials_write_only() -> None:
+    baseline = load_json(CONTRACTS / "openapi/platform-api.v1.json")
+    paths = baseline["paths"]
+    schemas = baseline["components"]["schemas"]
+
+    assert paths["/api/v1/platform/model-providers"]["get"]["operationId"] == (
+        "listPlatformModelProviders"
+    )
+    assert paths["/api/v1/platform/model-providers"]["post"]["operationId"] == (
+        "createPlatformModelProvider"
+    )
+    assert schemas["CreateModelProviderRequest"]["properties"]["api_key"]["writeOnly"] is True
+    assert (
+        schemas["RotateModelProviderCredentialRequest"]["properties"]["api_key"]["writeOnly"]
+        is True
+    )
+    response_fields = schemas["ModelProviderConfigurationResponse"]["properties"]
+    assert {
+        "api_key",
+        "ciphertext",
+        "encrypted_data_key",
+        "data_nonce",
+        "data_key_nonce",
+    }.isdisjoint(response_fields)
 
 
 def test_workspace_openapi_covers_enterprise_member_lifecycle() -> None:

@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1D-05` 待开始 |
+| 当前节点 | `P1D-06` 待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -321,6 +321,19 @@
 - 自动化验收：统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `283/283`，Ruff、mypy strict、架构、契约兼容、生成漂移和开发级供应链门禁均通过；索引构建单元测试 `6/6`、PostgreSQL 发布/重建/撤权生命周期 `1/1`、知识回归和 Migration 往返合计 `7/7` 通过。
 - 容器与真实闭环：重建 API、Worker、Web 和 Migration 镜像后，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0020`。Worker 注册四个版本化任务并持续执行 `platform.indexing.process.v1`；本地三个历史 Artifact 均形成 `ready` 索引和完整追溯 Chunk，因文档未发布保持 `active=false`。
 - 当前边界：本节点不增加检索与问答 API、任务查询页面或真实语义 Embedding 质量结论；供应商配置与密钥进入 `P1D-05`，主备路由和不可变运行配置进入 `P1D-06`，知识管理页面进入 `P1D-07`。未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`052e9e1`。
+
+### P1D-05 模型供应商与密钥
+
+- 状态：通过。
+- 平台管理边界：新增不携带工作空间的 `PlatformRequestContext` 和 `platform_administrators` 平台事实，空间所有者不会被隐式视为平台管理员。平台配置 API 逐请求复核管理员状态；本地唯一提权入口为 `./platform admin grant|revoke <login_name>`，撤权后已有 Session 的下一次请求立即失败。
+- 配置与凭证：新增 OpenAI-compatible 供应商配置、不可覆盖的递增凭证版本、单一活跃凭证和独立平台审计。API Key 使用 AES-256-GCM 信封加密，关联数据绑定供应商、凭证主键和版本；响应、审计及错误均不回显明文，轮换后旧凭证原子撤销并强制重新探测。
+- 外发安全：自定义 `base_url` 仅接受运维通过 `MODEL_PROVIDER_ALLOWED_HOSTS` 明确批准的公网 HTTPS 域名和 443 端口，拒绝认证信息、查询参数、片段、路径穿越、私网/保留地址及混合 DNS。能力探测连接钉住校验后的公网 IP、保留原域名 TLS 校验且不跟随重定向，并限制超时和响应读取量。
+- 数据政策与运行边界：供应商默认处于 `draft`，只有数据政策已审核、声明能力全部探测通过且存在活跃凭证时才能激活。外发前继续按四级敏感级别、保留期限、训练用途和供应商位置失败关闭；后续模型网关只能通过 `resolve_runtime_access` 在调用边缘短暂取得已审核配置和明文 Key，不能直接读取凭证表。
+- 数据与契约：新增 Migration `20260814_0021` 及平台管理员、供应商配置、版本化凭证和平台审计表。OpenAPI 新增供应商列表、创建、凭证轮换、数据政策审核、探测、激活和停用 7 个接口；`ResourceRegistry` 推进至版本 6，覆盖 52 项 Permission、60 个 API、49 个菜单和 46 个菜单接口绑定。新增可复现 OpenAPI 导出脚本并纳入统一漂移门禁。
+- 自动化验收：统一 `./scripts/verify` 全部通过，React 测试 `6/6`、Python pytest `289/289`，Ruff、mypy strict、架构、契约兼容与生成漂移、Secret Scanner、SBOM 和许可证检查均通过；真实 PostgreSQL 供应商生命周期、Migration `base → head → base → head` 和平台管理员安全边界通过。
+- 容器与 HTTP 验收：以当前工作树重建 API、Worker、Web 和 Migration 镜像，`platform doctor` 八项通过，数据库 Revision 为 `20260814_0021`。全合成平台管理员不需要 `X-Workspace-ID` 即可读取空供应商列表；执行本地撤权后，同一 Session 立即返回 `403 PLATFORM_ADMIN_REQUIRED`，验收账号最终均保持 `revoked`。
+- 当前边界：未配置真实供应商，`MODEL_PROVIDER_ALLOWED_HOSTS` 默认是空列表，`provider_integration` 和 `ai_quality` 继续保持 `not_configured`。本节点只提供后端配置 API，管理页面进入 `P1D-07`；主备路由、预算、熔断、用量和不可变运行配置进入 `P1D-06`。未扩展真实多源连接器、SaaS、Go 运行层、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -332,4 +345,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-04`，当前进入 `P1D-05`。
+`not_run`。阶段 0 已关闭，阶段 1 已完成至 `P1D-05`，当前进入 `P1D-06`。

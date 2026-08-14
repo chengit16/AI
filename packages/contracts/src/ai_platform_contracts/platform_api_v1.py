@@ -82,6 +82,19 @@ class CreateKnowledgeBaseRequest(typing.TypedDict):
     name: str
 
 
+class CreateModelProviderRequest(typing.TypedDict):
+    adapter_kind: typing.NotRequired[str]
+    api_key: str
+    base_url: str
+    declared_capabilities: list[
+        typing.Literal["generation", "streaming", "tools", "structured_output"]
+    ]
+    display_name: str
+    location: typing.NotRequired[typing.Literal["external", "private"]]
+    probe_model_id: str
+    provider_key: str
+
+
 class CreatePositionRequest(typing.TypedDict):
     department_id: str
     name: str
@@ -344,6 +357,40 @@ class MenuReleaseSnapshotRoleMenuEntry(typing.TypedDict):
     visible: bool
 
 
+class ModelProviderConfigurationListResponse(typing.TypedDict):
+    items: list[ModelProviderConfigurationResponse]
+
+
+class ModelProviderConfigurationResponse(typing.TypedDict):
+    adapter_kind: str
+    base_url: str
+    created_at: str
+    declared_capabilities: list[
+        typing.Literal["generation", "streaming", "tools", "structured_output"]
+    ]
+    display_name: str
+    last_probe_error_code: str | None
+    last_probed_at: str | None
+    location: typing.Literal["external", "private"]
+    max_security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    policy_review_status: typing.Literal["pending", "approved", "rejected"]
+    policy_reviewed_at: str | None
+    policy_url: str | None
+    policy_version: str | None
+    probe_model_id: str
+    probe_status: typing.Literal["not_run", "passed", "failed"]
+    probed_capabilities: list[
+        typing.Literal["generation", "streaming", "tools", "structured_output"]
+    ]
+    provider_id: str
+    provider_key: str
+    retention_days: int | None
+    status: typing.Literal["draft", "active", "disabled"]
+    training_usage_allowed: bool
+    updated_at: str
+    version: int
+
+
 class MoveDepartmentRequest(typing.TypedDict):
     parent_department_id: typing.NotRequired[str | None]
 
@@ -402,6 +449,17 @@ class ReplaceWorkspaceMenuConfigurationRequest(typing.TypedDict):
     items: list[WorkspaceMenuOverrideEntry]
 
 
+class ReviewModelProviderDataPolicyRequest(typing.TypedDict):
+    approved: bool
+    max_security_level: typing.NotRequired[
+        typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    ]
+    policy_url: typing.NotRequired[str | None]
+    policy_version: typing.NotRequired[str | None]
+    retention_days: typing.NotRequired[int | None]
+    training_usage_allowed: typing.NotRequired[bool]
+
+
 class RoleBindingResponse(typing.TypedDict):
     binding_id: str
     department_id: str | None
@@ -452,6 +510,10 @@ class RoleResponse(typing.TypedDict):
 
 class RoleStatusRequest(typing.TypedDict):
     active: bool
+
+
+class RotateModelProviderCredentialRequest(typing.TypedDict):
+    api_key: str
 
 
 class UploadMetadataResponse(typing.TypedDict):

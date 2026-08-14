@@ -155,6 +155,50 @@ logs() {
   compose logs --tail=200 "${@:1}"
 }
 
+platform_admin() {
+  ensure_environment
+  local action="${1:-}" login_name="${2:-}"
+  [[ "$action" == "grant" || "$action" == "revoke" ]] || fail "用法: ./platform admin <grant|revoke> <login_name>"
+  [[ -n "$login_name" && "$login_name" != *$'\n'* ]] || fail "平台管理员登录名不能为空或包含换行"
+  compose ps --services --status running | grep -qx postgres || fail "PostgreSQL 尚未运行"
+
+  local sql
+  if [[ "$action" == "grant" ]]; then
+    # 本地运维命令是平台管理员唯一提权入口，Web/API 不能把空间所有者提升为平台管理员。
+    sql="
+      INSERT INTO public.platform_administrators (
+        account_id, status, granted_by_account_id, granted_at, revoked_at
+      )
+      SELECT account_id, 'active', account_id, CURRENT_TIMESTAMP, NULL
+        FROM public.accounts
+       WHERE login_name = lower(btrim(:'login_name'))
+      ON CONFLICT (account_id) DO UPDATE
+        SET status = 'active', granted_by_account_id = EXCLUDED.granted_by_account_id,
+            granted_at = EXCLUDED.granted_at, revoked_at = NULL;
+    "
+  else
+    sql="
+      UPDATE public.platform_administrators
+         SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP
+       WHERE account_id = (
+         SELECT account_id FROM public.accounts
+          WHERE login_name = lower(btrim(:'login_name'))
+       ) AND status = 'active';
+    "
+  fi
+  compose exec -T postgres psql -v ON_ERROR_STOP=1 -v login_name="$login_name" \
+    -U ai_platform -d ai_platform >/dev/null <<<"$sql"
+  local status_value
+  status_value="$(
+    compose exec -T postgres psql -v ON_ERROR_STOP=1 -v login_name="$login_name" \
+      -U ai_platform -d ai_platform -Atq <<<\
+      "SELECT COALESCE((SELECT pa.status FROM public.platform_administrators pa JOIN public.accounts a USING (account_id) WHERE a.login_name = lower(btrim(:'login_name'))), 'not_found');"
+  )"
+  status_value="$(printf '%s' "$status_value" | tr -d '[:space:]')"
+  [[ "$status_value" != "not_found" ]] || fail "未找到已注册账号: $login_name"
+  log "平台管理员状态已更新: $login_name -> $status_value"
+}
+
 doctor() {
   check_runtime
   ensure_environment
@@ -192,10 +236,10 @@ doctor() {
       'SELECT version_num FROM public.alembic_version' 2>/dev/null || true
   )"
   database_revision="$(printf '%s' "$database_revision" | tr -d '[:space:]')"
-  if [[ "$database_revision" == "20260814_0020" ]]; then
+  if [[ "$database_revision" == "20260814_0021" ]]; then
     log "数据库 Revision: 正常 ($database_revision)"
   else
-    log "数据库 Revision: 失败 (期望 20260814_0020，实际 ${database_revision:-unknown})"
+    log "数据库 Revision: 失败 (期望 20260814_0021，实际 ${database_revision:-unknown})"
     failed=1
   fi
   if [[ "$(compose exec -T valkey valkey-cli ping)" == "PONG" ]]; then
@@ -231,6 +275,7 @@ usage() {
   restart  重启全部服务
   status   显示容器与健康状态
   logs     查看最近日志，可追加服务名
+  admin    本地授予或撤销平台管理员: admin <grant|revoke> <login_name>
   doctor   执行服务与基础设施诊断
 EOF
 }
@@ -242,6 +287,7 @@ case "$command_name" in
   restart) stop; start ;;
   status) status ;;
   logs) shift; logs "$@" ;;
+  admin) shift; platform_admin "$@" ;;
   doctor) doctor ;;
   *) usage; [[ -z "$command_name" ]] || exit 1 ;;
 esac

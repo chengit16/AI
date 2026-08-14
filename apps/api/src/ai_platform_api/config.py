@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     upload_max_file_size_bytes: int = 20 * 1024 * 1024
     ingestion_max_attempts: int = 3
     tika_url: str = "http://127.0.0.1:9998"
+    model_provider_allowed_hosts: tuple[str, ...] = ()
+    model_provider_probe_timeout_seconds: int = 10
     session_ttl_seconds: int = 43_200
     session_cookie_secure: bool = False
 
@@ -45,6 +47,14 @@ class Settings(BaseSettings):
             raise ValueError("上传大小上限必须位于 1 MiB 到 100 MiB 之间")
         if not 1 <= self.ingestion_max_attempts <= 10:
             raise ValueError("入库任务最大尝试次数必须位于 1 到 10 之间")
+        if not 1 <= self.model_provider_probe_timeout_seconds <= 30:
+            raise ValueError("模型供应商探测超时必须位于 1 秒到 30 秒之间")
+        normalized_hosts = tuple(
+            host.strip().casefold().rstrip(".") for host in self.model_provider_allowed_hosts
+        )
+        if any(not host or "/" in host or ":" in host for host in normalized_hosts):
+            raise ValueError("模型供应商允许列表只能包含不带端口和路径的域名")
+        self.model_provider_allowed_hosts = tuple(sorted(set(normalized_hosts)))
         return self
 
 
