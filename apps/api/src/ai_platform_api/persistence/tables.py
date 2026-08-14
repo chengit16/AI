@@ -1563,6 +1563,116 @@ Index(
     workspace_resources.c.resource_id,
 )
 
+approval_policies = Table(
+    "approval_policies",
+    metadata,
+    Column("approval_policy_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("current_version_id", UUID(as_uuid=True), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "approval_policy_id",
+        "workspace_id",
+        name="uq_approval_policies_id_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_approval_policies_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_approval_policies_creator",
+    ),
+    ForeignKeyConstraint(
+        ["approval_policy_id", "workspace_id", "current_version_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_policy_versions.approval_policy_id",
+            f"{SCHEMA_TOKEN}.approval_policy_versions.workspace_id",
+            f"{SCHEMA_TOKEN}.approval_policy_versions.approval_policy_version_id",
+        ],
+        name="fk_approval_policies_current_version",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
+    CheckConstraint("status IN ('active', 'disabled')", name="ck_approval_policies_status"),
+    CheckConstraint("version >= 1", name="ck_approval_policies_version"),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_approval_policies_name",
+    ),
+)
+Index(
+    "uq_approval_policies_workspace_name",
+    approval_policies.c.workspace_id,
+    func.lower(approval_policies.c.name),
+    unique=True,
+)
+Index(
+    "ix_approval_policies_workspace_time",
+    approval_policies.c.workspace_id,
+    approval_policies.c.updated_at,
+)
+
+approval_policy_versions = Table(
+    "approval_policy_versions",
+    metadata,
+    Column("approval_policy_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("approval_policy_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("version_number", Integer, nullable=False),
+    Column("definition", JSONB, nullable=False),
+    Column("definition_digest", String(64), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "approval_policy_id",
+        "workspace_id",
+        "approval_policy_version_id",
+        name="uq_approval_policy_versions_identity",
+    ),
+    UniqueConstraint(
+        "approval_policy_id",
+        "version_number",
+        name="uq_approval_policy_versions_number",
+    ),
+    ForeignKeyConstraint(
+        ["approval_policy_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_policies.approval_policy_id",
+            f"{SCHEMA_TOKEN}.approval_policies.workspace_id",
+        ],
+        name="fk_approval_policy_versions_policy",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_approval_policy_versions_creator",
+    ),
+    CheckConstraint(
+        "version_number >= 1",
+        name="ck_approval_policy_versions_number",
+    ),
+    CheckConstraint(
+        "definition_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_approval_policy_versions_digest",
+    ),
+)
+Index(
+    "ix_approval_policy_versions_policy_time",
+    approval_policy_versions.c.workspace_id,
+    approval_policy_versions.c.approval_policy_id,
+    approval_policy_versions.c.created_at,
+)
+
 workflows = Table(
     "workflows",
     metadata,

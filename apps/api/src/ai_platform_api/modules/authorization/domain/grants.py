@@ -14,6 +14,10 @@ from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.policy import DataScopeType
 
 OWNER_PERMISSION_CODES = (
+    "approval.chain.preview",
+    "approval.policy.create",
+    "approval.policy.read",
+    "approval.policy.update",
     "authorization.binding.create",
     "authorization.binding.revoke",
     "authorization.effective_role.read",
@@ -80,6 +84,7 @@ OWNER_PERMISSION_CODES = (
     "workflow.run.read",
 )
 MEMBER_PERMISSION_CODES = (
+    "approval.chain.preview",
     "authorization.effective_role.read",
     "authorization.menu_release.read",
     "workspace.context.switch",

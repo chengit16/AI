@@ -33,6 +33,7 @@ from ai_platform_api.modules.model_gateway.api.routes import (
     runtime_router as ai_runtime_router,
 )
 from ai_platform_api.modules.system.api.health import router as health_router
+from ai_platform_api.modules.workflow.api.approval_routes import router as approval_policy_router
 from ai_platform_api.modules.workflow.api.routes import router as workflow_router
 
 
@@ -96,6 +97,7 @@ def create_app(
     application.state.retrieval_evidence_service = dependencies.retrieval_evidence
     application.state.workflow_definition_service = dependencies.workflows
     application.state.workflow_run_executor = dependencies.workflow_run_executor
+    application.state.approval_policy_service = dependencies.approval_policies
     # 3. 中间件、错误映射和 Router 在状态装配后注册，所有业务入口共享同一安全边界。
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
@@ -113,4 +115,5 @@ def create_app(
     application.include_router(ai_runtime_router, prefix="/api/v1")
     application.include_router(assistant_router, prefix="/api/v1")
     application.include_router(workflow_router, prefix="/api/v1")
+    application.include_router(approval_policy_router, prefix="/api/v1")
     return application

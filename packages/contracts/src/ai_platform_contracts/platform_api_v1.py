@@ -30,6 +30,83 @@ class AiRuntimeConfigResponse(typing.TypedDict):
     version_number: int
 
 
+class ApprovalApproverSourceDocument(typing.TypedDict):
+    levels_up: typing.NotRequired[int | None]
+    reference_ids: list[str]
+    source_type: typing.Literal["accounts", "roles", "department_managers", "upper_managers"]
+
+
+class ApprovalChainResponse(typing.TypedDict):
+    approval_policy_id: str | None
+    approval_policy_version_id: str | None
+    chain_digest: str
+    levels: list[ResolvedApprovalLevelResponse]
+    personal_owner_confirmation: bool
+    workspace_id: str
+
+
+class ApprovalFieldConditionDocument(typing.TypedDict):
+    expected: typing.NotRequired[object | None]
+    field_path: str
+    operator: typing.Literal["eq", "ne", "gt", "gte", "lt", "lte", "in", "contains", "exists"]
+
+
+class ApprovalLevelDocument(typing.TypedDict):
+    fallback_sources: typing.NotRequired[list[ApprovalApproverSourceDocument]]
+    mode: typing.Literal["any", "all"]
+    reminder_after_minutes: typing.NotRequired[int]
+    sequence_no: int
+    sources: list[ApprovalApproverSourceDocument]
+    timeout_action: typing.NotRequired[typing.Literal["escalate", "transfer", "reject", "wait"]]
+    timeout_after_minutes: typing.NotRequired[int]
+
+
+class ApprovalPolicyDefinitionDocument(typing.TypedDict):
+    allow_self_approval: typing.NotRequired[bool]
+    department_ids: typing.NotRequired[list[str]]
+    field_conditions: typing.NotRequired[list[ApprovalFieldConditionDocument]]
+    levels: list[ApprovalLevelDocument]
+    operation: str
+    priority: int
+    resource_type: str
+    risk_levels: typing.NotRequired[list[typing.Literal["normal", "high", "critical"]]]
+    security_levels: typing.NotRequired[
+        list[typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]]
+    ]
+
+
+class ApprovalPolicyDetailResponse(typing.TypedDict):
+    policy: ApprovalPolicyResponse
+    version: ApprovalPolicyVersionResponse
+
+
+class ApprovalPolicyListResponse(typing.TypedDict):
+    items: list[ApprovalPolicyResponse]
+
+
+class ApprovalPolicyResponse(typing.TypedDict):
+    approval_policy_id: str
+    created_at: str
+    created_by_account_id: str
+    current_version_id: str
+    name: str
+    status: typing.Literal["active", "disabled"]
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
+class ApprovalPolicyVersionResponse(typing.TypedDict):
+    approval_policy_id: str
+    approval_policy_version_id: str
+    created_at: str
+    created_by_account_id: str
+    definition: ApprovalPolicyDefinitionDocument
+    definition_digest: str
+    version_number: int
+    workspace_id: str
+
+
 class AssignMemberOrganizationRequest(typing.TypedDict):
     department_ids: list[str]
     position_ids: list[str]
@@ -120,6 +197,11 @@ class CreateAiRuntimeConfigRequest(typing.TypedDict):
     policy: GatewayPolicySchema
     routes: list[RuntimeRouteRequest]
     system_prompt_template: str
+
+
+class CreateApprovalPolicyRequest(typing.TypedDict):
+    definition: ApprovalPolicyDefinitionDocument
+    name: str
 
 
 class CreateConversationRequest(typing.TypedDict):
@@ -650,6 +732,16 @@ class PositionResponse(typing.TypedDict):
     version: int
 
 
+class PreviewApprovalChainRequest(typing.TypedDict):
+    department_ids: typing.NotRequired[list[str]]
+    fields: typing.NotRequired[dict[str, object]]
+    operation: str
+    resource_id: typing.NotRequired[str | None]
+    resource_type: str
+    risk_level: typing.Literal["normal", "high", "critical"]
+    security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+
+
 class PublishWorkflowRequest(typing.TypedDict):
     expected_revision: int
 
@@ -687,6 +779,16 @@ class ReplaceWorkspaceMenuConfigurationRequest(typing.TypedDict):
     items: list[WorkspaceMenuOverrideEntry]
 
 
+class ResolvedApprovalLevelResponse(typing.TypedDict):
+    approver_account_ids: list[str]
+    fallback_approver_account_ids: list[str]
+    mode: typing.Literal["any", "all"]
+    reminder_after_minutes: int
+    sequence_no: int
+    timeout_action: typing.Literal["escalate", "transfer", "reject", "wait"]
+    timeout_after_minutes: int
+
+
 class ReviewModelProviderDataPolicyRequest(typing.TypedDict):
     approved: bool
     max_security_level: typing.NotRequired[
@@ -696,6 +798,11 @@ class ReviewModelProviderDataPolicyRequest(typing.TypedDict):
     policy_version: typing.NotRequired[str | None]
     retention_days: typing.NotRequired[int | None]
     training_usage_allowed: typing.NotRequired[bool]
+
+
+class ReviseApprovalPolicyRequest(typing.TypedDict):
+    definition: ApprovalPolicyDefinitionDocument
+    expected_version: int
 
 
 class RoleBindingResponse(typing.TypedDict):

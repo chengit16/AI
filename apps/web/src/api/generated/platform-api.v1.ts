@@ -332,6 +332,90 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/approval-policies": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Approval Policies
+     * @description 列出 PDP 授权范围内的审批策略身份。
+     */
+    readonly get: operations["listApprovalPolicies"];
+    readonly put?: never;
+    /**
+     * Create Approval Policy
+     * @description 创建策略身份和首个不可变版本。
+     */
+    readonly post: operations["createApprovalPolicy"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/approval-policies/{approval_policy_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Approval Policy
+     * @description 读取策略身份和当前不可变版本。
+     */
+    readonly get: operations["getApprovalPolicy"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/approval-policies/{approval_policy_id}/versions": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Revise Approval Policy
+     * @description 新增不可变版本并以乐观锁推进当前版本指针。
+     */
+    readonly post: operations["reviseApprovalPolicy"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/approval-policies/preview-chain": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Preview Approval Chain
+     * @description 按当前策略和组织事实预计算审批链，但不创建审批实例。
+     */
+    readonly post: operations["previewApprovalChain"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/conversations": {
     readonly parameters: {
       readonly query?: never;
@@ -1559,6 +1643,214 @@ export type components = {
       readonly version_number: number;
     };
     /**
+     * ApprovalApproverSourceDocument
+     * @description 表示指定账号、角色或负责人职位来源。
+     */
+    readonly ApprovalApproverSourceDocument: {
+      /** Levels Up */
+      readonly levels_up?: number | null;
+      /** Reference Ids */
+      readonly reference_ids: readonly string[];
+      /**
+       * Source Type
+       * @enum {string}
+       */
+      readonly source_type: "accounts" | "roles" | "department_managers" | "upper_managers";
+    };
+    /**
+     * ApprovalChainResponse
+     * @description 返回供 P1F-04 冻结的策略版本、审批层级和稳定链摘要。
+     */
+    readonly ApprovalChainResponse: {
+      /** Approval Policy Id */
+      readonly approval_policy_id: string | null;
+      /** Approval Policy Version Id */
+      readonly approval_policy_version_id: string | null;
+      /** Chain Digest */
+      readonly chain_digest: string;
+      /** Levels */
+      readonly levels: readonly components["schemas"]["ResolvedApprovalLevelResponse"][];
+      /** Personal Owner Confirmation */
+      readonly personal_owner_confirmation: boolean;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * ApprovalFieldConditionDocument
+     * @description 表示一个受限字段路径和固定操作符条件，不接受脚本表达式。
+     */
+    readonly ApprovalFieldConditionDocument: {
+      /** Expected */
+      readonly expected?: unknown | null;
+      /** Field Path */
+      readonly field_path: string;
+      /**
+       * Operator
+       * @enum {string}
+       */
+      readonly operator: "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "in" | "contains" | "exists";
+    };
+    /**
+     * ApprovalLevelDocument
+     * @description 表示一个串行层级的同级通过模式、提醒和超时动作。
+     */
+    readonly ApprovalLevelDocument: {
+      /** Fallback Sources */
+      readonly fallback_sources?: readonly components["schemas"]["ApprovalApproverSourceDocument"][];
+      /**
+       * Mode
+       * @enum {string}
+       */
+      readonly mode: "any" | "all";
+      /**
+       * Reminder After Minutes
+       * @default 1440
+       */
+      readonly reminder_after_minutes: number;
+      /** Sequence No */
+      readonly sequence_no: number;
+      /** Sources */
+      readonly sources: readonly components["schemas"]["ApprovalApproverSourceDocument"][];
+      /**
+       * Timeout Action
+       * @default wait
+       * @enum {string}
+       */
+      readonly timeout_action: "escalate" | "transfer" | "reject" | "wait";
+      /**
+       * Timeout After Minutes
+       * @default 4320
+       */
+      readonly timeout_after_minutes: number;
+    };
+    /**
+     * ApprovalPolicyDefinitionDocument
+     * @description 表示资源、组织、密级、风险、字段和最多五级审批定义。
+     */
+    readonly ApprovalPolicyDefinitionDocument: {
+      /**
+       * Allow Self Approval
+       * @default false
+       */
+      readonly allow_self_approval: boolean;
+      /** Department Ids */
+      readonly department_ids?: readonly string[];
+      /** Field Conditions */
+      readonly field_conditions?: readonly components["schemas"]["ApprovalFieldConditionDocument"][];
+      /** Levels */
+      readonly levels: readonly components["schemas"]["ApprovalLevelDocument"][];
+      /** Operation */
+      readonly operation: string;
+      /** Priority */
+      readonly priority: number;
+      /** Resource Type */
+      readonly resource_type: string;
+      /** Risk Levels */
+      readonly risk_levels?: readonly ("normal" | "high" | "critical")[];
+      /** Security Levels */
+      readonly security_levels?: readonly ("PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED")[];
+    };
+    /**
+     * ApprovalPolicyDetailResponse
+     * @description 聚合策略身份和当前不可变版本。
+     */
+    readonly ApprovalPolicyDetailResponse: {
+      readonly policy: components["schemas"]["ApprovalPolicyResponse"];
+      readonly version: components["schemas"]["ApprovalPolicyVersionResponse"];
+    };
+    /**
+     * ApprovalPolicyListResponse
+     * @description 返回当前授权范围内的审批策略身份列表。
+     */
+    readonly ApprovalPolicyListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["ApprovalPolicyResponse"][];
+    };
+    /**
+     * ApprovalPolicyResponse
+     * @description 返回审批策略稳定身份和当前版本指针。
+     */
+    readonly ApprovalPolicyResponse: {
+      /**
+       * Approval Policy Id
+       * Format: uuid
+       */
+      readonly approval_policy_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Created By Account Id
+       * Format: uuid
+       */
+      readonly created_by_account_id: string;
+      /**
+       * Current Version Id
+       * Format: uuid
+       */
+      readonly current_version_id: string;
+      /** Name */
+      readonly name: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "disabled";
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * ApprovalPolicyVersionResponse
+     * @description 返回只增不改的审批定义版本及规范摘要。
+     */
+    readonly ApprovalPolicyVersionResponse: {
+      /**
+       * Approval Policy Id
+       * Format: uuid
+       */
+      readonly approval_policy_id: string;
+      /**
+       * Approval Policy Version Id
+       * Format: uuid
+       */
+      readonly approval_policy_version_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Created By Account Id
+       * Format: uuid
+       */
+      readonly created_by_account_id: string;
+      readonly definition: components["schemas"]["ApprovalPolicyDefinitionDocument"];
+      /** Definition Digest */
+      readonly definition_digest: string;
+      /** Version Number */
+      readonly version_number: number;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
      * AssignMemberOrganizationRequest
      * @description 定义分配成员组织操作的请求字段与协议校验边界。
      */
@@ -1803,6 +2095,15 @@ export type components = {
       readonly routes: readonly components["schemas"]["RuntimeRouteRequest"][];
       /** System Prompt Template */
       readonly system_prompt_template: string;
+    };
+    /**
+     * CreateApprovalPolicyRequest
+     * @description 创建审批策略身份和首个不可变版本。
+     */
+    readonly CreateApprovalPolicyRequest: {
+      readonly definition: components["schemas"]["ApprovalPolicyDefinitionDocument"];
+      /** Name */
+      readonly name: string;
     };
     /**
      * CreateConversationRequest
@@ -3194,6 +3495,34 @@ export type components = {
       readonly version: number;
     };
     /**
+     * PreviewApprovalChainRequest
+     * @description 提供一次审批链预计算所需的可信业务主题字段。
+     */
+    readonly PreviewApprovalChainRequest: {
+      /** Department Ids */
+      readonly department_ids?: readonly string[];
+      /** Fields */
+      readonly fields?: {
+        readonly [key: string]: unknown;
+      };
+      /** Operation */
+      readonly operation: string;
+      /** Resource Id */
+      readonly resource_id?: string | null;
+      /** Resource Type */
+      readonly resource_type: string;
+      /**
+       * Risk Level
+       * @enum {string}
+       */
+      readonly risk_level: "normal" | "high" | "critical";
+      /**
+       * Security Level
+       * @enum {string}
+       */
+      readonly security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+    };
+    /**
      * PublishWorkflowRequest
      * @description 发布指定修订的已校验草稿。
      */
@@ -3277,6 +3606,32 @@ export type components = {
       readonly items: readonly components["schemas"]["WorkspaceMenuOverrideEntry"][];
     };
     /**
+     * ResolvedApprovalLevelResponse
+     * @description 返回一个层级的稳定审批人集合和冻结超时参数。
+     */
+    readonly ResolvedApprovalLevelResponse: {
+      /** Approver Account Ids */
+      readonly approver_account_ids: readonly string[];
+      /** Fallback Approver Account Ids */
+      readonly fallback_approver_account_ids: readonly string[];
+      /**
+       * Mode
+       * @enum {string}
+       */
+      readonly mode: "any" | "all";
+      /** Reminder After Minutes */
+      readonly reminder_after_minutes: number;
+      /** Sequence No */
+      readonly sequence_no: number;
+      /**
+       * Timeout Action
+       * @enum {string}
+       */
+      readonly timeout_action: "escalate" | "transfer" | "reject" | "wait";
+      /** Timeout After Minutes */
+      readonly timeout_after_minutes: number;
+    };
+    /**
      * ReviewModelProviderDataPolicyRequest
      * @description 定义审核模型供应商数据策略操作的请求字段与协议校验边界。
      */
@@ -3300,6 +3655,15 @@ export type components = {
        * @default false
        */
       readonly training_usage_allowed: boolean;
+    };
+    /**
+     * ReviseApprovalPolicyRequest
+     * @description 按策略乐观锁版本新增不可变版本。
+     */
+    readonly ReviseApprovalPolicyRequest: {
+      readonly definition: components["schemas"]["ApprovalPolicyDefinitionDocument"];
+      /** Expected Version */
+      readonly expected_version: number;
     };
     /**
      * RoleBindingResponse
@@ -5240,6 +5604,431 @@ export interface operations {
       };
       /** @description 请求未获授权 */
       readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listApprovalPolicies: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ApprovalPolicyListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createApprovalPolicy: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateApprovalPolicyRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ApprovalPolicyDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getApprovalPolicy: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly approval_policy_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ApprovalPolicyDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly reviseApprovalPolicy: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly approval_policy_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["ReviseApprovalPolicyRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ApprovalPolicyDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly previewApprovalChain: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["PreviewApprovalChainRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ApprovalChainResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
         headers: {
           readonly [name: string]: unknown;
         };

@@ -237,6 +237,7 @@ def _resource_reference(
                 "knowledge_base_id",
                 "ingestion_job_id",
                 "conversation_id",
+                "approval_policy_id",
                 "workflow_run_id",
                 "workflow_id",
             )
@@ -257,6 +258,7 @@ def _resource_reference(
             "document_version_id",
             "ingestion_job_id",
             "conversation_id",
+            "approval_policy_id",
             "workflow_run_id",
             "workflow_id",
         )

@@ -12898,6 +12898,786 @@
           }
         }
       }
+    },
+    "/api/v1/workspaces/{workspace_id}/approval-policies": {
+      "post": {
+        "tags": [
+          "审批策略"
+        ],
+        "summary": "Create Approval Policy",
+        "description": "创建策略身份和首个不可变版本。",
+        "operationId": "createApprovalPolicy",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApprovalPolicyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalPolicyDetailResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "审批策略"
+        ],
+        "summary": "List Approval Policies",
+        "description": "列出 PDP 授权范围内的审批策略身份。",
+        "operationId": "listApprovalPolicies",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalPolicyListResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/approval-policies/preview-chain": {
+      "post": {
+        "tags": [
+          "审批策略"
+        ],
+        "summary": "Preview Approval Chain",
+        "description": "按当前策略和组织事实预计算审批链，但不创建审批实例。",
+        "operationId": "previewApprovalChain",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewApprovalChainRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalChainResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/approval-policies/{approval_policy_id}": {
+      "get": {
+        "tags": [
+          "审批策略"
+        ],
+        "summary": "Get Approval Policy",
+        "description": "读取策略身份和当前不可变版本。",
+        "operationId": "getApprovalPolicy",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "approval_policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Approval Policy Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalPolicyDetailResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/approval-policies/{approval_policy_id}/versions": {
+      "post": {
+        "tags": [
+          "审批策略"
+        ],
+        "summary": "Revise Approval Policy",
+        "description": "新增不可变版本并以乐观锁推进当前版本指针。",
+        "operationId": "reviseApprovalPolicy",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "approval_policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Approval Policy Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseApprovalPolicyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalPolicyDetailResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -13021,6 +13801,458 @@
         ],
         "title": "AiRuntimeConfigResponse",
         "description": "定义AI运行时配置操作的稳定响应结构。"
+      },
+      "ApprovalApproverSourceDocument": {
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "accounts",
+              "roles",
+              "department_managers",
+              "upper_managers"
+            ],
+            "title": "Source Type"
+          },
+          "reference_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Reference Ids"
+          },
+          "levels_up": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Levels Up"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_type",
+          "reference_ids"
+        ],
+        "title": "ApprovalApproverSourceDocument",
+        "description": "表示指定账号、角色或负责人职位来源。"
+      },
+      "ApprovalChainResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "approval_policy_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Policy Id"
+          },
+          "approval_policy_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Policy Version Id"
+          },
+          "personal_owner_confirmation": {
+            "type": "boolean",
+            "title": "Personal Owner Confirmation"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedApprovalLevelResponse"
+            },
+            "type": "array",
+            "title": "Levels"
+          },
+          "chain_digest": {
+            "type": "string",
+            "title": "Chain Digest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "approval_policy_id",
+          "approval_policy_version_id",
+          "personal_owner_confirmation",
+          "levels",
+          "chain_digest"
+        ],
+        "title": "ApprovalChainResponse",
+        "description": "返回供 P1F-04 冻结的策略版本、审批层级和稳定链摘要。"
+      },
+      "ApprovalFieldConditionDocument": {
+        "properties": {
+          "field_path": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Field Path"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "ne",
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+              "in",
+              "contains",
+              "exists"
+            ],
+            "title": "Operator"
+          },
+          "expected": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_path",
+          "operator"
+        ],
+        "title": "ApprovalFieldConditionDocument",
+        "description": "表示一个受限字段路径和固定操作符条件，不接受脚本表达式。"
+      },
+      "ApprovalLevelDocument": {
+        "properties": {
+          "sequence_no": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Sequence No"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "any",
+              "all"
+            ],
+            "title": "Mode"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalApproverSourceDocument"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Sources"
+          },
+          "reminder_after_minutes": {
+            "type": "integer",
+            "maximum": 43199.0,
+            "minimum": 1.0,
+            "title": "Reminder After Minutes",
+            "default": 1440
+          },
+          "timeout_after_minutes": {
+            "type": "integer",
+            "maximum": 43200.0,
+            "minimum": 2.0,
+            "title": "Timeout After Minutes",
+            "default": 4320
+          },
+          "timeout_action": {
+            "type": "string",
+            "enum": [
+              "escalate",
+              "transfer",
+              "reject",
+              "wait"
+            ],
+            "title": "Timeout Action",
+            "default": "wait"
+          },
+          "fallback_sources": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalApproverSourceDocument"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Fallback Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence_no",
+          "mode",
+          "sources"
+        ],
+        "title": "ApprovalLevelDocument",
+        "description": "表示一个串行层级的同级通过模式、提醒和超时动作。"
+      },
+      "ApprovalPolicyDefinitionDocument": {
+        "properties": {
+          "resource_type": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Resource Type"
+          },
+          "operation": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operation"
+          },
+          "priority": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Priority"
+          },
+          "department_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Department Ids"
+          },
+          "security_levels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "PUBLIC",
+                "INTERNAL",
+                "CONFIDENTIAL",
+                "RESTRICTED"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Security Levels"
+          },
+          "risk_levels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "high",
+                "critical"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Risk Levels"
+          },
+          "field_conditions": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalFieldConditionDocument"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Field Conditions"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalLevelDocument"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Levels"
+          },
+          "allow_self_approval": {
+            "type": "boolean",
+            "title": "Allow Self Approval",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "resource_type",
+          "operation",
+          "priority",
+          "levels"
+        ],
+        "title": "ApprovalPolicyDefinitionDocument",
+        "description": "表示资源、组织、密级、风险、字段和最多五级审批定义。"
+      },
+      "ApprovalPolicyDetailResponse": {
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/ApprovalPolicyResponse"
+          },
+          "version": {
+            "$ref": "#/components/schemas/ApprovalPolicyVersionResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "policy",
+          "version"
+        ],
+        "title": "ApprovalPolicyDetailResponse",
+        "description": "聚合策略身份和当前不可变版本。"
+      },
+      "ApprovalPolicyListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalPolicyResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ApprovalPolicyListResponse",
+        "description": "返回当前授权范围内的审批策略身份列表。"
+      },
+      "ApprovalPolicyResponse": {
+        "properties": {
+          "approval_policy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Policy Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ],
+            "title": "Status"
+          },
+          "current_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Current Version Id"
+          },
+          "created_by_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By Account Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approval_policy_id",
+          "workspace_id",
+          "name",
+          "status",
+          "current_version_id",
+          "created_by_account_id",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "title": "ApprovalPolicyResponse",
+        "description": "返回审批策略稳定身份和当前版本指针。"
+      },
+      "ApprovalPolicyVersionResponse": {
+        "properties": {
+          "approval_policy_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Policy Version Id"
+          },
+          "approval_policy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Policy Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ApprovalPolicyDefinitionDocument"
+          },
+          "definition_digest": {
+            "type": "string",
+            "title": "Definition Digest"
+          },
+          "created_by_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By Account Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approval_policy_version_id",
+          "approval_policy_id",
+          "workspace_id",
+          "version_number",
+          "definition",
+          "definition_digest",
+          "created_by_account_id",
+          "created_at"
+        ],
+        "title": "ApprovalPolicyVersionResponse",
+        "description": "返回只增不改的审批定义版本及规范摘要。"
       },
       "AssignMemberOrganizationRequest": {
         "properties": {
@@ -13589,6 +14821,26 @@
         ],
         "title": "CreateAiRuntimeConfigRequest",
         "description": "定义创建AI运行时配置操作的请求字段与协议校验边界。"
+      },
+      "CreateApprovalPolicyRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ApprovalPolicyDefinitionDocument"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "definition"
+        ],
+        "title": "CreateApprovalPolicyRequest",
+        "description": "创建审批策略身份和首个不可变版本。"
       },
       "CreateConversationRequest": {
         "properties": {
@@ -16809,6 +18061,76 @@
         "title": "PositionResponse",
         "description": "定义职位操作的稳定响应结构。"
       },
+      "PreviewApprovalChainRequest": {
+        "properties": {
+          "resource_type": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Resource Type"
+          },
+          "operation": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operation"
+          },
+          "resource_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Id"
+          },
+          "department_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Department Ids"
+          },
+          "security_level": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "INTERNAL",
+              "CONFIDENTIAL",
+              "RESTRICTED"
+            ],
+            "title": "Security Level"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "high",
+              "critical"
+            ],
+            "title": "Risk Level"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resource_type",
+          "operation",
+          "security_level",
+          "risk_level"
+        ],
+        "title": "PreviewApprovalChainRequest",
+        "description": "提供一次审批链预计算所需的可信业务主题字段。"
+      },
       "PublishWorkflowRequest": {
         "properties": {
           "expected_revision": {
@@ -16978,6 +18300,68 @@
         "title": "ReplaceWorkspaceMenuConfigurationRequest",
         "description": "定义替换工作空间菜单配置操作的请求字段与协议校验边界。"
       },
+      "ResolvedApprovalLevelResponse": {
+        "properties": {
+          "sequence_no": {
+            "type": "integer",
+            "title": "Sequence No"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "any",
+              "all"
+            ],
+            "title": "Mode"
+          },
+          "approver_account_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Approver Account Ids"
+          },
+          "reminder_after_minutes": {
+            "type": "integer",
+            "title": "Reminder After Minutes"
+          },
+          "timeout_after_minutes": {
+            "type": "integer",
+            "title": "Timeout After Minutes"
+          },
+          "timeout_action": {
+            "type": "string",
+            "enum": [
+              "escalate",
+              "transfer",
+              "reject",
+              "wait"
+            ],
+            "title": "Timeout Action"
+          },
+          "fallback_approver_account_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Fallback Approver Account Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence_no",
+          "mode",
+          "approver_account_ids",
+          "reminder_after_minutes",
+          "timeout_after_minutes",
+          "timeout_action",
+          "fallback_approver_account_ids"
+        ],
+        "title": "ResolvedApprovalLevelResponse",
+        "description": "返回一个层级的稳定审批人集合和冻结超时参数。"
+      },
       "ReviewModelProviderDataPolicyRequest": {
         "properties": {
           "approved": {
@@ -17048,6 +18432,25 @@
         ],
         "title": "ReviewModelProviderDataPolicyRequest",
         "description": "定义审核模型供应商数据策略操作的请求字段与协议校验边界。"
+      },
+      "ReviseApprovalPolicyRequest": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ApprovalPolicyDefinitionDocument"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version",
+          "definition"
+        ],
+        "title": "ReviseApprovalPolicyRequest",
+        "description": "按策略乐观锁版本新增不可变版本。"
       },
       "RoleBindingResponse": {
         "properties": {

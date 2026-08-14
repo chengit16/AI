@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 12,
+  "registry_version": 13,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -67,6 +67,10 @@
     ,{ "code": "workflow.definition.publish", "resource_type": "workflow_definition", "action": "publish", "scope": "resource", "status": "active" }
     ,{ "code": "workflow.run.create", "resource_type": "workflow_definition", "action": "run", "scope": "resource", "status": "active" }
     ,{ "code": "workflow.run.read", "resource_type": "workflow_instance", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "approval.policy.create", "resource_type": "approval_policy", "action": "create", "scope": "workspace", "status": "active" }
+    ,{ "code": "approval.policy.read", "resource_type": "approval_policy", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "approval.policy.update", "resource_type": "approval_policy", "action": "update", "scope": "resource", "status": "active" }
+    ,{ "code": "approval.chain.preview", "resource_type": "approval_chain", "action": "preview", "scope": "workspace", "status": "active" }
   ],
   "page_resources": [
     {
@@ -256,7 +260,12 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000084", "api_key": "workflow.draft.validate", "operation_id": "validateWorkflowDraft", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/draft/validate", "access_level": "authorized", "permission_code": "workflow.definition.update", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000085", "api_key": "workflow.version.publish", "operation_id": "publishWorkflowVersion", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/publish", "access_level": "authorized", "permission_code": "workflow.definition.publish", "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000086", "api_key": "workflow.run.create", "operation_id": "createWorkflowRun", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs", "access_level": "authorized", "permission_code": "workflow.run.create", "risk_level": "high", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000087", "api_key": "workflow.run.get", "operation_id": "getWorkflowRun", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs/{workflow_run_id}", "access_level": "authorized", "permission_code": "workflow.run.read", "risk_level": "normal", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000087", "api_key": "workflow.run.get", "operation_id": "getWorkflowRun", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs/{workflow_run_id}", "access_level": "authorized", "permission_code": "workflow.run.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000088", "api_key": "approval.policy.create", "operation_id": "createApprovalPolicy", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-policies", "access_level": "authorized", "permission_code": "approval.policy.create", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000089", "api_key": "approval.policy.list", "operation_id": "listApprovalPolicies", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-policies", "access_level": "authorized", "permission_code": "approval.policy.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000090", "api_key": "approval.chain.preview", "operation_id": "previewApprovalChain", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-policies/preview-chain", "access_level": "authorized", "permission_code": "approval.chain.preview", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000091", "api_key": "approval.policy.get", "operation_id": "getApprovalPolicy", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-policies/{approval_policy_id}", "access_level": "authorized", "permission_code": "approval.policy.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000092", "api_key": "approval.policy.revise", "operation_id": "reviseApprovalPolicy", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-policies/{approval_policy_id}/versions", "access_level": "authorized", "permission_code": "approval.policy.update", "risk_level": "high", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -330,6 +339,10 @@
     { "menu_id": "82000000-0000-4000-8000-000000000175", "menu_key": "navigation.workspace.workflow.definition_publish", "parent_menu_key": "navigation.workspace.workflow", "name": "发布工作流", "menu_type": "action", "page_resource_id": null, "permission_code": "workflow.definition.publish", "icon_key": null, "sort_order": 130, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000176", "menu_key": "navigation.workspace.workflow.run_create", "parent_menu_key": "navigation.workspace.workflow", "name": "运行工作流", "menu_type": "action", "page_resource_id": null, "permission_code": "workflow.run.create", "icon_key": null, "sort_order": 140, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000177", "menu_key": "navigation.workspace.workflow.run_read", "parent_menu_key": "navigation.workspace.workflow", "name": "查看工作流运行", "menu_type": "action", "page_resource_id": null, "permission_code": "workflow.run.read", "icon_key": null, "sort_order": 150, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000178", "menu_key": "navigation.workspace.workflow.approval_create", "parent_menu_key": "navigation.workspace.workflow", "name": "创建审批策略", "menu_type": "action", "page_resource_id": null, "permission_code": "approval.policy.create", "icon_key": null, "sort_order": 160, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000179", "menu_key": "navigation.workspace.workflow.approval_read", "parent_menu_key": "navigation.workspace.workflow", "name": "查看审批策略", "menu_type": "action", "page_resource_id": null, "permission_code": "approval.policy.read", "icon_key": null, "sort_order": 170, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000180", "menu_key": "navigation.workspace.workflow.approval_update", "parent_menu_key": "navigation.workspace.workflow", "name": "修订审批策略", "menu_type": "action", "page_resource_id": null, "permission_code": "approval.policy.update", "icon_key": null, "sort_order": 180, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000181", "menu_key": "navigation.workspace.workflow.approval_preview", "parent_menu_key": "navigation.workspace.workflow", "name": "预计算审批链", "menu_type": "action", "page_resource_id": null, "permission_code": "approval.chain.preview", "icon_key": null, "sort_order": 190, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000152", "menu_key": "navigation.platform.models.provider_query", "parent_menu_key": "navigation.platform.models", "name": "查看模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000153", "menu_key": "navigation.platform.models.provider_create", "parent_menu_key": "navigation.platform.models", "name": "创建模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000154", "menu_key": "navigation.platform.models.credential_rotate", "parent_menu_key": "navigation.platform.models", "name": "轮换模型凭证", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
@@ -422,6 +435,11 @@
     { "menu_id": "82000000-0000-4000-8000-000000000174", "api_resource_id": "81000000-0000-4000-8000-000000000084", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000175", "api_resource_id": "81000000-0000-4000-8000-000000000085", "action_type": "publish" },
     { "menu_id": "82000000-0000-4000-8000-000000000176", "api_resource_id": "81000000-0000-4000-8000-000000000086", "action_type": "mutation" },
-    { "menu_id": "82000000-0000-4000-8000-000000000177", "api_resource_id": "81000000-0000-4000-8000-000000000087", "action_type": "query" }
+    { "menu_id": "82000000-0000-4000-8000-000000000177", "api_resource_id": "81000000-0000-4000-8000-000000000087", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000178", "api_resource_id": "81000000-0000-4000-8000-000000000088", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000179", "api_resource_id": "81000000-0000-4000-8000-000000000089", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000181", "api_resource_id": "81000000-0000-4000-8000-000000000090", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000179", "api_resource_id": "81000000-0000-4000-8000-000000000091", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000180", "api_resource_id": "81000000-0000-4000-8000-000000000092", "action_type": "mutation" }
   ]
 }
