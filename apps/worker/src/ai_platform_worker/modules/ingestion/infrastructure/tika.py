@@ -1,3 +1,5 @@
+"""通过受控 Tika HTTP 边界解析 DOCX 并传递中文 OCR 配置。"""
+
 from __future__ import annotations
 
 from html import unescape
@@ -22,14 +24,20 @@ TIKA_NULL_REFERENCE = b"&#0;"
 
 
 def local_name(element: ElementTree.Element) -> str:
+    """处理本地名称，在基础设施边界维持稳定领域对象映射。"""
+
     return element.tag.removeprefix(XHTML_NAMESPACE)
 
 
 def normalized_text(element: ElementTree.Element) -> str:
+    """处理规范化文本，在基础设施边界维持稳定领域对象映射。"""
+
     return " ".join(unescape("".join(element.itertext())).split())
 
 
 def table_text(element: ElementTree.Element) -> str:
+    """处理表格文本，在基础设施边界维持稳定领域对象映射。"""
+
     rows: list[str] = []
     for row in element.iter(f"{XHTML_NAMESPACE}tr"):
         cells = [
@@ -43,6 +51,8 @@ def table_text(element: ElementTree.Element) -> str:
 
 
 def metadata_from(root: ElementTree.Element) -> dict[str, str]:
+    """处理元数据从，在基础设施边界维持稳定领域对象映射。"""
+
     metadata: dict[str, str] = {}
     for element in root.iter(f"{XHTML_NAMESPACE}meta"):
         name = element.attrib.get("name")
@@ -57,6 +67,8 @@ def append_element(
     element: ElementTree.Element,
     page_number: int | None,
 ) -> None:
+    """追加元素，在基础设施边界维持稳定领域对象映射。"""
+
     tag = local_name(element)
     classes = set(element.attrib.get("class", "").split())
     if tag == "table":
@@ -87,6 +99,8 @@ def append_element(
 
 def parse_xhtml(payload: bytes, fallback_media_type: str) -> ParsedDocument:
     # Tika 3.2.3 会用 XML 禁止的 &#0; 表示空标题，移除该兼容性占位后再严格解析结构。
+    """解析XHTML，在基础设施边界维持稳定领域对象映射。"""
+
     payload = payload.replace(TIKA_NULL_REFERENCE, b"")
     try:
         root = ElementTree.fromstring(payload)
@@ -136,6 +150,8 @@ def parse_xhtml(payload: bytes, fallback_media_type: str) -> ParsedDocument:
 
 
 class TikaDocumentParser:
+    """封装Tika文档解析器执行边界，并将失败转换为可追踪的稳定结果。"""
+
     def __init__(
         self,
         base_url: str,
@@ -154,6 +170,9 @@ class TikaDocumentParser:
         file_name: str,
         declared_media_type: str | None,
     ) -> ParsedDocument:
+        """通过受限 Tika 请求解析 Office 文档，超时或异常响应失败关闭。"""
+
+        # 1. 文件名只进入受控 Header，路径和引号必须移除以避免协议注入。
         safe_file_name = Path(file_name).name.replace('"', "")
         headers = {
             "Accept": "text/html",
@@ -164,6 +183,7 @@ class TikaDocumentParser:
             # 语言选择只在 Tika Adapter 边缘传递，任务层不依赖 Tesseract 专有参数。
             headers["X-Tika-OCRLanguage"] = self._ocr_language
             headers["X-Tika-PDFOcrStrategy"] = "auto"
+        # 2. 使用固定 PUT 端点、媒体类型和超时调用本地 Tika，不跟随文档内外部地址。
         request = Request(
             self._endpoint,
             data=content,
@@ -190,6 +210,7 @@ class TikaDocumentParser:
                 "Tika 当前不可用或请求超时",
                 retryable=True,
             ) from error
+        # 3. 仅在响应成功后解析 XHTML 为规范块，HTTP 和网络失败映射为稳定重试语义。
         return parse_xhtml(payload, declared_media_type or response_media_type)
 
 

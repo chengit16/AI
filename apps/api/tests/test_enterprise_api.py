@@ -1,3 +1,5 @@
+"""验证企业空间与成员邀请生命周期 HTTP 协议。"""
+
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal, cast

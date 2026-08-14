@@ -1,3 +1,5 @@
+"""定义企业空间、成员邀请和成员生命周期领域模型及端口。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -14,6 +16,8 @@ InvitationStatus = Literal["pending", "accepted", "cancelled", "expired"]
 
 @dataclass(frozen=True)
 class EnterpriseWorkspace:
+    """记录企业空间的展示名称及创建审计信息。"""
+
     workspace_id: UUID
     name: str
     created_by_account_id: UUID
@@ -22,6 +26,8 @@ class EnterpriseWorkspace:
 
 @dataclass(frozen=True)
 class WorkspaceMembership:
+    """表示账号在工作空间内唯一且可转换状态的成员身份。"""
+
     membership_id: UUID
     workspace_id: UUID
     account_id: UUID
@@ -55,6 +61,8 @@ class WorkspaceMembership:
 
 @dataclass(frozen=True)
 class WorkspaceInvitation:
+    """保存企业空间邀请的有效期、接受对象和处理状态。"""
+
     invitation_id: UUID
     workspace_id: UUID
     invited_account_id: UUID
@@ -81,6 +89,8 @@ class WorkspaceInvitation:
 
 @dataclass(frozen=True)
 class WorkspaceRecord:
+    """提供企业用例校验空间类型和状态所需的最小记录。"""
+
     workspace_id: UUID
     workspace_type: Literal["personal", "enterprise"]
     name: str
@@ -89,12 +99,16 @@ class WorkspaceRecord:
 
 @dataclass(frozen=True)
 class WorkspaceSummary(WorkspaceRecord):
+    """描述账号可访问空间及其当前成员身份和状态。"""
+
     membership_type: MembershipType
     membership_status: Literal["active", "disabled", "left"]
 
 
 @dataclass(frozen=True)
 class WorkspaceMemberSummary:
+    """汇总企业成员账号、名称、身份类型和启用状态。"""
+
     account_id: UUID
     display_name: str
     membership_type: MembershipType
@@ -114,6 +128,8 @@ class EnterpriseWriteConflictError(Exception):
 
 
 class EnterpriseRepository(Protocol):
+    """在空间隔离范围内维护企业、成员和邀请事实。"""
+
     def add_workspace(
         self,
         workspace: EnterpriseWorkspace,
@@ -165,6 +181,8 @@ class EnterpriseRepository(Protocol):
 
 
 class EnterpriseUnitOfWork(Protocol):
+    """保证企业成员变更、审计、Outbox 和配额记录原子提交。"""
+
     @property
     def enterprise(self) -> EnterpriseRepository: ...
 

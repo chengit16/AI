@@ -1,3 +1,5 @@
+"""验证 P1D-05 供应商配置、凭证、数据政策和探测状态机。"""
+
 from __future__ import annotations
 
 from dataclasses import replace

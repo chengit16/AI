@@ -1,3 +1,5 @@
+"""验证 P1D-01 知识事实、版本状态机和发布事务。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

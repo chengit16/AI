@@ -1,3 +1,5 @@
+"""提供不联网、确定性且固定维度的本地 Embedding Adapter。"""
+
 import hashlib
 import math
 

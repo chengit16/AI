@@ -1,3 +1,5 @@
+"""以工作空间前缀和确定性对象键隔离 MinIO 文档内容。"""
+
 from __future__ import annotations
 
 import io

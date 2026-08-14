@@ -1,3 +1,5 @@
+"""编排工作空间资源授权、字段投影、审计和 Outbox 同事务写入。"""
+
 from collections.abc import Callable
 from datetime import UTC, datetime
 from types import TracebackType
@@ -33,6 +35,8 @@ class ResourceNotFoundError(PlatformError):
 
 
 class WorkspaceUnitOfWork(Protocol):
+    """约束工作空间单元相关写入、审计和事件使用同一事务边界。"""
+
     resources: WorkspaceResourceRepository
     outbox: OutboxWriter
     audit: AuditWriter
@@ -53,6 +57,8 @@ EventIdFactory = Callable[[], UUID]
 
 
 class CreateWorkspaceResource:
+    """创建请求工作空间内的资源并同步写入审计与 Outbox。"""
+
     def __init__(
         self,
         policy: PolicyDecisionPoint,
@@ -119,6 +125,8 @@ class CreateWorkspaceResource:
 
 
 class ReadWorkspaceResource:
+    """按可信工作空间上下文读取资源，跨空间标识统一视为不存在。"""
+
     def __init__(self, policy: PolicyDecisionPoint, unit_of_work: WorkspaceUnitOfWork) -> None:
         self._policy = policy
         self._unit_of_work = unit_of_work

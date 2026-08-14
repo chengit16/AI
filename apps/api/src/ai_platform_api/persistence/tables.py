@@ -1,3 +1,5 @@
+"""聚合 API、共享索引和集成事件表元数据，作为 Migration 事实来源。"""
+
 from ai_platform_backend.indexing import persistence as indexing_tables
 from ai_platform_backend.ingestion import persistence as ingestion_tables
 from ai_platform_backend.integration import persistence as integration_tables

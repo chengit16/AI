@@ -1,3 +1,4 @@
+/** @description 知识库选择侧栏与受权限控制的创建入口。 */
 import { Button, Skeleton } from "antd";
 import { BookOpen, Plus } from "lucide-react";
 
@@ -8,11 +9,17 @@ import { cn } from "@/utils/cn";
 import { securityLevelLabels } from "../config";
 
 interface KnowledgeBaseRailProps {
+  /** 当前空间可见的知识库摘要。 */
   items: readonly KnowledgeBaseSummary[];
+  /** 当前页面选中的知识库 ID。 */
   selectedId: string | null;
+  /** 知识库清单是否正在首次加载。 */
   isLoading: boolean;
+  /** 只控制创建入口展示，后端仍独立授权。 */
   canCreate: boolean;
+  /** 切换当前页面知识库上下文。 */
   onSelect: (knowledgeBaseId: string) => void;
+  /** 打开知识库创建流程。 */
   onCreate: () => void;
 }
 

@@ -1,3 +1,5 @@
+"""提供不联网的确定性模型 Provider 和调用事实记录器。"""
+
 from dataclasses import dataclass, field
 from typing import Literal
 from uuid import UUID
@@ -57,6 +59,8 @@ class MockProvider:
 
 @dataclass
 class InMemoryUsageRecorder:
+    """为领域测试收集模型尝试记录，不参与生产持久化。"""
+
     records: list[tuple[UUID, UUID, ModelAttempt]] = field(default_factory=list)
 
     def record(self, invocation_id: UUID, workspace_id: UUID, attempt: ModelAttempt) -> None:

@@ -1,3 +1,5 @@
+"""定义集成事件、审计、Outbox 租约和任务发布领域端口。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,6 +10,8 @@ from uuid import UUID
 
 @dataclass(frozen=True)
 class IntegrationEvent:
+    """定义跨进程传递的版本化业务事实及可信追踪元数据。"""
+
     event_id: UUID
     event_type: str
     workspace_id: UUID
@@ -25,6 +29,8 @@ class IntegrationEvent:
 
 @dataclass(frozen=True)
 class AuditRecord:
+    """记录工作空间内操作者、资源、结果和请求追踪信息。"""
+
     audit_id: UUID
     workspace_id: UUID
     actor_id: UUID
@@ -42,6 +48,8 @@ class AuditRecord:
 
 @dataclass(frozen=True)
 class ClaimedOutboxEvent:
+    """表示由指定 Worker 持有租约的一条待发布 Outbox 事件。"""
+
     event: IntegrationEvent
     attempt_count: int
     claimed_by: str
@@ -50,23 +58,33 @@ class ClaimedOutboxEvent:
 
 @dataclass(frozen=True)
 class OutboxClaimBatch:
+    """汇总本轮成功领取的事件及领取前已转死信数量。"""
+
     events: tuple[ClaimedOutboxEvent, ...]
     dead_lettered: int
 
 
 class OutboxWriter(Protocol):
+    """把集成事件写入当前业务事务，禁止先于业务提交发布。"""
+
     def add(self, event: IntegrationEvent) -> None: ...
 
 
 class AuditWriter(Protocol):
+    """把审计记录写入当前业务事务，敏感字段必须在调用前完成投影。"""
+
     def add(self, record: AuditRecord) -> None: ...
 
 
 class TaskPublisher(Protocol):
+    """发布已签名语言无关事件，Broker 异常由调度器决定重试。"""
+
     def publish(self, event: IntegrationEvent) -> None: ...
 
 
 class OutboxLeaseStore(Protocol):
+    """以租约领取到期事件，并只允许租约持有者回写发布或失败状态。"""
+
     def claim_due(
         self,
         *,

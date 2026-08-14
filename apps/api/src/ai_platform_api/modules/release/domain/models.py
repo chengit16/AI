@@ -1,3 +1,5 @@
+"""定义发布清单组件版本、兼容矩阵和确定性校验领域模型。"""
+
 from __future__ import annotations
 
 import re
@@ -12,11 +14,15 @@ SEMANTIC_VERSION_PATTERN = re.compile(
 
 
 def require_identifier(value: str, label: str) -> None:
+    """处理校验标识，输入违反领域不变量时失败关闭。"""
+
     if not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", value):
         raise ValueError(f"{label}必须是稳定的小写标识")
 
 
 def require_digest(value: str, label: str) -> None:
+    """处理校验摘要，输入违反领域不变量时失败关闭。"""
+
     if not DIGEST_PATTERN.fullmatch(value):
         raise ValueError(f"{label}必须是 sha256 摘要")
 
@@ -24,6 +30,8 @@ def require_digest(value: str, label: str) -> None:
 @total_ordering
 @dataclass(frozen=True)
 class SemanticVersion:
+    """解析和比较不带预发布标签的主、次、补丁版本。"""
+
     major: int
     minor: int
     patch: int
@@ -63,6 +71,8 @@ class SemanticVersion:
 
 @dataclass(frozen=True)
 class ComponentVersion:
+    """记录发布组件名称、语义版本和构建来源。"""
+
     name: str
     version: str
     source_digest: str
@@ -78,6 +88,8 @@ class ComponentVersion:
 
 @dataclass(frozen=True)
 class ImageArtifact:
+    """记录容器镜像名称和不可变 SHA-256 摘要。"""
+
     name: str
     reference: str
     digest: str
@@ -104,6 +116,8 @@ class ImageArtifact:
 
 @dataclass(frozen=True)
 class DatabaseVersion:
+    """记录数据库类型、Schema Revision 和最低兼容版本。"""
+
     schema_revision: str
 
     def __post_init__(self) -> None:
@@ -113,6 +127,8 @@ class DatabaseVersion:
 
 @dataclass(frozen=True)
 class RuntimeVersions:
+    """固定 Node.js、Python 及后置 Go 运行层接口版本。"""
+
     node: str
     python: str
 
@@ -126,6 +142,8 @@ class RuntimeVersions:
 
 @dataclass(frozen=True)
 class ManifestInputs:
+    """汇总生成发布清单所需的组件、镜像、数据库和运行时事实。"""
+
     release_version: str
     compatibility_matrix_version: str
     components: tuple[ComponentVersion, ...]
@@ -147,6 +165,8 @@ class ManifestInputs:
 
 @dataclass(frozen=True)
 class ReleaseManifest:
+    """提供内容寻址的完整发布组合，作为本地启动兼容判断依据。"""
+
     schema_version: int
     release_version: str
     compatibility_matrix_version: str
@@ -192,6 +212,8 @@ class ReleaseManifest:
 
 @dataclass(frozen=True)
 class ComponentRule:
+    """定义组件允许的最小版本和排他最大版本。"""
+
     name: str
     minimum_version: str
     maximum_exclusive_version: str
@@ -206,6 +228,8 @@ class ComponentRule:
 
 @dataclass(frozen=True)
 class RuntimeRule:
+    """定义指定运行时必须匹配的版本前缀。"""
+
     name: str
     version_prefix: str
 
@@ -218,6 +242,8 @@ class RuntimeRule:
 
 @dataclass(frozen=True)
 class CompatibilityMatrix:
+    """汇总清单版本、组件范围、数据库 Revision、运行时和必需镜像规则。"""
+
     schema_version: int
     matrix_version: str
     manifest_schema_version: int
@@ -241,6 +267,8 @@ class CompatibilityMatrix:
 
 @dataclass(frozen=True)
 class CompatibilityResult:
+    """返回组合是否可启动及全部稳定不兼容原因。"""
+
     compatible: bool
     reasons: tuple[str, ...]
 

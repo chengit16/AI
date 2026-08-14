@@ -1,3 +1,5 @@
+"""验证应用工厂、生命周期门禁和模块 Router 装配。"""
+
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path

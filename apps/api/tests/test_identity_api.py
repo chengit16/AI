@@ -1,3 +1,5 @@
+"""验证注册、登录、会话、退出和空间切换 HTTP 协议。"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

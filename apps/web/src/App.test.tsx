@@ -1,3 +1,4 @@
+/** @description 应用根路由与会话状态的集成测试。 */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";

@@ -1,3 +1,4 @@
+/** @description 平台品牌标识组件，支持完整与紧凑两种应用壳层表面。 */
 import { cn } from "@/utils/cn";
 
 interface PlatformMarkProps {

@@ -1,3 +1,5 @@
+"""在 ReleaseManifest 领域对象与稳定 JSON 文档之间严格转换。"""
+
 from __future__ import annotations
 
 import json
@@ -20,6 +22,8 @@ JsonObject = dict[str, object]
 
 
 def load_json(path: Path) -> JsonObject:
+    """加载JSON，并在可信上下文内维持授权、事务与审计边界。"""
+
     loaded: object = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise TypeError(f"JSON 顶层必须是对象: {path}")
@@ -51,6 +55,8 @@ def _integer(value: object, label: str) -> int:
 
 
 def parse_inputs(document: JsonObject) -> ManifestInputs:
+    """解析输入，并在可信上下文内维持授权、事务与审计边界。"""
+
     database = _object(document.get("database"), "database")
     runtimes = _object(document.get("runtimes"), "runtimes")
     return ManifestInputs(
@@ -95,6 +101,8 @@ def parse_inputs(document: JsonObject) -> ManifestInputs:
 
 
 def parse_manifest(document: JsonObject) -> ReleaseManifest:
+    """解析清单，并在可信上下文内维持授权、事务与审计边界。"""
+
     inputs = parse_inputs(document)
     return ReleaseManifest(
         schema_version=_integer(document.get("schema_version"), "schema_version"),
@@ -109,6 +117,8 @@ def parse_manifest(document: JsonObject) -> ReleaseManifest:
 
 
 def parse_matrix(document: JsonObject) -> CompatibilityMatrix:
+    """解析矩阵，并在可信上下文内维持授权、事务与审计边界。"""
+
     return CompatibilityMatrix(
         schema_version=_integer(document.get("schema_version"), "schema_version"),
         matrix_version=_string(document.get("matrix_version"), "matrix_version"),

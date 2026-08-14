@@ -1,3 +1,5 @@
+"""映射企业空间创建、成员邀请、加入、停用和离开 HTTP 协议。"""
+
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
@@ -84,6 +86,8 @@ def create_enterprise_workspace(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
 ) -> WorkspaceSummaryResponse:
+    """创建企业工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _workspace_response(service.create(context, name=body.name))
 
 
@@ -97,6 +101,8 @@ def list_workspaces(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
 ) -> WorkspaceListResponse:
+    """列出工作空间集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return WorkspaceListResponse(
         items=[_workspace_response(item) for item in service.list_workspaces(context)]
     )
@@ -115,6 +121,8 @@ def invite_workspace_member(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
 ) -> WorkspaceInvitationResponse:
+    """处理邀请工作空间成员；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     invitation = service.invite(
         context,
         workspace_id=workspace_id,
@@ -139,6 +147,8 @@ def accept_workspace_invitation(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
 ) -> WorkspaceSummaryResponse:
+    """接受工作空间邀请；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _workspace_response(service.accept_invitation(context, invitation_id=invitation_id))
 
 
@@ -154,6 +164,8 @@ def switch_workspace(
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
 ) -> WorkspaceSummaryResponse:
     # 当前 Header 只证明来源空间；目标空间必须由服务端再次查询成员事实。
+    """切换工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _workspace_response(service.switch(context, workspace_id=workspace_id))
 
 
@@ -168,6 +180,8 @@ def leave_workspace(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
 ) -> WorkspaceMembershipResponse:
+    """退出工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     membership = service.leave(context, workspace_id=workspace_id)
     return WorkspaceMembershipResponse(
         account_id=membership.account_id,
@@ -188,6 +202,8 @@ def disable_workspace_member(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
 ) -> WorkspaceMembershipResponse:
+    """停用工作空间成员；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     membership = service.disable_member(
         context,
         workspace_id=workspace_id,
@@ -213,6 +229,8 @@ def list_workspace_members(
     service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
     projection: Annotated[FieldProjectionService, Depends(field_projection_service)],
 ) -> WorkspaceMemberListResponse:
+    """列出工作空间成员集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return WorkspaceMemberListResponse(
         items=[
             _member_response(item, projection, context.authorized_field_mask)

@@ -1,3 +1,5 @@
+"""编排密码认证、服务端 Session 建立、撤销和空间切换用例。"""
+
 from __future__ import annotations
 
 import re
@@ -54,6 +56,9 @@ class AuthenticationService:
         self._entitlements = entitlements
 
     def login(self, login_name: str, password: str) -> LoginResult:
+        """校验账号状态和密码后创建服务端会话，失败响应不区分账号是否存在。"""
+
+        # 1. 无论账号是否存在都执行密码验证路径，避免通过时序枚举登录名。
         account = self._repository.get_account_by_login(login_name.strip().casefold())
         password_valid = self._passwords.verify(
             account.password_hash if account is not None else None,
@@ -67,6 +72,7 @@ class AuthenticationService:
         if personal_workspace_id is None:
             raise InvalidCredentialsError
 
+        # 2. 浏览器只持有随机令牌，服务端会话保存 CSRF 摘要和认证版本。
         csrf_token = secrets.token_urlsafe(32)
         session = BrowserSession(
             account_id=account.account_id,
@@ -86,6 +92,8 @@ class AuthenticationService:
         request_id: UUID,
         trace: TraceContext,
     ) -> RequestContext:
+        """由会话和 CSRF 凭据构造可信浏览器上下文，并校验认证版本。"""
+
         account = self._browser_account(
             session_token=session_token,
             csrf_token=csrf_token,
@@ -133,6 +141,9 @@ class AuthenticationService:
         trace: TraceContext,
         now: datetime | None = None,
     ) -> RequestContext:
+        """校验 API Key 摘要、作用域、过期和撤销状态后构造可信上下文。"""
+
+        # 1. 先解析公开格式，再统一校验工作空间、状态、期限和秘密摘要。
         key_id, secret = self._parse_api_key(credential)
         api_key = self._repository.get_api_key(key_id)
         current_time = now or datetime.now(UTC)
@@ -145,6 +156,7 @@ class AuthenticationService:
         ):
             raise ApiKeyInvalidError
 
+        # 2. Key 仍受创建账号、空间成员和套餐开关约束，不能成为长期旁路身份。
         account = self._repository.get_account(api_key.created_by_account_id)
         if account is None or account.status != "active":
             raise ApiKeyInvalidError
@@ -152,6 +164,7 @@ class AuthenticationService:
         open_api = self._entitlements.get_open_api_entitlement(workspace_id)
         if open_api is None or not open_api.active:
             raise ApiKeyInvalidError
+        # 3. 只有服务端完成全部校验后才能构造带作用域的可信上下文。
         return RequestContext.trusted(
             actor_id=api_key.actor_id,
             user_id=account.account_id,
@@ -163,6 +176,8 @@ class AuthenticationService:
         )
 
     def logout(self, session_token: str) -> None:
+        """撤销当前服务端会话，使已泄露的浏览器令牌立即失效。"""
+
         self._sessions.revoke(session_token)
 
     def _require_workspace_access(self, account_id: UUID, workspace_id: UUID) -> None:
@@ -208,6 +223,8 @@ class AuthenticationService:
 
 
 class ApiKeyService:
+    """签发和撤销工作空间 API Key，明文仅在签发响应中出现一次。"""
+
     def __init__(
         self,
         repository: IdentityReader,
@@ -228,6 +245,9 @@ class ApiKeyService:
         scopes: tuple[str, ...],
         expires_at: datetime | None,
     ) -> IssuedApiKey:
+        """校验工作空间权益和管理权限后签发 API Key，明文只在本次调用返回。"""
+
+        # 1. Key 签发依赖有效空间成员和已启用的 OpenAPI 权益。
         if context.user_id is None:
             raise AuthenticationRequiredError
         self._require_workspace_access(context.user_id, context.workspace_id)
@@ -248,6 +268,7 @@ class ApiKeyService:
             or (expires_at is not None and expires_at <= now)
         ):
             raise ApiKeyConfigurationError
+        # 2. 随机秘密只在内存构造，持久化层仅接收摘要和末四位。
         key_id = uuid4()
         actor_id = uuid4()
         secret = secrets.token_urlsafe(32)
@@ -262,6 +283,7 @@ class ApiKeyService:
             expires_at=expires_at,
             revoked_at=None,
         )
+        # 3. 完成持久化提交后才向调用方返回一次性明文。
         with self._unit_of_work as unit_of_work:
             unit_of_work.api_keys.add(api_key, name=normalized_name, last_four=secret[-4:])
             unit_of_work.commit()
@@ -275,6 +297,8 @@ class ApiKeyService:
         )
 
     def revoke(self, *, context: RequestContext, key_id: UUID) -> None:
+        """在工作空间边界内撤销 API Key，并记录审计与版本事件。"""
+
         if context.user_id is None:
             raise AuthenticationRequiredError
         self._require_workspace_access(context.user_id, context.workspace_id)

@@ -1,3 +1,5 @@
+"""定义索引版本、关键词、向量、全文和构建租约 PostgreSQL 表。"""
+
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     Boolean,

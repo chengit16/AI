@@ -1,3 +1,5 @@
+"""定义 API 与 Worker 共享的入库任务 PostgreSQL 表。"""
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,

@@ -1,3 +1,4 @@
+/** @description 知识生产 Hook 缓存刷新、任务轮询和失败提示测试。 */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp } from "antd";
 import type { PropsWithChildren } from "react";

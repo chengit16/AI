@@ -1,3 +1,5 @@
+"""验证角色、绑定和有效角色解释 HTTP 协议。"""
+
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast

@@ -1,3 +1,4 @@
+/** @description 知识文档版本状态、可见性与发布动作表格。 */
 import { Button, Dropdown, Popconfirm, Table, Tag } from "antd";
 import type { MenuProps, TableColumnsType } from "antd";
 import { CheckCircle2, MoreHorizontal, Send, Upload } from "lucide-react";
@@ -8,15 +9,25 @@ import { StateView } from "@/components/StateView/StateView";
 import { documentStatus, formatTimestamp, securityLevelLabels, visibilityLabels } from "../config";
 
 interface DocumentTableProps {
+  /** 服务端已按资源和字段策略投影的文档摘要。 */
   items: readonly KnowledgeDocumentSummary[];
+  /** 用于关联最新版本解析结果和内容摘要的入库任务。 */
   jobs: readonly IngestionJob[];
+  /** 文档清单是否正在首次加载。 */
   isLoading: boolean;
+  /** 只控制上传新版本入口，服务端仍独立授权。 */
   canUploadVersion: boolean;
+  /** 只控制确认就绪入口，状态和摘要仍由服务端校验。 */
   canMarkReady: boolean;
+  /** 只控制发布入口，服务端仍校验版本和资源范围。 */
   canPublish: boolean;
+  /** 任一文档写操作是否正在提交。 */
   isMutating: boolean;
+  /** 打开指定文档的新版本上传流程。 */
   onUploadVersion: (document: KnowledgeDocumentSummary) => void;
+  /** 以解析任务提供的内容摘要请求确认版本就绪。 */
   onMarkReady: (document: KnowledgeDocumentSummary, contentHash: string) => void;
+  /** 请求发布指定文档的最新版本。 */
   onPublish: (document: KnowledgeDocumentSummary) => void;
 }
 

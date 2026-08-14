@@ -1,3 +1,4 @@
+/** @description 模型供应商创建、凭证轮换和数据政策复核弹窗集合。 */
 import { Form, Input, InputNumber, Modal, Select, Switch } from "antd";
 
 import type {
@@ -7,21 +8,32 @@ import type {
 } from "@/api/services/platformModels";
 
 interface ProviderDialogsProps {
+  /** 是否打开新建供应商弹窗。 */
   createOpen: boolean;
+  /** 当前准备轮换凭证的供应商；为空时关闭对应弹窗。 */
   credentialProvider: ModelProvider | null;
+  /** 当前准备复核数据政策的供应商；为空时关闭对应弹窗。 */
   policyProvider: ModelProvider | null;
+  /** 任一供应商写操作进行中时统一锁定确认按钮。 */
   isSubmitting: boolean;
+  /** 关闭创建弹窗但不提交表单。 */
   onCloseCreate: () => void;
+  /** 关闭凭证轮换弹窗。 */
   onCloseCredential: () => void;
+  /** 关闭数据政策复核弹窗。 */
   onClosePolicy: () => void;
+  /** 提交新供应商配置和仅本次可见的明文凭证。 */
   onCreate: (values: CreateModelProviderRequest) => Promise<unknown>;
+  /** 为指定供应商提交新凭证；成功后旧凭证由服务端失效。 */
   onRotateCredential: (providerId: string, apiKey: string) => Promise<unknown>;
+  /** 提交指定供应商的数据政策人工复核结论。 */
   onReviewPolicy: (
     providerId: string,
     values: ReviewModelProviderDataPolicyRequest,
   ) => Promise<unknown>;
 }
 
+/** 编排三个相互独立的供应商治理表单，并只在成功后重置本地字段。 */
 export function ProviderDialogs({
   createOpen,
   credentialProvider,

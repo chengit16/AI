@@ -1,3 +1,5 @@
+"""验证 P1D-06 运行配置版本、组件兼容和原子发布。"""
+
 from __future__ import annotations
 
 from dataclasses import replace

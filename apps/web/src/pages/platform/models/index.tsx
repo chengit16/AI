@@ -1,4 +1,4 @@
-/** 平台模型治理页面编排，组合供应商生命周期和不可变运行配置发布入口。 */
+/** @description 平台模型治理页面编排，组合供应商生命周期和不可变运行配置发布入口。 */
 import { Button, Tabs } from "antd";
 import { Cpu, Plus } from "lucide-react";
 import { useState } from "react";

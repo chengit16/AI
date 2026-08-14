@@ -1,3 +1,5 @@
+"""编排知识库、文档和不可变版本事实的创建与发布事务。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -42,22 +44,32 @@ __all__ = [
 
 
 class KnowledgeDeniedError(PlatformError):
+    """表示知识拒绝错误，由协议层映射为稳定错误码。"""
+
     error_code = "POLICY_DENIED"
 
 
 class KnowledgeNotFoundError(PlatformError):
+    """表示知识未找到错误，由协议层映射为稳定错误码。"""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
 class KnowledgeConflictError(PlatformError):
+    """表示知识冲突错误，由协议层映射为稳定错误码。"""
+
     error_code = "KNOWLEDGE_CONFLICT"
 
 
 class KnowledgeValidationError(PlatformError):
+    """表示知识校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"
 
 
 class KnowledgeQuotaExceededError(PlatformError):
+    """表示知识额度超限错误，由协议层映射为稳定错误码。"""
+
     error_code = "QUOTA_EXCEEDED"
 
 
@@ -113,6 +125,9 @@ class KnowledgeFactService:
         department_ids: frozenset[UUID] = frozenset(),
         default_security_level: SecurityLevel = "INTERNAL",
     ) -> KnowledgeBase:
+        """校验知识权限、可见范围和额度后创建知识库事实。"""
+
+        # 1. 先构造并校验完整领域对象，名称和可见范围错误不进入事务。
         account_id = _account(context)
         now = datetime.now(UTC)
         knowledge_base = KnowledgeBase(
@@ -137,6 +152,7 @@ class KnowledgeFactService:
                     context.workspace_id,
                     department_ids,
                 )
+                # 2. 在写知识库前原子占用套餐额度，幂等键绑定新聚合标识。
                 usage = consume_usage(
                     unit_of_work.usage,
                     context=context,
@@ -147,6 +163,7 @@ class KnowledgeFactService:
                     occurred_at=now,
                 )
                 _record_usage(unit_of_work, usage)
+                # 3. 用量、知识库、审计和 Outbox 同事务提交。
                 unit_of_work.knowledge.add_knowledge_base(knowledge_base)
                 _record(
                     unit_of_work,
@@ -196,6 +213,9 @@ class KnowledgeFactService:
         upload_scanner_version: str | None = None,
         upload_scanned_at: datetime | None = None,
     ) -> tuple[Document, DocumentVersion, DocumentSource]:
+        """在知识库默认策略上创建文档，并固定字段级安全与可见范围。"""
+
+        # 1. 上传来源必须携带完整安全事实，其他来源不能伪造上传扫描结果。
         account_id = _account(context)
         now = datetime.now(UTC)
         _require_upload_security(
@@ -217,6 +237,7 @@ class KnowledgeFactService:
                 )
                 if knowledge_base is None or knowledge_base.status != "active":
                     raise KnowledgeNotFoundError
+                # 2. 锁定知识库后解析继承策略，并把结果冻结到文档而非运行时动态继承。
                 resolved_departments = (
                     department_ids if department_ids is not None else knowledge_base.department_ids
                 )
@@ -271,9 +292,11 @@ class KnowledgeFactService:
                     context.workspace_id,
                     resolved_departments,
                 )
+                # 3. 文档、首版、来源和入库任务构成一个不可拆分的知识事实。
                 unit_of_work.knowledge.add_document(document)
                 unit_of_work.knowledge.add_document_version(version, source)
                 self._add_ingestion_job(unit_of_work, context, document, version, source, now)
+                # 4. 上传来源同时占用存储额度，并与知识事实、审计和 Outbox 原子提交。
                 if upload_size_bytes is not None:
                     usage = consume_usage(
                         unit_of_work.usage,
@@ -333,6 +356,9 @@ class KnowledgeFactService:
         upload_scanner_version: str | None = None,
         upload_scanned_at: datetime | None = None,
     ) -> tuple[DocumentVersion, DocumentSource]:
+        """创建不可变文档版本及来源事实，不直接改变当前发布指针。"""
+
+        # 1. 校验上传安全元数据后锁定活动文档，版本号在事务内递增。
         account_id = _account(context)
         now = datetime.now(UTC)
         _require_upload_security(
@@ -358,6 +384,7 @@ class KnowledgeFactService:
                     or document.status != "active"
                 ):
                     raise KnowledgeNotFoundError
+                # 2. 新版本和来源一经创建不可变，但尚不影响当前发布版本和在线索引。
                 version = DocumentVersion(
                     uuid4(),
                     context.workspace_id,
@@ -392,6 +419,7 @@ class KnowledgeFactService:
                 )
                 version.assert_valid()
                 source.assert_valid()
+                # 3. 版本、来源、入库任务和存储用量同事务提交。
                 unit_of_work.knowledge.add_document_version(version, source)
                 self._add_ingestion_job(unit_of_work, context, document, version, source, now)
                 if upload_size_bytes is not None:
@@ -438,6 +466,7 @@ class KnowledgeFactService:
         source: DocumentSource,
         now: datetime,
     ) -> None:
+        # 1. 只有上传来源需要异步解析；手工和后置连接器来源由各自生产链路负责。
         if source.source_kind != "upload":
             return
         if (
@@ -446,6 +475,7 @@ class KnowledgeFactService:
             or source.content_hash is None
         ):
             raise KnowledgeValidationError
+        # 2. 任务固定来源摘要、最大尝试次数和原始追踪上下文，Worker 不重新猜测这些事实。
         job = IngestionJob(
             ingestion_job_id=uuid4(),
             workspace_id=context.workspace_id,
@@ -479,6 +509,8 @@ class KnowledgeFactService:
         document_version_id: UUID,
         content_hash: str,
     ) -> DocumentVersion:
+        """仅允许草稿在内容摘要确定后进入就绪状态。"""
+
         return self._transition_version(
             context,
             knowledge_base_id=knowledge_base_id,
@@ -497,6 +529,9 @@ class KnowledgeFactService:
         document_id: UUID,
         document_version_id: UUID,
     ) -> DocumentVersion:
+        """发布就绪版本、替代旧版本并原子切换当前版本和索引指针。"""
+
+        # 1. 锁定文档、目标版本和当前发布版本，确保状态转换基于同一数据库快照。
         account_id = _account(context)
         now = datetime.now(UTC)
         try:
@@ -520,6 +555,7 @@ class KnowledgeFactService:
                     or version is None
                 ):
                     raise KnowledgeNotFoundError
+                # 2. 先生成目标发布态并把旧发布版本标记为已替代。
                 published = version.publish(occurred_at=now)
                 current = unit_of_work.knowledge.get_current_document_version(
                     context.workspace_id,
@@ -529,6 +565,7 @@ class KnowledgeFactService:
                 if current is not None:
                     unit_of_work.knowledge.save_document_version(current.supersede())
                 unit_of_work.knowledge.save_document_version(published)
+                # 3. 当前版本指针和在线索引指针必须原子切换，避免回答引用错误内容。
                 unit_of_work.knowledge.set_current_document_version(
                     context.workspace_id,
                     document_id,
@@ -541,6 +578,7 @@ class KnowledgeFactService:
                     document_version_id,
                     activated_at=now,
                 )
+                # 4. 发布事实与指针切换同事务提交，消费者不会提前观察到未生效版本。
                 _record(
                     unit_of_work,
                     context,
@@ -566,6 +604,9 @@ class KnowledgeFactService:
         knowledge_base_id: UUID,
         document_id: UUID,
     ) -> Document:
+        """逻辑删除文档并停用其索引，保留历史版本用于审计。"""
+
+        # 1. 锁定活动文档并通过领域状态机生成逻辑删除版本。
         account_id = _account(context)
         now = datetime.now(UTC)
         try:
@@ -580,6 +621,7 @@ class KnowledgeFactService:
                     raise KnowledgeNotFoundError
                 deleted = document.delete(occurred_at=now)
                 unit_of_work.knowledge.save_document(deleted)
+                # 2. 文档删除与全部在线索引停用必须在同一事务完成。
                 unit_of_work.knowledge.deactivate_document_indexes(
                     context.workspace_id,
                     document_id,
@@ -609,6 +651,9 @@ class KnowledgeFactService:
         *,
         knowledge_base_id: UUID,
     ) -> KnowledgeBase:
+        """仅允许删除没有活动文档的知识库，避免形成孤立文档。"""
+
+        # 1. 锁定知识库并再次查询活动文档，关闭检查后并发新增的竞态。
         account_id = _account(context)
         now = datetime.now(UTC)
         try:
@@ -626,6 +671,7 @@ class KnowledgeFactService:
                     knowledge_base_id,
                 ):
                     raise KnowledgeConflictError
+                # 2. 逻辑删除同时释放套餐额度，幂等键绑定删除后的聚合版本。
                 deleted = knowledge_base.delete(occurred_at=now)
                 usage = consume_usage(
                     unit_of_work.usage,
@@ -640,6 +686,7 @@ class KnowledgeFactService:
                     occurred_at=now,
                 )
                 _record_usage(unit_of_work, usage)
+                # 3. 知识库、额度、审计和 Outbox 同事务提交。
                 unit_of_work.knowledge.save_knowledge_base(deleted)
                 _record(
                     unit_of_work,
@@ -674,6 +721,7 @@ class KnowledgeFactService:
         event_type: str,
         action: str,
     ) -> DocumentVersion:
+        # 1. 锁定文档与目标版本，并校验二者仍属于同一活动知识聚合。
         account_id = _account(context)
         now = datetime.now(UTC)
         try:
@@ -697,6 +745,7 @@ class KnowledgeFactService:
                     or version is None
                 ):
                     raise KnowledgeNotFoundError
+                # 2. 调用方提供的领域转换只处理状态，新版本、审计和事件统一在此提交。
                 updated = transition(version, now)
                 unit_of_work.knowledge.save_document_version(updated)
                 _record(

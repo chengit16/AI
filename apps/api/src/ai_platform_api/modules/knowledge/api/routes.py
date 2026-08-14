@@ -1,3 +1,5 @@
+"""映射知识库、文档版本、上传、发布和入库任务 HTTP 协议。"""
+
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -51,6 +53,8 @@ router = APIRouter(prefix="/workspaces/{workspace_id}", tags=["知识事实"])
 
 
 def knowledge_fact_service(request: Request) -> KnowledgeFactService:
+    """处理知识事实服务；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     service = getattr(request.app.state, "knowledge_fact_service", None)
     if not isinstance(service, KnowledgeFactService):
         raise RuntimeError("知识事实服务尚未完成装配")
@@ -58,6 +62,8 @@ def knowledge_fact_service(request: Request) -> KnowledgeFactService:
 
 
 def knowledge_upload_service(request: Request) -> KnowledgeUploadService:
+    """处理知识上传服务；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     service = getattr(request.app.state, "knowledge_upload_service", None)
     if not isinstance(service, KnowledgeUploadService):
         raise RuntimeError("知识上传服务尚未完成装配")
@@ -65,6 +71,8 @@ def knowledge_upload_service(request: Request) -> KnowledgeUploadService:
 
 
 def knowledge_management_service(request: Request) -> KnowledgeManagementService:
+    """处理知识管理服务；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     service = getattr(request.app.state, "knowledge_management_service", None)
     if not isinstance(service, KnowledgeManagementService):
         raise RuntimeError("知识管理服务尚未完成装配")
@@ -83,6 +91,8 @@ def list_knowledge_bases(
     service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
 ) -> KnowledgeBaseListResponse:
+    """列出知识库集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     items = service.list_knowledge_bases(context, limit=limit)
     return KnowledgeBaseListResponse(items=[_knowledge_base_summary(item) for item in items])
@@ -101,6 +111,8 @@ def list_documents(
     service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
 ) -> KnowledgeDocumentListResponse:
+    """列出文档集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     return KnowledgeDocumentListResponse(
         items=[
@@ -127,6 +139,8 @@ def list_ingestion_jobs(
     service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
 ) -> IngestionJobListResponse:
+    """列出入库任务集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     return IngestionJobListResponse(
         items=[
@@ -152,6 +166,8 @@ def retry_ingestion_job(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
 ) -> IngestionJobResponse:
+    """重试入库任务；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     return _ingestion_job(service.retry_ingestion_job(context, ingestion_job_id=ingestion_job_id))
 
@@ -169,6 +185,8 @@ def create_knowledge_base(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[KnowledgeFactService, Depends(knowledge_fact_service)],
 ) -> KnowledgeBaseResponse:
+    """创建知识库；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     return _knowledge_base(
         service.create_knowledge_base(
@@ -194,6 +212,8 @@ def delete_knowledge_base(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[KnowledgeFactService, Depends(knowledge_fact_service)],
 ) -> KnowledgeBaseResponse:
+    """删除知识库；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     return _knowledge_base(
         service.delete_knowledge_base(context, knowledge_base_id=knowledge_base_id)
@@ -214,6 +234,8 @@ def create_document(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[KnowledgeFactService, Depends(knowledge_fact_service)],
 ) -> DocumentCreatedResponse:
+    """创建文档；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     document, version, source = service.create_document(
         context,
@@ -262,6 +284,8 @@ async def upload_document(
     ] = None,
     permission_labels: Annotated[list[str] | None, Form()] = None,
 ) -> DocumentUploadResponse:
+    """上传文档；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     result = await run_in_threadpool(
         service.upload_document,
@@ -301,6 +325,8 @@ def delete_document(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[KnowledgeFactService, Depends(knowledge_fact_service)],
 ) -> DocumentResponse:
+    """删除文档；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     return _document(
         service.delete_document(
@@ -326,6 +352,8 @@ def create_document_version(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[KnowledgeFactService, Depends(knowledge_fact_service)],
 ) -> DocumentVersionCreatedResponse:
+    """创建文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     version, source = service.create_document_version(
         context,
@@ -361,6 +389,8 @@ async def upload_document_version(
     settings: Annotated[Settings, Depends(get_settings)],
     file: Annotated[UploadFile, File(description="待安全检查的新版本原件")],
 ) -> DocumentVersionUploadResponse:
+    """上传文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     result = await run_in_threadpool(
         service.upload_document_version,
@@ -397,6 +427,8 @@ def mark_document_version_ready(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[KnowledgeFactService, Depends(knowledge_fact_service)],
 ) -> DocumentVersionResponse:
+    """标记文档版本就绪；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     return _document_version(
         service.mark_document_version_ready(
@@ -423,6 +455,8 @@ def publish_document_version(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[KnowledgeFactService, Depends(knowledge_fact_service)],
 ) -> DocumentVersionResponse:
+    """发布文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     _require_workspace_path(context, workspace_id)
     return _document_version(
         service.publish_document_version(

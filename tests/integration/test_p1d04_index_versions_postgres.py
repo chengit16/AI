@@ -1,3 +1,5 @@
+"""验证 P1D-04 索引版本租约、构建和原子切换。"""
+
 from __future__ import annotations
 
 import hashlib

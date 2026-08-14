@@ -1,3 +1,5 @@
+"""把已认领 Outbox 事件封装为版本化任务信封并发布到 Celery。"""
+
 from datetime import UTC, datetime
 from uuid import uuid4
 

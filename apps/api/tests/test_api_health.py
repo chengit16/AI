@@ -1,3 +1,5 @@
+"""验证 API 健康探针在本地、容器依赖和降级场景中的响应。"""
+
 from unittest.mock import patch
 
 from ai_platform_api.config import Settings, get_settings

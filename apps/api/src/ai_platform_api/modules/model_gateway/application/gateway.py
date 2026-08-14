@@ -1,3 +1,5 @@
+"""执行模型路由、有限重试、熔断、降级和用量记录。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -30,6 +32,8 @@ MICRO_UNITS_PER_MILLION = 1_000_000
 
 @dataclass
 class CircuitState:
+    """记录连续失败次数和熔断开启时间，成功调用会重置状态。"""
+
     consecutive_failures: int = 0
     opened_at: float | None = None
 
@@ -55,6 +59,9 @@ class ModelGateway:
         self._circuits = circuit_states if circuit_states is not None else {}
 
     def invoke(self, request: ModelRequest) -> ModelResult:
+        """按策略筛选路由并执行有限重试、熔断和降级，完整记录每次尝试。"""
+
+        # 1. 先执行预算与内容边界校验，再按能力、位置和成本筛选候选路由。
         self._validate_request(request)
         routes = self._eligible_routes(request)
         if not routes:
@@ -64,6 +71,7 @@ class ModelGateway:
                 raise ModelDataBoundaryDeniedError()
             raise ModelRouteUnavailableError
 
+        # 2. 路由共享总超时预算；每个供应商调用仍受单次超时和熔断状态约束。
         attempts: list[ModelAttempt] = []
         started_total_at = self._clock()
         for route in routes:
@@ -86,6 +94,7 @@ class ModelGateway:
                 )
                 continue
 
+            # 3. 缺失 Adapter 也记录为一次失败尝试，保证路由问题可审计。
             provider = self._providers.get(route.provider_id)
             if provider is None:
                 self._record_failure(circuit)
@@ -112,6 +121,7 @@ class ModelGateway:
                 if remaining_ms <= 0:
                     break
                 started_at = self._clock()
+                # 4. 单路由只执行有限重试，失败类型决定是否重试、熔断或允许跨路由降级。
                 try:
                     response = provider.invoke(
                         request,
@@ -145,6 +155,7 @@ class ModelGateway:
                         break
                     continue
 
+                # 5. 成功响应先校验再计费和返回，供应商 Usage 缺失时使用零值而非猜测账单。
                 duration_ms = max(0, int((self._clock() - started_at) * 1000))
                 attempt = self._attempt(
                     route,
@@ -180,6 +191,7 @@ class ModelGateway:
             if not fallback_allowed:
                 break
 
+        # 6. 所有路由失败后仅允许显式规则降级；数据边界失败绝不转换为普通兜底回答。
         if attempts and all(attempt.failure_kind == "data_boundary" for attempt in attempts):
             raise ModelDataBoundaryDeniedError(tuple(attempts))
         if self._policy.rule_degradation_message is not None:

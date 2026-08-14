@@ -1,3 +1,5 @@
+"""验证 P1B-05 套餐、功能开关、配额和用量状态机。"""
+
 from datetime import UTC, datetime
 from uuid import UUID
 

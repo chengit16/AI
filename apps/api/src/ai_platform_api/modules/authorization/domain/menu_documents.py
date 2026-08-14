@@ -1,3 +1,5 @@
+"""在稳定 JSON 文档与菜单发布领域快照之间执行严格转换。"""
+
 from __future__ import annotations
 
 from typing import Any, cast
@@ -17,6 +19,8 @@ from ai_platform_api.modules.authorization.domain.resources import (
 
 
 def menu_snapshot_to_dict(snapshot: MenuReleaseSnapshot) -> dict[str, object]:
+    """将菜单发布快照转换为可计算摘要和持久化的稳定字典。"""
+
     return {
         "schema_version": snapshot.schema_version,
         "registry_version": snapshot.registry_version,
@@ -60,6 +64,8 @@ def menu_snapshot_to_dict(snapshot: MenuReleaseSnapshot) -> dict[str, object]:
 
 
 def menu_snapshot_from_dict(document: dict[str, Any]) -> MenuReleaseSnapshot:
+    """从持久化字典恢复菜单快照并拒绝不兼容的结构。"""
+
     return MenuReleaseSnapshot(
         int(document["schema_version"]),
         int(document["registry_version"]),

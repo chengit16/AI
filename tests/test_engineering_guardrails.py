@@ -1,3 +1,5 @@
+"""验证架构、契约、仓库策略和工程治理门禁反例。"""
+
 import json
 import subprocess
 from pathlib import Path

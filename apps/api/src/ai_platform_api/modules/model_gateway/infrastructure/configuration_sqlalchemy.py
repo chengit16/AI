@@ -1,3 +1,5 @@
+"""实现模型供应商治理聚合的 PostgreSQL Repository 与 UoW。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -42,6 +44,8 @@ SessionFactory = Callable[[], Session]
 
 
 class SqlAlchemyModelProviderRepository:
+    """维护平台级供应商配置、加密凭据版本和唯一活动凭据。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -147,6 +151,8 @@ class SqlAlchemyModelProviderRepository:
 
 
 class SqlAlchemyPlatformAuditWriter:
+    """写入平台治理审计；该记录不伪造工作空间归属。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 

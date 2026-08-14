@@ -1,10 +1,15 @@
+/** @description 页面加载、空数据、错误和无权限状态的统一可访问反馈组件。 */
 import { AlertTriangle, Inbox, LockKeyhole } from "lucide-react";
 import type { ReactNode } from "react";
 
 interface StateViewProps {
+  /** 状态类别，决定图标和辅助技术播报语义。 */
   kind: "empty" | "error" | "denied";
+  /** 可独立理解的状态标题。 */
   title: string;
+  /** 状态原因或可恢复方式说明。 */
   description: string;
+  /** 可选恢复、重试或导航动作。 */
   action?: ReactNode;
 }
 

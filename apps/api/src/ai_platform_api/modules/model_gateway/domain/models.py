@@ -1,3 +1,5 @@
+"""定义阶段 0 模型网关请求、路由、尝试、用量和 Provider 端口。"""
+
 from dataclasses import dataclass
 from typing import Literal, Protocol
 from uuid import UUID
@@ -12,6 +14,8 @@ AttemptStatus = Literal["succeeded", "failed", "circuit_open"]
 
 @dataclass(frozen=True)
 class ModelMessage:
+    """保存模型角色和文本内容，禁止在此携带未投影业务对象。"""
+
     role: Literal["system", "user", "assistant"]
     content: str
 
@@ -22,6 +26,8 @@ class ModelMessage:
 
 @dataclass(frozen=True)
 class ModelRequest:
+    """定义模型操作的请求字段与协议校验边界。"""
+
     invocation_id: UUID
     workspace_id: UUID
     trace_id: str
@@ -48,6 +54,8 @@ class ModelRequest:
 
 @dataclass(frozen=True)
 class TokenUsage:
+    """记录供应商返回的输入和输出 Token 数量。"""
+
     input_tokens: int
     output_tokens: int
 
@@ -62,6 +70,8 @@ class TokenUsage:
 
 @dataclass(frozen=True)
 class ProviderResponse:
+    """定义供应商操作的稳定响应结构。"""
+
     content: str
     finish_reason: str
     usage: TokenUsage | None
@@ -70,6 +80,8 @@ class ProviderResponse:
 
 @dataclass(frozen=True)
 class ModelRoute:
+    """定义供应商、模型、位置、能力、成本和活动状态的候选路由。"""
+
     route_id: str
     provider_id: str
     model_id: str
@@ -96,6 +108,8 @@ class ModelRoute:
 
 @dataclass(frozen=True)
 class GatewayPolicy:
+    """限制请求、响应、单次/总超时、重试、熔断、成本和规则降级。"""
+
     attempt_timeout_ms: int
     total_timeout_ms: int
     max_attempts_per_route: int
@@ -129,6 +143,8 @@ class GatewayPolicy:
 
 @dataclass(frozen=True)
 class ModelAttempt:
+    """记录单次路由尝试的状态、耗时、失败类型、Usage 和估算成本。"""
+
     route_id: str
     provider_id: str
     model_id: str
@@ -145,6 +161,8 @@ class ModelAttempt:
 
 @dataclass(frozen=True)
 class ModelResult:
+    """返回模型文本、结束原因、实际路由、成本、降级状态和完整尝试链。"""
+
     content: str
     finish_reason: str
     provider_id: str | None
@@ -159,10 +177,14 @@ class ModelResult:
 
 
 class ModelProvider(Protocol):
+    """以模型标识和超时调用供应商，并把错误分类为可重试、可降级或失败关闭。"""
+
     provider_id: str
 
     def invoke(self, request: ModelRequest, model_id: str, timeout_ms: int) -> ProviderResponse: ...
 
 
 class ModelUsageRecorder(Protocol):
+    """按调用、空间和尝试记录模型用量，重复写入必须保持幂等。"""
+
     def record(self, invocation_id: UUID, workspace_id: UUID, attempt: ModelAttempt) -> None: ...

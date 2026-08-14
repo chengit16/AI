@@ -1,3 +1,5 @@
+"""使用 Valkey 管理服务端浏览器 Session、CSRF 和过期撤销。"""
+
 from __future__ import annotations
 
 import json

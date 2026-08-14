@@ -1,3 +1,5 @@
+"""创建 Celery 应用并只注册受治理的集成事件与后台扫描任务。"""
+
 from celery import Celery
 
 from ai_platform_worker.config import get_worker_settings

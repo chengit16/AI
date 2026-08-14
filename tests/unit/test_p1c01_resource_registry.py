@@ -1,3 +1,5 @@
+"""验证 P1C-01 权限资源注册表完整性和重复拒绝。"""
+
 from __future__ import annotations
 
 from dataclasses import replace

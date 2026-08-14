@@ -1,4 +1,4 @@
-/** 本地运行状态页，轮询平台健康接口并区分正常、降级与不可达状态。 */
+/** @description 本地运行状态页，轮询平台健康接口并区分正常、降级与不可达状态。 */
 import { useQuery } from "@tanstack/react-query";
 import { Button, Skeleton, Tag, Tooltip } from "antd";
 import { CheckCircle2, CircleAlert, Database, RefreshCw, Server } from "lucide-react";

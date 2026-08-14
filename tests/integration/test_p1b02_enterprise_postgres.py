@@ -1,3 +1,5 @@
+"""验证 P1B-02 企业空间和成员生命周期 PostgreSQL 约束。"""
+
 from __future__ import annotations
 
 import os

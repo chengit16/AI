@@ -1,3 +1,5 @@
+"""验证 P1D-02 上传类型、签名、大小和安全扫描规则。"""
+
 from __future__ import annotations
 
 import io

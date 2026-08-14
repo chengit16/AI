@@ -1,3 +1,5 @@
+"""验证 P1C-02 默认拒绝、角色范围和数据级 ABAC 决策。"""
+
 from pathlib import Path
 from uuid import UUID
 

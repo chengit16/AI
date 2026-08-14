@@ -1,3 +1,5 @@
+"""验证 HTTP Trace 建立、延续和响应传播。"""
+
 import re
 
 from ai_platform_api.common.trace import TRACEPARENT_PATTERN, TraceContext

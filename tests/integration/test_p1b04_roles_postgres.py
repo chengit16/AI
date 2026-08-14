@@ -1,3 +1,5 @@
+"""验证 P1B-04 角色、绑定、继承和缓存失效。"""
+
 from __future__ import annotations
 
 import os

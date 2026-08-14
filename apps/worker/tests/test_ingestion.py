@@ -1,3 +1,5 @@
+"""验证 Worker 文档解析、结构化切片和稳定标识。"""
+
 from uuid import UUID
 
 import pytest

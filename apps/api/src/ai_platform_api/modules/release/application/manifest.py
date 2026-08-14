@@ -1,3 +1,5 @@
+"""从冻结输入生成可复现 ReleaseManifest 并校验组件兼容性。"""
+
 import hashlib
 import json
 from dataclasses import replace
@@ -15,6 +17,8 @@ class ReleaseManifestService:
     """集中生成发布清单并判断整个运行组合是否兼容。"""
 
     def build(self, inputs: ManifestInputs) -> ReleaseManifest:
+        """从构建输入生成发布清单，固定组件版本、镜像摘要和迁移兼容信息。"""
+
         unsigned = ReleaseManifest.from_inputs(inputs, manifest_digest="sha256:" + "0" * 64)
         digest = self._document_digest(unsigned.to_dict(include_digest=False))
         return replace(unsigned, manifest_digest=digest)
@@ -24,6 +28,9 @@ class ReleaseManifestService:
         manifest: ReleaseManifest,
         matrix: CompatibilityMatrix,
     ) -> CompatibilityResult:
+        """校验发布清单完整性与组件兼容矩阵，不满足基线时阻断启动。"""
+
+        # 1. 先验证内容摘要和清单自身版本，防止被篡改或错误格式继续参与兼容判断。
         reasons: list[str] = []
         expected_digest = self._document_digest(manifest.to_dict(include_digest=False))
         if manifest.manifest_digest != expected_digest:
@@ -33,6 +40,7 @@ class ReleaseManifestService:
         if manifest.compatibility_matrix_version != matrix.matrix_version:
             reasons.append("COMPATIBILITY_MATRIX_MISMATCH")
 
+        # 2. 逐项验证组件语义版本及数据库 Revision 是否落在兼容矩阵内。
         components = {component.name: component for component in manifest.components}
         for component_rule in matrix.component_rules:
             component = components.get(component_rule.name)
@@ -50,6 +58,7 @@ class ReleaseManifestService:
         if manifest.database.schema_revision not in matrix.database_revisions:
             reasons.append("DATABASE_REVISION_INCOMPATIBLE")
 
+        # 3. 最后验证运行时前缀和必需镜像，聚合全部原因供启动诊断一次展示。
         runtime_versions = manifest.runtimes.as_dict()
         for runtime_rule in matrix.runtime_rules:
             runtime_version = runtime_versions.get(runtime_rule.name)

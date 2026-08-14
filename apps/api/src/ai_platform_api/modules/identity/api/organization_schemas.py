@@ -1,3 +1,5 @@
+"""定义组织树、岗位和成员归属接口的请求与响应 Schema。"""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -7,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CreateDepartmentRequest(BaseModel):
+    """定义创建部门操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=120)
@@ -14,18 +18,24 @@ class CreateDepartmentRequest(BaseModel):
 
 
 class MoveDepartmentRequest(BaseModel):
+    """定义移动部门操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     parent_department_id: UUID | None = None
 
 
 class OrganizationStatusRequest(BaseModel):
+    """定义组织状态操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     active: bool
 
 
 class DepartmentResponse(BaseModel):
+    """定义部门操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     department_id: UUID
@@ -38,12 +48,16 @@ class DepartmentResponse(BaseModel):
 
 
 class DepartmentListResponse(BaseModel):
+    """定义部门列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[DepartmentResponse]
 
 
 class CreatePositionRequest(BaseModel):
+    """定义创建职位操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     department_id: UUID
@@ -51,6 +65,8 @@ class CreatePositionRequest(BaseModel):
 
 
 class PositionResponse(BaseModel):
+    """定义职位操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     position_id: UUID
@@ -62,12 +78,16 @@ class PositionResponse(BaseModel):
 
 
 class PositionListResponse(BaseModel):
+    """定义职位列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[PositionResponse]
 
 
 class AssignMemberOrganizationRequest(BaseModel):
+    """定义分配成员组织操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     department_ids: list[UUID] = Field(max_length=100)
@@ -88,6 +108,8 @@ class AssignMemberOrganizationRequest(BaseModel):
 
 
 class MemberOrganizationResponse(BaseModel):
+    """定义成员组织操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     account_id: UUID

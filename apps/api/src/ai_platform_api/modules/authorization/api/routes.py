@@ -1,3 +1,5 @@
+"""映射角色授权、菜单配置和菜单发布 HTTP 协议，不直接写私有表。"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -59,6 +61,8 @@ def list_role_permissions(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[RolePermissionService, Depends(role_permission_service)],
 ) -> RolePermissionListResponse:
+    """列出角色权限集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return RolePermissionListResponse(
         items=[
             _entry(grant)
@@ -84,6 +88,8 @@ def replace_role_permissions(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[RolePermissionService, Depends(role_permission_service)],
 ) -> RolePermissionListResponse:
+    """整体替换角色权限集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     grants = service.replace(
         context,
         workspace_id=workspace_id,
@@ -125,6 +131,8 @@ def get_workspace_menu_configuration(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuConfigurationService, Depends(menu_configuration_service)],
 ) -> WorkspaceMenuConfigurationResponse:
+    """获取工作空间菜单配置；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     configuration = service.get_workspace(context, workspace_id=workspace_id)
     return WorkspaceMenuConfigurationResponse(
         workspace_id=configuration.workspace_id,
@@ -145,6 +153,8 @@ def replace_workspace_menu_configuration(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuConfigurationService, Depends(menu_configuration_service)],
 ) -> WorkspaceMenuConfigurationResponse:
+    """整体替换工作空间菜单配置；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     configuration = service.replace_workspace(
         context,
         workspace_id=workspace_id,
@@ -179,6 +189,8 @@ def get_role_menu_visibility(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuConfigurationService, Depends(menu_configuration_service)],
 ) -> RoleMenuVisibilityResponse:
+    """获取角色菜单可见性；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     entries = service.get_role(context, workspace_id=workspace_id, role_id=role_id)
     return RoleMenuVisibilityResponse(
         role_id=role_id,
@@ -201,6 +213,8 @@ def replace_role_menu_visibility(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuConfigurationService, Depends(menu_configuration_service)],
 ) -> RoleMenuVisibilityResponse:
+    """整体替换角色菜单可见性；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     entries = service.replace_role(
         context,
         workspace_id=workspace_id,
@@ -238,6 +252,8 @@ def create_workspace_menu_release(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuReleaseService, Depends(menu_release_service)],
 ) -> MenuReleaseResponse:
+    """创建工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _menu_release(service.create_draft(context, workspace_id=workspace_id))
 
 
@@ -253,6 +269,8 @@ def validate_workspace_menu_release(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuReleaseService, Depends(menu_release_service)],
 ) -> MenuReleaseResponse:
+    """校验工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _menu_release(
         service.validate(context, workspace_id=workspace_id, release_id=release_id)
     )
@@ -271,6 +289,8 @@ def decide_workspace_menu_release(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuReleaseService, Depends(menu_release_service)],
 ) -> MenuReleaseResponse:
+    """审批工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _menu_release(
         service.decide(
             context,
@@ -294,6 +314,8 @@ def publish_workspace_menu_release(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuReleaseService, Depends(menu_release_service)],
 ) -> MenuReleaseResponse:
+    """发布工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _menu_release(service.publish(context, workspace_id=workspace_id, release_id=release_id))
 
 
@@ -309,6 +331,8 @@ def rollback_workspace_menu_release(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuReleaseService, Depends(menu_release_service)],
 ) -> MenuReleaseResponse:
+    """回滚工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _menu_release(
         service.rollback(context, workspace_id=workspace_id, source_release_id=release_id)
     )
@@ -325,6 +349,8 @@ def list_workspace_menu_releases(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuReleaseService, Depends(menu_release_service)],
 ) -> MenuReleaseListResponse:
+    """列出工作空间菜单发布记录；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return MenuReleaseListResponse(
         items=[_menu_release(item) for item in service.list(context, workspace_id=workspace_id)]
     )
@@ -341,6 +367,8 @@ def get_current_workspace_menu_release(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[MenuReleaseService, Depends(menu_release_service)],
 ) -> CurrentMenuReleaseResponse:
+    """获取当前工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     release = service.get_current(context, workspace_id=workspace_id)
     return CurrentMenuReleaseResponse(
         item=_menu_release(release) if release is not None else None,

@@ -1,3 +1,5 @@
+"""加载 Worker、Celery、Outbox、解析和对象存储配置并校验安全边界。"""
+
 from functools import lru_cache
 
 from pydantic import SecretStr, model_validator
@@ -5,6 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class WorkerSettings(BaseSettings):
+    """集中声明 Worker、Broker、对象存储、解析和租约相关运行配置。"""
+
     model_config = SettingsConfigDict(
         env_prefix="AI_PLATFORM_",
         env_file=".env",
@@ -84,4 +88,6 @@ class WorkerSettings(BaseSettings):
 
 @lru_cache
 def get_worker_settings() -> WorkerSettings:
+    """获取Worker设置，遵守任务幂等、有限重试和提交时机约束。"""
+
     return WorkerSettings()

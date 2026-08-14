@@ -1,3 +1,5 @@
+"""实现知识事实、上传和入库任务的 PostgreSQL Repository 与 UoW。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -50,6 +52,8 @@ SessionFactory = Callable[[], Session]
 
 
 class SqlAlchemyKnowledgeRepository:
+    """在授权条件下维护知识库、文档版本、来源、入库任务和索引指针。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 

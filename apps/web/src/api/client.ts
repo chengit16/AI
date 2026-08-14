@@ -1,3 +1,7 @@
+/**
+ * @description 浏览器统一 API Client
+ * 负责会话 Cookie、CSRF、工作空间上下文和稳定错误转换，不承担业务授权判断。
+ */
 import type { components } from "@/api/generated/platform-api.v1";
 
 type ErrorResponse = components["schemas"]["ErrorResponse"];
@@ -20,6 +24,7 @@ export function configureApiClient(
   handleUnauthorized = unauthorizedHandler;
 }
 
+/** 后端稳定错误响应，保留错误码、重试语义和 Trace 标识供页面恢复。 */
 export class PlatformApiError extends Error {
   constructor(
     public readonly status: number,
@@ -34,8 +39,11 @@ export class PlatformApiError extends Error {
 }
 
 interface RequestOptions extends Omit<RequestInit, "body" | "method"> {
+  /** 允许的只读或变更请求方法，默认使用 `GET`。 */
   method?: "GET" | MutationMethod;
+  /** 由 Client 统一序列化的 JSON 数据或保持原样发送的 `FormData`。 */
   body?: unknown;
+  /** 显式覆盖会话空间；传入 `null` 用于平台级和认证接口。 */
   workspaceId?: string | null;
 }
 
@@ -95,6 +103,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return payload as T;
 }
 
+/** 把未知请求失败收敛为可展示文案，不向界面泄露原始响应结构。 */
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "请求未完成，请稍后重试";
 }

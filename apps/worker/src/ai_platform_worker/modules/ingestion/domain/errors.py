@@ -1,3 +1,5 @@
+"""定义文档类型、解析、OCR 和切片阶段的稳定失败语义。"""
+
 from typing import Literal
 
 IngestionErrorCode = Literal[

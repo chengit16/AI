@@ -1,3 +1,5 @@
+"""定义角色、绑定、继承计算和确定性系统角色种子。"""
+
 from __future__ import annotations
 
 import hashlib
@@ -30,6 +32,8 @@ MEMBER_BINDING_NAMESPACE = UUID("760d6766-f06d-419e-a661-f7d8b86df2e9")
 
 @dataclass(frozen=True)
 class Role:
+    """表示工作空间内可授权的角色及其乐观并发版本。"""
+
     role_id: UUID
     workspace_id: UUID
     role_key: str
@@ -63,6 +67,8 @@ class Role:
 
 @dataclass(frozen=True)
 class RoleBinding:
+    """将角色绑定到整个空间、部门子树或指定成员。"""
+
     binding_id: UUID
     workspace_id: UUID
     role_id: UUID
@@ -87,12 +93,16 @@ class RoleBinding:
 
 @dataclass(frozen=True)
 class EffectiveRoleSource:
+    """标识一个有效角色来自空间、部门还是成员直接绑定。"""
+
     scope_type: RoleScopeType
     scope_id: UUID
 
 
 @dataclass(frozen=True)
 class EffectiveRole:
+    """合并同一角色的全部有效授权来源，便于审计与解释。"""
+
     role_id: UUID
     role_key: str
     name: str
@@ -101,6 +111,8 @@ class EffectiveRole:
 
 @dataclass(frozen=True)
 class EffectiveRoleSet:
+    """记录指定成员在角色版本下解析出的稳定角色集合。"""
+
     workspace_id: UUID
     account_id: UUID
     membership_id: UUID
@@ -194,6 +206,8 @@ def resolve_effective_roles(
 
 
 class RoleRepository(Protocol):
+    """在工作空间隔离和角色版本控制下维护角色及绑定。"""
+
     def get_workspace(
         self, workspace_id: UUID, *, for_update: bool = False
     ) -> WorkspaceRecord | None: ...
@@ -232,6 +246,8 @@ class RoleRepository(Protocol):
 
 
 class RoleUnitOfWork(Protocol):
+    """保证角色、绑定、审计和 Outbox 在同一事务内提交。"""
+
     @property
     def roles(self) -> RoleRepository: ...
 
@@ -254,6 +270,8 @@ class RoleUnitOfWork(Protocol):
 
 
 class RoleResolutionCache(Protocol):
+    """按成员与角色版本缓存有效角色，版本变化即自然失效。"""
+
     def get(
         self, workspace_id: UUID, membership_id: UUID, role_version: int
     ) -> EffectiveRoleSet | None: ...
@@ -325,6 +343,8 @@ def system_role_seed(
 
 
 def deterministic_role_uuid(namespace: UUID, value: UUID, suffix: str) -> UUID:
+    """生成与 Migration SQL 一致的确定性角色或绑定标识。"""
+
     digest = hashlib.md5(
         f"{namespace}:{value}:{suffix}".encode(), usedforsecurity=False
     ).hexdigest()

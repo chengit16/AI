@@ -1,3 +1,4 @@
+/** @description 文档入库任务状态、失败定位与人工重试表格。 */
 import { Button, Table, Tag, Tooltip } from "antd";
 import type { TableColumnsType } from "antd";
 import { RotateCcw } from "lucide-react";
@@ -8,10 +9,15 @@ import { StateView } from "@/components/StateView/StateView";
 import { formatTimestamp, ingestionStatus } from "../config";
 
 interface IngestionTableProps {
+  /** 当前知识库可见的入库任务快照。 */
   items: readonly IngestionJob[];
+  /** 任务清单是否正在首次加载。 */
   isLoading: boolean;
+  /** 只控制人工重试入口，后端仍校验失败状态和次数。 */
   canRetry: boolean;
+  /** 人工重试命令是否正在提交。 */
   isRetrying: boolean;
+  /** 请求把指定失败任务重新排队。 */
   onRetry: (ingestionJobId: string) => void;
 }
 

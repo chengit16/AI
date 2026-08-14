@@ -1,3 +1,5 @@
+"""管理工作空间菜单覆盖与角色可见性，并维护统一配置版本。"""
+
 from __future__ import annotations
 
 import re
@@ -28,18 +30,26 @@ __all__ = [
 
 
 class MenuConfigurationDeniedError(PlatformError):
+    """表示菜单配置拒绝错误，由协议层映射为稳定错误码。"""
+
     error_code = "POLICY_DENIED"
 
 
 class MenuConfigurationNotFoundError(PlatformError):
+    """表示菜单配置未找到错误，由协议层映射为稳定错误码。"""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
 class MenuConfigurationValidationError(PlatformError):
+    """表示菜单配置校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"
 
 
 class MenuConfigurationConflictError(PlatformError):
+    """表示菜单配置冲突错误，由协议层映射为稳定错误码。"""
+
     error_code = "ROLE_CONFLICT"
 
 
@@ -60,6 +70,8 @@ class MenuConfigurationService:
         *,
         workspace_id: UUID,
     ) -> MenuConfiguration:
+        """读取工作空间菜单覆盖及版本，菜单隐藏不作为接口安全边界。"""
+
         account_id = _browser_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
             _require_owner(unit_of_work.menus, workspace_id, account_id)
@@ -80,6 +92,9 @@ class MenuConfigurationService:
         workspace_id: UUID,
         entries: tuple[tuple[UUID, UUID | None, str, str | None, int, bool], ...],
     ) -> MenuConfiguration:
+        """整体替换空间菜单覆盖并校验父子关系、系统菜单和乐观锁版本。"""
+
+        # 1. 先构造完整覆盖集合并校验注册菜单、父子关系和不可变系统属性。
         account_id = _browser_account(context, workspace_id)
         overrides = tuple(
             WorkspaceMenuOverride(
@@ -95,6 +110,7 @@ class MenuConfigurationService:
         )
         self._validate_overrides(overrides)
         now = datetime.now(UTC)
+        # 2. 锁定菜单版本并以乐观锁递增，防止并发覆盖彼此静默丢失。
         try:
             with self._unit_of_work as unit_of_work:
                 _require_owner(unit_of_work.menus, workspace_id, account_id)
@@ -109,6 +125,7 @@ class MenuConfigurationService:
                     workspace_id,
                     current_version,
                 )
+                # 3. 覆盖集合、版本、审计和 Outbox 原子提交。
                 unit_of_work.menus.replace_overrides(workspace_id, overrides)
                 _record_change(
                     unit_of_work,
@@ -133,6 +150,8 @@ class MenuConfigurationService:
         workspace_id: UUID,
         role_id: UUID,
     ) -> tuple[RoleMenuVisibility, ...]:
+        """读取角色菜单可见性，结果仅用于体验裁剪而不授予接口权限。"""
+
         account_id = _browser_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
             _require_owner(unit_of_work.menus, workspace_id, account_id)
@@ -148,6 +167,9 @@ class MenuConfigurationService:
         role_id: UUID,
         entries: tuple[tuple[UUID, bool], ...],
     ) -> tuple[RoleMenuVisibility, ...]:
+        """整体替换角色菜单可见性并拒绝跨空间、未知或停用角色。"""
+
+        # 1. 先构造并校验完整角色可见性集合，菜单隐藏仍不授予或撤销接口权限。
         account_id = _browser_account(context, workspace_id)
         role_menus = tuple(
             RoleMenuVisibility(workspace_id, role_id, menu_id, visible)
@@ -155,6 +177,7 @@ class MenuConfigurationService:
         )
         self._validate_role_menus(role_menus)
         now = datetime.now(UTC)
+        # 2. 锁定角色和菜单版本，未知、停用或跨空间角色全部失败关闭。
         try:
             with self._unit_of_work as unit_of_work:
                 _require_owner(unit_of_work.menus, workspace_id, account_id)
@@ -170,6 +193,7 @@ class MenuConfigurationService:
                     workspace_id,
                     current_version,
                 )
+                # 3. 可见性、版本、审计和 Outbox 同事务提交。
                 unit_of_work.menus.replace_role_menus(workspace_id, role_id, role_menus)
                 _record_change(
                     unit_of_work,
@@ -188,6 +212,7 @@ class MenuConfigurationService:
         return role_menus
 
     def _validate_overrides(self, overrides: tuple[WorkspaceMenuOverride, ...]) -> None:
+        # 1. 逐条校验覆盖项只引用活动注册菜单，并保持菜单类型允许的父子关系。
         menu_by_id = {
             item.menu_id: item for item in self._registry.workspace_menus if item.status == "active"
         }
@@ -215,7 +240,7 @@ class MenuConfigurationService:
             if not _valid_parent(menu, parent):
                 raise MenuConfigurationValidationError
 
-        # 未覆盖条目仍沿用平台注册父节点，循环检查必须在最终合并树上执行。
+        # 2. 未覆盖条目仍沿用平台注册父节点，循环检查必须在最终合并树上执行。
         parent_by_id = {
             menu.menu_id: (
                 override_by_id[menu.menu_id].parent_menu_id

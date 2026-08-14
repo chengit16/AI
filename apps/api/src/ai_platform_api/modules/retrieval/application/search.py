@@ -1,3 +1,5 @@
+"""在模型前执行权限过滤、关键词与向量检索、RRF 和 FastPass。"""
+
 from dataclasses import replace
 
 from ai_platform_api.modules.retrieval.application.tokenization import (
@@ -26,6 +28,8 @@ def reciprocal_rank_fusion(
     vector_candidates: tuple[ChannelCandidate, ...],
     constant: int,
 ) -> tuple[SearchCandidate, ...]:
+    """用倒数排名融合合并多通道候选，重复分块只累计排名贡献。"""
+
     merged: dict[object, SearchCandidate] = {}
     seen_channels: set[tuple[object, str]] = set()
     for candidate in keyword_candidates + vector_candidates:
@@ -68,6 +72,8 @@ def reciprocal_rank_fusion(
 
 
 class HybridRetriever:
+    """编排授权过滤、关键词/向量召回、融合、重排和预算裁剪。"""
+
     def __init__(
         self,
         index: SearchIndex,

@@ -1,3 +1,5 @@
+"""按任务边界惰性装配数据库、对象存储、解析和索引运行依赖。"""
+
 from __future__ import annotations
 
 import socket
@@ -44,6 +46,8 @@ from ai_platform_worker.modules.ingestion.infrastructure.tika import (
 
 @dataclass(frozen=True)
 class WorkerRuntime:
+    """集中装配 Worker 数据库、对象存储、解析器、消费者和调度生命周期。"""
+
     database: PlatformDatabase
     dispatcher: OutboxDispatcher
     consumers: SqlAlchemyConsumerUnitOfWork
@@ -55,6 +59,8 @@ class WorkerRuntime:
 
 
 def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntime:
+    """构建Worker运行时，遵守任务幂等、有限重试和提交时机约束。"""
+
     resolved = settings or get_worker_settings()
     database = PlatformDatabase.create(resolved.database_url)
     signer = HmacTaskEnvelopeSigner(SigningKeyFile(resolved.task_signing_key_path).load())

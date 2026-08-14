@@ -1,3 +1,5 @@
+"""定义模型请求、路由、供应商失败和数据边界错误。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

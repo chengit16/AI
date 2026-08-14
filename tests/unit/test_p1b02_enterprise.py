@@ -1,3 +1,5 @@
+"""验证 P1B-02 企业空间、邀请和成员状态机。"""
+
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import UUID

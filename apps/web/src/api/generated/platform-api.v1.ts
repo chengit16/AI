@@ -11,7 +11,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Authentication Context */
+    /**
+     * Get Authentication Context
+     * @description 获取认证上下文；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["getAuthenticationContext"];
     readonly put?: never;
     readonly post?: never;
@@ -30,7 +33,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Login */
+    /**
+     * Login
+     * @description 登录；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["loginWithPassword"];
     readonly delete?: never;
     readonly options?: never;
@@ -47,7 +53,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Logout */
+    /**
+     * Logout
+     * @description 退出登录；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["logoutCurrentSession"];
     readonly delete?: never;
     readonly options?: never;
@@ -64,7 +73,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Register */
+    /**
+     * Register
+     * @description 注册；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["registerPersonalAccount"];
     readonly delete?: never;
     readonly options?: never;
@@ -79,7 +91,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Liveness */
+    /**
+     * Get Liveness
+     * @description 获取存活检查，并保持调用方可依赖的稳定返回语义。
+     */
     readonly get: operations["getLiveness"];
     readonly put?: never;
     readonly post?: never;
@@ -96,7 +111,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Readiness */
+    /**
+     * Get Readiness
+     * @description 获取就绪检查，并保持调用方可依赖的稳定返回语义。
+     */
     readonly get: operations["getReadiness"];
     readonly put?: never;
     readonly post?: never;
@@ -113,10 +131,16 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Ai Runtime Configs */
+    /**
+     * List Ai Runtime Configs
+     * @description 列出AI运行时配置集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listPlatformAiRuntimeConfigs"];
     readonly put?: never;
-    /** Create Ai Runtime Config */
+    /**
+     * Create Ai Runtime Config
+     * @description 创建AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createPlatformAiRuntimeConfig"];
     readonly delete?: never;
     readonly options?: never;
@@ -133,7 +157,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Activate Ai Runtime Config */
+    /**
+     * Activate Ai Runtime Config
+     * @description 启用AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["activatePlatformAiRuntimeConfig"];
     readonly delete?: never;
     readonly options?: never;
@@ -148,7 +175,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Current Ai Runtime Config */
+    /**
+     * Get Current Ai Runtime Config
+     * @description 获取当前AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["getCurrentPlatformAiRuntimeConfig"];
     readonly put?: never;
     readonly post?: never;
@@ -165,10 +195,16 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Model Providers */
+    /**
+     * List Model Providers
+     * @description 列出模型供应商集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listPlatformModelProviders"];
     readonly put?: never;
-    /** Create Model Provider */
+    /**
+     * Create Model Provider
+     * @description 创建模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createPlatformModelProvider"];
     readonly delete?: never;
     readonly options?: never;
@@ -185,7 +221,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Activate Model Provider */
+    /**
+     * Activate Model Provider
+     * @description 启用模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["activatePlatformModelProvider"];
     readonly delete?: never;
     readonly options?: never;
@@ -202,7 +241,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Rotate Model Provider Credential */
+    /**
+     * Rotate Model Provider Credential
+     * @description 处理轮换模型供应商凭据；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["rotatePlatformModelProviderCredential"];
     readonly delete?: never;
     readonly options?: never;
@@ -219,7 +261,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Review Model Provider Data Policy */
+    /**
+     * Review Model Provider Data Policy
+     * @description 审核模型供应商数据策略；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["reviewPlatformModelProviderDataPolicy"];
     readonly delete?: never;
     readonly options?: never;
@@ -236,7 +281,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Disable Model Provider */
+    /**
+     * Disable Model Provider
+     * @description 停用模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["disablePlatformModelProvider"];
     readonly delete?: never;
     readonly options?: never;
@@ -253,7 +301,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Probe Model Provider */
+    /**
+     * Probe Model Provider
+     * @description 探测模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["probePlatformModelProviderCapabilities"];
     readonly delete?: never;
     readonly options?: never;
@@ -268,7 +319,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Workspaces */
+    /**
+     * List Workspaces
+     * @description 列出工作空间集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listAccessibleWorkspaces"];
     readonly put?: never;
     readonly post?: never;
@@ -285,7 +339,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Entitlement */
+    /**
+     * Get Entitlement
+     * @description 获取权益；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["getWorkspaceEntitlement"];
     readonly put?: never;
     readonly post?: never;
@@ -304,7 +361,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Set Open Api Feature */
+    /**
+     * Set Open Api Feature
+     * @description 设置开放API功能；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["setWorkspaceOpenApiFeature"];
     readonly delete?: never;
     readonly options?: never;
@@ -321,7 +381,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Retry Ingestion Job */
+    /**
+     * Retry Ingestion Job
+     * @description 重试入库任务；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["retryKnowledgeIngestionJob"];
     readonly delete?: never;
     readonly options?: never;
@@ -338,7 +401,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Invite Workspace Member */
+    /**
+     * Invite Workspace Member
+     * @description 处理邀请工作空间成员；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["inviteEnterpriseWorkspaceMember"];
     readonly delete?: never;
     readonly options?: never;
@@ -353,10 +419,16 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Knowledge Bases */
+    /**
+     * List Knowledge Bases
+     * @description 列出知识库集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listKnowledgeBases"];
     readonly put?: never;
-    /** Create Knowledge Base */
+    /**
+     * Create Knowledge Base
+     * @description 创建知识库；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createKnowledgeBase"];
     readonly delete?: never;
     readonly options?: never;
@@ -374,7 +446,10 @@ export type paths = {
     readonly get?: never;
     readonly put?: never;
     readonly post?: never;
-    /** Delete Knowledge Base */
+    /**
+     * Delete Knowledge Base
+     * @description 删除知识库；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly delete: operations["deleteKnowledgeBase"];
     readonly options?: never;
     readonly head?: never;
@@ -388,10 +463,16 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Documents */
+    /**
+     * List Documents
+     * @description 列出文档集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listKnowledgeDocuments"];
     readonly put?: never;
-    /** Create Document */
+    /**
+     * Create Document
+     * @description 创建文档；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createKnowledgeDocument"];
     readonly delete?: never;
     readonly options?: never;
@@ -409,7 +490,10 @@ export type paths = {
     readonly get?: never;
     readonly put?: never;
     readonly post?: never;
-    /** Delete Document */
+    /**
+     * Delete Document
+     * @description 删除文档；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly delete: operations["deleteKnowledgeDocument"];
     readonly options?: never;
     readonly head?: never;
@@ -425,7 +509,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Create Document Version */
+    /**
+     * Create Document Version
+     * @description 创建文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createKnowledgeDocumentVersion"];
     readonly delete?: never;
     readonly options?: never;
@@ -442,7 +529,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Publish Document Version */
+    /**
+     * Publish Document Version
+     * @description 发布文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["publishKnowledgeDocumentVersion"];
     readonly delete?: never;
     readonly options?: never;
@@ -459,7 +549,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Mark Document Version Ready */
+    /**
+     * Mark Document Version Ready
+     * @description 标记文档版本就绪；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["markKnowledgeDocumentVersionReady"];
     readonly delete?: never;
     readonly options?: never;
@@ -476,7 +569,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Upload Document Version */
+    /**
+     * Upload Document Version
+     * @description 上传文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["uploadKnowledgeDocumentVersion"];
     readonly delete?: never;
     readonly options?: never;
@@ -493,7 +589,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Upload Document */
+    /**
+     * Upload Document
+     * @description 上传文档；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["uploadKnowledgeDocument"];
     readonly delete?: never;
     readonly options?: never;
@@ -508,7 +607,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Ingestion Jobs */
+    /**
+     * List Ingestion Jobs
+     * @description 列出入库任务集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listKnowledgeIngestionJobs"];
     readonly put?: never;
     readonly post?: never;
@@ -527,7 +629,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Leave Workspace */
+    /**
+     * Leave Workspace
+     * @description 退出工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["leaveEnterpriseWorkspace"];
     readonly delete?: never;
     readonly options?: never;
@@ -542,7 +647,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Workspace Members */
+    /**
+     * List Workspace Members
+     * @description 列出工作空间成员集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listEnterpriseWorkspaceMembers"];
     readonly put?: never;
     readonly post?: never;
@@ -561,7 +669,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Disable Workspace Member */
+    /**
+     * Disable Workspace Member
+     * @description 停用工作空间成员；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["disableEnterpriseWorkspaceMember"];
     readonly delete?: never;
     readonly options?: never;
@@ -576,10 +687,16 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Workspace Menu Releases */
+    /**
+     * List Workspace Menu Releases
+     * @description 列出工作空间菜单发布记录；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listWorkspaceMenuReleases"];
     readonly put?: never;
-    /** Create Workspace Menu Release */
+    /**
+     * Create Workspace Menu Release
+     * @description 创建工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createWorkspaceMenuRelease"];
     readonly delete?: never;
     readonly options?: never;
@@ -596,7 +713,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Decide Workspace Menu Release */
+    /**
+     * Decide Workspace Menu Release
+     * @description 审批工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["decideWorkspaceMenuRelease"];
     readonly delete?: never;
     readonly options?: never;
@@ -613,7 +733,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Publish Workspace Menu Release */
+    /**
+     * Publish Workspace Menu Release
+     * @description 发布工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["publishWorkspaceMenuRelease"];
     readonly delete?: never;
     readonly options?: never;
@@ -630,7 +753,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Rollback Workspace Menu Release */
+    /**
+     * Rollback Workspace Menu Release
+     * @description 回滚工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["rollbackWorkspaceMenuRelease"];
     readonly delete?: never;
     readonly options?: never;
@@ -647,7 +773,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Validate Workspace Menu Release */
+    /**
+     * Validate Workspace Menu Release
+     * @description 校验工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["validateWorkspaceMenuRelease"];
     readonly delete?: never;
     readonly options?: never;
@@ -662,7 +791,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Current Workspace Menu Release */
+    /**
+     * Get Current Workspace Menu Release
+     * @description 获取当前工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["getCurrentWorkspaceMenuRelease"];
     readonly put?: never;
     readonly post?: never;
@@ -679,9 +811,15 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Workspace Menu Configuration */
+    /**
+     * Get Workspace Menu Configuration
+     * @description 获取工作空间菜单配置；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["getWorkspaceMenuConfiguration"];
-    /** Replace Workspace Menu Configuration */
+    /**
+     * Replace Workspace Menu Configuration
+     * @description 整体替换工作空间菜单配置；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly put: operations["replaceWorkspaceMenuConfiguration"];
     readonly post?: never;
     readonly delete?: never;
@@ -697,10 +835,16 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Departments */
+    /**
+     * List Departments
+     * @description 列出部门集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listEnterpriseDepartments"];
     readonly put?: never;
-    /** Create Department */
+    /**
+     * Create Department
+     * @description 创建部门；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createEnterpriseDepartment"];
     readonly delete?: never;
     readonly options?: never;
@@ -717,7 +861,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Move Department */
+    /**
+     * Move Department
+     * @description 移动部门；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["moveEnterpriseDepartment"];
     readonly delete?: never;
     readonly options?: never;
@@ -734,7 +881,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Set Department Status */
+    /**
+     * Set Department Status
+     * @description 设置部门状态；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["setEnterpriseDepartmentStatus"];
     readonly delete?: never;
     readonly options?: never;
@@ -749,9 +899,15 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Member Organization */
+    /**
+     * Get Member Organization
+     * @description 获取成员组织；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["getEnterpriseMemberOrganization"];
-    /** Assign Member Organization */
+    /**
+     * Assign Member Organization
+     * @description 分配成员组织；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly put: operations["assignEnterpriseMemberOrganization"];
     readonly post?: never;
     readonly delete?: never;
@@ -767,10 +923,16 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Positions */
+    /**
+     * List Positions
+     * @description 列出职位集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listEnterprisePositions"];
     readonly put?: never;
-    /** Create Position */
+    /**
+     * Create Position
+     * @description 创建职位；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createEnterprisePosition"];
     readonly delete?: never;
     readonly options?: never;
@@ -787,7 +949,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Set Position Status */
+    /**
+     * Set Position Status
+     * @description 设置职位状态；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["setEnterprisePositionStatus"];
     readonly delete?: never;
     readonly options?: never;
@@ -802,10 +967,16 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Roles */
+    /**
+     * List Roles
+     * @description 列出角色集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listEnterpriseRoles"];
     readonly put?: never;
-    /** Create Role */
+    /**
+     * Create Role
+     * @description 创建角色；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createEnterpriseRole"];
     readonly delete?: never;
     readonly options?: never;
@@ -820,9 +991,15 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Role Menu Visibility */
+    /**
+     * Get Role Menu Visibility
+     * @description 获取角色菜单可见性；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["getRoleMenuVisibility"];
-    /** Replace Role Menu Visibility */
+    /**
+     * Replace Role Menu Visibility
+     * @description 整体替换角色菜单可见性；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly put: operations["replaceRoleMenuVisibility"];
     readonly post?: never;
     readonly delete?: never;
@@ -838,9 +1015,15 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** List Role Permissions */
+    /**
+     * List Role Permissions
+     * @description 列出角色权限集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["listEnterpriseRolePermissions"];
-    /** Replace Role Permissions */
+    /**
+     * Replace Role Permissions
+     * @description 整体替换角色权限集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly put: operations["replaceEnterpriseRolePermissions"];
     readonly post?: never;
     readonly delete?: never;
@@ -858,7 +1041,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Set Role Status */
+    /**
+     * Set Role Status
+     * @description 设置角色状态；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["setEnterpriseRoleStatus"];
     readonly delete?: never;
     readonly options?: never;
@@ -875,7 +1061,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Bind Role */
+    /**
+     * Bind Role
+     * @description 绑定角色；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["bindEnterpriseRole"];
     readonly delete?: never;
     readonly options?: never;
@@ -892,7 +1081,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Revoke Role Binding */
+    /**
+     * Revoke Role Binding
+     * @description 撤销角色绑定；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["revokeEnterpriseRoleBinding"];
     readonly delete?: never;
     readonly options?: never;
@@ -907,7 +1099,10 @@ export type paths = {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /** Get Effective Roles */
+    /**
+     * Get Effective Roles
+     * @description 获取有效角色集合；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly get: operations["getEffectiveEnterpriseRoles"];
     readonly put?: never;
     readonly post?: never;
@@ -926,7 +1121,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Switch Workspace */
+    /**
+     * Switch Workspace
+     * @description 切换工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["switchWorkspaceContext"];
     readonly delete?: never;
     readonly options?: never;
@@ -943,7 +1141,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Create Enterprise Workspace */
+    /**
+     * Create Enterprise Workspace
+     * @description 创建企业工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["createEnterpriseWorkspace"];
     readonly delete?: never;
     readonly options?: never;
@@ -960,7 +1161,10 @@ export type paths = {
     };
     readonly get?: never;
     readonly put?: never;
-    /** Accept Workspace Invitation */
+    /**
+     * Accept Workspace Invitation
+     * @description 接受工作空间邀请；仅转换协议数据，认证授权和事务由应用服务统一执行。
+     */
     readonly post: operations["acceptEnterpriseWorkspaceInvitation"];
     readonly delete?: never;
     readonly options?: never;
@@ -972,12 +1176,18 @@ export type paths = {
 export type webhooks = Record<string, never>;
 export type components = {
   schemas: {
-    /** AiRuntimeConfigListResponse */
+    /**
+     * AiRuntimeConfigListResponse
+     * @description 定义AI运行时配置列表操作的稳定响应结构。
+     */
     readonly AiRuntimeConfigListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["AiRuntimeConfigResponse"][];
     };
-    /** AiRuntimeConfigPublicationResponse */
+    /**
+     * AiRuntimeConfigPublicationResponse
+     * @description 定义AI运行时配置发布记录操作的稳定响应结构。
+     */
     readonly AiRuntimeConfigPublicationResponse: {
       /** Generation */
       readonly generation: number;
@@ -997,7 +1207,10 @@ export type components = {
        */
       readonly runtime_config_version_id: string;
     };
-    /** AiRuntimeConfigResponse */
+    /**
+     * AiRuntimeConfigResponse
+     * @description 定义AI运行时配置操作的稳定响应结构。
+     */
     readonly AiRuntimeConfigResponse: {
       readonly components: components["schemas"]["RuntimeComponentVersionsSchema"];
       /** Content Hash */
@@ -1029,7 +1242,10 @@ export type components = {
       /** Version Number */
       readonly version_number: number;
     };
-    /** AssignMemberOrganizationRequest */
+    /**
+     * AssignMemberOrganizationRequest
+     * @description 定义分配成员组织操作的请求字段与协议校验边界。
+     */
     readonly AssignMemberOrganizationRequest: {
       /** Department Ids */
       readonly department_ids: readonly string[];
@@ -1038,7 +1254,10 @@ export type components = {
       /** Primary Department Id */
       readonly primary_department_id?: string | null;
     };
-    /** AuthenticationContextResponse */
+    /**
+     * AuthenticationContextResponse
+     * @description 定义认证上下文操作的稳定响应结构。
+     */
     readonly AuthenticationContextResponse: {
       /**
        * Actor Id
@@ -1090,7 +1309,10 @@ export type components = {
        */
       readonly file: string;
     };
-    /** CreateAiRuntimeConfigRequest */
+    /**
+     * CreateAiRuntimeConfigRequest
+     * @description 定义创建AI运行时配置操作的请求字段与协议校验边界。
+     */
     readonly CreateAiRuntimeConfigRequest: {
       readonly components: components["schemas"]["RuntimeComponentVersionsSchema"];
       /** Display Name */
@@ -1101,14 +1323,20 @@ export type components = {
       /** System Prompt Template */
       readonly system_prompt_template: string;
     };
-    /** CreateDepartmentRequest */
+    /**
+     * CreateDepartmentRequest
+     * @description 定义创建部门操作的请求字段与协议校验边界。
+     */
     readonly CreateDepartmentRequest: {
       /** Name */
       readonly name: string;
       /** Parent Department Id */
       readonly parent_department_id?: string | null;
     };
-    /** CreateDocumentRequest */
+    /**
+     * CreateDocumentRequest
+     * @description 定义创建文档操作的请求字段与协议校验边界。
+     */
     readonly CreateDocumentRequest: {
       /** Captured At */
       readonly captured_at?: string | null;
@@ -1142,7 +1370,10 @@ export type components = {
       /** Visibility */
       readonly visibility?: ("private" | "workspace" | "departments") | null;
     };
-    /** CreateDocumentVersionRequest */
+    /**
+     * CreateDocumentVersionRequest
+     * @description 定义创建文档版本操作的请求字段与协议校验边界。
+     */
     readonly CreateDocumentVersionRequest: {
       /** Captured At */
       readonly captured_at?: string | null;
@@ -1166,12 +1397,18 @@ export type components = {
       /** Source Url */
       readonly source_url?: string | null;
     };
-    /** CreateEnterpriseWorkspaceRequest */
+    /**
+     * CreateEnterpriseWorkspaceRequest
+     * @description 定义创建企业工作空间操作的请求字段与协议校验边界。
+     */
     readonly CreateEnterpriseWorkspaceRequest: {
       /** Name */
       readonly name: string;
     };
-    /** CreateKnowledgeBaseRequest */
+    /**
+     * CreateKnowledgeBaseRequest
+     * @description 定义创建知识库操作的请求字段与协议校验边界。
+     */
     readonly CreateKnowledgeBaseRequest: {
       /**
        * Default Security Level
@@ -1192,7 +1429,10 @@ export type components = {
       /** Name */
       readonly name: string;
     };
-    /** CreateModelProviderRequest */
+    /**
+     * CreateModelProviderRequest
+     * @description 定义创建模型供应商操作的请求字段与协议校验边界。
+     */
     readonly CreateModelProviderRequest: {
       /**
        * Adapter Kind
@@ -1224,7 +1464,10 @@ export type components = {
       /** Provider Key */
       readonly provider_key: string;
     };
-    /** CreatePositionRequest */
+    /**
+     * CreatePositionRequest
+     * @description 定义创建职位操作的请求字段与协议校验边界。
+     */
     readonly CreatePositionRequest: {
       /**
        * Department Id
@@ -1234,7 +1477,10 @@ export type components = {
       /** Name */
       readonly name: string;
     };
-    /** CreateRoleBindingRequest */
+    /**
+     * CreateRoleBindingRequest
+     * @description 定义创建角色绑定操作的请求字段与协议校验边界。
+     */
     readonly CreateRoleBindingRequest: {
       /** Account Id */
       readonly account_id?: string | null;
@@ -1251,28 +1497,43 @@ export type components = {
        */
       readonly scope_type: "workspace" | "department" | "member";
     };
-    /** CreateRoleRequest */
+    /**
+     * CreateRoleRequest
+     * @description 定义创建角色操作的请求字段与协议校验边界。
+     */
     readonly CreateRoleRequest: {
       /** Name */
       readonly name: string;
       /** Role Key */
       readonly role_key: string;
     };
-    /** CurrentAiRuntimeConfigResponse */
+    /**
+     * CurrentAiRuntimeConfigResponse
+     * @description 定义当前AI运行时配置操作的稳定响应结构。
+     */
     readonly CurrentAiRuntimeConfigResponse: {
       readonly item: components["schemas"]["AiRuntimeConfigResponse"] | null;
     };
-    /** CurrentMenuReleaseResponse */
+    /**
+     * CurrentMenuReleaseResponse
+     * @description 定义当前菜单发布操作的稳定响应结构。
+     */
     readonly CurrentMenuReleaseResponse: {
       readonly item: components["schemas"]["MenuReleaseResponse"] | null;
       readonly snapshot: components["schemas"]["MenuReleaseSnapshotResponse"] | null;
     };
-    /** DepartmentListResponse */
+    /**
+     * DepartmentListResponse
+     * @description 定义部门列表操作的稳定响应结构。
+     */
     readonly DepartmentListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["DepartmentResponse"][];
     };
-    /** DepartmentResponse */
+    /**
+     * DepartmentResponse
+     * @description 定义部门操作的稳定响应结构。
+     */
     readonly DepartmentResponse: {
       /**
        * Department Id
@@ -1295,13 +1556,19 @@ export type components = {
       /** Version */
       readonly version: number;
     };
-    /** DocumentCreatedResponse */
+    /**
+     * DocumentCreatedResponse
+     * @description 定义文档已创建操作的稳定响应结构。
+     */
     readonly DocumentCreatedResponse: {
       readonly document: components["schemas"]["DocumentResponse"];
       readonly document_version: components["schemas"]["DocumentVersionResponse"];
       readonly source: components["schemas"]["DocumentSourceResponse"];
     };
-    /** DocumentResponse */
+    /**
+     * DocumentResponse
+     * @description 定义文档操作的稳定响应结构。
+     */
     readonly DocumentResponse: {
       /**
        * Created At
@@ -1359,7 +1626,10 @@ export type components = {
        */
       readonly workspace_id: string;
     };
-    /** DocumentSourceResponse */
+    /**
+     * DocumentSourceResponse
+     * @description 定义文档来源操作的稳定响应结构。
+     */
     readonly DocumentSourceResponse: {
       /** Captured At */
       readonly captured_at: string | null;
@@ -1381,19 +1651,28 @@ export type components = {
       /** Source Name */
       readonly source_name: string;
     };
-    /** DocumentUploadResponse */
+    /**
+     * DocumentUploadResponse
+     * @description 定义文档上传操作的稳定响应结构。
+     */
     readonly DocumentUploadResponse: {
       readonly document: components["schemas"]["DocumentResponse"];
       readonly document_version: components["schemas"]["DocumentVersionResponse"];
       readonly source: components["schemas"]["DocumentSourceResponse"];
       readonly upload: components["schemas"]["UploadMetadataResponse"];
     };
-    /** DocumentVersionCreatedResponse */
+    /**
+     * DocumentVersionCreatedResponse
+     * @description 定义文档版本已创建操作的稳定响应结构。
+     */
     readonly DocumentVersionCreatedResponse: {
       readonly document_version: components["schemas"]["DocumentVersionResponse"];
       readonly source: components["schemas"]["DocumentSourceResponse"];
     };
-    /** DocumentVersionResponse */
+    /**
+     * DocumentVersionResponse
+     * @description 定义文档版本操作的稳定响应结构。
+     */
     readonly DocumentVersionResponse: {
       /** Content Hash */
       readonly content_hash: string | null;
@@ -1434,13 +1713,19 @@ export type components = {
        */
       readonly workspace_id: string;
     };
-    /** DocumentVersionUploadResponse */
+    /**
+     * DocumentVersionUploadResponse
+     * @description 定义文档版本上传操作的稳定响应结构。
+     */
     readonly DocumentVersionUploadResponse: {
       readonly document_version: components["schemas"]["DocumentVersionResponse"];
       readonly source: components["schemas"]["DocumentSourceResponse"];
       readonly upload: components["schemas"]["UploadMetadataResponse"];
     };
-    /** EffectiveRoleResponse */
+    /**
+     * EffectiveRoleResponse
+     * @description 定义有效角色操作的稳定响应结构。
+     */
     readonly EffectiveRoleResponse: {
       /** Name */
       readonly name: string;
@@ -1454,7 +1739,10 @@ export type components = {
       /** Sources */
       readonly sources: readonly components["schemas"]["EffectiveRoleSourceResponse"][];
     };
-    /** EffectiveRoleSetResponse */
+    /**
+     * EffectiveRoleSetResponse
+     * @description 定义有效角色集合操作的稳定响应结构。
+     */
     readonly EffectiveRoleSetResponse: {
       /**
        * Account Id
@@ -1471,7 +1759,10 @@ export type components = {
       /** Roles */
       readonly roles: readonly components["schemas"]["EffectiveRoleResponse"][];
     };
-    /** EffectiveRoleSourceResponse */
+    /**
+     * EffectiveRoleSourceResponse
+     * @description 定义有效角色来源操作的稳定响应结构。
+     */
     readonly EffectiveRoleSourceResponse: {
       /**
        * Scope Id
@@ -1484,7 +1775,10 @@ export type components = {
        */
       readonly scope_type: "workspace" | "department" | "member";
     };
-    /** EntitlementResponse */
+    /**
+     * EntitlementResponse
+     * @description 定义权益操作的稳定响应结构。
+     */
     readonly EntitlementResponse: {
       /** Entitlement Version */
       readonly entitlement_version: number;
@@ -1509,7 +1803,10 @@ export type components = {
        */
       readonly workspace_status: "active" | "suspended" | "archived";
     };
-    /** ErrorResponse */
+    /**
+     * ErrorResponse
+     * @description 表示错误响应，由协议层映射为稳定错误码。
+     */
     readonly ErrorResponse: {
       /** Code */
       readonly code: string;
@@ -1525,7 +1822,10 @@ export type components = {
       /** Trace Id */
       readonly trace_id: string;
     };
-    /** GatewayPolicySchema */
+    /**
+     * GatewayPolicySchema
+     * @description 定义网关策略结构的协议字段和序列化边界。
+     */
     readonly GatewayPolicySchema: {
       /** Attempt Timeout Ms */
       readonly attempt_timeout_ms: number;
@@ -1548,7 +1848,10 @@ export type components = {
       /** Total Timeout Ms */
       readonly total_timeout_ms: number;
     };
-    /** HealthResponse */
+    /**
+     * HealthResponse
+     * @description 定义健康状态操作的稳定响应结构。
+     */
     readonly HealthResponse: {
       /** Checks */
       readonly checks: {
@@ -1566,12 +1869,18 @@ export type components = {
       /** Version */
       readonly version: string;
     };
-    /** IngestionJobListResponse */
+    /**
+     * IngestionJobListResponse
+     * @description 定义入库任务列表操作的稳定响应结构。
+     */
     readonly IngestionJobListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["IngestionJobResponse"][];
     };
-    /** IngestionJobResponse */
+    /**
+     * IngestionJobResponse
+     * @description 定义入库任务操作的稳定响应结构。
+     */
     readonly IngestionJobResponse: {
       /** Attempt Count */
       readonly attempt_count: number;
@@ -1653,17 +1962,26 @@ export type components = {
        */
       readonly updated_at: string;
     };
-    /** InviteWorkspaceMemberRequest */
+    /**
+     * InviteWorkspaceMemberRequest
+     * @description 定义邀请工作空间成员操作的请求字段与协议校验边界。
+     */
     readonly InviteWorkspaceMemberRequest: {
       /** Login Name */
       readonly login_name: string;
     };
-    /** KnowledgeBaseListResponse */
+    /**
+     * KnowledgeBaseListResponse
+     * @description 定义知识库列表操作的稳定响应结构。
+     */
     readonly KnowledgeBaseListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["KnowledgeBaseSummaryResponse"][];
     };
-    /** KnowledgeBaseResponse */
+    /**
+     * KnowledgeBaseResponse
+     * @description 定义知识库操作的稳定响应结构。
+     */
     readonly KnowledgeBaseResponse: {
       /**
        * Created At
@@ -1716,7 +2034,10 @@ export type components = {
        */
       readonly workspace_id: string;
     };
-    /** KnowledgeBaseSummaryResponse */
+    /**
+     * KnowledgeBaseSummaryResponse
+     * @description 定义知识库摘要操作的稳定响应结构。
+     */
     readonly KnowledgeBaseSummaryResponse: {
       /**
        * Default Security Level
@@ -1743,12 +2064,18 @@ export type components = {
        */
       readonly updated_at: string;
     };
-    /** KnowledgeDocumentListResponse */
+    /**
+     * KnowledgeDocumentListResponse
+     * @description 定义知识文档列表操作的稳定响应结构。
+     */
     readonly KnowledgeDocumentListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["KnowledgeDocumentSummaryResponse"][];
     };
-    /** KnowledgeDocumentSummaryResponse */
+    /**
+     * KnowledgeDocumentSummaryResponse
+     * @description 定义知识文档摘要操作的稳定响应结构。
+     */
     readonly KnowledgeDocumentSummaryResponse: {
       /** Current Document Version Id */
       readonly current_document_version_id: string | null;
@@ -1788,7 +2115,10 @@ export type components = {
        */
       readonly visibility: "private" | "workspace" | "departments";
     };
-    /** LoginRequest */
+    /**
+     * LoginRequest
+     * @description 定义登录操作的请求字段与协议校验边界。
+     */
     readonly LoginRequest: {
       /** Login Name */
       readonly login_name: string;
@@ -1798,7 +2128,10 @@ export type components = {
        */
       readonly password: string;
     };
-    /** LoginResponse */
+    /**
+     * LoginResponse
+     * @description 定义登录操作的稳定响应结构。
+     */
     readonly LoginResponse: {
       /**
        * Account Id
@@ -1810,17 +2143,26 @@ export type components = {
       /** Personal Workspace Id */
       readonly personal_workspace_id?: string | null;
     };
-    /** LogoutResponse */
+    /**
+     * LogoutResponse
+     * @description 定义退出登录操作的稳定响应结构。
+     */
     readonly LogoutResponse: {
       /** Logged Out */
       readonly logged_out: boolean;
     };
-    /** MarkDocumentVersionReadyRequest */
+    /**
+     * MarkDocumentVersionReadyRequest
+     * @description 定义标记文档版本就绪操作的请求字段与协议校验边界。
+     */
     readonly MarkDocumentVersionReadyRequest: {
       /** Content Hash */
       readonly content_hash: string;
     };
-    /** MemberOrganizationResponse */
+    /**
+     * MemberOrganizationResponse
+     * @description 定义成员组织操作的稳定响应结构。
+     */
     readonly MemberOrganizationResponse: {
       /**
        * Account Id
@@ -1836,19 +2178,28 @@ export type components = {
       /** Primary Department Id */
       readonly primary_department_id: string | null;
     };
-    /** MenuReleaseDecisionRequest */
+    /**
+     * MenuReleaseDecisionRequest
+     * @description 定义菜单发布决策操作的请求字段与协议校验边界。
+     */
     readonly MenuReleaseDecisionRequest: {
       /** Approved */
       readonly approved: boolean;
       /** Reason */
       readonly reason?: string | null;
     };
-    /** MenuReleaseListResponse */
+    /**
+     * MenuReleaseListResponse
+     * @description 定义菜单发布列表操作的稳定响应结构。
+     */
     readonly MenuReleaseListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["MenuReleaseResponse"][];
     };
-    /** MenuReleaseResponse */
+    /**
+     * MenuReleaseResponse
+     * @description 定义菜单发布操作的稳定响应结构。
+     */
     readonly MenuReleaseResponse: {
       /**
        * Created At
@@ -1913,7 +2264,10 @@ export type components = {
        */
       readonly workspace_id: string;
     };
-    /** MenuReleaseSnapshotApiBindingEntry */
+    /**
+     * MenuReleaseSnapshotApiBindingEntry
+     * @description 定义菜单发布快照API绑定条目的协议字段和序列化边界。
+     */
     readonly MenuReleaseSnapshotApiBindingEntry: {
       /**
        * Action Type
@@ -1931,7 +2285,10 @@ export type components = {
        */
       readonly menu_id: string;
     };
-    /** MenuReleaseSnapshotMenuEntry */
+    /**
+     * MenuReleaseSnapshotMenuEntry
+     * @description 定义菜单发布快照菜单条目的协议字段和序列化边界。
+     */
     readonly MenuReleaseSnapshotMenuEntry: {
       /** Icon Key */
       readonly icon_key: string | null;
@@ -1970,7 +2327,10 @@ export type components = {
       /** Visible */
       readonly visible: boolean;
     };
-    /** MenuReleaseSnapshotResponse */
+    /**
+     * MenuReleaseSnapshotResponse
+     * @description 定义菜单发布快照操作的稳定响应结构。
+     */
     readonly MenuReleaseSnapshotResponse: {
       /** Menu Api Bindings */
       readonly menu_api_bindings: readonly components["schemas"]["MenuReleaseSnapshotApiBindingEntry"][];
@@ -1990,7 +2350,10 @@ export type components = {
        */
       readonly workspace_id: string;
     };
-    /** MenuReleaseSnapshotRoleMenuEntry */
+    /**
+     * MenuReleaseSnapshotRoleMenuEntry
+     * @description 定义菜单发布快照角色菜单条目的协议字段和序列化边界。
+     */
     readonly MenuReleaseSnapshotRoleMenuEntry: {
       /**
        * Menu Id
@@ -2005,12 +2368,18 @@ export type components = {
       /** Visible */
       readonly visible: boolean;
     };
-    /** ModelProviderConfigurationListResponse */
+    /**
+     * ModelProviderConfigurationListResponse
+     * @description 定义模型供应商配置列表操作的稳定响应结构。
+     */
     readonly ModelProviderConfigurationListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["ModelProviderConfigurationResponse"][];
     };
-    /** ModelProviderConfigurationResponse */
+    /**
+     * ModelProviderConfigurationResponse
+     * @description 定义模型供应商配置操作的稳定响应结构。
+     */
     readonly ModelProviderConfigurationResponse: {
       /**
        * Adapter Kind
@@ -2090,27 +2459,42 @@ export type components = {
       /** Version */
       readonly version: number;
     };
-    /** MoveDepartmentRequest */
+    /**
+     * MoveDepartmentRequest
+     * @description 定义移动部门操作的请求字段与协议校验边界。
+     */
     readonly MoveDepartmentRequest: {
       /** Parent Department Id */
       readonly parent_department_id?: string | null;
     };
-    /** OpenApiFeatureRequest */
+    /**
+     * OpenApiFeatureRequest
+     * @description 定义开放API功能操作的请求字段与协议校验边界。
+     */
     readonly OpenApiFeatureRequest: {
       /** Enabled */
       readonly enabled: boolean;
     };
-    /** OrganizationStatusRequest */
+    /**
+     * OrganizationStatusRequest
+     * @description 定义组织状态操作的请求字段与协议校验边界。
+     */
     readonly OrganizationStatusRequest: {
       /** Active */
       readonly active: boolean;
     };
-    /** PositionListResponse */
+    /**
+     * PositionListResponse
+     * @description 定义职位列表操作的稳定响应结构。
+     */
     readonly PositionListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["PositionResponse"][];
     };
-    /** PositionResponse */
+    /**
+     * PositionResponse
+     * @description 定义职位操作的稳定响应结构。
+     */
     readonly PositionResponse: {
       /**
        * Department Id
@@ -2134,7 +2518,10 @@ export type components = {
       /** Version */
       readonly version: number;
     };
-    /** QuotaResponse */
+    /**
+     * QuotaResponse
+     * @description 定义额度操作的稳定响应结构。
+     */
     readonly QuotaResponse: {
       /** Limit Value */
       readonly limit_value: number;
@@ -2151,7 +2538,10 @@ export type components = {
       /** Used Value */
       readonly used_value: number;
     };
-    /** RegistrationRequest */
+    /**
+     * RegistrationRequest
+     * @description 定义注册操作的请求字段与协议校验边界。
+     */
     readonly RegistrationRequest: {
       /** Display Name */
       readonly display_name: string;
@@ -2163,7 +2553,10 @@ export type components = {
        */
       readonly password: string;
     };
-    /** RegistrationResponse */
+    /**
+     * RegistrationResponse
+     * @description 定义注册操作的稳定响应结构。
+     */
     readonly RegistrationResponse: {
       /**
        * Account Id
@@ -2176,22 +2569,34 @@ export type components = {
        */
       readonly personal_workspace_id: string;
     };
-    /** ReplaceRoleMenuVisibilityRequest */
+    /**
+     * ReplaceRoleMenuVisibilityRequest
+     * @description 定义替换角色菜单可见性操作的请求字段与协议校验边界。
+     */
     readonly ReplaceRoleMenuVisibilityRequest: {
       /** Items */
       readonly items: readonly components["schemas"]["RoleMenuVisibilityEntry"][];
     };
-    /** ReplaceRolePermissionsRequest */
+    /**
+     * ReplaceRolePermissionsRequest
+     * @description 定义替换角色权限集合操作的请求字段与协议校验边界。
+     */
     readonly ReplaceRolePermissionsRequest: {
       /** Items */
       readonly items: readonly components["schemas"]["RolePermissionEntry"][];
     };
-    /** ReplaceWorkspaceMenuConfigurationRequest */
+    /**
+     * ReplaceWorkspaceMenuConfigurationRequest
+     * @description 定义替换工作空间菜单配置操作的请求字段与协议校验边界。
+     */
     readonly ReplaceWorkspaceMenuConfigurationRequest: {
       /** Items */
       readonly items: readonly components["schemas"]["WorkspaceMenuOverrideEntry"][];
     };
-    /** ReviewModelProviderDataPolicyRequest */
+    /**
+     * ReviewModelProviderDataPolicyRequest
+     * @description 定义审核模型供应商数据策略操作的请求字段与协议校验边界。
+     */
     readonly ReviewModelProviderDataPolicyRequest: {
       /** Approved */
       readonly approved: boolean;
@@ -2213,7 +2618,10 @@ export type components = {
        */
       readonly training_usage_allowed: boolean;
     };
-    /** RoleBindingResponse */
+    /**
+     * RoleBindingResponse
+     * @description 定义角色绑定操作的稳定响应结构。
+     */
     readonly RoleBindingResponse: {
       /**
        * Binding Id
@@ -2242,12 +2650,18 @@ export type components = {
       /** Version */
       readonly version: number;
     };
-    /** RoleListResponse */
+    /**
+     * RoleListResponse
+     * @description 定义角色列表操作的稳定响应结构。
+     */
     readonly RoleListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["RoleResponse"][];
     };
-    /** RoleMenuVisibilityEntry */
+    /**
+     * RoleMenuVisibilityEntry
+     * @description 定义角色菜单可见性条目的协议字段和序列化边界。
+     */
     readonly RoleMenuVisibilityEntry: {
       /**
        * Menu Id
@@ -2257,7 +2671,10 @@ export type components = {
       /** Visible */
       readonly visible: boolean;
     };
-    /** RoleMenuVisibilityResponse */
+    /**
+     * RoleMenuVisibilityResponse
+     * @description 定义角色菜单可见性操作的稳定响应结构。
+     */
     readonly RoleMenuVisibilityResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["RoleMenuVisibilityEntry"][];
@@ -2267,7 +2684,10 @@ export type components = {
        */
       readonly role_id: string;
     };
-    /** RolePermissionEntry */
+    /**
+     * RolePermissionEntry
+     * @description 定义角色权限条目的协议字段和序列化边界。
+     */
     readonly RolePermissionEntry: {
       /** Department Ids */
       readonly department_ids?: readonly string[];
@@ -2289,12 +2709,18 @@ export type components = {
        */
       readonly scope_type: "workspace" | "department_tree" | "self" | "resource";
     };
-    /** RolePermissionListResponse */
+    /**
+     * RolePermissionListResponse
+     * @description 定义角色权限列表操作的稳定响应结构。
+     */
     readonly RolePermissionListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["RolePermissionEntry"][];
     };
-    /** RoleResponse */
+    /**
+     * RoleResponse
+     * @description 定义角色操作的稳定响应结构。
+     */
     readonly RoleResponse: {
       /** Name */
       readonly name: string;
@@ -2315,12 +2741,18 @@ export type components = {
       /** Version */
       readonly version: number;
     };
-    /** RoleStatusRequest */
+    /**
+     * RoleStatusRequest
+     * @description 定义角色状态操作的请求字段与协议校验边界。
+     */
     readonly RoleStatusRequest: {
       /** Active */
       readonly active: boolean;
     };
-    /** RotateModelProviderCredentialRequest */
+    /**
+     * RotateModelProviderCredentialRequest
+     * @description 定义轮换模型供应商凭据操作的请求字段与协议校验边界。
+     */
     readonly RotateModelProviderCredentialRequest: {
       /**
        * Api Key
@@ -2328,7 +2760,10 @@ export type components = {
        */
       readonly api_key: string;
     };
-    /** RuntimeComponentVersionsSchema */
+    /**
+     * RuntimeComponentVersionsSchema
+     * @description 定义运行时组件版本集合结构的协议字段和序列化边界。
+     */
     readonly RuntimeComponentVersionsSchema: {
       /** Chunking */
       readonly chunking: string;
@@ -2351,7 +2786,10 @@ export type components = {
       /** Source Ranking */
       readonly source_ranking: string;
     };
-    /** RuntimeRouteRequest */
+    /**
+     * RuntimeRouteRequest
+     * @description 定义运行时路由操作的请求字段与协议校验边界。
+     */
     readonly RuntimeRouteRequest: {
       /** Capabilities */
       readonly capabilities: readonly (
@@ -2371,7 +2809,10 @@ export type components = {
        */
       readonly provider_id: string;
     };
-    /** RuntimeRouteResponse */
+    /**
+     * RuntimeRouteResponse
+     * @description 定义运行时路由操作的稳定响应结构。
+     */
     readonly RuntimeRouteResponse: {
       /** Capabilities */
       readonly capabilities: readonly (
@@ -2408,7 +2849,10 @@ export type components = {
        */
       readonly route_id: string;
     };
-    /** UploadMetadataResponse */
+    /**
+     * UploadMetadataResponse
+     * @description 定义上传元数据操作的稳定响应结构。
+     */
     readonly UploadMetadataResponse: {
       /** Content Hash */
       readonly content_hash: string;
@@ -2423,7 +2867,10 @@ export type components = {
       /** Size Bytes */
       readonly size_bytes: number;
     };
-    /** WorkspaceInvitationResponse */
+    /**
+     * WorkspaceInvitationResponse
+     * @description 定义工作空间邀请操作的稳定响应结构。
+     */
     readonly WorkspaceInvitationResponse: {
       /**
        * Expires At
@@ -2446,12 +2893,18 @@ export type components = {
        */
       readonly workspace_id: string;
     };
-    /** WorkspaceListResponse */
+    /**
+     * WorkspaceListResponse
+     * @description 定义工作空间列表操作的稳定响应结构。
+     */
     readonly WorkspaceListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["WorkspaceSummaryResponse"][];
     };
-    /** WorkspaceMemberListResponse */
+    /**
+     * WorkspaceMemberListResponse
+     * @description 定义工作空间成员列表操作的稳定响应结构。
+     */
     readonly WorkspaceMemberListResponse: {
       /** Items */
       readonly items: readonly (
@@ -2459,7 +2912,10 @@ export type components = {
         | components["schemas"]["WorkspaceMemberProjectionResponse"]
       )[];
     };
-    /** WorkspaceMemberProjectionResponse */
+    /**
+     * WorkspaceMemberProjectionResponse
+     * @description 定义工作空间成员投影操作的稳定响应结构。
+     */
     readonly WorkspaceMemberProjectionResponse: {
       /** Account Id */
       readonly account_id?: string | null;
@@ -2470,7 +2926,10 @@ export type components = {
       /** Status */
       readonly status?: ("active" | "disabled" | "left") | null;
     };
-    /** WorkspaceMemberResponse */
+    /**
+     * WorkspaceMemberResponse
+     * @description 定义工作空间成员操作的稳定响应结构。
+     */
     readonly WorkspaceMemberResponse: {
       /**
        * Account Id
@@ -2490,7 +2949,10 @@ export type components = {
        */
       readonly status: "active" | "disabled" | "left";
     };
-    /** WorkspaceMembershipResponse */
+    /**
+     * WorkspaceMembershipResponse
+     * @description 定义工作空间成员身份操作的稳定响应结构。
+     */
     readonly WorkspaceMembershipResponse: {
       /**
        * Account Id
@@ -2508,7 +2970,10 @@ export type components = {
        */
       readonly status: "active" | "disabled" | "left";
     };
-    /** WorkspaceMenuConfigurationResponse */
+    /**
+     * WorkspaceMenuConfigurationResponse
+     * @description 定义工作空间菜单配置操作的稳定响应结构。
+     */
     readonly WorkspaceMenuConfigurationResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["WorkspaceMenuOverrideEntry"][];
@@ -2520,7 +2985,10 @@ export type components = {
        */
       readonly workspace_id: string;
     };
-    /** WorkspaceMenuOverrideEntry */
+    /**
+     * WorkspaceMenuOverrideEntry
+     * @description 定义工作空间菜单覆盖条目的协议字段和序列化边界。
+     */
     readonly WorkspaceMenuOverrideEntry: {
       /** Icon Key */
       readonly icon_key?: string | null;
@@ -2543,7 +3011,10 @@ export type components = {
       /** Visible */
       readonly visible: boolean;
     };
-    /** WorkspaceSummaryResponse */
+    /**
+     * WorkspaceSummaryResponse
+     * @description 定义工作空间摘要操作的稳定响应结构。
+     */
     readonly WorkspaceSummaryResponse: {
       /**
        * Membership Status

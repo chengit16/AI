@@ -1,3 +1,5 @@
+"""实现菜单配置与发布聚合的 PostgreSQL Repository 和事务边界。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -41,6 +43,8 @@ SessionFactory = Callable[[], Session]
 
 
 class SqlAlchemyMenuConfigurationRepository:
+    """在工作空间隔离下维护菜单覆盖、角色可见性、发布历史和当前指针。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -312,6 +316,8 @@ class SqlAlchemyMenuConfigurationRepository:
 
 
 class SqlAlchemyMenuConfigurationUnitOfWork:
+    """保证菜单配置或发布、审计和 Outbox 使用同一 Session 提交。"""
+
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
         self._state: ContextVar[

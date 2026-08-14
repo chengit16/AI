@@ -1,3 +1,7 @@
+/**
+ * @description 知识生产业务 Hook
+ * 负责知识库、文档和入库任务查询、轮询与写操作编排，不负责服务端状态机。
+ */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 import { useEffect } from "react";
@@ -18,17 +22,29 @@ import {
 } from "@/api/services/knowledge";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 
+/** 文档上传表单在进入 API Service 前的完整值。 */
 export interface UploadDocumentValues {
+  /** 文档在知识库中的展示标题。 */
   title: string;
+  /** 用户本次选择的原始浏览器文件。 */
   file: File;
+  /** 首期允许的创建者私有或空间共享范围。 */
   visibility: "private" | "workspace";
+  /** 服务端用于字段、检索和模型上下文策略的敏感级别。 */
   securityLevel: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
 }
 
+/**
+ * 返回知识生产页三类查询和全部写操作。
+ *
+ * 任务查询只在存在当前空间和知识库时启动，活动任务按 3 秒轮询；任何会改变文档
+ * 或任务状态的命令成功后统一刷新知识库、文档和任务，避免跨列表状态不一致。
+ */
 export function useKnowledgeProduction(knowledgeBaseId: string | null) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const { workspaceId } = useCurrentWorkspace();
+  // 1. 三组 Query 分别缓存空间知识库、选中文档和异步任务事实。
   const bases = useQuery({
     queryKey: ["knowledge-bases", workspaceId],
     queryFn: ({ signal }) => getKnowledgeBases(workspaceId!, signal),
@@ -62,6 +78,7 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
     });
   }, [jobs.data, jobs.dataUpdatedAt, knowledgeBaseId, queryClient, workspaceId]);
 
+  // 2. 文档写操作会同时改变知识库统计、版本摘要和任务状态，必须整体刷新。
   const refreshBase = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["knowledge-bases", workspaceId] }),
@@ -73,6 +90,7 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
       }),
     ]);
   };
+  // 3. 所有 Mutation 复用稳定错误转换，成功后再刷新相关服务端事实并提示用户。
   const notifyError = (error: unknown) => void message.error(errorMessage(error));
   const createBase = useMutation({
     mutationFn: (body: CreateKnowledgeBaseRequest) => createKnowledgeBase(workspaceId!, body),

@@ -1,3 +1,5 @@
+"""验证 Worker 健康信息和 Celery 任务注册。"""
+
 from ai_platform_worker.health import get_worker_health
 
 

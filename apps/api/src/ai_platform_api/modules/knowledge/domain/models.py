@@ -1,3 +1,5 @@
+"""定义知识库、文档、版本、发布指针和持久化端口。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -33,6 +35,8 @@ class KnowledgeWriteConflictError(Exception):
 
 @dataclass(frozen=True)
 class VisibilityPolicy:
+    """约束文档可见范围与部门集合必须保持一致。"""
+
     visibility: DocumentVisibility
     department_ids: frozenset[UUID] = frozenset()
 
@@ -44,6 +48,8 @@ class VisibilityPolicy:
 
 @dataclass(frozen=True)
 class KnowledgeBase:
+    """表示工作空间知识内容的可见性与安全级别默认容器。"""
+
     knowledge_base_id: UUID
     workspace_id: UUID
     name: str
@@ -81,6 +87,8 @@ class KnowledgeBase:
 
 @dataclass(frozen=True)
 class Document:
+    """保存文档权限标签、安全级别和逻辑删除状态。"""
+
     document_id: UUID
     workspace_id: UUID
     knowledge_base_id: UUID
@@ -119,6 +127,8 @@ class Document:
 
 @dataclass(frozen=True)
 class DocumentVersion:
+    """承载文档内容从草稿、就绪到发布或被替代的状态。"""
+
     document_version_id: UUID
     workspace_id: UUID
     document_id: UUID
@@ -175,6 +185,8 @@ class DocumentVersion:
 
 @dataclass(frozen=True)
 class DocumentSource:
+    """记录文档版本的来源定位信息与上传安全扫描事实。"""
+
     source_id: UUID
     workspace_id: UUID
     document_version_id: UUID
@@ -242,6 +254,8 @@ class DocumentSource:
 
 
 class KnowledgeRepository(Protocol):
+    """按工作空间和授权投影读写知识聚合、版本及入库任务。"""
+
     def get_workspace_access(
         self, workspace_id: UUID, account_id: UUID
     ) -> tuple[str, str] | None: ...
@@ -355,6 +369,8 @@ class KnowledgeRepository(Protocol):
 
 
 class KnowledgeUnitOfWork(Protocol):
+    """保证知识事实、用量、审计和 Outbox 在同一事务内提交。"""
+
     @property
     def knowledge(self) -> KnowledgeRepository: ...
 
@@ -381,6 +397,8 @@ class KnowledgeUnitOfWork(Protocol):
 
 @dataclass(frozen=True)
 class KnowledgeDocumentSummary:
+    """汇总文档与最新版本，供列表查询避免暴露内容正文。"""
+
     document: Document
     latest_version: DocumentVersion
     source_id: UUID

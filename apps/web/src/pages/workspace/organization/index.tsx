@@ -1,4 +1,4 @@
-/** 企业组织治理页，组合部门树、岗位、成员归属表单及状态操作。 */
+/** @description 企业组织治理页，组合部门树、岗位、成员归属表单及状态操作。 */
 import { Button, Dropdown, Skeleton, Table, Tag } from "antd";
 import type { MenuProps, TableColumnsType } from "antd";
 import { BriefcaseBusiness, Network, Plus, UserCog } from "lucide-react";

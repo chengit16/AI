@@ -1,3 +1,5 @@
+"""实现角色、绑定和继承事实的 PostgreSQL Repository 与事务边界。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -47,6 +49,8 @@ SessionFactory = Callable[[], Session]
 
 
 class SqlAlchemyRoleRepository:
+    """在工作空间隔离下维护角色、作用域绑定和角色版本。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -285,6 +289,8 @@ class SqlAlchemyRoleRepository:
 
 
 class SqlAlchemyRoleUnitOfWork:
+    """保证角色、绑定、版本、审计和 Outbox 使用同一 Session 提交。"""
+
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
         self._state: ContextVar[

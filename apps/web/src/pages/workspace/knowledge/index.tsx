@@ -1,4 +1,4 @@
-/** 知识生产页面编排，组合知识库导航、文档版本、入库任务和权限化操作入口。 */
+/** @description 知识生产页面编排，组合知识库导航、文档版本、入库任务和权限化操作入口。 */
 import { Button, Tabs } from "antd";
 import { Plus, Upload } from "lucide-react";
 import { useEffect, useState } from "react";

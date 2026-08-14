@@ -1,3 +1,5 @@
+"""在集成事件与跨进程任务信封之间执行版本化严格转换。"""
+
 from __future__ import annotations
 
 import hashlib
@@ -18,6 +20,8 @@ class InvalidTaskEnvelopeError(ValueError):
 
 @dataclass(frozen=True)
 class SignedTaskEnvelope:
+    """承载语言无关的任务载荷、签名、追踪信息和重放保护字段。"""
+
     task_name: str
     task_id: UUID
     issued_at: datetime
@@ -126,6 +130,8 @@ class SigningKeyFile:
 
 
 def event_to_dict(event: IntegrationEvent) -> dict[str, object]:
+    """处理事件转换为字典，并保持调用方可依赖的稳定返回语义。"""
+
     return {
         "event_id": str(event.event_id),
         "event_type": event.event_type,
@@ -144,6 +150,8 @@ def event_to_dict(event: IntegrationEvent) -> dict[str, object]:
 
 
 def event_from_dict(value: object) -> IntegrationEvent:
+    """处理事件从字典，并保持调用方可依赖的稳定返回语义。"""
+
     if not isinstance(value, dict):
         raise ValueError("集成事件必须是对象")
     required = {

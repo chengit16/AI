@@ -1,3 +1,5 @@
+"""验证 P1B-04 角色状态、绑定和继承计算规则。"""
+
 from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID

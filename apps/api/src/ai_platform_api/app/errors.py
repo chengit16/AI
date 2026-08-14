@@ -1,3 +1,5 @@
+"""把领域稳定错误映射为脱敏 HTTP 响应和可追踪错误码。"""
+
 from __future__ import annotations
 
 import json
@@ -21,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ErrorDefinition:
+    """表示错误定义，由协议层映射为稳定错误码。"""
+
     code: str
     http_status: int
     message: str

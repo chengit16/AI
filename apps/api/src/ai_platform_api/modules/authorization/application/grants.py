@@ -1,3 +1,5 @@
+"""编排角色权限读取与原子替换，并同步审计、版本和 Outbox。"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -24,18 +26,26 @@ from ai_platform_api.modules.integration.domain.events import IntegrationEvent
 
 
 class RolePermissionDeniedError(PlatformError):
+    """表示角色权限拒绝错误，由协议层映射为稳定错误码。"""
+
     error_code = "POLICY_DENIED"
 
 
 class RolePermissionNotFoundError(PlatformError):
+    """表示角色权限未找到错误，由协议层映射为稳定错误码。"""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
 class RolePermissionValidationError(PlatformError):
+    """表示角色权限校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"
 
 
 class RolePermissionConflictError(PlatformError):
+    """表示角色权限冲突错误，由协议层映射为稳定错误码。"""
+
     error_code = "ROLE_CONFLICT"
 
 
@@ -70,6 +80,8 @@ class RolePermissionService:
         workspace_id: UUID,
         role_id: UUID,
     ) -> tuple[RolePermissionGrant, ...]:
+        """校验空间所有者身份后列出角色授权，并拒绝跨空间角色标识。"""
+
         account_id = _browser_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
             _require_owner(unit_of_work.permissions, workspace_id, account_id)
@@ -96,6 +108,9 @@ class RolePermissionService:
             ...,
         ],
     ) -> tuple[RolePermissionGrant, ...]:
+        """整体替换角色权限并递增角色版本，使有效角色和策略缓存自然失效。"""
+
+        # 1. 先把协议输入转为不可变授权项，并校验权限码、数据范围和字段掩码。
         account_id = _browser_account(context, workspace_id)
         permission_by_code = {item.code: item for item in self._registry.permissions}
         grants = tuple(
@@ -133,6 +148,7 @@ class RolePermissionService:
         except InvalidRolePermissionGrantError as error:
             raise RolePermissionValidationError from error
 
+        # 2. 锁定目标角色并拒绝修改系统角色或停用角色。
         now = datetime.now(UTC)
         try:
             with self._unit_of_work as unit_of_work:
@@ -143,8 +159,10 @@ class RolePermissionService:
                 _, system_managed, status = role
                 if system_managed or status != "active":
                     raise RolePermissionConflictError
+                # 3. 权限集合整体替换并递增角色版本，策略缓存不会读取到部分更新。
                 role_version = unit_of_work.permissions.bump_role_version(workspace_id)
                 unit_of_work.permissions.replace_role_grants(workspace_id, role_id, grants)
+                # 4. 授权、审计和 Outbox 版本事件同事务提交。
                 unit_of_work.audit.add(
                     AuditRecord(
                         audit_id=uuid4(),

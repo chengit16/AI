@@ -1,3 +1,5 @@
+"""验证 P1C-03 字段掩码和响应、日志、检索、模型出口。"""
+
 from pathlib import Path
 from uuid import UUID
 

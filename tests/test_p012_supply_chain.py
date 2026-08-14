@@ -1,3 +1,5 @@
+"""验证 P0-12 SBOM、许可证和供应链清单漂移门禁。"""
+
 import json
 import re
 from pathlib import Path

@@ -1,3 +1,5 @@
+"""验证 P1D-04 索引构建、Embedding、切换和失败恢复。"""
+
 from __future__ import annotations
 
 import hashlib

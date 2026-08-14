@@ -1,3 +1,4 @@
+/** @description 模型供应商治理状态与允许操作的表格组件。 */
 import { Button, Dropdown, Table, Tag } from "antd";
 import type { MenuProps, TableColumnsType } from "antd";
 import { MoreHorizontal } from "lucide-react";
@@ -8,11 +9,17 @@ import { StateView } from "@/components/StateView/StateView";
 import { capabilityLabels, policyStatus, probeStatus, providerStatus } from "../config";
 
 interface ProviderTableProps {
+  /** 服务端返回的脱敏供应商治理视图。 */
   items: readonly ModelProvider[];
+  /** 首次查询是否仍在进行。 */
   isLoading: boolean;
+  /** 任一供应商写操作是否正在提交。 */
   isMutating: boolean;
+  /** 打开指定供应商的凭证轮换流程。 */
   onRotateCredential: (provider: ModelProvider) => void;
+  /** 打开指定供应商的数据政策复核流程。 */
   onReviewPolicy: (provider: ModelProvider) => void;
+  /** 执行服务端探测、激活或停用命令。 */
   onAction: (providerId: string, action: "probe" | "activate" | "disable") => void;
 }
 

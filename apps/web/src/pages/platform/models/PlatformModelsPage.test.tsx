@@ -1,3 +1,4 @@
+/** @description 平台模型治理页面权限、供应商和运行配置交互测试。 */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

@@ -1,3 +1,5 @@
+"""验证 P1C-04 菜单树覆盖、角色可见性和权限绑定。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

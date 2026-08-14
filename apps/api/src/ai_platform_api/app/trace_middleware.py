@@ -1,3 +1,5 @@
+"""在 HTTP 边缘建立或延续可信 Trace，并把响应标识返回调用方。"""
+
 from uuid import UUID, uuid4
 
 from starlette.datastructures import MutableHeaders

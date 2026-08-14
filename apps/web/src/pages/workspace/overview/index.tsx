@@ -1,4 +1,4 @@
-/** 空间总览页，组合当前空间、套餐配额、Open API 开关和邀请加入入口。 */
+/** @description 空间总览页，组合当前空间、套餐配额、Open API 开关和邀请加入入口。 */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,

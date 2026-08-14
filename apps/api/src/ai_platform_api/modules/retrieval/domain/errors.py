@@ -1,3 +1,5 @@
+"""定义检索正文拒绝、向量异常和引用失效错误。"""
+
 from ai_platform_api.common.errors import PlatformError
 
 

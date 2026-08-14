@@ -1,3 +1,5 @@
+"""向 Worker 模块公开共享的入库任务领域对象和持久化端口。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,6 +17,8 @@ class IngestionStorageUnavailableError(Exception):
 
 @dataclass(frozen=True)
 class ClaimedIngestionJob:
+    """保存由当前 Worker 租约保护的入库任务及领取标识。"""
+
     ingestion_job_id: UUID
     workspace_id: UUID
     knowledge_base_id: UUID
@@ -34,6 +38,8 @@ class ClaimedIngestionJob:
 
 @dataclass(frozen=True)
 class ParsedArtifact:
+    """记录解析产物对象键、内容摘要、解析器版本和分块数量。"""
+
     object_key: str
     payload: bytes
     content_hash: str
@@ -41,6 +47,8 @@ class ParsedArtifact:
 
 
 class IngestionJobStore(Protocol):
+    """按租约领取入库任务，并在持有租约时写回完成、重试或失败状态。"""
+
     def claim_next(
         self,
         *,
@@ -71,6 +79,8 @@ class IngestionJobStore(Protocol):
 
 
 class IngestionObjectStorage(Protocol):
+    """读取来源对象并写入内容寻址解析产物，摘要不匹配时拒绝处理。"""
+
     def read_source(self, job: ClaimedIngestionJob) -> bytes: ...
 
     def write_artifact(self, job: ClaimedIngestionJob, artifact: ParsedArtifact) -> None: ...

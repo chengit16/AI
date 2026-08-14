@@ -1,3 +1,5 @@
+"""映射空间权益、功能开关和套餐用量治理 HTTP 协议。"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -55,6 +57,8 @@ def get_entitlement(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EntitlementService, Depends(entitlement_service)],
 ) -> EntitlementResponse:
+    """获取权益；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _response(service.get_snapshot(context, workspace_id=workspace_id))
 
 
@@ -70,6 +74,8 @@ def set_open_api_feature(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[EntitlementService, Depends(entitlement_service)],
 ) -> EntitlementResponse:
+    """设置开放API功能；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _response(
         service.set_open_api_enabled(
             context,

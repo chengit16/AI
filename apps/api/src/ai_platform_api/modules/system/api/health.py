@@ -1,3 +1,5 @@
+"""提供进程存活与受配置控制的外部依赖就绪探针。"""
+
 import socket
 from collections.abc import Callable
 from typing import Annotated
@@ -13,6 +15,8 @@ router = APIRouter(prefix="/health", tags=["系统健康"])
 
 
 def check_tcp(url: str, default_port: int) -> bool:
+    """处理检查TCP，并保持调用方可依赖的稳定返回语义。"""
+
     parsed = urlparse(url)
     if parsed.hostname is None:
         return False
@@ -24,6 +28,8 @@ def check_tcp(url: str, default_port: int) -> bool:
 
 
 def check_http(url: str, path: str) -> bool:
+    """处理检查HTTP，并保持调用方可依赖的稳定返回语义。"""
+
     try:
         with urlopen(f"{url.rstrip('/')}{path}", timeout=2) as response:
             return bool(200 <= response.status < 300)
@@ -32,6 +38,8 @@ def check_http(url: str, path: str) -> bool:
 
 
 def dependency_checks(settings: Settings) -> dict[str, bool]:
+    """处理依赖检查，并保持调用方可依赖的稳定返回语义。"""
+
     checks: dict[str, Callable[[], bool]] = {
         "postgres": lambda: check_tcp(settings.database_url, 5432),
         "valkey": lambda: check_tcp(settings.valkey_url, 6379),
@@ -43,6 +51,8 @@ def dependency_checks(settings: Settings) -> dict[str, bool]:
 
 @router.get("/live", response_model=HealthResponse, operation_id="getLiveness")
 def get_liveness(settings: Annotated[Settings, Depends(get_settings)]) -> HealthResponse:
+    """获取存活检查，并保持调用方可依赖的稳定返回语义。"""
+
     return HealthResponse(
         service=settings.app_name,
         status="ok",
@@ -63,6 +73,8 @@ def get_readiness(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> HealthResponse:
     # 非容器单元测试只验证进程与配置；容器环境显式开启全部外部依赖探测。
+    """获取就绪检查，并保持调用方可依赖的稳定返回语义。"""
+
     checks = {"api": True, "configuration": True}
     if settings.dependency_checks_enabled:
         checks.update(dependency_checks(settings))

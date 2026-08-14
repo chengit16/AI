@@ -1,3 +1,5 @@
+"""提供跨 HTTP、Outbox 和 Worker 的 W3C Trace Context 校验与派生。"""
+
 import re
 import secrets
 from dataclasses import dataclass

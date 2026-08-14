@@ -1,3 +1,5 @@
+"""从浏览器会话构建可信身份上下文，并注入身份模块应用服务。"""
+
 from dataclasses import replace
 from typing import Annotated, cast
 from uuid import UUID
@@ -33,6 +35,8 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def authentication_service(request: Request) -> AuthenticationService:
+    """从应用容器解析认证服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "authentication_service", None)
     if not isinstance(service, AuthenticationService):
         raise RuntimeError("身份认证服务尚未完成装配")
@@ -40,6 +44,8 @@ def authentication_service(request: Request) -> AuthenticationService:
 
 
 def registration_service(request: Request) -> RegistrationService:
+    """从应用容器解析注册服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "registration_service", None)
     if not isinstance(service, RegistrationService):
         raise RuntimeError("注册服务尚未完成装配")
@@ -47,6 +53,8 @@ def registration_service(request: Request) -> RegistrationService:
 
 
 def enterprise_workspace_service(request: Request) -> EnterpriseWorkspaceService:
+    """从应用容器解析企业工作空间服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "enterprise_workspace_service", None)
     if not isinstance(service, EnterpriseWorkspaceService):
         raise RuntimeError("企业空间服务尚未完成装配")
@@ -54,6 +62,8 @@ def enterprise_workspace_service(request: Request) -> EnterpriseWorkspaceService
 
 
 def entitlement_service(request: Request) -> EntitlementService:
+    """从应用容器解析权益服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "entitlement_service", None)
     if not isinstance(service, EntitlementService):
         raise RuntimeError("工作空间权益服务尚未完成装配")
@@ -61,6 +71,8 @@ def entitlement_service(request: Request) -> EntitlementService:
 
 
 def organization_service(request: Request) -> OrganizationService:
+    """从应用容器解析组织服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "organization_service", None)
     if not isinstance(service, OrganizationService):
         raise RuntimeError("企业组织服务尚未完成装配")
@@ -68,6 +80,8 @@ def organization_service(request: Request) -> OrganizationService:
 
 
 def role_service(request: Request) -> RoleService:
+    """从应用容器解析角色服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "role_service", None)
     if not isinstance(service, RoleService):
         raise RuntimeError("企业角色服务尚未完成装配")
@@ -75,6 +89,8 @@ def role_service(request: Request) -> RoleService:
 
 
 def role_permission_service(request: Request) -> RolePermissionService:
+    """从应用容器解析角色权限服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "role_permission_service", None)
     if not isinstance(service, RolePermissionService):
         raise RuntimeError("角色权限服务尚未完成装配")
@@ -82,6 +98,8 @@ def role_permission_service(request: Request) -> RolePermissionService:
 
 
 def menu_configuration_service(request: Request) -> MenuConfigurationService:
+    """从应用容器解析菜单配置服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "menu_configuration_service", None)
     if not isinstance(service, MenuConfigurationService):
         raise RuntimeError("菜单配置服务尚未完成装配")
@@ -89,6 +107,8 @@ def menu_configuration_service(request: Request) -> MenuConfigurationService:
 
 
 def menu_release_service(request: Request) -> MenuReleaseService:
+    """从应用容器解析菜单发布服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "menu_release_service", None)
     if not isinstance(service, MenuReleaseService):
         raise RuntimeError("菜单发布服务尚未完成装配")
@@ -96,6 +116,8 @@ def menu_release_service(request: Request) -> MenuReleaseService:
 
 
 def field_projection_service(request: Request) -> FieldProjectionService:
+    """从应用容器解析字段投影服务，避免路由自行装配基础设施。"""
+
     service = getattr(request.app.state, "field_projection_service", None)
     if not isinstance(service, FieldProjectionService):
         raise RuntimeError("字段投影服务尚未完成装配")
@@ -108,6 +130,8 @@ def trusted_request_context(
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     csrf_token: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
 ) -> RequestContext:
+    """从应用容器解析可信请求上下文，避免路由自行装配基础设施。"""
+
     try:
         workspace_id = UUID(workspace_header) if workspace_header is not None else None
     except ValueError as error:

@@ -1,3 +1,5 @@
+"""编排入库任务租约认领、解析执行、有限重试和终态回写。"""
+
 from __future__ import annotations
 
 import hashlib
@@ -26,6 +28,8 @@ from ai_platform_worker.modules.ingestion.domain.jobs import (
 
 @dataclass(frozen=True)
 class IngestionBatchResult:
+    """汇总一次入库领取批次的成功、重试、失败和跳过数量。"""
+
     claimed: int = 0
     succeeded: int = 0
     retried: int = 0

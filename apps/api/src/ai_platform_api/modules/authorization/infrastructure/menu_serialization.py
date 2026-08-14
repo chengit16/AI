@@ -1,3 +1,5 @@
+"""在菜单领域对象与 PostgreSQL 行之间执行集中序列化。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -17,6 +19,8 @@ from ai_platform_api.modules.authorization.domain.menus import (
 
 
 def menu_release_values(release: MenuRelease) -> dict[str, object]:
+    """将菜单发布聚合映射为数据库写入值，保持快照与摘要一致。"""
+
     return {
         "release_id": release.release_id,
         "workspace_id": release.workspace_id,
@@ -39,6 +43,8 @@ def menu_release_values(release: MenuRelease) -> dict[str, object]:
 
 
 def menu_release_from_row(row: Row[Any]) -> MenuRelease:
+    """从数据库行恢复不可变菜单发布聚合。"""
+
     return MenuRelease(
         row.release_id,
         row.workspace_id,

@@ -1,3 +1,4 @@
+/** @description 企业组织部门、岗位和成员归属表单集合及其提交类型。 */
 import { Button, Drawer, Form, Input, Select } from "antd";
 
 import type { Department, Position } from "@/api/services/organization";
@@ -24,14 +25,23 @@ export interface AssignmentFormValues {
 }
 
 interface OrganizationFormsProps {
+  /** 当前打开的组织表单类型；为空时关闭抽屉。 */
   mode: "department" | "position" | "assignment" | null;
+  /** 服务端返回的部门层级事实。 */
   departments: readonly Department[];
+  /** 服务端返回的岗位事实。 */
   positions: readonly Position[];
+  /** 可选择组织归属的企业成员。 */
   members: readonly WorkspaceMember[];
+  /** 任一组织命令是否正在提交。 */
   pending: boolean;
+  /** 关闭当前表单抽屉。 */
   onClose: () => void;
+  /** 提交部门创建表单。 */
   onDepartment: (values: DepartmentFormValues) => void;
+  /** 提交岗位创建表单。 */
   onPosition: (values: PositionFormValues) => void;
+  /** 原子替换成员的部门、主部门和岗位归属。 */
   onAssignment: (values: AssignmentFormValues) => void;
 }
 

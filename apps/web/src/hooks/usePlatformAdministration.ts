@@ -1,3 +1,4 @@
+/** @description 当前会话的平台管理员资格查询 Hook。 */
 import { useQuery } from "@tanstack/react-query";
 
 import { PlatformApiError } from "@/api/client";

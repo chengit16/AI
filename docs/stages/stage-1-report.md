@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-14 |
-| 当前节点 | `P1E-01` 待开始；UnoCSS 样式治理已完成 |
+| 当前节点 | `P1E-01` 待开始；UnoCSS 样式治理与 `P1Q-01` 注释治理已完成 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -441,6 +441,17 @@
 - 浏览器验收：登录态执行 23 个桌面、平板、移动和横屏视口用例，生产登录页执行 5 个视口用例；`320px` 登录、`1440px` 总览、`390px` 知识生产和 `844×390` 横屏截图正常，侧栏和移动抽屉交互可用。最终复核 `1440×900` 总览与 `390×844` 知识页，页面 `scrollWidth` 均不超过视口，可见控件均有可访问名称，未发现缺失样式边框，浏览器控制台错误为 0。
 - 自动验收：统一 `./scripts/verify` 全部通过，包括 Prettier、ESLint、TypeScript、UnoCSS、React `21/21`、Python `307/307`、Ruff、mypy strict（331 个源文件）、契约、架构、供应链和生产构建。生产 CSS 为 `14.31 kB`、gzip `3.64 kB`；仅保留既有 Ant Design Vendor Chunk 体积提示。重建最新镜像后 `platform doctor` 八项通过，数据库 Revision 为 `20260814_0024`。
 - 当前边界：本节点不调整主色调、字体、暗色模式或业务功能；主题评审仍在 `P1G-04`。真实供应商、模型质量、Linux 和容量认证状态未改变。
+- 提交：`3ff9a59`。
+
+### P1Q-01 注释可维护性治理
+
+- 状态：通过。
+- 规范升级：采用 `digitizing` 的分层阅读思路，前端规范固定文件职责、导出 JSDoc、Props/Options 字段语义、复杂 Hook 和数据流说明；后端规范固定模块职责、公开接口 docstring、Service/Gateway/Consumer/Parser/Cipher 具体业务契约及复杂流程编号步骤。注释说明目的、约束、边界和失败语义，不要求逐行复述自解释代码。
+- 自动门禁：新增 TypeScript 与 Python 注释结构检查并接入 `./scripts/verify`，覆盖文件头、公开接口、字段说明、中文业务注释以及带责任人、年月和退出条件的 `TODO/FIXME/HACK`；生成文件和纯再导出入口按规则排除。Protocol、Repository 和 Unit of Work 可由类型级 docstring 统一说明契约，具体执行边界仍要求逐方法说明。
+- 当前代码治理：补齐前端手写源码的文件职责、公共导出和配置字段说明；补齐 API、Worker、共享后端、Migration 与测试代码的模块和公开接口说明。身份、组织、角色、权益、知识、模型网关、菜单发布、Outbox 和解析入库等复杂流程增加 `# 1.`、`# 2.` 编号说明，低价值模板句式专项扫描归零。
+- 契约影响：Router 和 Schema 的中文 docstring 同步进入 OpenAPI `description`，冻结契约及 React/Python 生成类型已经更新；兼容性检查确认仅描述变化，路径、Method、参数、字段结构和数据库均未改变。
+- 自动验收：前端注释门禁反例 `5/5`、Python 注释门禁反例 `6/6` 通过。统一 `./scripts/verify` 全部通过，包括 Prettier、ESLint、TypeScript、React `21/21`、生产构建、Ruff、mypy strict（333 个源文件）、Python `313/313`、架构依赖、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、UnoCSS 和契约兼容检查；真实 PostgreSQL、MinIO 与 Tika 集成测试均通过。
+- 当前边界：本节点只提升代码可读性和自动治理，不改变业务行为、接口结构、数据库或运行架构；不新增 SaaS、Go 运行层、真实连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -452,4 +463,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1D-08`，当前进入 `P1E-01`；`P1S-00`～`P1S-05` 样式治理轨道已完成，后续新页面按 UnoCSS 完成态规范建设。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1D-08`，当前进入 `P1E-01`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。

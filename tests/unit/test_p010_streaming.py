@@ -1,3 +1,5 @@
+"""验证 P0-10 流式 Run、游标、保留期和回放预算。"""
+
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4

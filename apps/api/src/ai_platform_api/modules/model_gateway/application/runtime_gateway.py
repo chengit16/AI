@@ -1,3 +1,5 @@
+"""从激活配置构建可追溯模型请求并记录调用事实。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -40,10 +42,14 @@ from ai_platform_api.modules.model_gateway.domain.runtime_errors import (
 
 
 class RuntimeProviderFactory(Protocol):
+    """按活动配置和短暂凭据创建单次调用使用的供应商 Adapter。"""
+
     def create(self, access: RuntimeProviderAccess) -> ModelProvider: ...
 
 
 class RuntimeProviderAccessResolver(Protocol):
+    """解析指定供应商版本的活动配置与凭据，版本不一致时失败关闭。"""
+
     def resolve_runtime_access(
         self,
         provider_id: UUID,
@@ -107,11 +113,15 @@ class RuntimeModelGatewayService:
         self._circuit_states: dict[str, CircuitState] = {}
 
     def invoke(self, request: ModelRequest) -> ModelResult:
+        """读取当前发布配置和短暂凭据后调用模型，并持久化最终调用结果。"""
+
+        # 1. 固定本次调用使用的发布配置，并先预留调用记录防止进程失败后无迹可查。
         configuration = self._configurations.current()
         if configuration is None:
             raise AiRuntimeConfigNotActiveError
         self._invocations.reserve(request, configuration.runtime_config_version_id)
 
+        # 2. 为快照路由装配受治理供应商；凭据在实际调用时短暂解析并记录版本。
         credential_versions: dict[str, int] = {}
         providers: dict[str, ModelProvider] = {
             str(route.provider_id): _GovernedProvider(
@@ -145,6 +155,7 @@ class RuntimeModelGatewayService:
             configuration.policy,
             circuit_states=self._circuit_states,
         )
+        # 3. 调用失败也必须写入尝试链、稳定错误码和已使用凭据版本，再向上抛出。
         try:
             result = replace(
                 gateway.invoke(request),
@@ -176,6 +187,7 @@ class RuntimeModelGatewayService:
             )
             raise
 
+        # 4. 成功或规则降级统一完成调用记录，结果绑定不可变运行配置版本。
         self._invocations.complete(
             RuntimeInvocationOutcome(
                 request=request,

@@ -1,3 +1,5 @@
+"""定义模型供应商和不可变运行配置接口 Schema。"""
+
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -9,6 +11,8 @@ SecurityLevel = Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
 
 
 class CreateModelProviderRequest(BaseModel):
+    """定义创建模型供应商操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     provider_key: str = Field(min_length=3, max_length=64, pattern=r"^[a-z][a-z0-9_]+$")
@@ -22,12 +26,16 @@ class CreateModelProviderRequest(BaseModel):
 
 
 class RotateModelProviderCredentialRequest(BaseModel):
+    """定义轮换模型供应商凭据操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     api_key: SecretStr = Field(min_length=1, max_length=4096)
 
 
 class ReviewModelProviderDataPolicyRequest(BaseModel):
+    """定义审核模型供应商数据策略操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     approved: bool
@@ -39,6 +47,8 @@ class ReviewModelProviderDataPolicyRequest(BaseModel):
 
 
 class ModelProviderConfigurationResponse(BaseModel):
+    """定义模型供应商配置操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     provider_id: UUID
@@ -67,12 +77,16 @@ class ModelProviderConfigurationResponse(BaseModel):
 
 
 class ModelProviderConfigurationListResponse(BaseModel):
+    """定义模型供应商配置列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[ModelProviderConfigurationResponse]
 
 
 class RuntimeComponentVersionsSchema(BaseModel):
+    """定义运行时组件版本集合结构的协议字段和序列化边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     chunking: str = Field(min_length=1, max_length=128)
@@ -88,6 +102,8 @@ class RuntimeComponentVersionsSchema(BaseModel):
 
 
 class GatewayPolicySchema(BaseModel):
+    """定义网关策略结构的协议字段和序列化边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     attempt_timeout_ms: int = Field(ge=1, le=120_000)
@@ -103,6 +119,8 @@ class GatewayPolicySchema(BaseModel):
 
 
 class RuntimeRouteRequest(BaseModel):
+    """定义运行时路由操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     provider_id: UUID
@@ -114,6 +132,8 @@ class RuntimeRouteRequest(BaseModel):
 
 
 class CreateAiRuntimeConfigRequest(BaseModel):
+    """定义创建AI运行时配置操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     display_name: str = Field(min_length=1, max_length=120)
@@ -124,6 +144,8 @@ class CreateAiRuntimeConfigRequest(BaseModel):
 
 
 class RuntimeRouteResponse(BaseModel):
+    """定义运行时路由操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     route_id: UUID
@@ -139,6 +161,8 @@ class RuntimeRouteResponse(BaseModel):
 
 
 class AiRuntimeConfigResponse(BaseModel):
+    """定义AI运行时配置操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     runtime_config_version_id: UUID
@@ -155,18 +179,24 @@ class AiRuntimeConfigResponse(BaseModel):
 
 
 class AiRuntimeConfigListResponse(BaseModel):
+    """定义AI运行时配置列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[AiRuntimeConfigResponse]
 
 
 class CurrentAiRuntimeConfigResponse(BaseModel):
+    """定义当前AI运行时配置操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     item: AiRuntimeConfigResponse | None
 
 
 class AiRuntimeConfigPublicationResponse(BaseModel):
+    """定义AI运行时配置发布记录操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     runtime_config_version_id: UUID

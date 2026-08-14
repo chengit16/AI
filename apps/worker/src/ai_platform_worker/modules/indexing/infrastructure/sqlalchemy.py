@@ -1,3 +1,5 @@
+"""实现索引版本租约认领、切换、重试和失败记录的 PostgreSQL Store。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta

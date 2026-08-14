@@ -1,3 +1,5 @@
+"""编排部门创建、移动和启停事务及组织树约束。"""
+
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -43,6 +45,9 @@ class DepartmentService:
         name: str,
         parent_department_id: UUID | None,
     ) -> DepartmentSummary:
+        """校验企业所有者、父部门和同级唯一名称后创建部门并重建闭包。"""
+
+        # 1. 规范化新部门事实，授权和树结构校验留在锁定事务内完成。
         account_id = governance_account(context, workspace_id)
         now = datetime.now(UTC)
         department = Department(
@@ -67,6 +72,7 @@ class DepartmentService:
                     parent_department_id=parent_department_id,
                     name=department.name,
                 )
+                # 2. 先在内存中构建候选树，闭包检测失败时不会写入邻接节点。
                 updated_departments = (*departments, department)
                 event, audit = organization_facts(
                     context=context,
@@ -80,6 +86,7 @@ class DepartmentService:
                     payload={"parent_department_id": uuid_value(parent_department_id)},
                     attributes={"status": department.status},
                 )
+                # 3. 邻接节点、完整闭包、审计和 Outbox 必须在同一事务切换。
                 unit_of_work.organization.add_department(department)
                 unit_of_work.organization.replace_department_closure(
                     workspace_id, build_department_closure(updated_departments)
@@ -99,6 +106,9 @@ class DepartmentService:
         department_id: UUID,
         parent_department_id: UUID | None,
     ) -> DepartmentSummary:
+        """锁定部门树后移动节点，形成环、跨空间或同级重名时拒绝提交。"""
+
+        # 1. 锁定整棵部门树后校验所有者、目标节点、父节点和同级唯一名称。
         account_id = governance_account(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -114,6 +124,7 @@ class DepartmentService:
                     parent_department_id=parent_department_id,
                     name=current.name,
                 )
+                # 2. 在内存中替换父节点并重建闭包，任何环或悬空引用都会失败关闭。
                 moved = current.move(parent_department_id=parent_department_id, occurred_at=now)
                 updated_departments = tuple(
                     moved if item.department_id == department_id else item for item in departments
@@ -132,6 +143,7 @@ class DepartmentService:
                         "previous_parent_department_id": uuid_value(current.parent_department_id)
                     },
                 )
+                # 3. 邻接树、闭包和角色版本同步提交，避免权限继承读取到混合版本。
                 unit_of_work.organization.save_department(moved)
                 unit_of_work.organization.replace_department_closure(
                     workspace_id, build_department_closure(updated_departments)
@@ -156,6 +168,9 @@ class DepartmentService:
         department_id: UUID,
         active: bool,
     ) -> DepartmentSummary:
+        """切换部门状态并更新角色版本，使部门继承授权即时失效。"""
+
+        # 1. 锁定部门树并由领域状态机执行启停转换。
         account_id = governance_account(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -173,6 +188,7 @@ class DepartmentService:
                 updated_departments = tuple(
                     updated if item.department_id == department_id else item for item in departments
                 )
+                # 2. 状态事件记录前后值，便于审计角色继承为何发生变化。
                 event, audit = organization_facts(
                     context=context,
                     workspace_id=workspace_id,
@@ -185,6 +201,7 @@ class DepartmentService:
                     payload={"status": updated.status},
                     attributes={"previous_status": current.status},
                 )
+                # 3. 部门状态与角色版本原子提交，缓存按新版本自然失效。
                 unit_of_work.organization.save_department(updated)
                 unit_of_work.organization.bump_role_version(workspace_id)
                 unit_of_work.audit.add(audit)
@@ -195,6 +212,8 @@ class DepartmentService:
         return department_summary(updated_departments, department_id)
 
     def list(self, context: RequestContext, *, workspace_id: UUID) -> tuple[DepartmentSummary, ...]:
+        """计算部门树深度和祖先有效状态后返回稳定排序摘要。"""
+
         account_id = governance_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
             if context.authorized_permission_code is None:

@@ -1,3 +1,5 @@
+"""定义菜单、页面、接口和权限码注册契约及完整性约束。"""
+
 from __future__ import annotations
 
 import re
@@ -23,6 +25,8 @@ COMPONENT_KEY_PATTERN = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 
 @dataclass(frozen=True)
 class Permission:
+    """把稳定权限码绑定到资源类型、动作和启用状态。"""
+
     code: str
     resource_type: str
     action: str
@@ -32,6 +36,8 @@ class Permission:
 
 @dataclass(frozen=True)
 class PageResource:
+    """描述受菜单和权限共同控制的前端页面资源。"""
+
     page_resource_id: UUID
     page_key: str
     route: str
@@ -45,6 +51,8 @@ class PageResource:
 
 @dataclass(frozen=True)
 class ApiResource:
+    """描述后端接口的 Method、路径模板、资源类型和权限码。"""
+
     api_resource_id: UUID
     api_key: str
     operation_id: str
@@ -58,6 +66,8 @@ class ApiResource:
 
 @dataclass(frozen=True)
 class Menu:
+    """描述平台注册菜单的层级、页面绑定、权限码和来源。"""
+
     menu_id: UUID
     menu_key: str
     parent_menu_key: str | None
@@ -73,6 +83,8 @@ class Menu:
 
 @dataclass(frozen=True)
 class MenuApiBinding:
+    """把菜单动作绑定到后端 API，确保页面入口和接口权限使用同一注册事实。"""
+
     menu_id: UUID
     api_resource_id: UUID
     action_type: MenuActionType
@@ -80,6 +92,8 @@ class MenuApiBinding:
 
 @dataclass(frozen=True)
 class ResourceRegistry:
+    """汇总权限、页面、API、菜单及其绑定，并提供跨引用完整性校验。"""
+
     schema_version: int
     registry_version: int
     permissions: tuple[Permission, ...]
@@ -376,6 +390,8 @@ class ResourceRegistry:
 
 
 class ResourceRegistryInvalidError(Exception):
+    """表示资源注册表无效错误，由协议层映射为稳定错误码。"""
+
     def __init__(self, violations: tuple[str, ...]) -> None:
         self.violations = violations
         super().__init__("; ".join(violations))

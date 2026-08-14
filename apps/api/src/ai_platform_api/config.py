@@ -1,3 +1,5 @@
+"""加载 API 进程配置并在启动前关闭不安全的生产默认值。"""
+
 from functools import lru_cache
 
 from pydantic import SecretStr, model_validator
@@ -60,4 +62,6 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """读取并缓存进程配置；测试通过缓存清理显式切换环境。"""
+
     return Settings()

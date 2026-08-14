@@ -1,3 +1,4 @@
+/** @description UnoCSS 静态类名合并工具测试。 */
 import { describe, expect, it } from "vitest";
 
 import { cn } from "./cn";

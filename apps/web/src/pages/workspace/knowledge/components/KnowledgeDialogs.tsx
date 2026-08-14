@@ -1,3 +1,4 @@
+/** @description 知识库创建、首版上传和新版本上传弹窗集合。 */
 import { Button, Form, Input, Modal, Select, Upload } from "antd";
 import type { UploadFile } from "antd";
 import { Upload as UploadIcon } from "lucide-react";
@@ -11,16 +12,27 @@ import type {
 import type { UploadDocumentValues } from "../useKnowledgeProduction";
 
 interface KnowledgeDialogsProps {
+  /** 是否打开知识库创建弹窗。 */
   createOpen: boolean;
+  /** 是否打开文档首版上传弹窗。 */
   uploadOpen: boolean;
+  /** 当前准备上传新版本的文档；为空时关闭对应弹窗。 */
   versionDocument: KnowledgeDocumentSummary | null;
+  /** 知识库创建命令是否正在提交。 */
   isCreating: boolean;
+  /** 首版或新版本上传是否正在提交。 */
   isUploading: boolean;
+  /** 关闭创建弹窗。 */
   onCloseCreate: () => void;
+  /** 关闭首版上传弹窗。 */
   onCloseUpload: () => void;
+  /** 关闭新版本上传弹窗。 */
   onCloseVersion: () => void;
+  /** 提交知识库创建请求。 */
   onCreate: (values: CreateKnowledgeBaseRequest) => Promise<unknown>;
+  /** 提交文档标题、可见范围、敏感级别和文件。 */
   onUpload: (values: UploadDocumentValues) => Promise<unknown>;
+  /** 为指定文档提交一个不可变新版本文件。 */
   onUploadVersion: (documentId: string, file: File) => Promise<unknown>;
 }
 
@@ -35,6 +47,7 @@ function selectedFile(files: UploadFile[]): File | null {
   return file instanceof File ? file : null;
 }
 
+/** 编排知识库与文档上传表单，只在服务端成功后清空对应本地状态。 */
 export function KnowledgeDialogs({
   createOpen,
   uploadOpen,

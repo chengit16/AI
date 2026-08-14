@@ -1,3 +1,5 @@
+"""验证 P1D-06 不可变运行配置、发布指针和调用记录。"""
+
 from __future__ import annotations
 
 import os

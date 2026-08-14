@@ -1,3 +1,5 @@
+"""按授权正文范围和字符预算读取证据块及相邻上下文。"""
+
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -11,6 +13,8 @@ from ai_platform_api.modules.retrieval.domain.models import (
 
 @dataclass(frozen=True)
 class ReaderBudget:
+    """限制单次引用读取的文档数和总字符数。"""
+
     surrounding_chunks: int
     max_chunks: int
     max_characters: int
@@ -21,6 +25,8 @@ class ReaderBudget:
 
 
 class AuthorizedDocumentReader:
+    """在策略再次授权和预算检查后返回引用正文。"""
+
     def __init__(self, index: SearchIndex) -> None:
         self._index = index
 

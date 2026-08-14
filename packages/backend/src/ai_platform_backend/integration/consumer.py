@@ -1,3 +1,5 @@
+"""实现基于事件 ID 的幂等投影消费事务。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -9,6 +11,8 @@ from ai_platform_backend.integration.domain import IntegrationEvent
 
 
 class ConsumerUnitOfWork(Protocol):
+    """约束消费者单元相关写入、审计和事件使用同一事务边界。"""
+
     def __enter__(self) -> ConsumerUnitOfWork: ...
 
     def __exit__(
@@ -50,6 +54,9 @@ class IdempotentProjectionConsumer:
         traceparent: str,
         processed_at: datetime,
     ) -> bool:
+        """先以事件标识判重再更新投影，业务写入与消费位置原子提交。"""
+
+        # 1. claim 在事务内写入消费位置；重复事件直接返回且不执行投影。
         with self._unit_of_work as unit_of_work:
             if not unit_of_work.claim(
                 self._consumer_name,
@@ -60,6 +67,7 @@ class IdempotentProjectionConsumer:
                 processed_at=processed_at,
             ):
                 return False
+            # 2. 投影和消费位置共享一次提交，进程失败后可安全重投而不重复副作用。
             unit_of_work.apply_projection(event, traceparent=traceparent)
             unit_of_work.commit()
             return True

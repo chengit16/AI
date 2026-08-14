@@ -1,3 +1,5 @@
+"""定义套餐权益、功能开关、额度和幂等用量领域规则。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,6 +22,8 @@ UsageMetric = Literal[
 
 @dataclass(frozen=True)
 class WorkspaceEntitlement:
+    """描述工作空间套餐允许的功能与各类硬额度上限。"""
+
     workspace_id: UUID
     plan_code: str
     max_storage_bytes: int
@@ -44,6 +48,8 @@ class WorkspaceEntitlement:
 
 @dataclass(frozen=True)
 class WorkspaceFeatureSettings:
+    """记录工作空间管理员在套餐允许范围内启用的功能。"""
+
     workspace_id: UUID
     open_api_enabled: bool
     updated_at: datetime
@@ -52,6 +58,8 @@ class WorkspaceFeatureSettings:
 
 @dataclass(frozen=True)
 class UsageCounter:
+    """记录工作空间在指定计费周期内已消耗的某项额度。"""
+
     workspace_id: UUID
     metric: UsageMetric
     period_key: str
@@ -62,6 +70,8 @@ class UsageCounter:
 
 @dataclass(frozen=True)
 class UsageRecord:
+    """以幂等键记录一次额度变动及变动后的确定结果。"""
+
     usage_record_id: UUID
     workspace_id: UUID
     metric: UsageMetric
@@ -74,6 +84,8 @@ class UsageRecord:
 
 @dataclass(frozen=True)
 class QuotaSnapshot:
+    """提供某项额度当前用量、上限和剩余量的只读快照。"""
+
     metric: Literal[
         "members",
         "storage_bytes",
@@ -92,6 +104,8 @@ class QuotaSnapshot:
 
 @dataclass(frozen=True)
 class EntitlementSnapshot:
+    """聚合空间状态、套餐功能开关和全部额度的对外事实。"""
+
     workspace_id: UUID
     workspace_status: Literal["active", "suspended", "archived"]
     plan_code: str
@@ -104,6 +118,8 @@ class EntitlementSnapshot:
 
 @dataclass(frozen=True)
 class OpenApiEntitlement:
+    """区分套餐是否允许 OpenAPI 与空间是否实际启用。"""
+
     allowed: bool
     enabled: bool
 
@@ -113,6 +129,8 @@ class OpenApiEntitlement:
 
 
 class EntitlementAccessReader(Protocol):
+    """向其他业务模块暴露最小化的 OpenAPI 权益查询端口。"""
+
     def get_open_api_entitlement(self, workspace_id: UUID) -> OpenApiEntitlement | None: ...
 
 
@@ -150,6 +168,8 @@ class UsageRepository(Protocol):
 
 
 class EntitlementRepository(UsageRepository, Protocol):
+    """在空间隔离范围内管理权益、功能设置和用量版本。"""
+
     def get_membership(
         self,
         workspace_id: UUID,
@@ -179,6 +199,8 @@ class EntitlementRepository(UsageRepository, Protocol):
 
 
 class EntitlementUnitOfWork(Protocol):
+    """保证权益变更、审计和 Outbox 事件原子提交。"""
+
     @property
     def entitlements(self) -> EntitlementRepository: ...
 

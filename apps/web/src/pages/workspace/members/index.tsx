@@ -1,4 +1,4 @@
-/** 企业成员治理页，处理邀请创建、成员状态展示和即时停用入口。 */
+/** @description 企业成员治理页，处理邀请创建、成员状态展示和即时停用入口。 */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Form, Input, Modal, Popconfirm, Skeleton, Table, Tag } from "antd";
 import type { TableColumnsType } from "antd";

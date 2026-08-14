@@ -1,3 +1,5 @@
+"""验证 P0-07 全合成文档解析、OCR 和切片链路。"""
+
 import hashlib
 import json
 import os

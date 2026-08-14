@@ -1,3 +1,5 @@
+"""验证 P1C-04 菜单配置、角色可见性和版本并发。"""
+
 from __future__ import annotations
 
 import os

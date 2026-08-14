@@ -1,3 +1,5 @@
+"""验证 P1A-05 Worker 运行配置、任务路由和健康边界。"""
+
 from pathlib import Path
 from typing import Any, cast
 

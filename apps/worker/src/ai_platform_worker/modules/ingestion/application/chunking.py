@@ -1,3 +1,5 @@
+"""按标题、段落、表格、页码和字符预算生成稳定结构化 Chunk。"""
+
 import hashlib
 import re
 from dataclasses import dataclass
@@ -17,17 +19,23 @@ SENTENCE_BOUNDARY = re.compile(r"(?<=[。!?])\s+|\n+")
 
 @dataclass(frozen=True)
 class ChunkPiece:
+    """保存待归并文本片段、块类型和原始来源位置。"""
+
     text: str
     block_index: int
     block: ParsedBlock
 
 
 def normalize_text(value: str) -> str:
+    """规范化文本，并在可信上下文内维持授权、事务与审计边界。"""
+
     lines = [" ".join(line.split()) for line in value.replace("\r", "\n").split("\n")]
     return "\n".join(line for line in lines if line).strip()
 
 
 def split_large_block(block: ParsedBlock, block_index: int, limit: int) -> list[ChunkPiece]:
+    """按最大字符数拆分超长块，并保留来源位置用于引用回链。"""
+
     text = normalize_text(block.text)
     if len(text) <= limit:
         return [ChunkPiece(text=text, block_index=block_index, block=block)]
@@ -59,6 +67,8 @@ def split_large_block(block: ParsedBlock, block_index: int, limit: int) -> list[
 
 
 def source_position(pieces: list[ChunkPiece]) -> ChunkSourcePosition:
+    """把页码或行号位置转换为稳定显示文本，缺失位置时返回空值。"""
+
     pages = {piece.block.source_position.page_number for piece in pieces}
     pages.discard(None)
     line_starts = [

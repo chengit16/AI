@@ -1,3 +1,5 @@
+"""从工作空间隔离对象键读取索引输入和写入确定性构建产物。"""
+
 from ai_platform_backend.indexing.domain import ClaimedIndexVersion
 from minio import Minio
 

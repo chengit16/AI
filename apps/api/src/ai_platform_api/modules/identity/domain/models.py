@@ -1,3 +1,5 @@
+"""定义账号、工作空间、会话、密码和身份读取基础端口。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,6 +16,8 @@ WorkspaceType = Literal["personal", "enterprise"]
 
 @dataclass(frozen=True)
 class AccountCredential:
+    """提供认证所需的账号摘要，避免向认证层暴露完整账号记录。"""
+
     account_id: UUID
     login_name: str
     password_hash: str
@@ -23,6 +27,8 @@ class AccountCredential:
 
 @dataclass(frozen=True)
 class WorkspaceAccess:
+    """汇总账号进入某工作空间所需的空间与成员状态。"""
+
     workspace_id: UUID
     account_id: UUID
     workspace_status: WorkspaceStatus
@@ -44,6 +50,8 @@ class WorkspaceAccess:
 
 @dataclass(frozen=True)
 class BrowserSession:
+    """保存服务端会话绑定的账号版本和 CSRF 摘要。"""
+
     account_id: UUID
     auth_version: int
     csrf_digest: str
@@ -51,6 +59,8 @@ class BrowserSession:
 
 @dataclass(frozen=True)
 class LoginResult:
+    """返回登录后仅一次交付给浏览器的会话与 CSRF 凭据。"""
+
     session_token: str
     csrf_token: str
     account_id: UUID
@@ -59,6 +69,8 @@ class LoginResult:
 
 @dataclass(frozen=True)
 class OpenApiKey:
+    """表示已持久化的 OpenAPI Key 摘要、作用域与撤销状态。"""
+
     key_id: UUID
     actor_id: UUID
     workspace_id: UUID
@@ -71,6 +83,8 @@ class OpenApiKey:
 
 @dataclass(frozen=True)
 class IssuedApiKey:
+    """承载新签发 Key 的一次性明文及可长期展示的元数据。"""
+
     key_id: UUID
     actor_id: UUID
     workspace_id: UUID
@@ -80,18 +94,24 @@ class IssuedApiKey:
 
 
 class PasswordVerifier(Protocol):
+    """隔离密码散列算法，使领域服务不依赖具体安全库。"""
+
     def hash(self, password: str) -> str: ...
 
     def verify(self, password_hash: str | None, password: str) -> bool: ...
 
 
 class SecretDigester(Protocol):
+    """为 API Key 等高熵凭据提供不可逆摘要与恒定语义比对。"""
+
     def digest(self, secret: str) -> str: ...
 
     def matches(self, expected_digest: str, secret: str) -> bool: ...
 
 
 class IdentityReader(Protocol):
+    """以最小只读投影解析账号、空间访问和 API Key 身份。"""
+
     def get_account_by_login(self, login_name: str) -> AccountCredential | None: ...
 
     def get_account(self, account_id: UUID) -> AccountCredential | None: ...
@@ -108,12 +128,16 @@ class IdentityReader(Protocol):
 
 
 class ApiKeyWriter(Protocol):
+    """在身份事务中持久化或撤销工作空间 API Key。"""
+
     def add(self, api_key: OpenApiKey, *, name: str, last_four: str) -> None: ...
 
     def revoke(self, workspace_id: UUID, key_id: UUID, revoked_at: datetime) -> bool: ...
 
 
 class IdentityUnitOfWork(Protocol):
+    """约束 API Key 写入使用显式事务和统一提交责任。"""
+
     @property
     def api_keys(self) -> ApiKeyWriter: ...
 
@@ -130,6 +154,8 @@ class IdentityUnitOfWork(Protocol):
 
 
 class SessionStore(Protocol):
+    """管理有过期时间的浏览器会话，存储实现不得保存会话明文令牌。"""
+
     def create(self, session: BrowserSession, ttl_seconds: int) -> str: ...
 
     def resolve(self, token: str) -> BrowserSession | None: ...

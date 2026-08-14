@@ -1,3 +1,5 @@
+"""提供索引版本原子切换、停用和发布指针查询 SQL 操作。"""
+
 from datetime import datetime
 from typing import cast
 from uuid import UUID
@@ -170,6 +172,8 @@ def published_document_version_id(
     workspace_id: UUID,
     document_id: UUID,
 ) -> UUID | None:
+    """处理已发布文档版本标识，并保持调用方可依赖的稳定返回语义。"""
+
     value = session.execute(
         select(document_publications.c.current_document_version_id).where(
             document_publications.c.workspace_id == workspace_id,

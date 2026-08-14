@@ -1,3 +1,5 @@
+"""编排菜单草稿、校验、审批、发布和回滚的不可变快照生命周期。"""
+
 from __future__ import annotations
 
 import hashlib
@@ -33,18 +35,26 @@ __all__ = ["MenuRelease", "MenuReleaseService"]
 
 
 class MenuReleaseDeniedError(PlatformError):
+    """表示菜单发布拒绝错误，由协议层映射为稳定错误码。"""
+
     error_code = "POLICY_DENIED"
 
 
 class MenuReleaseNotFoundError(PlatformError):
+    """表示菜单发布未找到错误，由协议层映射为稳定错误码。"""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
 class MenuReleaseValidationError(PlatformError):
+    """表示菜单发布校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"
 
 
 class MenuReleaseConflictError(PlatformError):
+    """表示菜单发布冲突错误，由协议层映射为稳定错误码。"""
+
     error_code = "ROLE_CONFLICT"
 
 
@@ -65,6 +75,9 @@ class MenuReleaseService:
         *,
         workspace_id: UUID,
     ) -> MenuRelease:
+        """冻结当前注册表、空间菜单和角色可见性，创建可审计的发布草稿。"""
+
+        # 1. 校验浏览器所有者并锁定菜单版本，确保快照来自单一配置时点。
         account_id = _browser_owner(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -77,6 +90,7 @@ class MenuReleaseService:
                 )
                 if menu_version is None:
                     raise MenuReleaseNotFoundError
+                # 2. 冻结注册表、空间覆盖、角色可见性和接口绑定并计算内容摘要。
                 snapshot = _build_snapshot(
                     self._registry,
                     workspace_id=workspace_id,
@@ -103,6 +117,7 @@ class MenuReleaseService:
                     published_at=None,
                     version=1,
                 )
+                # 3. 草稿、审计和 Outbox 同事务提交，历史快照后续不可原地修改。
                 unit_of_work.menus.add_release(release)
                 _record_release_change(
                     unit_of_work,
@@ -124,6 +139,9 @@ class MenuReleaseService:
         workspace_id: UUID,
         release_id: UUID,
     ) -> MenuRelease:
+        """重新校验草稿快照的页面、权限和接口绑定，错误未清零时禁止审批。"""
+
+        # 1. 锁定草稿并对照当前注册表重新校验全部跨引用。
         account_id = _browser_owner(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -135,6 +153,7 @@ class MenuReleaseService:
                     release = release.record_validation(errors, occurred_at=now)
                 except InvalidMenuReleaseTransitionError as error:
                     raise MenuReleaseConflictError from error
+                # 2. 校验状态、错误列表、审计和事件同事务提交。
                 unit_of_work.menus.save_release(release)
                 _record_release_change(
                     unit_of_work,
@@ -159,6 +178,9 @@ class MenuReleaseService:
         approved: bool,
         reason: str | None,
     ) -> MenuRelease:
+        """记录审批人和审批结论；驳回必须给出原因且不能进入发布状态。"""
+
+        # 1. 锁定已校验草稿并由领域状态机执行批准或驳回。
         account_id = _browser_owner(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -174,6 +196,7 @@ class MenuReleaseService:
                     )
                 except InvalidMenuReleaseTransitionError as error:
                     raise MenuReleaseConflictError from error
+                # 2. 审批人、结论、原因、审计和事件同事务提交。
                 unit_of_work.menus.save_release(release)
                 _record_release_change(
                     unit_of_work,
@@ -200,6 +223,9 @@ class MenuReleaseService:
         workspace_id: UUID,
         release_id: UUID,
     ) -> MenuRelease:
+        """原子更新当前发布指针并发送版本事件，只有已批准快照允许发布。"""
+
+        # 1. 锁定发布记录并再次校验冻结快照，防止已失效注册引用进入当前指针。
         account_id = _browser_owner(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -213,12 +239,14 @@ class MenuReleaseService:
                     release = release.publish(occurred_at=now)
                 except InvalidMenuReleaseTransitionError as error:
                     raise MenuReleaseConflictError from error
+                # 2. 发布状态与当前指针先在事务中同时切换。
                 unit_of_work.menus.save_release(release)
                 unit_of_work.menus.set_current_release(
                     workspace_id,
                     release.release_id,
                     published_at=now,
                 )
+                # 3. 发布审计和版本事件与指针同事务提交，前端缓存只观察完整发布。
                 _record_release_change(
                     unit_of_work,
                     context=context,
@@ -239,6 +267,9 @@ class MenuReleaseService:
         workspace_id: UUID,
         source_release_id: UUID,
     ) -> MenuRelease:
+        """基于历史快照创建新的回滚发布，保留完整版本链而不覆写历史。"""
+
+        # 1. 锁定当前菜单版本并校验目标历史发布仍与注册表兼容。
         account_id = _browser_owner(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -257,6 +288,7 @@ class MenuReleaseService:
                 )
                 if source.status != "published" or _snapshot_violations(self._registry, source):
                     raise MenuReleaseConflictError
+                # 2. 复制历史不可变快照为新的回滚发布，原历史记录保持不变。
                 release = MenuRelease(
                     release_id=uuid4(),
                     workspace_id=workspace_id,
@@ -276,6 +308,7 @@ class MenuReleaseService:
                     published_at=now,
                     version=1,
                 )
+                # 3. 新发布、当前指针、审计和回滚事件同事务提交。
                 unit_of_work.menus.add_release(release)
                 unit_of_work.menus.set_current_release(
                     workspace_id,
@@ -302,6 +335,8 @@ class MenuReleaseService:
         *,
         workspace_id: UUID,
     ) -> tuple[MenuRelease, ...]:
+        """校验工作空间管理权限后按版本倒序返回菜单发布历史。"""
+
         account_id = _browser_owner(context, workspace_id)
         with self._unit_of_work as unit_of_work:
             _require_owner(unit_of_work.menus, workspace_id, account_id)
@@ -313,6 +348,8 @@ class MenuReleaseService:
         *,
         workspace_id: UUID,
     ) -> MenuRelease | None:
+        """读取当前发布指针及不可变快照，未发布时返回明确空状态。"""
+
         account_id = _browser_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
             _require_active_member(unit_of_work.menus, workspace_id, account_id)

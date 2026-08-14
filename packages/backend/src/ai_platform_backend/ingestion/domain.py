@@ -1,3 +1,5 @@
+"""定义共享入库任务状态机、租约、有限重试和 Store 端口。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -29,6 +31,8 @@ class ManualIngestionRetryNotAllowedError(Exception):
 
 @dataclass(frozen=True)
 class IngestionJob:
+    """记录文档解析任务的租约、尝试次数、追踪上下文和终态。"""
+
     ingestion_job_id: UUID
     workspace_id: UUID
     knowledge_base_id: UUID

@@ -1,3 +1,5 @@
+"""编排文档解析、结构化切片并输出可索引入库结果。"""
+
 from ai_platform_worker.modules.ingestion.application.chunking import StructuralChunker
 from ai_platform_worker.modules.ingestion.domain.documents import (
     IngestionRequest,
@@ -10,6 +12,8 @@ from ai_platform_worker.modules.ingestion.domain.errors import IngestionError
 
 
 class ParseDocument:
+    """组合解析结果、分块产物和最终内容摘要。"""
+
     def __init__(self, parser_router: ParserRouter) -> None:
         self._parser_router = parser_router
 
@@ -50,6 +54,8 @@ class ParseDocument:
 
 
 class IngestDocument:
+    """编排对象读取、摘要校验、文档解析、分块和产物写入。"""
+
     def __init__(self, parser_router: ParserRouter, chunker: StructuralChunker) -> None:
         self._parser = ParseDocument(parser_router)
         self._chunker = chunker

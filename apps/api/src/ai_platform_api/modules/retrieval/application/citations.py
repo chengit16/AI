@@ -1,3 +1,5 @@
+"""验证引用仍属于授权、有效且包含声明原文的文档版本。"""
+
 from uuid import UUID
 
 from ai_platform_api.modules.retrieval.domain.errors import (
@@ -12,6 +14,8 @@ from ai_platform_api.modules.retrieval.domain.models import (
 
 
 class CitationService:
+    """在引用签发前重新校验工作空间、文档版本、分块和策略授权。"""
+
     def __init__(self, index: SearchIndex) -> None:
         self._index = index
 
@@ -21,6 +25,8 @@ class CitationService:
         chunk_id: UUID,
         quote: str,
     ) -> Citation:
+        """按引用签发时的策略版本再次授权，生成可追踪且不可越权的引用。"""
+
         if not scope.content_allowed:
             raise RetrievalScopeDeniedError
         normalized_quote = " ".join(quote.split())

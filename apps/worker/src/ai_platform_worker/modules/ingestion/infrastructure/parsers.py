@@ -1,3 +1,5 @@
+"""按真实媒体类型路由 Markdown、DOCX、PDF 和 Tika 解析器。"""
+
 import re
 from pathlib import Path
 
@@ -15,6 +17,8 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
 
 
 def decode_utf8(content: bytes) -> str:
+    """处理解码UTF-8，在基础设施边界维持稳定领域对象映射。"""
+
     try:
         return content.decode("utf-8-sig")
     except UnicodeDecodeError as error:
@@ -26,6 +30,8 @@ def decode_utf8(content: bytes) -> str:
 
 
 class PlainTextParser:
+    """封装纯文本文本解析器执行边界，并将失败转换为可追踪的稳定结果。"""
+
     def parse(
         self,
         *,
@@ -33,6 +39,8 @@ class PlainTextParser:
         file_name: str,
         declared_media_type: str | None,
     ) -> ParsedDocument:
+        """以严格 UTF-8 解码纯文本并返回规范段落，非法编码时拒绝入库。"""
+
         blocks = tuple(
             ParsedBlock(
                 block_type="paragraph",
@@ -53,6 +61,8 @@ class PlainTextParser:
 
 
 class MarkdownParser:
+    """封装Markdown解析器执行边界，并将失败转换为可追踪的稳定结果。"""
+
     def parse(
         self,
         *,
@@ -60,6 +70,9 @@ class MarkdownParser:
         file_name: str,
         declared_media_type: str | None,
     ) -> ParsedDocument:
+        """解析 Markdown 结构并保留标题层级，禁止执行其中的嵌入内容。"""
+
+        # 1. 严格解码文本后按行扫描，解析器不执行链接、HTML 或代码块中的内容。
         lines = decode_utf8(content).splitlines()
         blocks: list[ParsedBlock] = []
         index = 0
@@ -69,6 +82,7 @@ class MarkdownParser:
             if not line:
                 index += 1
                 continue
+            # 2. 标题和表格优先形成结构块，其余连续文本合并为带行号的段落。
             heading = HEADING_PATTERN.match(line)
             if heading:
                 blocks.append(
@@ -113,6 +127,7 @@ class MarkdownParser:
                     source_position=SourcePosition(line_start=start, line_end=index),
                 )
             )
+        # 3. 返回稳定顺序和来源位置，后续分块不再重新解释 Markdown 语法。
         return ParsedDocument(
             media_type=declared_media_type or "text/markdown",
             parser_name="markdown-structural-v1",
@@ -124,6 +139,8 @@ class MarkdownParser:
 
 
 class DefaultParserRouter:
+    """按真实媒体类型选择纯文本、Markdown、PDF 或 Tika 解析器。"""
+
     def __init__(
         self,
         tika_parser: DocumentParser,

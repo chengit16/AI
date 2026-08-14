@@ -1,3 +1,5 @@
+"""聚合组织管理服务并向 Router 暴露稳定部门、岗位和成员用例。"""
+
 from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
@@ -50,6 +52,8 @@ class OrganizationService:
         name: str,
         parent_department_id: UUID | None,
     ) -> DepartmentSummary:
+        """委托部门用例创建节点，并统一维护闭包、审计和角色版本。"""
+
         return self._departments.create(
             context,
             workspace_id=workspace_id,
@@ -65,6 +69,8 @@ class OrganizationService:
         department_id: UUID,
         parent_department_id: UUID | None,
     ) -> DepartmentSummary:
+        """移动部门后重建闭包，检测到环或悬空父节点时整体回滚。"""
+
         return self._departments.move(
             context,
             workspace_id=workspace_id,
@@ -80,6 +86,8 @@ class OrganizationService:
         department_id: UUID,
         active: bool,
     ) -> DepartmentSummary:
+        """切换部门状态并递增角色版本，使继承权限重新解析。"""
+
         return self._departments.set_status(
             context,
             workspace_id=workspace_id,
@@ -90,6 +98,8 @@ class OrganizationService:
     def list_departments(
         self, context: RequestContext, *, workspace_id: UUID
     ) -> tuple[DepartmentSummary, ...]:
+        """返回含祖先有效状态的部门摘要，停用祖先会关闭整棵子树。"""
+
         return self._departments.list(context, workspace_id=workspace_id)
 
     def create_position(
@@ -100,6 +110,8 @@ class OrganizationService:
         department_id: UUID,
         name: str,
     ) -> PositionSummary:
+        """在有效部门下创建职位，并拒绝跨空间部门引用。"""
+
         return self._positions.create(
             context,
             workspace_id=workspace_id,
@@ -115,6 +127,8 @@ class OrganizationService:
         position_id: UUID,
         active: bool,
     ) -> PositionSummary:
+        """切换职位状态并递增成员归属版本和角色版本。"""
+
         return self._positions.set_status(
             context,
             workspace_id=workspace_id,
@@ -125,6 +139,8 @@ class OrganizationService:
     def list_positions(
         self, context: RequestContext, *, workspace_id: UUID
     ) -> tuple[PositionSummary, ...]:
+        """列出职位及其部门链有效状态，供成员分配前校验。"""
+
         return self._positions.list(context, workspace_id=workspace_id)
 
     def assign_member(
@@ -137,6 +153,8 @@ class OrganizationService:
         primary_department_id: UUID | None,
         position_ids: tuple[UUID, ...],
     ) -> OrganizationAssignment:
+        """整体替换成员部门和职位归属，主部门必须属于所选部门集合。"""
+
         return self._members.assign(
             context,
             workspace_id=workspace_id,
@@ -153,6 +171,8 @@ class OrganizationService:
         workspace_id: UUID,
         target_account_id: UUID,
     ) -> OrganizationAssignment:
+        """读取成员组织归属并校验请求者具有当前空间访问权。"""
+
         return self._members.get(
             context,
             workspace_id=workspace_id,

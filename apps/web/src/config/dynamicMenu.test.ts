@@ -1,3 +1,4 @@
+/** @description 动态菜单树、路由绑定和权限裁剪规则测试。 */
 import { Activity, LayoutDashboard } from "lucide-react";
 import { describe, expect, it } from "vitest";
 

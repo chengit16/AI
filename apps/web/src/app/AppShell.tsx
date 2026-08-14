@@ -1,3 +1,7 @@
+/**
+ * @description 动态菜单应用壳层
+ * 负责工作空间导航、桌面侧栏和移动抽屉，菜单裁剪不替代服务端接口授权。
+ */
 import { useMutation } from "@tanstack/react-query";
 import { App, Button, Drawer, Dropdown, Tooltip } from "antd";
 import type { MenuProps } from "antd";

@@ -1,3 +1,5 @@
+"""验证 P1C-05 菜单草稿、审批、发布、回滚和快照不变性。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace

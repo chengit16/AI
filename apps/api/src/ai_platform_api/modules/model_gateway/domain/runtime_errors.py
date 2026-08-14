@@ -1,3 +1,5 @@
+"""定义运行配置版本和模型调用事实的稳定错误语义。"""
+
 from ai_platform_api.common.errors import PlatformError
 
 

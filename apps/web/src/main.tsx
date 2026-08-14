@@ -1,4 +1,4 @@
-/** Web 应用唯一浏览器入口，按 Token、全局规则、UnoCSS 的顺序装载样式层。 */
+/** @description Web 应用唯一浏览器入口，按 Token、全局规则、UnoCSS 顺序装载样式层。 */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";

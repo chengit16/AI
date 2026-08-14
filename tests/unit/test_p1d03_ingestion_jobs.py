@@ -1,3 +1,5 @@
+"""验证 P1D-03 入库任务租约、重试和终态规则。"""
+
 from __future__ import annotations
 
 import hashlib

@@ -1,3 +1,5 @@
+"""验证部门、岗位和成员组织归属 HTTP 协议。"""
+
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast

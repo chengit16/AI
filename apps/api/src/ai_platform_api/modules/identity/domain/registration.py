@@ -1,3 +1,5 @@
+"""定义账号与默认个人空间注册聚合和同事务写入端口。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -25,6 +27,8 @@ class AccountRegistration:
 
 @dataclass(frozen=True)
 class RegistrationResult:
+    """返回新账号及其默认个人空间标识。"""
+
     account_id: UUID
     personal_workspace_id: UUID
 
@@ -34,10 +38,14 @@ class DuplicateLoginNameError(Exception):
 
 
 class RegistrationWriter(Protocol):
+    """一次写入账号、个人空间、所有者成员、系统角色和默认权益。"""
+
     def add(self, registration: AccountRegistration) -> None: ...
 
 
 class RegistrationUnitOfWork(Protocol):
+    """保证账号、个人空间、审计和 Outbox 在同一事务内提交。"""
+
     @property
     def registrations(self) -> RegistrationWriter: ...
 

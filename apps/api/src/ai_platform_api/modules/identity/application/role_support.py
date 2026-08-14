@@ -1,3 +1,5 @@
+"""提供角色用例共享的主体授权、审计和缓存失效规则。"""
+
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -14,6 +16,8 @@ from ai_platform_api.modules.identity.domain.roles import Role, RoleRepository
 
 
 def browser_account(context: RequestContext, workspace_id: UUID) -> UUID:
+    """从当前工作空间浏览器会话取得账号，拒绝 API Key 和跨空间上下文。"""
+
     if (
         context.user_id is None
         or context.authentication_method != "browser_session"
@@ -24,6 +28,8 @@ def browser_account(context: RequestContext, workspace_id: UUID) -> UUID:
 
 
 def require_owner(repository: RoleRepository, workspace_id: UUID, account_id: UUID) -> None:
+    """校验活动企业空间和所有者成员身份，个人空间与普通成员均拒绝。"""
+
     workspace = repository.get_workspace(workspace_id, for_update=True)
     membership = repository.get_membership(workspace_id, account_id, for_update=True)
     if (
@@ -38,6 +44,8 @@ def require_owner(repository: RoleRepository, workspace_id: UUID, account_id: UU
 
 
 def normalized_role_name(value: str) -> str:
+    """去除角色名称首尾空白并执行非空和长度限制。"""
+
     normalized = value.strip()
     if not normalized or len(normalized) > 120:
         raise RoleValidationError
@@ -45,6 +53,8 @@ def normalized_role_name(value: str) -> str:
 
 
 def find_role(roles: tuple[Role, ...], role_id: UUID) -> Role:
+    """按标识查找当前工作空间角色，不存在时返回稳定资源错误。"""
+
     for role in roles:
         if role.role_id == role_id:
             return role
@@ -64,6 +74,8 @@ def role_facts(
     role_version: int,
     attributes: dict[str, object],
 ) -> tuple[IntegrationEvent, AuditRecord]:
+    """为角色或绑定变化生成共享追踪上下文的事件与审计记录。"""
+
     return (
         IntegrationEvent(
             event_id=uuid4(),
@@ -98,6 +110,8 @@ def role_facts(
 
 
 def next_role_version(repository: RoleRepository, workspace_id: UUID) -> int:
+    """在乐观锁保护下递增角色版本，并把并发冲突转换为业务冲突。"""
+
     current = repository.get_role_version(workspace_id, for_update=True)
     if current is None:
         raise RoleNotFoundError

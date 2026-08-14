@@ -1,3 +1,5 @@
+"""定义统一错误响应 Schema 和 Router 可复用的错误状态声明。"""
+
 from typing import Any
 from uuid import UUID
 
@@ -5,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ErrorResponse(BaseModel):
+    """表示错误响应，由协议层映射为稳定错误码。"""
+
     model_config = ConfigDict(extra="forbid")
 
     code: str = Field(pattern=r"^[A-Z][A-Z0-9_]+$")
@@ -15,6 +19,8 @@ class ErrorResponse(BaseModel):
 
 
 def error_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
+    """将业务错误定义转换为 OpenAPI 可声明的稳定响应集合。"""
+
     descriptions = {
         400: "请求上下文无效",
         401: "身份凭证无效",

@@ -1,3 +1,5 @@
+"""实现审计、Outbox 租约和幂等投影事务的 SQLAlchemy Adapter。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -27,6 +29,8 @@ SessionFactory = sessionmaker[Session]
 
 
 class SqlAlchemyOutboxWriter:
+    """把集成事件写入当前 Session，事件发布由事务提交后的 Dispatcher 负责。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -54,6 +58,8 @@ class SqlAlchemyOutboxWriter:
 
 
 class SqlAlchemyAuditWriter:
+    """把已投影审计记录写入当前 Session，不执行独立提交。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -221,6 +227,8 @@ class SqlAlchemyOutboxLeaseStore:
 
 
 class SqlAlchemyConsumerUnitOfWork:
+    """保证消费位置和业务投影使用同一 SQLAlchemy Session 提交。"""
+
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
         self._session: Session | None = None
@@ -295,6 +303,8 @@ class SqlAlchemyConsumerUnitOfWork:
 
 
 def get_outbox_event(session: Session, event_id: UUID) -> IntegrationEvent:
+    """获取Outbox事件，并保持调用方可依赖的稳定返回语义。"""
+
     row = session.execute(select(outbox_events).where(outbox_events.c.event_id == event_id)).one()
     return _event_from_row(row)
 

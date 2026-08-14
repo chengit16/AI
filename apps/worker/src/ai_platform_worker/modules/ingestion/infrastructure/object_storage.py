@@ -1,3 +1,5 @@
+"""按工作空间隔离对象键读取上传文件并写入确定性解析产物。"""
+
 from __future__ import annotations
 
 from io import BytesIO

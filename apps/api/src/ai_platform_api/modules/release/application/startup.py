@@ -1,3 +1,5 @@
+"""在应用开放服务前加载并验证完整发布组合。"""
+
 import json
 from pathlib import Path
 

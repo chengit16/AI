@@ -1,3 +1,5 @@
+"""实现文件名、扩展名、媒体类型、签名和安全扫描失败关闭策略。"""
+
 from __future__ import annotations
 
 import hashlib

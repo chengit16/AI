@@ -1,3 +1,5 @@
+"""验证 P0-10 PostgreSQL 流式事件并发与断点回放。"""
+
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass

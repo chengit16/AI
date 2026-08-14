@@ -1,3 +1,5 @@
+"""编排文档上传安全校验、对象写入和入库任务创建事务。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -34,39 +36,57 @@ from ai_platform_api.modules.knowledge.domain.uploads import (
 
 
 class UploadEmptyFileError(PlatformError):
+    """表示上传空文件错误，由协议层映射为稳定错误码。"""
+
     error_code = "UPLOAD_EMPTY_FILE"
 
 
 class UploadFileTooLargeError(PlatformError):
+    """表示上传文件过大型错误，由协议层映射为稳定错误码。"""
+
     error_code = "UPLOAD_FILE_TOO_LARGE"
 
 
 class UploadUnsupportedFormatError(PlatformError):
+    """表示上传不支持格式错误，由协议层映射为稳定错误码。"""
+
     error_code = "UPLOAD_UNSUPPORTED_FORMAT"
 
 
 class UploadTypeMismatchError(PlatformError):
+    """表示上传类型不匹配错误，由协议层映射为稳定错误码。"""
+
     error_code = "UPLOAD_TYPE_MISMATCH"
 
 
 class UploadUnsafeFileError(PlatformError):
+    """表示上传不安全文件错误，由协议层映射为稳定错误码。"""
+
     error_code = "UPLOAD_UNSAFE_FILE"
 
 
 class UploadSecurityUnavailableError(PlatformError):
+    """表示上传安全不可用错误，由协议层映射为稳定错误码。"""
+
     error_code = "UPLOAD_SCANNER_UNAVAILABLE"
 
 
 class UploadStorageUnavailableError(PlatformError):
+    """表示上传存储不可用错误，由协议层映射为稳定错误码。"""
+
     error_code = "OBJECT_STORAGE_UNAVAILABLE"
 
 
 class UploadValidationError(PlatformError):
+    """表示上传校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"
 
 
 @dataclass(frozen=True)
 class UploadedDocument:
+    """返回新文档、首版、来源和已验证的上传摘要。"""
+
     document: Document
     document_version: DocumentVersion
     source: DocumentSource
@@ -77,6 +97,8 @@ class UploadedDocument:
 
 @dataclass(frozen=True)
 class UploadedDocumentVersion:
+    """返回新文档版本、来源和已验证的上传摘要。"""
+
     document_version: DocumentVersion
     source: DocumentSource
     media_type: str
@@ -113,13 +135,18 @@ class KnowledgeUploadService:
         security_level: SecurityLevel | None,
         permission_labels: frozenset[str],
     ) -> UploadedDocument:
+        """先检查文件类型、大小、摘要和恶意内容，再原子创建文档与入库任务。"""
+
+        # 1. 在读取和存储文件前确认调用者确实有权向目标知识库上传。
         self._facts.require_upload_target(
             context,
             knowledge_base_id=knowledge_base_id,
         )
+        # 2. 检查真实类型、计算摘要并完成恶意扫描后，才把对象写入工作空间路径。
         inspected, scan, location, scanned_at = self._store_clean_upload(
             context, file_name, declared_media_type, content
         )
+        # 3. 数据库事实写入失败时补偿删除对象，成功后对象由文档来源事实接管。
         try:
             document, version, source = self._facts.create_document(
                 context,
@@ -161,14 +188,19 @@ class KnowledgeUploadService:
         declared_media_type: str | None,
         content: bytes,
     ) -> UploadedDocumentVersion:
+        """为既有文档安全上传新版本，失败时清理尚未提交的对象。"""
+
+        # 1. 先授权目标文档，避免无权请求借扫描和存储消耗资源。
         self._facts.require_upload_target(
             context,
             knowledge_base_id=knowledge_base_id,
             document_id=document_id,
         )
+        # 2. 安全检查通过后存储对象，再创建尚未发布的新版本事实。
         inspected, scan, location, scanned_at = self._store_clean_upload(
             context, file_name, declared_media_type, content
         )
+        # 3. 版本事务失败时补偿对象；补偿失败由生命周期任务清理且不覆盖根因。
         try:
             version, source = self._facts.create_document_version(
                 context,
@@ -202,6 +234,7 @@ class KnowledgeUploadService:
         declared_media_type: str | None,
         content: bytes,
     ) -> tuple[InspectedUpload, ScanResult, WorkspaceObject, datetime]:
+        # 1. 文件检查负责名称、真实媒体类型、大小和摘要；扫描器只接收检查后的事实。
         try:
             inspected = self._inspector.inspect(
                 file_name=file_name,
@@ -210,6 +243,7 @@ class KnowledgeUploadService:
             )
             scan = self._scanner.scan(inspected)
             scan.assert_clean()
+            # 2. 只有扫描为 clean 的文件才能生成工作空间对象键并进入存储。
             location = WorkspaceObject(
                 context.workspace_id,
                 _object_key(context.workspace_id, inspected.safe_file_name),

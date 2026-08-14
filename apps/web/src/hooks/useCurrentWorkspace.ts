@@ -1,4 +1,4 @@
-/** 当前工作空间查询 Hook，复用空间清单缓存解析选中空间。 */
+/** @description 当前工作空间查询 Hook，复用空间清单缓存解析选中空间。 */
 import { useQuery } from "@tanstack/react-query";
 
 import { getWorkspaces } from "@/api/services/workspaces";

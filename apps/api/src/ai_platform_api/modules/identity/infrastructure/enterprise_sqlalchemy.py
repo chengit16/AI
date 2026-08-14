@@ -1,3 +1,5 @@
+"""实现企业空间和成员生命周期聚合的 PostgreSQL 事务边界。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -51,6 +53,8 @@ SessionFactory = Callable[[], Session]
 
 
 class SqlAlchemyEnterpriseRepository:
+    """在企业空间隔离下维护空间、成员、邀请和成员额度读取。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 

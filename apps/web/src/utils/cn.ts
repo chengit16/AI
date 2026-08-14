@@ -1,3 +1,7 @@
+/**
+ * @description 静态 UnoCSS 类名合并工具
+ * 仅组合完整候选类名，禁止通过本工具生成运行时动态 Utility。
+ */
 import { clsx, type ClassValue } from "clsx";
 
 /**

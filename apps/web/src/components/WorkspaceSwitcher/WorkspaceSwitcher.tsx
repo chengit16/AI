@@ -1,3 +1,7 @@
+/**
+ * @description 当前工作空间切换器
+ * 切换后统一失效查询缓存；选项展示不替代服务端成员资格检查。
+ */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Form, Input, Modal, Select, Tooltip } from "antd";
 import { Building2, Plus, UserRound } from "lucide-react";

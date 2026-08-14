@@ -1,3 +1,5 @@
+"""验证套餐权益、功能开关和用量接口授权。"""
+
 from datetime import datetime
 from pathlib import Path
 from typing import cast

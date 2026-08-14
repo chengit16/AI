@@ -1,3 +1,5 @@
+"""实现入库任务租约、状态机和有限重试的 PostgreSQL Store。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta

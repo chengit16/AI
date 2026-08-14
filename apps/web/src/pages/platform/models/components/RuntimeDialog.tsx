@@ -1,3 +1,4 @@
+/** @description 不可变 AI 运行配置版本的创建弹窗。 */
 import { Button, Collapse, Form, Input, InputNumber, Modal, Select } from "antd";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -17,10 +18,15 @@ interface RuntimeFormValues {
 }
 
 interface RuntimeDialogProps {
+  /** 是否显示运行配置创建弹窗。 */
   open: boolean;
+  /** 可作为运行路由目标的供应商治理视图。 */
   providers: readonly ModelProvider[];
+  /** 创建请求是否正在提交。 */
   isSubmitting: boolean;
+  /** 关闭弹窗但不创建版本。 */
   onClose: () => void;
+  /** 提交完整运行配置快照；服务端会冻结版本与 Hash。 */
   onCreate: (values: CreateAiRuntimeConfigRequest) => Promise<unknown>;
 }
 

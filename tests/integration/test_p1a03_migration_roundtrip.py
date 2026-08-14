@@ -1,3 +1,5 @@
+"""验证阶段 1 Migration 从空库升级、逐步降级和再次升级。"""
+
 import os
 from collections.abc import Iterator
 from pathlib import Path

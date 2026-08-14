@@ -1,3 +1,5 @@
+"""定义认证与注册用例可稳定映射的错误语义。"""
+
 from ai_platform_api.common.errors import PlatformError
 
 

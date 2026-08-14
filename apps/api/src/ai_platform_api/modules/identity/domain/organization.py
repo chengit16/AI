@@ -1,3 +1,5 @@
+"""定义多级部门、岗位、成员归属和闭包重建领域规则。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -18,6 +20,8 @@ OrganizationStatus = Literal["active", "disabled"]
 
 @dataclass(frozen=True)
 class Department:
+    """表示企业空间部门节点及其父子关系和并发版本。"""
+
     department_id: UUID
     workspace_id: UUID
     parent_department_id: UUID | None
@@ -60,6 +64,8 @@ class Department:
 
 @dataclass(frozen=True)
 class DepartmentClosure:
+    """保存部门祖先到后代的闭包关系和层级距离。"""
+
     ancestor_department_id: UUID
     descendant_department_id: UUID
     depth: int
@@ -67,6 +73,8 @@ class DepartmentClosure:
 
 @dataclass(frozen=True)
 class DepartmentSummary:
+    """提供部门有效状态与树深度的稳定只读投影。"""
+
     department_id: UUID
     parent_department_id: UUID | None
     name: str
@@ -78,6 +86,8 @@ class DepartmentSummary:
 
 @dataclass(frozen=True)
 class Position:
+    """表示企业空间内归属于指定部门的可分配职位。"""
+
     position_id: UUID
     workspace_id: UUID
     department_id: UUID
@@ -110,6 +120,8 @@ class Position:
 
 @dataclass(frozen=True)
 class PositionSummary:
+    """提供职位状态、名称和有效状态的只读投影。"""
+
     position_id: UUID
     department_id: UUID
     name: str
@@ -120,6 +132,8 @@ class PositionSummary:
 
 @dataclass(frozen=True)
 class OrganizationAssignment:
+    """汇总成员的主部门、全部部门及职位归属。"""
+
     account_id: UUID
     department_ids: tuple[UUID, ...]
     primary_department_id: UUID | None
@@ -178,6 +192,8 @@ def build_department_closure(
 def summarize_departments(
     departments: tuple[Department, ...],
 ) -> tuple[DepartmentSummary, ...]:
+    """结合闭包和祖先状态生成稳定排序的部门摘要。"""
+
     closures = build_department_closure(departments)
     by_id = {department.department_id: department for department in departments}
     ancestor_ids: dict[UUID, set[UUID]] = {
@@ -229,6 +245,8 @@ def active_descendant_ids(
 
 
 class OrganizationRepository(Protocol):
+    """在工作空间边界内维护组织树、职位和成员归属。"""
+
     def get_workspace(
         self, workspace_id: UUID, *, for_update: bool = False
     ) -> WorkspaceRecord | None: ...
@@ -284,6 +302,8 @@ class OrganizationRepository(Protocol):
 
 
 class OrganizationUnitOfWork(Protocol):
+    """保证组织变更、角色版本、审计与 Outbox 原子提交。"""
+
     @property
     def organization(self) -> OrganizationRepository: ...
 

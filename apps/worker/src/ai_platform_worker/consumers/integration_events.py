@@ -1,3 +1,5 @@
+"""注册 Outbox 发布、入库扫描、索引扫描和单事件幂等消费任务。"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -17,6 +19,8 @@ from ai_platform_worker.config import get_worker_settings
 
 @shared_task(name="platform.outbox.dispatch.v1", ignore_result=True)
 def dispatch_outbox() -> dict[str, int]:
+    """分发Outbox，遵守任务幂等、有限重试和提交时机约束。"""
+
     runtime = build_worker_runtime()
     try:
         result = runtime.dispatcher.dispatch_once()
@@ -32,6 +36,8 @@ def dispatch_outbox() -> dict[str, int]:
 
 @shared_task(name="platform.ingestion.process.v1", ignore_result=True)
 def process_ingestion_jobs() -> dict[str, int]:
+    """处理处理入库任务集合，遵守任务幂等、有限重试和提交时机约束。"""
+
     settings = get_worker_settings()
     runtime = build_worker_runtime(settings)
     try:
@@ -49,6 +55,8 @@ def process_ingestion_jobs() -> dict[str, int]:
 
 @shared_task(name="platform.indexing.process.v1", ignore_result=True)
 def process_index_versions() -> dict[str, int]:
+    """处理处理索引版本集合，遵守任务幂等、有限重试和提交时机约束。"""
+
     settings = get_worker_settings()
     runtime = build_worker_runtime(settings)
     try:
@@ -73,6 +81,8 @@ def process_index_versions() -> dict[str, int]:
     reject_on_worker_lost=True,
 )
 def consume_integration_event(self: Task, *, envelope: object) -> bool:
+    """处理消费集成事件，遵守任务幂等、有限重试和提交时机约束。"""
+
     settings = get_worker_settings()
     signer = HmacTaskEnvelopeSigner(SigningKeyFile(settings.task_signing_key_path).load())
     signed = signer.verify(envelope)

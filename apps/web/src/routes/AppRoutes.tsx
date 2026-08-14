@@ -1,3 +1,7 @@
+/**
+ * @description 应用路由注册与会话保护入口
+ * 动态菜单控制导航可见性，路由直访和接口访问仍分别执行体验保护与后端授权。
+ */
 import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { Skeleton } from "antd";
@@ -76,6 +80,7 @@ function RequirePlatformAdministrator({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** 注册登录、空间菜单保护和平台管理员保护后的完整路由树。 */
 export function AppRoutes() {
   return (
     <Suspense fallback={<Skeleton active paragraph={{ rows: 10 }} />}>

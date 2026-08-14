@@ -1,3 +1,5 @@
+"""定义字段敏感级别、出口白名单和默认拒绝投影规则。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -16,6 +18,8 @@ SECURITY_LEVEL_RANK: dict[SecurityLevel, int] = {
 
 @dataclass(frozen=True)
 class FieldRule:
+    """定义资源字段的敏感级别及允许进入响应、日志、检索和模型的出口。"""
+
     resource_type: str
     field_name: str
     security_level: SecurityLevel
@@ -24,6 +28,8 @@ class FieldRule:
 
 @dataclass(frozen=True)
 class FieldPolicyRegistry:
+    """按资源类型索引字段规则，未注册字段在投影时默认拒绝。"""
+
     schema_version: int
     registry_version: int
     rules: tuple[FieldRule, ...]

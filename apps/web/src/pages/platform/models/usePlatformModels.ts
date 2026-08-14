@@ -1,3 +1,7 @@
+/**
+ * @description 平台模型治理业务 Hook
+ * 组合供应商和运行配置 Query/Mutation，并集中维护跨列表缓存刷新。
+ */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
@@ -19,6 +23,12 @@ import {
 } from "@/api/services/platformModels";
 import { usePlatformAdministration } from "@/hooks/usePlatformAdministration";
 
+/**
+ * 返回模型供应商和运行配置的查询、写操作及统一加载状态。
+ *
+ * 供应商变化只刷新供应商治理视图；运行配置创建或发布会同时刷新版本清单和当前指针，
+ * 防止页面显示已发布版本与详情列表不一致。
+ */
 export function usePlatformModels() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -33,8 +43,10 @@ export function usePlatformModels() {
     queryFn: ({ signal }) => getCurrentPlatformAiRuntimeConfig(signal),
     retry: false,
   });
+  // 供应商命令都会改变治理状态或凭证版本，因此成功后统一刷新脱敏列表。
   const invalidateProviders = () =>
     queryClient.invalidateQueries({ queryKey: ["platform-model-providers"] });
+  // 运行配置写操作同时影响版本清单和当前指针，两份缓存必须作为同一展示事实刷新。
   const invalidateRuntime = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ["platform-ai-runtime-configs"] }),

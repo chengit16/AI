@@ -1,3 +1,5 @@
+"""定义知识生产接口的范围化请求与响应 Schema。"""
+
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -6,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CreateKnowledgeBaseRequest(BaseModel):
+    """定义创建知识库操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=120)
@@ -16,6 +20,8 @@ class CreateKnowledgeBaseRequest(BaseModel):
 
 
 class KnowledgeBaseResponse(BaseModel):
+    """定义知识库操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     knowledge_base_id: UUID
@@ -34,6 +40,8 @@ class KnowledgeBaseResponse(BaseModel):
 
 
 class KnowledgeBaseSummaryResponse(BaseModel):
+    """定义知识库摘要操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     knowledge_base_id: UUID
@@ -45,12 +53,16 @@ class KnowledgeBaseSummaryResponse(BaseModel):
 
 
 class KnowledgeBaseListResponse(BaseModel):
+    """定义知识库列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[KnowledgeBaseSummaryResponse]
 
 
 class DocumentSourceRequest(BaseModel):
+    """定义文档来源操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     source_kind: Literal["manual", "upload", "web", "data_source"]
@@ -75,6 +87,8 @@ class DocumentSourceRequest(BaseModel):
 
 
 class CreateDocumentRequest(DocumentSourceRequest):
+    """定义创建文档操作的请求字段与协议校验边界。"""
+
     title: str = Field(min_length=1, max_length=255)
     visibility: Literal["private", "workspace", "departments"] | None = None
     department_ids: list[UUID] | None = Field(default=None, max_length=100)
@@ -83,16 +97,22 @@ class CreateDocumentRequest(DocumentSourceRequest):
 
 
 class CreateDocumentVersionRequest(DocumentSourceRequest):
+    """定义创建文档版本操作的请求字段与协议校验边界。"""
+
     pass
 
 
 class MarkDocumentVersionReadyRequest(BaseModel):
+    """定义标记文档版本就绪操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class DocumentResponse(BaseModel):
+    """定义文档操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     document_id: UUID
@@ -112,6 +132,8 @@ class DocumentResponse(BaseModel):
 
 
 class DocumentVersionResponse(BaseModel):
+    """定义文档版本操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     document_version_id: UUID
@@ -127,6 +149,8 @@ class DocumentVersionResponse(BaseModel):
 
 
 class KnowledgeDocumentSummaryResponse(BaseModel):
+    """定义知识文档摘要操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     document_id: UUID
@@ -142,12 +166,16 @@ class KnowledgeDocumentSummaryResponse(BaseModel):
 
 
 class KnowledgeDocumentListResponse(BaseModel):
+    """定义知识文档列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[KnowledgeDocumentSummaryResponse]
 
 
 class IngestionJobResponse(BaseModel):
+    """定义入库任务操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     ingestion_job_id: UUID
@@ -179,12 +207,16 @@ class IngestionJobResponse(BaseModel):
 
 
 class IngestionJobListResponse(BaseModel):
+    """定义入库任务列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[IngestionJobResponse]
 
 
 class DocumentSourceResponse(BaseModel):
+    """定义文档来源操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     source_id: UUID
@@ -195,6 +227,8 @@ class DocumentSourceResponse(BaseModel):
 
 
 class DocumentCreatedResponse(BaseModel):
+    """定义文档已创建操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     document: DocumentResponse
@@ -203,6 +237,8 @@ class DocumentCreatedResponse(BaseModel):
 
 
 class DocumentVersionCreatedResponse(BaseModel):
+    """定义文档版本已创建操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     document_version: DocumentVersionResponse
@@ -210,6 +246,8 @@ class DocumentVersionCreatedResponse(BaseModel):
 
 
 class UploadMetadataResponse(BaseModel):
+    """定义上传元数据操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     media_type: str
@@ -219,8 +257,12 @@ class UploadMetadataResponse(BaseModel):
 
 
 class DocumentUploadResponse(DocumentCreatedResponse):
+    """定义文档上传操作的稳定响应结构。"""
+
     upload: UploadMetadataResponse
 
 
 class DocumentVersionUploadResponse(DocumentVersionCreatedResponse):
+    """定义文档版本上传操作的稳定响应结构。"""
+
     upload: UploadMetadataResponse

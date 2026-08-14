@@ -1,3 +1,5 @@
+"""定义角色配置、绑定和继承计算用例的稳定错误语义。"""
+
 from ai_platform_api.common.errors import PlatformError
 
 
@@ -14,8 +16,12 @@ class RoleConflictError(PlatformError):
 
 
 class RoleNotFoundError(PlatformError):
+    """表示角色未找到错误，由协议层映射为稳定错误码。"""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
 class RoleValidationError(PlatformError):
+    """表示角色校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"

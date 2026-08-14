@@ -1,3 +1,5 @@
+"""编排不可变 AI 运行配置版本创建、查询和原子发布事务。"""
+
 from __future__ import annotations
 
 import hashlib
@@ -48,6 +50,8 @@ class AiRuntimeConfigurationService:
     def list_configurations(
         self, context: PlatformRequestContext
     ) -> tuple[AiRuntimeConfigVersion, ...]:
+        """仅向平台管理员列出不可变运行配置版本。"""
+
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
             return unit_of_work.runtime_configs.list_configurations()
@@ -55,6 +59,8 @@ class AiRuntimeConfigurationService:
     def current_configuration(
         self, context: PlatformRequestContext
     ) -> AiRuntimeConfigVersion | None:
+        """读取当前发布指针及完整运行快照，未发布时返回明确空状态。"""
+
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
             publication = unit_of_work.runtime_configs.get_current_publication()
@@ -74,6 +80,9 @@ class AiRuntimeConfigurationService:
         policy: GatewayPolicy,
         routes: tuple[RuntimeRouteDraft, ...],
     ) -> AiRuntimeConfigVersion:
+        """冻结供应商版本、模型路由、系统提示词和组件版本为不可变配置。"""
+
+        # 1. 在事务外校验配置结构和版本字符串，减少持锁时间。
         normalized_name = display_name.strip()
         normalized_prompt = system_prompt_template.strip()
         self._validate_snapshot(normalized_name, normalized_prompt, components, policy, routes)
@@ -82,6 +91,7 @@ class AiRuntimeConfigurationService:
 
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
+            # 2. 逐条解析活动供应商并冻结其配置版本、位置、能力和成本。
             snapshots: list[RuntimeRouteSnapshot] = []
             for route in sorted(routes, key=lambda item: item.priority):
                 provider = unit_of_work.runtime_configs.get_provider_configuration(
@@ -111,6 +121,7 @@ class AiRuntimeConfigurationService:
                     )
                 )
 
+            # 3. 对完整内容计算摘要并写入新版本，后续发布只移动指针不修改快照。
             version_number = unit_of_work.runtime_configs.next_version_number()
             system_prompt_hash = hashlib.sha256(normalized_prompt.encode()).hexdigest()
             configuration = AiRuntimeConfigVersion(
@@ -132,6 +143,7 @@ class AiRuntimeConfigurationService:
                 created_by_account_id=context.account_id,
                 created_at=now,
             )
+            # 4. 配置版本和平台审计同事务提交。
             unit_of_work.runtime_configs.add_configuration(configuration)
             unit_of_work.audit.add(
                 account_id=context.account_id,
@@ -154,6 +166,9 @@ class AiRuntimeConfigurationService:
         context: PlatformRequestContext,
         runtime_config_version_id: UUID,
     ) -> AiRuntimeConfigPublication:
+        """校验所有路由供应商可用后原子切换发布指针并递增代次。"""
+
+        # 1. 锁定目标配置和当前发布指针，重复发布同一版本按幂等返回。
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
@@ -169,12 +184,14 @@ class AiRuntimeConfigurationService:
                 and current.runtime_config_version_id == runtime_config_version_id
             ):
                 return current
+            # 2. 发布代次单调递增，作为进程内外缓存失效的稳定版本。
             publication = AiRuntimeConfigPublication(
                 runtime_config_version_id=runtime_config_version_id,
                 generation=(current.generation + 1) if current is not None else 1,
                 published_by_account_id=context.account_id,
                 published_at=now,
             )
+            # 3. 当前指针和平台审计同事务提交，调用路径不会看到无审计的配置切换。
             unit_of_work.runtime_configs.publish(publication)
             unit_of_work.audit.add(
                 account_id=context.account_id,
@@ -209,6 +226,7 @@ class AiRuntimeConfigurationService:
         policy: GatewayPolicy,
         routes: tuple[RuntimeRouteDraft, ...],
     ) -> None:
+        # 1. 校验全局结构、连续优先级、组件版本和网关安全上限。
         version_values = asdict(components).values()
         priorities = sorted(route.priority for route in routes)
         route_keys = {(route.provider_id, route.model_id.strip()) for route in routes}
@@ -235,6 +253,7 @@ class AiRuntimeConfigurationService:
             or policy.max_estimated_cost_microunits > 1_000_000_000_000
         ):
             raise AiRuntimeConfigInvalidError
+        # 2. 每条路由必须具备生成能力、合法模型标识和非负且有上限的成本。
         for route in routes:
             if (
                 route.priority < 1

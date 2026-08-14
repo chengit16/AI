@@ -1,3 +1,5 @@
+"""编排索引版本认领、证据构建、Embedding、原子切换和失败回写。"""
+
 from __future__ import annotations
 
 import hashlib
@@ -35,6 +37,8 @@ from ai_platform_worker.modules.ingestion.domain.documents import (
 
 @dataclass(frozen=True)
 class IndexBatchResult:
+    """汇总一次索引领取批次的成功、重试、失败和跳过数量。"""
+
     enqueued: int = 0
     claimed: int = 0
     succeeded: int = 0

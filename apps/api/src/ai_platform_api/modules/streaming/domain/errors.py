@@ -1,3 +1,5 @@
+"""定义流式并发、游标、过期、预算和终态写入错误。"""
+
 from ai_platform_api.common.errors import PlatformError
 
 

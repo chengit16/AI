@@ -1,3 +1,5 @@
+"""验证 P1B-01 账号与默认个人空间注册原子性。"""
+
 from __future__ import annotations
 
 import os

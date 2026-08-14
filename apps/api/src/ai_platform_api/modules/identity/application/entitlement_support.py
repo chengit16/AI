@@ -1,3 +1,5 @@
+"""提供权益用例共享的可信主体、空间和审计事件构造规则。"""
+
 from __future__ import annotations
 
 import re
@@ -33,6 +35,8 @@ IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 
 
 def browser_account(context: RequestContext, workspace_id: UUID) -> UUID:
+    """从当前工作空间浏览器会话取得账号，拒绝 API Key 和跨空间上下文。"""
+
     if (
         context.user_id is None
         or context.authentication_method != "browser_session"
@@ -43,6 +47,8 @@ def browser_account(context: RequestContext, workspace_id: UUID) -> UUID:
 
 
 def require_trusted_actor(context: RequestContext, workspace_id: UUID) -> None:
+    """校验调用者是当前空间可信账号或代表该账号签发的内部操作者。"""
+
     if context.workspace_id != workspace_id:
         raise EntitlementGovernanceDeniedError
 
@@ -58,6 +64,8 @@ def require_owner(
     WorkspaceEntitlement,
     WorkspaceFeatureSettings,
 ]:
+    """锁定并返回活动空间、所有者成员、套餐和功能设置。"""
+
     workspace = repository.get_workspace(workspace_id, for_update=True)
     membership = repository.get_membership(workspace_id, account_id, for_update=True)
     entitlement = repository.get_entitlement(workspace_id, for_update=True)
@@ -79,6 +87,8 @@ def workspace_entitlement_version(
     repository: EntitlementRepository,
     workspace_id: UUID,
 ) -> int:
+    """读取空间权益版本，不存在时关闭权益相关业务入口。"""
+
     version = repository.get_entitlement_version(workspace_id)
     if version is None:
         raise EntitlementNotFoundError
@@ -86,10 +96,14 @@ def workspace_entitlement_version(
 
 
 def month_key(value: datetime) -> str:
+    """把 UTC 时间转换为月度配额使用的 `YYYY-MM` 周期键。"""
+
     return value.astimezone(UTC).strftime("%Y-%m")
 
 
 def period_key(metric: UsageMetric, occurred_at: datetime) -> str:
+    """为月度指标返回月份键，为非周期指标返回固定累计键。"""
+
     if metric in LIFETIME_METRICS:
         return "lifetime"
     month = month_key(occurred_at)
@@ -108,6 +122,8 @@ def entitlement_snapshot(
     member_count: int,
     current_month: str,
 ) -> EntitlementSnapshot:
+    """合并套餐、功能开关和用量计数，生成调用方可直接执行的额度快照。"""
+
     counter_by_key = {(item.metric, item.period_key): item.used_value for item in counters}
     quotas = (
         QuotaSnapshot("members", "lifetime", member_count, entitlement.max_members),
@@ -160,6 +176,8 @@ def entitlement_facts(
     occurred_at: datetime,
     payload: dict[str, object],
 ) -> tuple[IntegrationEvent, AuditRecord]:
+    """为权益变化生成共享请求与追踪上下文的事件和审计记录。"""
+
     return (
         IntegrationEvent(
             event_id=uuid4(),

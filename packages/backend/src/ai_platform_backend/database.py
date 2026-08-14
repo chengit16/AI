@@ -1,3 +1,5 @@
+"""提供 API 与 Worker 共用的 SQLAlchemy 引擎和 Session 工厂。"""
+
 from dataclasses import dataclass
 
 from sqlalchemy import Engine, create_engine
@@ -7,11 +9,15 @@ SCHEMA_TOKEN = "ai_platform"
 
 
 def create_platform_engine(database_url: str, schema: str = "public") -> Engine:
+    """创建平台引擎，并保持调用方可依赖的稳定返回语义。"""
+
     engine = create_engine(database_url, pool_pre_ping=True)
     return engine.execution_options(schema_translate_map={SCHEMA_TOKEN: schema})
 
 
 def create_session_factory(engine: Engine) -> sessionmaker[Session]:
+    """创建会话工厂，并保持调用方可依赖的稳定返回语义。"""
+
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

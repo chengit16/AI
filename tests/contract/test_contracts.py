@@ -1,3 +1,5 @@
+"""验证 OpenAPI、SSE、事件、错误码和领域契约 Fixture。"""
+
 import json
 from pathlib import Path
 from typing import Any, cast

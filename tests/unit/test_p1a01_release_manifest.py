@@ -1,3 +1,5 @@
+"""验证 P1A-01 发布清单确定性和组件兼容矩阵。"""
+
 from dataclasses import replace
 from pathlib import Path
 

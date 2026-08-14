@@ -1,3 +1,5 @@
+"""实现运行配置版本、发布指针和模型调用记录的 PostgreSQL Adapter。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -53,6 +55,8 @@ SessionFactory = Callable[[], Session]
 
 
 class SqlAlchemyRuntimeConfigurationRepository:
+    """维护平台级不可变运行配置版本和唯一当前发布指针。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
         self._providers = SqlAlchemyModelProviderRepository(session)
@@ -261,6 +265,8 @@ class SqlAlchemyRuntimeConfigurationUnitOfWork(RuntimeConfigurationUnitOfWork):
 
 
 class SqlAlchemyRuntimeConfigurationReader:
+    """读取当前运行快照和供应商凭据，并校验快照绑定的配置版本。"""
+
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
 

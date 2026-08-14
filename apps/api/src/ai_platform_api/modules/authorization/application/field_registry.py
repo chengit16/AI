@@ -1,3 +1,5 @@
+"""从冻结资源契约构建字段策略注册表并拒绝不一致配置。"""
+
 from __future__ import annotations
 
 import json
@@ -12,6 +14,8 @@ from ai_platform_api.modules.authorization.domain.fields import (
 
 
 def load_field_policy_registry(path: Path) -> FieldPolicyRegistry:
+    """从版本化配置加载字段策略注册表，配置不合法时启动失败。"""
+
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:

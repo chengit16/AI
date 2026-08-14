@@ -1,3 +1,5 @@
+"""定义可跨应用层和 HTTP 边界稳定映射的平台基础异常。"""
+
 from typing import ClassVar
 
 

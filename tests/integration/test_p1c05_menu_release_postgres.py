@@ -1,3 +1,5 @@
+"""验证 P1C-05 菜单发布快照、审批、回滚和并发。"""
+
 from __future__ import annotations
 
 import os

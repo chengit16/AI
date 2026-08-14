@@ -1,3 +1,5 @@
+"""使用 Argon2id 实现密码哈希与验证，不暴露原始凭证。"""
+
 from __future__ import annotations
 
 import hashlib

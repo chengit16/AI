@@ -1,3 +1,5 @@
+"""映射账号注册、登录、退出和工作空间切换 HTTP 协议。"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -40,6 +42,8 @@ def register(
     response: Response,
     service: Annotated[RegistrationService, Depends(registration_service)],
 ) -> RegistrationResponse:
+    """注册；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     state = request.scope.get("state", {})
     request_id = state.get("request_id")
     trace = state.get("trace_context")
@@ -71,6 +75,8 @@ def login(
     service: Annotated[AuthenticationService, Depends(authentication_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> LoginResponse:
+    """登录；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     result = service.login(
         body.login_name,
         body.password.get_secret_value(),
@@ -105,6 +111,8 @@ def logout(
     service: Annotated[AuthenticationService, Depends(authentication_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> LogoutResponse:
+    """退出登录；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     session_token = request.cookies.get("ai_platform_session")
     if session_token is None:
         raise AuthenticationRequiredError
@@ -130,6 +138,8 @@ def logout(
 def get_authentication_context(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
 ) -> AuthenticationContextResponse:
+    """获取认证上下文；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return AuthenticationContextResponse(
         request_id=context.request_id,
         trace_id=context.trace.trace_id,

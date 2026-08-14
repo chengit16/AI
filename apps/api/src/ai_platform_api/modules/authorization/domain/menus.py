@@ -1,3 +1,5 @@
+"""定义菜单配置、角色可见性和不可变发布快照领域模型。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -18,6 +20,8 @@ from ai_platform_api.modules.authorization.domain.resources import (
 
 @dataclass(frozen=True)
 class WorkspaceMenuOverride:
+    """记录工作空间对注册菜单名称、层级、排序和可见性的覆盖值。"""
+
     workspace_id: UUID
     menu_id: UUID
     parent_menu_id: UUID | None
@@ -30,6 +34,8 @@ class WorkspaceMenuOverride:
 
 @dataclass(frozen=True)
 class RoleMenuVisibility:
+    """记录角色对单个菜单的显式可见性，不替代接口权限判定。"""
+
     workspace_id: UUID
     role_id: UUID
     menu_id: UUID
@@ -38,6 +44,8 @@ class RoleMenuVisibility:
 
 @dataclass(frozen=True)
 class MenuConfiguration:
+    """汇总工作空间当前菜单版本及其全部覆盖配置。"""
+
     workspace_id: UUID
     menu_version: int
     overrides: tuple[WorkspaceMenuOverride, ...]
@@ -49,6 +57,8 @@ MenuReleaseKind = Literal["standard", "rollback"]
 
 @dataclass(frozen=True)
 class MenuSnapshotItem:
+    """冻结发布时单个菜单及其页面、权限和展示属性。"""
+
     menu_id: UUID
     menu_key: str
     parent_menu_id: UUID | None
@@ -65,6 +75,8 @@ class MenuSnapshotItem:
 
 @dataclass(frozen=True)
 class MenuReleaseSnapshot:
+    """冻结一次菜单发布所依赖的注册表、角色可见性和接口绑定。"""
+
     schema_version: int
     registry_version: int
     workspace_id: UUID
@@ -76,6 +88,8 @@ class MenuReleaseSnapshot:
 
 @dataclass(frozen=True)
 class MenuRelease:
+    """承载菜单草稿校验、审批和发布状态的不可变聚合。"""
+
     release_id: UUID
     workspace_id: UUID
     release_number: int
@@ -154,6 +168,8 @@ class MenuConfigurationWriteConflictError(Exception):
 
 
 class MenuConfigurationRepository(Protocol):
+    """在工作空间边界内整体读取和替换菜单配置。"""
+
     def get_workspace_access(
         self,
         workspace_id: UUID,
@@ -217,6 +233,8 @@ class MenuReleaseRepository(MenuConfigurationRepository, Protocol):
 
 
 class MenuConfigurationUnitOfWork(Protocol):
+    """保证菜单配置、审计和 Outbox 在同一事务内提交。"""
+
     @property
     def menus(self) -> MenuConfigurationRepository: ...
 
@@ -239,6 +257,8 @@ class MenuConfigurationUnitOfWork(Protocol):
 
 
 class MenuReleaseUnitOfWork(Protocol):
+    """保证菜单发布历史、当前指针、审计和 Outbox 原子提交。"""
+
     @property
     def menus(self) -> MenuReleaseRepository: ...
 

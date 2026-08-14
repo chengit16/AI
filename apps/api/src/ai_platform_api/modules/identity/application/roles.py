@@ -1,3 +1,5 @@
+"""编排空间角色、角色绑定和确定性有效角色计算事务。"""
+
 from __future__ import annotations
 
 import re
@@ -65,6 +67,9 @@ class RoleService:
         role_key: str,
         name: str,
     ) -> Role:
+        """校验企业所有者和角色键唯一性后创建自定义角色并递增版本。"""
+
+        # 1. 先规范化角色键和名称，保留数据库唯一约束关闭并发竞态。
         account_id = browser_account(context, workspace_id)
         normalized_key = role_key.strip().casefold()
         if ROLE_KEY_PATTERN.fullmatch(normalized_key) is None:
@@ -90,6 +95,7 @@ class RoleService:
                     for item in existing
                 ):
                     raise RoleConflictError
+                # 2. 角色创建与版本递增属于同一授权事实，缓存只按新版本读取。
                 role_version = next_role_version(unit_of_work.roles, workspace_id)
                 event, audit = role_facts(
                     context=context,
@@ -103,6 +109,7 @@ class RoleService:
                     role_version=role_version,
                     attributes={"role_key": role.role_key},
                 )
+                # 3. 角色、审计和 Outbox 原子提交，避免策略侧提前看到版本事件。
                 unit_of_work.roles.add_role(role)
                 unit_of_work.audit.add(audit)
                 unit_of_work.outbox.add(event)
@@ -119,6 +126,9 @@ class RoleService:
         role_id: UUID,
         active: bool,
     ) -> Role:
+        """启停自定义角色；系统角色不可修改，版本变化使缓存自然失效。"""
+
+        # 1. 锁定角色并由领域状态机拒绝系统角色和重复状态转换。
         account_id = browser_account(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -133,6 +143,7 @@ class RoleService:
                     if active
                     else current.disable(occurred_at=now)
                 )
+                # 2. 状态变化必须同步递增角色版本，使有效角色缓存自然失效。
                 role_version = next_role_version(unit_of_work.roles, workspace_id)
                 event, audit = role_facts(
                     context=context,
@@ -146,6 +157,7 @@ class RoleService:
                     role_version=role_version,
                     attributes={"previous_status": current.status},
                 )
+                # 3. 角色、审计和事件同事务提交，策略决策不会观察到混合版本。
                 unit_of_work.roles.save_role(updated)
                 unit_of_work.audit.add(audit)
                 unit_of_work.outbox.add(event)
@@ -155,6 +167,8 @@ class RoleService:
         return updated
 
     def list_roles(self, context: RequestContext, *, workspace_id: UUID) -> tuple[Role, ...]:
+        """在空间访问校验后返回系统角色和自定义角色。"""
+
         account_id = browser_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
             require_owner(unit_of_work.roles, workspace_id, account_id)
@@ -170,6 +184,9 @@ class RoleService:
         department_id: UUID | None,
         target_account_id: UUID | None,
     ) -> RoleBinding:
+        """把角色绑定到空间、部门或成员，作用域字段必须与绑定类型严格一致。"""
+
+        # 1. 先校验所有者和目标角色，系统角色只能由确定性种子维护。
         account_id = browser_account(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -179,6 +196,7 @@ class RoleService:
                 role = find_role(roles, role_id)
                 if role.status != "active" or role.system_managed:
                     raise RoleConflictError
+                # 2. 按作用域类型验证部门或成员引用，并拒绝等价的活动绑定。
                 membership_id = self._validate_scope(
                     unit_of_work.roles,
                     workspace_id=workspace_id,
@@ -211,6 +229,7 @@ class RoleService:
                     None,
                     1,
                 )
+                # 3. 新绑定与角色版本同步变化，保证缓存键准确代表授权集合。
                 role_version = next_role_version(unit_of_work.roles, workspace_id)
                 event, audit = role_facts(
                     context=context,
@@ -227,6 +246,7 @@ class RoleService:
                         "scope_type": scope_type,
                     },
                 )
+                # 4. 绑定、审计和 Outbox 同事务提交。
                 unit_of_work.roles.add_binding(binding)
                 unit_of_work.audit.add(audit)
                 unit_of_work.outbox.add(event)
@@ -242,6 +262,9 @@ class RoleService:
         workspace_id: UUID,
         binding_id: UUID,
     ) -> RoleBinding:
+        """撤销指定角色绑定并递增角色版本，重复撤销按非法状态拒绝。"""
+
+        # 1. 锁定绑定及其角色，系统角色绑定不允许通过管理接口撤销。
         account_id = browser_account(context, workspace_id)
         now = datetime.now(UTC)
         try:
@@ -263,6 +286,7 @@ class RoleService:
                 )
                 if role.system_managed:
                     raise RoleConflictError
+                # 2. 领域状态机执行撤销并同步递增角色版本。
                 updated = current.revoke(occurred_at=now)
                 role_version = next_role_version(unit_of_work.roles, workspace_id)
                 event, audit = role_facts(
@@ -277,6 +301,7 @@ class RoleService:
                     role_version=role_version,
                     attributes={"role_id": str(current.role_id)},
                 )
+                # 3. 绑定终态、审计和 Outbox 同事务提交。
                 unit_of_work.roles.save_binding(updated)
                 unit_of_work.audit.add(audit)
                 unit_of_work.outbox.add(event)
@@ -292,6 +317,9 @@ class RoleService:
         workspace_id: UUID,
         target_account_id: UUID,
     ) -> EffectiveRoleSet:
+        """合并空间、有效部门祖先和成员直接绑定，并按角色版本缓存结果。"""
+
+        # 1. 校验请求者和目标成员；非所有者只能查询自己的有效角色。
         account_id = browser_account(context, workspace_id)
         with self._unit_of_work as unit_of_work:
             workspace = unit_of_work.roles.get_workspace(workspace_id)
@@ -310,10 +338,12 @@ class RoleService:
             role_version = unit_of_work.roles.get_role_version(workspace_id)
             if role_version is None:
                 raise RoleNotFoundError
+            # 2. 缓存键包含角色版本，任一角色或绑定变化都会自然绕过旧结果。
             if self._cache is not None:
                 cached = self._cache.get(workspace_id, target.membership_id, role_version)
                 if cached is not None:
                     return cached
+            # 3. 缓存未命中时合并空间、有效部门祖先和成员直接绑定。
             role_set = resolve_effective_roles(
                 membership=target,
                 role_version=role_version,
@@ -324,6 +354,7 @@ class RoleService:
                     workspace_id, target.membership_id
                 ),
             )
+        # 4. 事务外写入派生缓存，不影响角色事实的提交语义。
         if self._cache is not None:
             self._cache.put(role_set)
         return role_set

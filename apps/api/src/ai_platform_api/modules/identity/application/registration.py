@@ -1,3 +1,5 @@
+"""在单一事务中创建账号、默认个人空间、所有者关系、审计和事件。"""
+
 from __future__ import annotations
 
 import re
@@ -44,6 +46,9 @@ class RegistrationService:
         request_id: UUID,
         trace: TraceContext,
     ) -> RegistrationResult:
+        """创建账号、个人空间、所有者成员、系统角色和默认权益并原子提交。"""
+
+        # 1. 先规范化公开输入并完成冲突预检查，密码错误统一映射为注册校验失败。
         normalized_login = login_name.strip().casefold()
         normalized_display_name = display_name.strip()
         if (
@@ -59,6 +64,7 @@ class RegistrationService:
         except ValueError as error:
             raise RegistrationValidationError from error
 
+        # 2. 一次生成账号、默认个人空间和随事务发布的审计/事件事实。
         account_id = uuid4()
         workspace_id = uuid4()
         now = datetime.now(UTC)
@@ -102,6 +108,7 @@ class RegistrationService:
             traceparent=trace.traceparent,
             attributes={"workspace_type": "personal"},
         )
+        # 3. 所有注册事实在同一事务提交；数据库唯一约束负责关闭并发同名竞态。
         try:
             with self._unit_of_work:
                 self._unit_of_work.registrations.add(registration)

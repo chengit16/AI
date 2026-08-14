@@ -1,3 +1,5 @@
+"""验证 P1B-03 部门环、有效状态、岗位和成员归属规则。"""
+
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 

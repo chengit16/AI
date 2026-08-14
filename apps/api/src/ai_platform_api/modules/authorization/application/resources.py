@@ -1,3 +1,5 @@
+"""装载并校验页面、接口、菜单和权限码统一资源注册表。"""
+
 from __future__ import annotations
 
 import json
@@ -25,6 +27,8 @@ from ai_platform_api.modules.authorization.domain.resources import (
 
 
 def load_resource_registry(path: Path) -> ResourceRegistry:
+    """从版本化资源文件加载菜单、页面、接口和权限绑定。"""
+
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -33,6 +37,8 @@ def load_resource_registry(path: Path) -> ResourceRegistry:
 
 
 def resource_registry_from_dict(document: dict[str, object]) -> ResourceRegistry:
+    """将已解析配置转换为资源注册表并执行跨引用完整性校验。"""
+
     permissions = tuple(
         Permission(
             code=_string(item, "code", location),

@@ -1,3 +1,5 @@
+"""验证 P1B-01 注册输入、个人空间和并发冲突规则。"""
+
 from __future__ import annotations
 
 from types import TracebackType

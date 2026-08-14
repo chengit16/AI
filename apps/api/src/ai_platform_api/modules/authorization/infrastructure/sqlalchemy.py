@@ -1,3 +1,5 @@
+"""实现角色授权、主体解析和组织范围展开的 PostgreSQL Adapter。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -152,6 +154,8 @@ class SqlAlchemyPolicyGrantRepository:
 
 
 class SqlAlchemyRolePermissionRepository:
+    """在工作空间隔离下整体维护角色授权项和角色版本。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -254,6 +258,8 @@ class SqlAlchemyRolePermissionRepository:
 
 
 class SqlAlchemyRolePermissionUnitOfWork:
+    """保证角色权限、版本、审计和 Outbox 使用同一 Session 提交。"""
+
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
         self._state: ContextVar[

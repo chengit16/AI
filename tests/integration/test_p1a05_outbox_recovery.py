@@ -1,3 +1,5 @@
+"""验证 P1A-05 Outbox 租约、失败恢复和幂等投影。"""
+
 from __future__ import annotations
 
 import os

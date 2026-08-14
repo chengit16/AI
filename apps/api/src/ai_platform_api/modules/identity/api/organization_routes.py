@@ -1,3 +1,5 @@
+"""映射部门、岗位和成员组织归属管理 HTTP 协议。"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -77,6 +79,8 @@ def create_department(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> DepartmentResponse:
+    """创建部门；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _department_response(
         service.create_department(
             context,
@@ -98,6 +102,8 @@ def list_departments(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> DepartmentListResponse:
+    """列出部门集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return DepartmentListResponse(
         items=[
             _department_response(item)
@@ -119,6 +125,8 @@ def move_department(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> DepartmentResponse:
+    """移动部门；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _department_response(
         service.move_department(
             context,
@@ -142,6 +150,8 @@ def set_department_status(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> DepartmentResponse:
+    """设置部门状态；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _department_response(
         service.set_department_status(
             context,
@@ -165,6 +175,8 @@ def create_position(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> PositionResponse:
+    """创建职位；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _position_response(
         service.create_position(
             context,
@@ -186,6 +198,8 @@ def list_positions(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> PositionListResponse:
+    """列出职位集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return PositionListResponse(
         items=[
             _position_response(item)
@@ -207,6 +221,8 @@ def set_position_status(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> PositionResponse:
+    """设置职位状态；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _position_response(
         service.set_position_status(
             context,
@@ -230,6 +246,8 @@ def assign_member_organization(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> MemberOrganizationResponse:
+    """分配成员组织；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _assignment_response(
         service.assign_member(
             context,
@@ -254,6 +272,8 @@ def get_member_organization(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[OrganizationService, Depends(organization_service)],
 ) -> MemberOrganizationResponse:
+    """获取成员组织；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _assignment_response(
         service.get_assignment(
             context,

@@ -1,3 +1,5 @@
+"""使用 Valkey 缓存有效角色版本，并在授权事实变化后精确失效。"""
+
 from __future__ import annotations
 
 import json

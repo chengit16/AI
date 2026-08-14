@@ -1,3 +1,4 @@
+/** @description 应用级 Ant Design、TanStack Query 与错误边界 Provider 编排。 */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp, ConfigProvider } from "antd";
 import type { PropsWithChildren } from "react";
@@ -9,6 +10,7 @@ const queryClient = new QueryClient({
   },
 });
 
+/** 提供统一主题、全局消息上下文和共享 QueryClient。 */
 export function AppProviders({ children }: PropsWithChildren) {
   return (
     <ConfigProvider

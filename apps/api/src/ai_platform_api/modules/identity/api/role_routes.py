@@ -1,3 +1,5 @@
+"""映射空间角色、绑定和有效角色解释 HTTP 协议。"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -89,6 +91,8 @@ def create_role(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[RoleService, Depends(role_service)],
 ) -> RoleResponse:
+    """创建角色；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _role_response(
         service.create(
             context,
@@ -110,6 +114,8 @@ def list_roles(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[RoleService, Depends(role_service)],
 ) -> RoleListResponse:
+    """列出角色集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return RoleListResponse(
         items=[
             _role_response(role) for role in service.list_roles(context, workspace_id=workspace_id)
@@ -130,6 +136,8 @@ def set_role_status(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[RoleService, Depends(role_service)],
 ) -> RoleResponse:
+    """设置角色状态；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _role_response(
         service.set_status(
             context,
@@ -153,6 +161,8 @@ def bind_role(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[RoleService, Depends(role_service)],
 ) -> RoleBindingResponse:
+    """绑定角色；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _binding_response(
         service.bind(
             context,
@@ -177,6 +187,8 @@ def revoke_role_binding(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[RoleService, Depends(role_service)],
 ) -> RoleBindingResponse:
+    """撤销角色绑定；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _binding_response(
         service.revoke(
             context,
@@ -198,6 +210,8 @@ def get_effective_roles(
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[RoleService, Depends(role_service)],
 ) -> EffectiveRoleSetResponse:
+    """获取有效角色集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     return _effective_response(
         service.effective_roles(
             context,

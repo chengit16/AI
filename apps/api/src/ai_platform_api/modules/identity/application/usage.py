@@ -1,3 +1,5 @@
+"""在业务事务内执行套餐用量预留、确认和回滚。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

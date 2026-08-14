@@ -12,6 +12,7 @@
           "系统健康"
         ],
         "summary": "Get Liveness",
+        "description": "获取存活检查，并保持调用方可依赖的稳定返回语义。",
         "operationId": "getLiveness",
         "responses": {
           "200": {
@@ -43,6 +44,7 @@
           "系统健康"
         ],
         "summary": "Get Readiness",
+        "description": "获取就绪检查，并保持调用方可依赖的稳定返回语义。",
         "operationId": "getReadiness",
         "responses": {
           "200": {
@@ -84,6 +86,7 @@
           "身份认证"
         ],
         "summary": "Register",
+        "description": "注册；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "registerPersonalAccount",
         "requestBody": {
           "content": {
@@ -145,6 +148,7 @@
           "身份认证"
         ],
         "summary": "Login",
+        "description": "登录；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "loginWithPassword",
         "requestBody": {
           "content": {
@@ -206,6 +210,7 @@
           "身份认证"
         ],
         "summary": "Logout",
+        "description": "退出登录；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "logoutCurrentSession",
         "parameters": [
           {
@@ -327,6 +332,7 @@
           "身份认证"
         ],
         "summary": "Get Authentication Context",
+        "description": "获取认证上下文；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "getAuthenticationContext",
         "parameters": [
           {
@@ -448,6 +454,7 @@
           "工作空间"
         ],
         "summary": "Create Enterprise Workspace",
+        "description": "创建企业工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createEnterpriseWorkspace",
         "parameters": [
           {
@@ -589,6 +596,7 @@
           "工作空间"
         ],
         "summary": "List Workspaces",
+        "description": "列出工作空间集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listAccessibleWorkspaces",
         "parameters": [
           {
@@ -710,6 +718,7 @@
           "工作空间"
         ],
         "summary": "Invite Workspace Member",
+        "description": "处理邀请工作空间成员；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "inviteEnterpriseWorkspaceMember",
         "parameters": [
           {
@@ -871,6 +880,7 @@
           "工作空间"
         ],
         "summary": "Accept Workspace Invitation",
+        "description": "接受工作空间邀请；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "acceptEnterpriseWorkspaceInvitation",
         "parameters": [
           {
@@ -1022,6 +1032,7 @@
           "工作空间"
         ],
         "summary": "Switch Workspace",
+        "description": "切换工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "switchWorkspaceContext",
         "parameters": [
           {
@@ -1153,6 +1164,7 @@
           "工作空间"
         ],
         "summary": "Leave Workspace",
+        "description": "退出工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "leaveEnterpriseWorkspace",
         "parameters": [
           {
@@ -1304,6 +1316,7 @@
           "工作空间"
         ],
         "summary": "Disable Workspace Member",
+        "description": "停用工作空间成员；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "disableEnterpriseWorkspaceMember",
         "parameters": [
           {
@@ -1465,6 +1478,7 @@
           "工作空间"
         ],
         "summary": "List Workspace Members",
+        "description": "列出工作空间成员集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listEnterpriseWorkspaceMembers",
         "parameters": [
           {
@@ -1596,6 +1610,7 @@
           "工作空间套餐"
         ],
         "summary": "Get Entitlement",
+        "description": "获取权益；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "getWorkspaceEntitlement",
         "parameters": [
           {
@@ -1737,6 +1752,7 @@
           "工作空间套餐"
         ],
         "summary": "Set Open Api Feature",
+        "description": "设置开放API功能；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "setWorkspaceOpenApiFeature",
         "parameters": [
           {
@@ -1898,6 +1914,7 @@
           "企业组织"
         ],
         "summary": "Create Department",
+        "description": "创建部门；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createEnterpriseDepartment",
         "parameters": [
           {
@@ -2057,6 +2074,7 @@
           "企业组织"
         ],
         "summary": "List Departments",
+        "description": "列出部门集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listEnterpriseDepartments",
         "parameters": [
           {
@@ -2198,6 +2216,7 @@
           "企业组织"
         ],
         "summary": "Move Department",
+        "description": "移动部门；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "moveEnterpriseDepartment",
         "parameters": [
           {
@@ -2369,6 +2388,7 @@
           "企业组织"
         ],
         "summary": "Set Department Status",
+        "description": "设置部门状态；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "setEnterpriseDepartmentStatus",
         "parameters": [
           {
@@ -2540,6 +2560,7 @@
           "企业组织"
         ],
         "summary": "Create Position",
+        "description": "创建职位；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createEnterprisePosition",
         "parameters": [
           {
@@ -2699,6 +2720,7 @@
           "企业组织"
         ],
         "summary": "List Positions",
+        "description": "列出职位集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listEnterprisePositions",
         "parameters": [
           {
@@ -2840,6 +2862,7 @@
           "企业组织"
         ],
         "summary": "Set Position Status",
+        "description": "设置职位状态；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "setEnterprisePositionStatus",
         "parameters": [
           {
@@ -3011,6 +3034,7 @@
           "企业组织"
         ],
         "summary": "Assign Member Organization",
+        "description": "分配成员组织；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "assignEnterpriseMemberOrganization",
         "parameters": [
           {
@@ -3180,6 +3204,7 @@
           "企业组织"
         ],
         "summary": "Get Member Organization",
+        "description": "获取成员组织；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "getEnterpriseMemberOrganization",
         "parameters": [
           {
@@ -3341,6 +3366,7 @@
           "企业角色"
         ],
         "summary": "Create Role",
+        "description": "创建角色；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createEnterpriseRole",
         "parameters": [
           {
@@ -3500,6 +3526,7 @@
           "企业角色"
         ],
         "summary": "List Roles",
+        "description": "列出角色集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listEnterpriseRoles",
         "parameters": [
           {
@@ -3631,6 +3658,7 @@
           "企业角色"
         ],
         "summary": "Set Role Status",
+        "description": "设置角色状态；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "setEnterpriseRoleStatus",
         "parameters": [
           {
@@ -3802,6 +3830,7 @@
           "企业角色"
         ],
         "summary": "Bind Role",
+        "description": "绑定角色；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "bindEnterpriseRole",
         "parameters": [
           {
@@ -3963,6 +3992,7 @@
           "企业角色"
         ],
         "summary": "Revoke Role Binding",
+        "description": "撤销角色绑定；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "revokeEnterpriseRoleBinding",
         "parameters": [
           {
@@ -4124,6 +4154,7 @@
           "企业角色"
         ],
         "summary": "Get Effective Roles",
+        "description": "获取有效角色集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "getEffectiveEnterpriseRoles",
         "parameters": [
           {
@@ -4275,6 +4306,7 @@
           "角色权限"
         ],
         "summary": "List Role Permissions",
+        "description": "列出角色权限集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listEnterpriseRolePermissions",
         "parameters": [
           {
@@ -4424,6 +4456,7 @@
           "角色权限"
         ],
         "summary": "Replace Role Permissions",
+        "description": "整体替换角色权限集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "replaceEnterpriseRolePermissions",
         "parameters": [
           {
@@ -4595,6 +4628,7 @@
           "菜单权限"
         ],
         "summary": "Get Workspace Menu Configuration",
+        "description": "获取工作空间菜单配置；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "getWorkspaceMenuConfiguration",
         "parameters": [
           {
@@ -4744,6 +4778,7 @@
           "菜单权限"
         ],
         "summary": "Replace Workspace Menu Configuration",
+        "description": "整体替换工作空间菜单配置；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "replaceWorkspaceMenuConfiguration",
         "parameters": [
           {
@@ -4905,6 +4940,7 @@
           "菜单权限"
         ],
         "summary": "Get Role Menu Visibility",
+        "description": "获取角色菜单可见性；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "getRoleMenuVisibility",
         "parameters": [
           {
@@ -5064,6 +5100,7 @@
           "菜单权限"
         ],
         "summary": "Replace Role Menu Visibility",
+        "description": "整体替换角色菜单可见性；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "replaceRoleMenuVisibility",
         "parameters": [
           {
@@ -5235,6 +5272,7 @@
           "菜单权限"
         ],
         "summary": "Create Workspace Menu Release",
+        "description": "创建工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createWorkspaceMenuRelease",
         "parameters": [
           {
@@ -5384,6 +5422,7 @@
           "菜单权限"
         ],
         "summary": "List Workspace Menu Releases",
+        "description": "列出工作空间菜单发布记录；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listWorkspaceMenuReleases",
         "parameters": [
           {
@@ -5535,6 +5574,7 @@
           "菜单权限"
         ],
         "summary": "Validate Workspace Menu Release",
+        "description": "校验工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "validateWorkspaceMenuRelease",
         "parameters": [
           {
@@ -5696,6 +5736,7 @@
           "菜单权限"
         ],
         "summary": "Decide Workspace Menu Release",
+        "description": "审批工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "decideWorkspaceMenuRelease",
         "parameters": [
           {
@@ -5867,6 +5908,7 @@
           "菜单权限"
         ],
         "summary": "Publish Workspace Menu Release",
+        "description": "发布工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "publishWorkspaceMenuRelease",
         "parameters": [
           {
@@ -6028,6 +6070,7 @@
           "菜单权限"
         ],
         "summary": "Rollback Workspace Menu Release",
+        "description": "回滚工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "rollbackWorkspaceMenuRelease",
         "parameters": [
           {
@@ -6189,6 +6232,7 @@
           "菜单权限"
         ],
         "summary": "Get Current Workspace Menu Release",
+        "description": "获取当前工作空间菜单发布；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "getCurrentWorkspaceMenuRelease",
         "parameters": [
           {
@@ -6340,6 +6384,7 @@
           "知识事实"
         ],
         "summary": "List Knowledge Bases",
+        "description": "列出知识库集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listKnowledgeBases",
         "parameters": [
           {
@@ -6481,6 +6526,7 @@
           "知识事实"
         ],
         "summary": "Create Knowledge Base",
+        "description": "创建知识库；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createKnowledgeBase",
         "parameters": [
           {
@@ -6632,6 +6678,7 @@
           "知识事实"
         ],
         "summary": "List Documents",
+        "description": "列出文档集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listKnowledgeDocuments",
         "parameters": [
           {
@@ -6793,6 +6840,7 @@
           "知识事实"
         ],
         "summary": "Create Document",
+        "description": "创建文档；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createKnowledgeDocument",
         "parameters": [
           {
@@ -6964,6 +7012,7 @@
           "知识事实"
         ],
         "summary": "List Ingestion Jobs",
+        "description": "列出入库任务集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listKnowledgeIngestionJobs",
         "parameters": [
           {
@@ -7127,6 +7176,7 @@
           "知识事实"
         ],
         "summary": "Retry Ingestion Job",
+        "description": "重试入库任务；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "retryKnowledgeIngestionJob",
         "parameters": [
           {
@@ -7288,6 +7338,7 @@
           "知识事实"
         ],
         "summary": "Delete Knowledge Base",
+        "description": "删除知识库；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "deleteKnowledgeBase",
         "parameters": [
           {
@@ -7449,6 +7500,7 @@
           "知识事实"
         ],
         "summary": "Upload Document",
+        "description": "上传文档；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "uploadKnowledgeDocument",
         "parameters": [
           {
@@ -7650,6 +7702,7 @@
           "知识事实"
         ],
         "summary": "Delete Document",
+        "description": "删除文档；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "deleteKnowledgeDocument",
         "parameters": [
           {
@@ -7821,6 +7874,7 @@
           "知识事实"
         ],
         "summary": "Create Document Version",
+        "description": "创建文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createKnowledgeDocumentVersion",
         "parameters": [
           {
@@ -8002,6 +8056,7 @@
           "知识事实"
         ],
         "summary": "Upload Document Version",
+        "description": "上传文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "uploadKnowledgeDocumentVersion",
         "parameters": [
           {
@@ -8213,6 +8268,7 @@
           "知识事实"
         ],
         "summary": "Mark Document Version Ready",
+        "description": "标记文档版本就绪；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "markKnowledgeDocumentVersionReady",
         "parameters": [
           {
@@ -8404,6 +8460,7 @@
           "知识事实"
         ],
         "summary": "Publish Document Version",
+        "description": "发布文档版本；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "publishKnowledgeDocumentVersion",
         "parameters": [
           {
@@ -8585,6 +8642,7 @@
           "平台模型供应商"
         ],
         "summary": "List Model Providers",
+        "description": "列出模型供应商集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listPlatformModelProviders",
         "parameters": [
           {
@@ -8662,6 +8720,7 @@
           "平台模型供应商"
         ],
         "summary": "Create Model Provider",
+        "description": "创建模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createPlatformModelProvider",
         "parameters": [
           {
@@ -8761,6 +8820,7 @@
           "平台模型供应商"
         ],
         "summary": "Rotate Model Provider Credential",
+        "description": "处理轮换模型供应商凭据；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "rotatePlatformModelProviderCredential",
         "parameters": [
           {
@@ -8880,6 +8940,7 @@
           "平台模型供应商"
         ],
         "summary": "Review Model Provider Data Policy",
+        "description": "审核模型供应商数据策略；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "reviewPlatformModelProviderDataPolicy",
         "parameters": [
           {
@@ -8999,6 +9060,7 @@
           "平台模型供应商"
         ],
         "summary": "Probe Model Provider",
+        "description": "探测模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "probePlatformModelProviderCapabilities",
         "parameters": [
           {
@@ -9118,6 +9180,7 @@
           "平台模型供应商"
         ],
         "summary": "Activate Model Provider",
+        "description": "启用模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "activatePlatformModelProvider",
         "parameters": [
           {
@@ -9227,6 +9290,7 @@
           "平台模型供应商"
         ],
         "summary": "Disable Model Provider",
+        "description": "停用模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "disablePlatformModelProvider",
         "parameters": [
           {
@@ -9336,6 +9400,7 @@
           "平台 AI 运行配置"
         ],
         "summary": "List Ai Runtime Configs",
+        "description": "列出AI运行时配置集合；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "listPlatformAiRuntimeConfigs",
         "parameters": [
           {
@@ -9413,6 +9478,7 @@
           "平台 AI 运行配置"
         ],
         "summary": "Create Ai Runtime Config",
+        "description": "创建AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "createPlatformAiRuntimeConfig",
         "parameters": [
           {
@@ -9512,6 +9578,7 @@
           "平台 AI 运行配置"
         ],
         "summary": "Get Current Ai Runtime Config",
+        "description": "获取当前AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "getCurrentPlatformAiRuntimeConfig",
         "parameters": [
           {
@@ -9591,6 +9658,7 @@
           "平台 AI 运行配置"
         ],
         "summary": "Activate Ai Runtime Config",
+        "description": "启用AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。",
         "operationId": "activatePlatformAiRuntimeConfig",
         "parameters": [
           {
@@ -9712,7 +9780,8 @@
         "required": [
           "items"
         ],
-        "title": "AiRuntimeConfigListResponse"
+        "title": "AiRuntimeConfigListResponse",
+        "description": "定义AI运行时配置列表操作的稳定响应结构。"
       },
       "AiRuntimeConfigPublicationResponse": {
         "properties": {
@@ -9744,7 +9813,8 @@
           "published_by_account_id",
           "published_at"
         ],
-        "title": "AiRuntimeConfigPublicationResponse"
+        "title": "AiRuntimeConfigPublicationResponse",
+        "description": "定义AI运行时配置发布记录操作的稳定响应结构。"
       },
       "AiRuntimeConfigResponse": {
         "properties": {
@@ -9812,7 +9882,8 @@
           "created_by_account_id",
           "created_at"
         ],
-        "title": "AiRuntimeConfigResponse"
+        "title": "AiRuntimeConfigResponse",
+        "description": "定义AI运行时配置操作的稳定响应结构。"
       },
       "AssignMemberOrganizationRequest": {
         "properties": {
@@ -9853,7 +9924,8 @@
           "department_ids",
           "position_ids"
         ],
-        "title": "AssignMemberOrganizationRequest"
+        "title": "AssignMemberOrganizationRequest",
+        "description": "定义分配成员组织操作的请求字段与协议校验边界。"
       },
       "AuthenticationContextResponse": {
         "properties": {
@@ -9918,7 +9990,8 @@
           "authentication_method",
           "credential_scopes"
         ],
-        "title": "AuthenticationContextResponse"
+        "title": "AuthenticationContextResponse",
+        "description": "定义认证上下文操作的稳定响应结构。"
       },
       "Body_uploadKnowledgeDocument": {
         "properties": {
@@ -10058,7 +10131,8 @@
           "policy",
           "routes"
         ],
-        "title": "CreateAiRuntimeConfigRequest"
+        "title": "CreateAiRuntimeConfigRequest",
+        "description": "定义创建AI运行时配置操作的请求字段与协议校验边界。"
       },
       "CreateDepartmentRequest": {
         "properties": {
@@ -10086,7 +10160,8 @@
         "required": [
           "name"
         ],
-        "title": "CreateDepartmentRequest"
+        "title": "CreateDepartmentRequest",
+        "description": "定义创建部门操作的请求字段与协议校验边界。"
       },
       "CreateDocumentRequest": {
         "properties": {
@@ -10239,7 +10314,8 @@
           "source_name",
           "title"
         ],
-        "title": "CreateDocumentRequest"
+        "title": "CreateDocumentRequest",
+        "description": "定义创建文档操作的请求字段与协议校验边界。"
       },
       "CreateDocumentVersionRequest": {
         "properties": {
@@ -10328,7 +10404,8 @@
           "source_kind",
           "source_name"
         ],
-        "title": "CreateDocumentVersionRequest"
+        "title": "CreateDocumentVersionRequest",
+        "description": "定义创建文档版本操作的请求字段与协议校验边界。"
       },
       "CreateEnterpriseWorkspaceRequest": {
         "properties": {
@@ -10344,7 +10421,8 @@
         "required": [
           "name"
         ],
-        "title": "CreateEnterpriseWorkspaceRequest"
+        "title": "CreateEnterpriseWorkspaceRequest",
+        "description": "定义创建企业工作空间操作的请求字段与协议校验边界。"
       },
       "CreateKnowledgeBaseRequest": {
         "properties": {
@@ -10402,7 +10480,8 @@
         "required": [
           "name"
         ],
-        "title": "CreateKnowledgeBaseRequest"
+        "title": "CreateKnowledgeBaseRequest",
+        "description": "定义创建知识库操作的请求字段与协议校验边界。"
       },
       "CreateModelProviderRequest": {
         "properties": {
@@ -10480,7 +10559,8 @@
           "declared_capabilities",
           "api_key"
         ],
-        "title": "CreateModelProviderRequest"
+        "title": "CreateModelProviderRequest",
+        "description": "定义创建模型供应商操作的请求字段与协议校验边界。"
       },
       "CreatePositionRequest": {
         "properties": {
@@ -10502,7 +10582,8 @@
           "department_id",
           "name"
         ],
-        "title": "CreatePositionRequest"
+        "title": "CreatePositionRequest",
+        "description": "定义创建职位操作的请求字段与协议校验边界。"
       },
       "CreateRoleBindingRequest": {
         "properties": {
@@ -10551,7 +10632,8 @@
           "role_id",
           "scope_type"
         ],
-        "title": "CreateRoleBindingRequest"
+        "title": "CreateRoleBindingRequest",
+        "description": "定义创建角色绑定操作的请求字段与协议校验边界。"
       },
       "CreateRoleRequest": {
         "properties": {
@@ -10574,7 +10656,8 @@
           "role_key",
           "name"
         ],
-        "title": "CreateRoleRequest"
+        "title": "CreateRoleRequest",
+        "description": "定义创建角色操作的请求字段与协议校验边界。"
       },
       "CurrentAiRuntimeConfigResponse": {
         "properties": {
@@ -10594,7 +10677,8 @@
         "required": [
           "item"
         ],
-        "title": "CurrentAiRuntimeConfigResponse"
+        "title": "CurrentAiRuntimeConfigResponse",
+        "description": "定义当前AI运行时配置操作的稳定响应结构。"
       },
       "CurrentMenuReleaseResponse": {
         "properties": {
@@ -10625,7 +10709,8 @@
           "item",
           "snapshot"
         ],
-        "title": "CurrentMenuReleaseResponse"
+        "title": "CurrentMenuReleaseResponse",
+        "description": "定义当前菜单发布操作的稳定响应结构。"
       },
       "DepartmentListResponse": {
         "properties": {
@@ -10642,7 +10727,8 @@
         "required": [
           "items"
         ],
-        "title": "DepartmentListResponse"
+        "title": "DepartmentListResponse",
+        "description": "定义部门列表操作的稳定响应结构。"
       },
       "DepartmentResponse": {
         "properties": {
@@ -10699,7 +10785,8 @@
           "depth",
           "version"
         ],
-        "title": "DepartmentResponse"
+        "title": "DepartmentResponse",
+        "description": "定义部门操作的稳定响应结构。"
       },
       "DocumentCreatedResponse": {
         "properties": {
@@ -10720,7 +10807,8 @@
           "document_version",
           "source"
         ],
-        "title": "DocumentCreatedResponse"
+        "title": "DocumentCreatedResponse",
+        "description": "定义文档已创建操作的稳定响应结构。"
       },
       "DocumentResponse": {
         "properties": {
@@ -10835,7 +10923,8 @@
           "deleted_at",
           "version"
         ],
-        "title": "DocumentResponse"
+        "title": "DocumentResponse",
+        "description": "定义文档操作的稳定响应结构。"
       },
       "DocumentSourceResponse": {
         "properties": {
@@ -10885,7 +10974,8 @@
           "captured_at",
           "created_at"
         ],
-        "title": "DocumentSourceResponse"
+        "title": "DocumentSourceResponse",
+        "description": "定义文档来源操作的稳定响应结构。"
       },
       "DocumentUploadResponse": {
         "properties": {
@@ -10910,7 +11000,8 @@
           "source",
           "upload"
         ],
-        "title": "DocumentUploadResponse"
+        "title": "DocumentUploadResponse",
+        "description": "定义文档上传操作的稳定响应结构。"
       },
       "DocumentVersionCreatedResponse": {
         "properties": {
@@ -10927,7 +11018,8 @@
           "document_version",
           "source"
         ],
-        "title": "DocumentVersionCreatedResponse"
+        "title": "DocumentVersionCreatedResponse",
+        "description": "定义文档版本已创建操作的稳定响应结构。"
       },
       "DocumentVersionResponse": {
         "properties": {
@@ -11012,7 +11104,8 @@
           "published_at",
           "record_version"
         ],
-        "title": "DocumentVersionResponse"
+        "title": "DocumentVersionResponse",
+        "description": "定义文档版本操作的稳定响应结构。"
       },
       "DocumentVersionUploadResponse": {
         "properties": {
@@ -11033,7 +11126,8 @@
           "source",
           "upload"
         ],
-        "title": "DocumentVersionUploadResponse"
+        "title": "DocumentVersionUploadResponse",
+        "description": "定义文档版本上传操作的稳定响应结构。"
       },
       "EffectiveRoleResponse": {
         "properties": {
@@ -11066,7 +11160,8 @@
           "name",
           "sources"
         ],
-        "title": "EffectiveRoleResponse"
+        "title": "EffectiveRoleResponse",
+        "description": "定义有效角色操作的稳定响应结构。"
       },
       "EffectiveRoleSetResponse": {
         "properties": {
@@ -11100,7 +11195,8 @@
           "role_version",
           "roles"
         ],
-        "title": "EffectiveRoleSetResponse"
+        "title": "EffectiveRoleSetResponse",
+        "description": "定义有效角色集合操作的稳定响应结构。"
       },
       "EffectiveRoleSourceResponse": {
         "properties": {
@@ -11125,7 +11221,8 @@
           "scope_type",
           "scope_id"
         ],
-        "title": "EffectiveRoleSourceResponse"
+        "title": "EffectiveRoleSourceResponse",
+        "description": "定义有效角色来源操作的稳定响应结构。"
       },
       "EntitlementResponse": {
         "properties": {
@@ -11183,7 +11280,8 @@
           "public_publish_allowed",
           "quotas"
         ],
-        "title": "EntitlementResponse"
+        "title": "EntitlementResponse",
+        "description": "定义权益操作的稳定响应结构。"
       },
       "ErrorResponse": {
         "properties": {
@@ -11221,7 +11319,8 @@
           "request_id",
           "trace_id"
         ],
-        "title": "ErrorResponse"
+        "title": "ErrorResponse",
+        "description": "表示错误响应，由协议层映射为稳定错误码。"
       },
       "GatewayPolicySchema": {
         "properties": {
@@ -11306,7 +11405,8 @@
           "circuit_recovery_ms",
           "max_estimated_cost_microunits"
         ],
-        "title": "GatewayPolicySchema"
+        "title": "GatewayPolicySchema",
+        "description": "定义网关策略结构的协议字段和序列化边界。"
       },
       "HealthResponse": {
         "properties": {
@@ -11351,7 +11451,8 @@
           "environment",
           "checks"
         ],
-        "title": "HealthResponse"
+        "title": "HealthResponse",
+        "description": "定义健康状态操作的稳定响应结构。"
       },
       "IngestionJobListResponse": {
         "properties": {
@@ -11368,7 +11469,8 @@
         "required": [
           "items"
         ],
-        "title": "IngestionJobListResponse"
+        "title": "IngestionJobListResponse",
+        "description": "定义入库任务列表操作的稳定响应结构。"
       },
       "IngestionJobResponse": {
         "properties": {
@@ -11609,7 +11711,8 @@
           "created_at",
           "updated_at"
         ],
-        "title": "IngestionJobResponse"
+        "title": "IngestionJobResponse",
+        "description": "定义入库任务操作的稳定响应结构。"
       },
       "InviteWorkspaceMemberRequest": {
         "properties": {
@@ -11625,7 +11728,8 @@
         "required": [
           "login_name"
         ],
-        "title": "InviteWorkspaceMemberRequest"
+        "title": "InviteWorkspaceMemberRequest",
+        "description": "定义邀请工作空间成员操作的请求字段与协议校验边界。"
       },
       "KnowledgeBaseListResponse": {
         "properties": {
@@ -11642,7 +11746,8 @@
         "required": [
           "items"
         ],
-        "title": "KnowledgeBaseListResponse"
+        "title": "KnowledgeBaseListResponse",
+        "description": "定义知识库列表操作的稳定响应结构。"
       },
       "KnowledgeBaseResponse": {
         "properties": {
@@ -11755,7 +11860,8 @@
           "deleted_at",
           "version"
         ],
-        "title": "KnowledgeBaseResponse"
+        "title": "KnowledgeBaseResponse",
+        "description": "定义知识库操作的稳定响应结构。"
       },
       "KnowledgeBaseSummaryResponse": {
         "properties": {
@@ -11814,7 +11920,8 @@
           "default_security_level",
           "updated_at"
         ],
-        "title": "KnowledgeBaseSummaryResponse"
+        "title": "KnowledgeBaseSummaryResponse",
+        "description": "定义知识库摘要操作的稳定响应结构。"
       },
       "KnowledgeDocumentListResponse": {
         "properties": {
@@ -11831,7 +11938,8 @@
         "required": [
           "items"
         ],
-        "title": "KnowledgeDocumentListResponse"
+        "title": "KnowledgeDocumentListResponse",
+        "description": "定义知识文档列表操作的稳定响应结构。"
       },
       "KnowledgeDocumentSummaryResponse": {
         "properties": {
@@ -11917,7 +12025,8 @@
           "source_name",
           "current_document_version_id"
         ],
-        "title": "KnowledgeDocumentSummaryResponse"
+        "title": "KnowledgeDocumentSummaryResponse",
+        "description": "定义知识文档摘要操作的稳定响应结构。"
       },
       "LoginRequest": {
         "properties": {
@@ -11942,7 +12051,8 @@
           "login_name",
           "password"
         ],
-        "title": "LoginRequest"
+        "title": "LoginRequest",
+        "description": "定义登录操作的请求字段与协议校验边界。"
       },
       "LoginResponse": {
         "properties": {
@@ -11974,7 +12084,8 @@
           "account_id",
           "csrf_token"
         ],
-        "title": "LoginResponse"
+        "title": "LoginResponse",
+        "description": "定义登录操作的稳定响应结构。"
       },
       "LogoutResponse": {
         "properties": {
@@ -11988,7 +12099,8 @@
         "required": [
           "logged_out"
         ],
-        "title": "LogoutResponse"
+        "title": "LogoutResponse",
+        "description": "定义退出登录操作的稳定响应结构。"
       },
       "MarkDocumentVersionReadyRequest": {
         "properties": {
@@ -12003,7 +12115,8 @@
         "required": [
           "content_hash"
         ],
-        "title": "MarkDocumentVersionReadyRequest"
+        "title": "MarkDocumentVersionReadyRequest",
+        "description": "定义标记文档版本就绪操作的请求字段与协议校验边界。"
       },
       "MemberOrganizationResponse": {
         "properties": {
@@ -12054,7 +12167,8 @@
           "position_ids",
           "membership_version"
         ],
-        "title": "MemberOrganizationResponse"
+        "title": "MemberOrganizationResponse",
+        "description": "定义成员组织操作的稳定响应结构。"
       },
       "MenuReleaseDecisionRequest": {
         "properties": {
@@ -12080,7 +12194,8 @@
         "required": [
           "approved"
         ],
-        "title": "MenuReleaseDecisionRequest"
+        "title": "MenuReleaseDecisionRequest",
+        "description": "定义菜单发布决策操作的请求字段与协议校验边界。"
       },
       "MenuReleaseListResponse": {
         "properties": {
@@ -12097,7 +12212,8 @@
         "required": [
           "items"
         ],
-        "title": "MenuReleaseListResponse"
+        "title": "MenuReleaseListResponse",
+        "description": "定义菜单发布列表操作的稳定响应结构。"
       },
       "MenuReleaseResponse": {
         "properties": {
@@ -12290,7 +12406,8 @@
           "published_at",
           "version"
         ],
-        "title": "MenuReleaseResponse"
+        "title": "MenuReleaseResponse",
+        "description": "定义菜单发布操作的稳定响应结构。"
       },
       "MenuReleaseSnapshotApiBindingEntry": {
         "properties": {
@@ -12322,7 +12439,8 @@
           "api_resource_id",
           "action_type"
         ],
-        "title": "MenuReleaseSnapshotApiBindingEntry"
+        "title": "MenuReleaseSnapshotApiBindingEntry",
+        "description": "定义菜单发布快照API绑定条目的协议字段和序列化边界。"
       },
       "MenuReleaseSnapshotMenuEntry": {
         "properties": {
@@ -12436,7 +12554,8 @@
           "status",
           "visible"
         ],
-        "title": "MenuReleaseSnapshotMenuEntry"
+        "title": "MenuReleaseSnapshotMenuEntry",
+        "description": "定义菜单发布快照菜单条目的协议字段和序列化边界。"
       },
       "MenuReleaseSnapshotResponse": {
         "properties": {
@@ -12493,7 +12612,8 @@
           "role_menus",
           "menu_api_bindings"
         ],
-        "title": "MenuReleaseSnapshotResponse"
+        "title": "MenuReleaseSnapshotResponse",
+        "description": "定义菜单发布快照操作的稳定响应结构。"
       },
       "MenuReleaseSnapshotRoleMenuEntry": {
         "properties": {
@@ -12519,7 +12639,8 @@
           "menu_id",
           "visible"
         ],
-        "title": "MenuReleaseSnapshotRoleMenuEntry"
+        "title": "MenuReleaseSnapshotRoleMenuEntry",
+        "description": "定义菜单发布快照角色菜单条目的协议字段和序列化边界。"
       },
       "ModelProviderConfigurationListResponse": {
         "properties": {
@@ -12536,7 +12657,8 @@
         "required": [
           "items"
         ],
-        "title": "ModelProviderConfigurationListResponse"
+        "title": "ModelProviderConfigurationListResponse",
+        "description": "定义模型供应商配置列表操作的稳定响应结构。"
       },
       "ModelProviderConfigurationResponse": {
         "properties": {
@@ -12751,7 +12873,8 @@
           "updated_at",
           "version"
         ],
-        "title": "ModelProviderConfigurationResponse"
+        "title": "ModelProviderConfigurationResponse",
+        "description": "定义模型供应商配置操作的稳定响应结构。"
       },
       "MoveDepartmentRequest": {
         "properties": {
@@ -12770,7 +12893,8 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "MoveDepartmentRequest"
+        "title": "MoveDepartmentRequest",
+        "description": "定义移动部门操作的请求字段与协议校验边界。"
       },
       "OpenApiFeatureRequest": {
         "properties": {
@@ -12784,7 +12908,8 @@
         "required": [
           "enabled"
         ],
-        "title": "OpenApiFeatureRequest"
+        "title": "OpenApiFeatureRequest",
+        "description": "定义开放API功能操作的请求字段与协议校验边界。"
       },
       "OrganizationStatusRequest": {
         "properties": {
@@ -12798,7 +12923,8 @@
         "required": [
           "active"
         ],
-        "title": "OrganizationStatusRequest"
+        "title": "OrganizationStatusRequest",
+        "description": "定义组织状态操作的请求字段与协议校验边界。"
       },
       "PositionListResponse": {
         "properties": {
@@ -12815,7 +12941,8 @@
         "required": [
           "items"
         ],
-        "title": "PositionListResponse"
+        "title": "PositionListResponse",
+        "description": "定义职位列表操作的稳定响应结构。"
       },
       "PositionResponse": {
         "properties": {
@@ -12860,7 +12987,8 @@
           "effective_active",
           "version"
         ],
-        "title": "PositionResponse"
+        "title": "PositionResponse",
+        "description": "定义职位操作的稳定响应结构。"
       },
       "QuotaResponse": {
         "properties": {
@@ -12901,7 +13029,8 @@
           "limit_value",
           "remaining_value"
         ],
-        "title": "QuotaResponse"
+        "title": "QuotaResponse",
+        "description": "定义额度操作的稳定响应结构。"
       },
       "RegistrationRequest": {
         "properties": {
@@ -12933,7 +13062,8 @@
           "display_name",
           "password"
         ],
-        "title": "RegistrationRequest"
+        "title": "RegistrationRequest",
+        "description": "定义注册操作的请求字段与协议校验边界。"
       },
       "RegistrationResponse": {
         "properties": {
@@ -12954,7 +13084,8 @@
           "account_id",
           "personal_workspace_id"
         ],
-        "title": "RegistrationResponse"
+        "title": "RegistrationResponse",
+        "description": "定义注册操作的稳定响应结构。"
       },
       "ReplaceRoleMenuVisibilityRequest": {
         "properties": {
@@ -12972,7 +13103,8 @@
         "required": [
           "items"
         ],
-        "title": "ReplaceRoleMenuVisibilityRequest"
+        "title": "ReplaceRoleMenuVisibilityRequest",
+        "description": "定义替换角色菜单可见性操作的请求字段与协议校验边界。"
       },
       "ReplaceRolePermissionsRequest": {
         "properties": {
@@ -12990,7 +13122,8 @@
         "required": [
           "items"
         ],
-        "title": "ReplaceRolePermissionsRequest"
+        "title": "ReplaceRolePermissionsRequest",
+        "description": "定义替换角色权限集合操作的请求字段与协议校验边界。"
       },
       "ReplaceWorkspaceMenuConfigurationRequest": {
         "properties": {
@@ -13008,7 +13141,8 @@
         "required": [
           "items"
         ],
-        "title": "ReplaceWorkspaceMenuConfigurationRequest"
+        "title": "ReplaceWorkspaceMenuConfigurationRequest",
+        "description": "定义替换工作空间菜单配置操作的请求字段与协议校验边界。"
       },
       "ReviewModelProviderDataPolicyRequest": {
         "properties": {
@@ -13078,7 +13212,8 @@
         "required": [
           "approved"
         ],
-        "title": "ReviewModelProviderDataPolicyRequest"
+        "title": "ReviewModelProviderDataPolicyRequest",
+        "description": "定义审核模型供应商数据策略操作的请求字段与协议校验边界。"
       },
       "RoleBindingResponse": {
         "properties": {
@@ -13149,7 +13284,8 @@
           "status",
           "version"
         ],
-        "title": "RoleBindingResponse"
+        "title": "RoleBindingResponse",
+        "description": "定义角色绑定操作的稳定响应结构。"
       },
       "RoleListResponse": {
         "properties": {
@@ -13166,7 +13302,8 @@
         "required": [
           "items"
         ],
-        "title": "RoleListResponse"
+        "title": "RoleListResponse",
+        "description": "定义角色列表操作的稳定响应结构。"
       },
       "RoleMenuVisibilityEntry": {
         "properties": {
@@ -13186,7 +13323,8 @@
           "menu_id",
           "visible"
         ],
-        "title": "RoleMenuVisibilityEntry"
+        "title": "RoleMenuVisibilityEntry",
+        "description": "定义角色菜单可见性条目的协议字段和序列化边界。"
       },
       "RoleMenuVisibilityResponse": {
         "properties": {
@@ -13209,7 +13347,8 @@
           "role_id",
           "items"
         ],
-        "title": "RoleMenuVisibilityResponse"
+        "title": "RoleMenuVisibilityResponse",
+        "description": "定义角色菜单可见性操作的稳定响应结构。"
       },
       "RolePermissionEntry": {
         "properties": {
@@ -13270,7 +13409,8 @@
           "permission_code",
           "scope_type"
         ],
-        "title": "RolePermissionEntry"
+        "title": "RolePermissionEntry",
+        "description": "定义角色权限条目的协议字段和序列化边界。"
       },
       "RolePermissionListResponse": {
         "properties": {
@@ -13287,7 +13427,8 @@
         "required": [
           "items"
         ],
-        "title": "RolePermissionListResponse"
+        "title": "RolePermissionListResponse",
+        "description": "定义角色权限列表操作的稳定响应结构。"
       },
       "RoleResponse": {
         "properties": {
@@ -13331,7 +13472,8 @@
           "system_managed",
           "version"
         ],
-        "title": "RoleResponse"
+        "title": "RoleResponse",
+        "description": "定义角色操作的稳定响应结构。"
       },
       "RoleStatusRequest": {
         "properties": {
@@ -13345,7 +13487,8 @@
         "required": [
           "active"
         ],
-        "title": "RoleStatusRequest"
+        "title": "RoleStatusRequest",
+        "description": "定义角色状态操作的请求字段与协议校验边界。"
       },
       "RotateModelProviderCredentialRequest": {
         "properties": {
@@ -13363,7 +13506,8 @@
         "required": [
           "api_key"
         ],
-        "title": "RotateModelProviderCredentialRequest"
+        "title": "RotateModelProviderCredentialRequest",
+        "description": "定义轮换模型供应商凭据操作的请求字段与协议校验边界。"
       },
       "RuntimeComponentVersionsSchema": {
         "properties": {
@@ -13442,7 +13586,8 @@
           "relevance_grader_interface",
           "multimodal_router_interface"
         ],
-        "title": "RuntimeComponentVersionsSchema"
+        "title": "RuntimeComponentVersionsSchema",
+        "description": "定义运行时组件版本集合结构的协议字段和序列化边界。"
       },
       "RuntimeRouteRequest": {
         "properties": {
@@ -13501,7 +13646,8 @@
           "input_price_microunits_per_million_tokens",
           "output_price_microunits_per_million_tokens"
         ],
-        "title": "RuntimeRouteRequest"
+        "title": "RuntimeRouteRequest",
+        "description": "定义运行时路由操作的请求字段与协议校验边界。"
       },
       "RuntimeRouteResponse": {
         "properties": {
@@ -13576,7 +13722,8 @@
           "output_price_microunits_per_million_tokens",
           "currency"
         ],
-        "title": "RuntimeRouteResponse"
+        "title": "RuntimeRouteResponse",
+        "description": "定义运行时路由操作的稳定响应结构。"
       },
       "UploadMetadataResponse": {
         "properties": {
@@ -13608,7 +13755,8 @@
           "size_bytes",
           "content_hash"
         ],
-        "title": "UploadMetadataResponse"
+        "title": "UploadMetadataResponse",
+        "description": "定义上传元数据操作的稳定响应结构。"
       },
       "WorkspaceInvitationResponse": {
         "properties": {
@@ -13646,7 +13794,8 @@
           "status",
           "expires_at"
         ],
-        "title": "WorkspaceInvitationResponse"
+        "title": "WorkspaceInvitationResponse",
+        "description": "定义工作空间邀请操作的稳定响应结构。"
       },
       "WorkspaceListResponse": {
         "properties": {
@@ -13663,7 +13812,8 @@
         "required": [
           "items"
         ],
-        "title": "WorkspaceListResponse"
+        "title": "WorkspaceListResponse",
+        "description": "定义工作空间列表操作的稳定响应结构。"
       },
       "WorkspaceMemberListResponse": {
         "properties": {
@@ -13687,7 +13837,8 @@
         "required": [
           "items"
         ],
-        "title": "WorkspaceMemberListResponse"
+        "title": "WorkspaceMemberListResponse",
+        "description": "定义工作空间成员列表操作的稳定响应结构。"
       },
       "WorkspaceMemberProjectionResponse": {
         "properties": {
@@ -13748,7 +13899,8 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "WorkspaceMemberProjectionResponse"
+        "title": "WorkspaceMemberProjectionResponse",
+        "description": "定义工作空间成员投影操作的稳定响应结构。"
       },
       "WorkspaceMemberResponse": {
         "properties": {
@@ -13787,7 +13939,8 @@
           "status",
           "display_name"
         ],
-        "title": "WorkspaceMemberResponse"
+        "title": "WorkspaceMemberResponse",
+        "description": "定义工作空间成员操作的稳定响应结构。"
       },
       "WorkspaceMembershipResponse": {
         "properties": {
@@ -13821,7 +13974,8 @@
           "membership_type",
           "status"
         ],
-        "title": "WorkspaceMembershipResponse"
+        "title": "WorkspaceMembershipResponse",
+        "description": "定义工作空间成员身份操作的稳定响应结构。"
       },
       "WorkspaceMenuConfigurationResponse": {
         "properties": {
@@ -13850,7 +14004,8 @@
           "menu_version",
           "items"
         ],
-        "title": "WorkspaceMenuConfigurationResponse"
+        "title": "WorkspaceMenuConfigurationResponse",
+        "description": "定义工作空间菜单配置操作的稳定响应结构。"
       },
       "WorkspaceMenuOverrideEntry": {
         "properties": {
@@ -13913,7 +14068,8 @@
           "sort_order",
           "visible"
         ],
-        "title": "WorkspaceMenuOverrideEntry"
+        "title": "WorkspaceMenuOverrideEntry",
+        "description": "定义工作空间菜单覆盖条目的协议字段和序列化边界。"
       },
       "WorkspaceSummaryResponse": {
         "properties": {
@@ -13971,7 +14127,8 @@
           "membership_type",
           "membership_status"
         ],
-        "title": "WorkspaceSummaryResponse"
+        "title": "WorkspaceSummaryResponse",
+        "description": "定义工作空间摘要操作的稳定响应结构。"
       }
     }
   }

@@ -1,3 +1,5 @@
+"""提供知识生产页范围化查询和安全人工重试用例。"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -39,6 +41,8 @@ class KnowledgeManagementService:
         *,
         limit: int,
     ) -> tuple[KnowledgeBase, ...]:
+        """按策略决策和字段投影列出当前账号可见的知识库。"""
+
         account_id = _browser_account(context)
         _require_limit(limit)
         with self._unit_of_work as unit_of_work:
@@ -58,6 +62,8 @@ class KnowledgeManagementService:
         knowledge_base_id: UUID,
         limit: int,
     ) -> tuple[KnowledgeDocumentSummary, ...]:
+        """按空间、部门、账号和资源授权交集列出文档摘要。"""
+
         account_id = _browser_account(context)
         _require_limit(limit)
         with self._unit_of_work as unit_of_work:
@@ -84,6 +90,8 @@ class KnowledgeManagementService:
         knowledge_base_id: UUID,
         limit: int,
     ) -> tuple[IngestionJob, ...]:
+        """只返回当前账号有权查看文档对应的入库任务。"""
+
         account_id = _browser_account(context)
         _require_limit(limit)
         with self._unit_of_work as unit_of_work:
@@ -109,6 +117,9 @@ class KnowledgeManagementService:
         *,
         ingestion_job_id: UUID,
     ) -> IngestionJob:
+        """校验任务归属和可重试状态后创建新租约，禁止复用失败执行。"""
+
+        # 1. 锁定任务并重新验证空间成员、知识库和文档仍处于活动状态。
         account_id = _browser_account(context)
         now = datetime.now(UTC)
         try:
@@ -132,12 +143,14 @@ class KnowledgeManagementService:
                     current.knowledge_base_id,
                     current.document_id,
                 )
+                # 2. 领域状态机生成新的排队状态和追踪上下文，已运行或已成功任务不能重试。
                 retried = current.retry_manually(
                     actor_id=context.actor_id,
                     trace_id=context.trace.trace_id,
                     traceparent=context.trace.traceparent,
                     occurred_at=now,
                 )
+                # 3. 任务、审计和 Outbox 同事务提交，Worker 只领取完整的新版本。
                 unit_of_work.knowledge.save_ingestion_job(retried)
                 _record_retry(unit_of_work, context, retried, now)
                 unit_of_work.commit()

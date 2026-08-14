@@ -1,3 +1,5 @@
+"""验证 P1D-07 知识生产查询、范围裁剪和人工重试。"""
+
 from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID

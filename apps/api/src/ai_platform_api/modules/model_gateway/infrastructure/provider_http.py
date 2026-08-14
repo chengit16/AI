@@ -1,3 +1,5 @@
+"""实现经 SSRF 校验、地址钉住和响应限额保护的模型 HTTP Adapter。"""
+
 from __future__ import annotations
 
 import http.client
@@ -31,6 +33,8 @@ DnsResolver = Callable[..., list[tuple[Any, ...]]]
 
 @dataclass(frozen=True)
 class ValidatedProviderTarget:
+    """保存通过 SSRF 校验的供应商 URL、主机和解析地址。"""
+
     base_url: str
     hostname: str
     port: int
@@ -39,6 +43,8 @@ class ValidatedProviderTarget:
 
 
 class ProviderTargetResolver(Protocol):
+    """规范化供应商 URL 并解析主机地址，私网或保留地址一律拒绝。"""
+
     def resolve(self, value: str) -> ValidatedProviderTarget: ...
 
 

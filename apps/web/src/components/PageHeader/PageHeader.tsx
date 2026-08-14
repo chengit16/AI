@@ -1,9 +1,14 @@
+/** @description 业务页面统一标题、说明与操作区组件。 */
 import type { ReactNode } from "react";
 
 interface PageHeaderProps {
+  /** 当前页面的唯一主标题。 */
   title: string;
+  /** 对当前工作目标和范围的简短说明。 */
   description: string;
+  /** 标题上方的可选业务域提示。 */
   eyebrow?: string;
+  /** 已经过体验权限裁剪的页面主操作区。 */
   actions?: ReactNode;
 }
 

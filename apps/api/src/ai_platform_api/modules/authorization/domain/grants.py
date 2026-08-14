@@ -1,3 +1,5 @@
+"""定义角色授权聚合、主体解析端口和授权事务边界。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -75,6 +77,8 @@ MEMBER_PERMISSION_CODES = (
 
 @dataclass(frozen=True)
 class RolePermissionGrant:
+    """定义角色在数据范围、安全级别和字段掩码下可执行的权限。"""
+
     workspace_id: UUID
     role_id: UUID
     permission_code: str
@@ -105,6 +109,8 @@ class RolePermissionWriteConflictError(Exception):
 
 @dataclass(frozen=True)
 class PolicySubject:
+    """汇总账号、成员、角色版本和有效角色，作为策略计算的可信主体。"""
+
     account_id: UUID
     membership_id: UUID
     role_version: int
@@ -112,6 +118,8 @@ class PolicySubject:
 
 
 class PolicyGrantReader(Protocol):
+    """按可信上下文解析授权主体，并读取其有效角色授权项。"""
+
     def resolve_subject(self, context: RequestContext) -> PolicySubject | None: ...
 
     def list_role_grants(
@@ -128,6 +136,8 @@ class PolicyGrantReader(Protocol):
 
 
 class RolePermissionRepository(PolicyGrantReader, Protocol):
+    """在工作空间边界内整体替换角色授权并递增角色版本。"""
+
     def get_requester_membership_type(
         self,
         workspace_id: UUID,
@@ -147,6 +157,8 @@ class RolePermissionRepository(PolicyGrantReader, Protocol):
 
 
 class RolePermissionUnitOfWork(Protocol):
+    """保证角色权限、审计和 Outbox 在同一事务内提交。"""
+
     @property
     def permissions(self) -> RolePermissionRepository: ...
 

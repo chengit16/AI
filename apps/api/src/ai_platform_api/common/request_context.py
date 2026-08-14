@@ -1,3 +1,5 @@
+"""承载认证层建立的可信主体、工作空间、策略范围和 Trace 上下文。"""
+
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 

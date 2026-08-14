@@ -1,3 +1,5 @@
+"""定义审计、Outbox 和幂等消费 PostgreSQL 表。"""
+
 from sqlalchemy import (
     JSON,
     CheckConstraint,

@@ -1,3 +1,5 @@
+"""编排企业空间与成员邀请生命周期，并保持审计和 Outbox 同事务。"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -42,10 +44,14 @@ class WorkspaceLifecycleConflictError(PlatformError):
 
 
 class WorkspaceGovernanceValidationError(PlatformError):
+    """表示工作空间治理校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"
 
 
 class WorkspaceGovernanceNotFoundError(PlatformError):
+    """表示工作空间治理未找到错误，由协议层映射为稳定错误码。"""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
@@ -56,6 +62,9 @@ class EnterpriseWorkspaceService:
         self._unit_of_work = unit_of_work
 
     def create(self, context: RequestContext, *, name: str) -> WorkspaceSummary:
+        """创建企业空间、所有者成员、系统角色与默认权益，全部事实原子提交。"""
+
+        # 1. 从可信浏览器上下文取得创建者，并在构造领域对象前规范化空间名称。
         account_id = self._browser_account(context)
         normalized_name = name.strip()
         if not normalized_name or len(normalized_name) > 120:
@@ -72,6 +81,7 @@ class EnterpriseWorkspaceService:
             updated_at=now,
             version=1,
         )
+        # 2. 企业空间和不可移除的所有者成员共享同一个创建事实与追踪上下文。
         event, audit = self._facts(
             context=context,
             workspace_id=workspace.workspace_id,
@@ -83,6 +93,7 @@ class EnterpriseWorkspaceService:
             payload={"workspace_type": "enterprise"},
             attributes={"membership_type": "owner"},
         )
+        # 3. 空间、成员、审计和 Outbox 同事务写入，任何约束冲突都不留下半成品空间。
         try:
             with self._unit_of_work as unit_of_work:
                 unit_of_work.enterprise.add_workspace(workspace, owner)
@@ -107,12 +118,16 @@ class EnterpriseWorkspaceService:
         workspace_id: UUID,
         login_name: str,
     ) -> WorkspaceInvitation:
+        """校验所有者和成员额度后创建邀请，重复待处理邀请按冲突拒绝。"""
+
+        # 1. 请求必须来自当前企业空间，登录名只作为查找现有活动账号的标识。
         account_id = self._browser_account(context)
         self._require_current_workspace(context, workspace_id)
         normalized_login = login_name.strip().casefold()
         if not normalized_login or len(normalized_login) > 255:
             raise WorkspaceGovernanceValidationError
         now = datetime.now(UTC)
+        # 2. 在事务内锁定成员和旧邀请，避免并发邀请绕过成员状态与唯一约束。
         try:
             with self._unit_of_work as unit_of_work:
                 self._require_owner(unit_of_work.enterprise, workspace_id, account_id)
@@ -141,6 +156,7 @@ class EnterpriseWorkspaceService:
                     unit_of_work.enterprise.save_invitation(
                         previous_invitation.expire(occurred_at=now)
                     )
+                # 3. 过期邀请处理完成后创建新邀请，并把邀请、审计和事件原子提交。
                 invitation = WorkspaceInvitation(
                     invitation_id=uuid4(),
                     workspace_id=workspace_id,
@@ -177,6 +193,9 @@ class EnterpriseWorkspaceService:
         *,
         invitation_id: UUID,
     ) -> WorkspaceSummary:
+        """锁定邀请并激活成员身份，过期、错账号或已处理邀请失败关闭。"""
+
+        # 1. 接受动作只信任当前登录账号，邀请目标和空间状态必须从数据库重建。
         account_id = self._browser_account(context)
         now = datetime.now(UTC)
         try:
@@ -197,6 +216,7 @@ class EnterpriseWorkspaceService:
                     or workspace.status != "active"
                 ):
                     raise WorkspaceGovernanceDeniedError
+                # 2. 锁定邀请和成员后校验额度，再创建成员或恢复已有非活动成员。
                 accepted = invitation.accept(account_id=account_id, occurred_at=now)
                 membership = unit_of_work.enterprise.get_membership(
                     invitation.workspace_id,
@@ -220,6 +240,7 @@ class EnterpriseWorkspaceService:
                 else:
                     membership = membership.activate_as_member(occurred_at=now)
                     unit_of_work.enterprise.save_membership(membership)
+                # 3. 邀请终态、成员状态、审计和加入事件共享一次提交。
                 event, audit = self._facts(
                     context=context,
                     workspace_id=invitation.workspace_id,
@@ -250,6 +271,9 @@ class EnterpriseWorkspaceService:
         )
 
     def leave(self, context: RequestContext, *, workspace_id: UUID) -> WorkspaceMembership:
+        """允许普通成员退出企业空间，但禁止所有者离开造成无主空间。"""
+
+        # 1. 当前空间上下文和账号必须一致，不能代替其他成员执行退出。
         account_id = self._browser_account(context)
         self._require_current_workspace(context, workspace_id)
         now = datetime.now(UTC)
@@ -263,6 +287,7 @@ class EnterpriseWorkspaceService:
                 )
                 if membership is None:
                     raise WorkspaceGovernanceNotFoundError
+                # 2. 领域状态机禁止所有者退出或重复退出。
                 updated = membership.leave(occurred_at=now)
                 event, audit = self._facts(
                     context=context,
@@ -276,6 +301,7 @@ class EnterpriseWorkspaceService:
                     attributes={"membership_status": "left"},
                     aggregate_version=updated.version,
                 )
+                # 3. 成员状态、审计和离开事件同事务提交，使后续访问立即失败。
                 unit_of_work.enterprise.save_membership(updated)
                 unit_of_work.audit.add(audit)
                 unit_of_work.outbox.add(event)
@@ -291,6 +317,9 @@ class EnterpriseWorkspaceService:
         workspace_id: UUID,
         target_account_id: UUID,
     ) -> WorkspaceMembership:
+        """由企业所有者停用普通成员，并同步使其后续访问失效。"""
+
+        # 1. 先校验当前空间与所有者身份，再锁定目标成员。
         account_id = self._browser_account(context)
         self._require_current_workspace(context, workspace_id)
         now = datetime.now(UTC)
@@ -304,6 +333,7 @@ class EnterpriseWorkspaceService:
                 )
                 if target is None:
                     raise WorkspaceGovernanceNotFoundError
+                # 2. 领域状态机禁止停用所有者或重复停用成员。
                 updated = target.disable(occurred_at=now)
                 event, audit = self._facts(
                     context=context,
@@ -317,6 +347,7 @@ class EnterpriseWorkspaceService:
                     attributes={"membership_status": "disabled"},
                     aggregate_version=updated.version,
                 )
+                # 3. 成员状态、审计和停用事件同事务提交，认证层下次访问即可观察到变化。
                 unit_of_work.enterprise.save_membership(updated)
                 unit_of_work.audit.add(audit)
                 unit_of_work.outbox.add(event)
@@ -326,6 +357,8 @@ class EnterpriseWorkspaceService:
         return updated
 
     def list_workspaces(self, context: RequestContext) -> tuple[WorkspaceSummary, ...]:
+        """列出账号仍可访问的个人和企业空间及成员状态。"""
+
         account_id = self._browser_account(context)
         with self._unit_of_work as unit_of_work:
             return unit_of_work.enterprise.list_workspaces(account_id)
@@ -336,6 +369,8 @@ class EnterpriseWorkspaceService:
         *,
         workspace_id: UUID,
     ) -> tuple[WorkspaceMemberSummary, ...]:
+        """校验空间访问后列出企业成员，个人空间不暴露企业治理入口。"""
+
         account_id = self._browser_account(context)
         self._require_current_workspace(context, workspace_id)
         with self._unit_of_work as unit_of_work:
@@ -354,6 +389,8 @@ class EnterpriseWorkspaceService:
             )
 
     def switch(self, context: RequestContext, *, workspace_id: UUID) -> WorkspaceSummary:
+        """校验目标空间可访问后返回切换结果，调用方据此刷新空间级缓存。"""
+
         account_id = self._browser_account(context)
         with self._unit_of_work as unit_of_work:
             workspace = unit_of_work.enterprise.get_workspace(workspace_id)
@@ -432,6 +469,7 @@ class EnterpriseWorkspaceService:
         attributes: dict[str, object],
         aggregate_version: int = 1,
     ) -> tuple[IntegrationEvent, AuditRecord]:
+        # 事件和审计共享操作者、请求与追踪上下文，避免同一业务动作产生不可关联的双份事实。
         return (
             IntegrationEvent(
                 event_id=uuid4(),

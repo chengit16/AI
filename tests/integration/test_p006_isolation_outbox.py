@@ -1,3 +1,5 @@
+"""验证 P0-06 工作空间隔离、字段掩码和 Outbox 原子性。"""
+
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass

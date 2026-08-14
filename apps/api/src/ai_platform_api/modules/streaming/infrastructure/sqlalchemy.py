@@ -1,3 +1,5 @@
+"""实现严格序号、同会话并发约束和保留期回放的 PostgreSQL Store。"""
+
 from datetime import datetime, timedelta
 from typing import Literal
 from uuid import UUID
@@ -26,6 +28,8 @@ from ai_platform_api.persistence.tables import stream_events, stream_runs
 
 
 def stream_run_from_row(row: RowMapping) -> StreamRun:
+    """处理流式事件运行从数据库行，在基础设施边界维持稳定领域对象映射。"""
+
     return StreamRun(
         run_id=row["run_id"],
         workspace_id=row["workspace_id"],
@@ -39,6 +43,8 @@ def stream_run_from_row(row: RowMapping) -> StreamRun:
 
 
 def stream_event_from_row(row: RowMapping) -> StreamEvent:
+    """处理流式事件事件从数据库行，在基础设施边界维持稳定领域对象映射。"""
+
     return StreamEvent(
         event_id=row["event_id"],
         event_type=row["event_type"],
@@ -56,6 +62,8 @@ def stream_event_from_row(row: RowMapping) -> StreamEvent:
 
 
 class SqlAlchemyStreamStore(StreamStore):
+    """原子维护 Run、严格递增事件序号、保留期和按工作空间隔离的游标回放。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 

@@ -1,3 +1,5 @@
+"""实现权益、功能开关和用量账本的 PostgreSQL Adapter。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -72,6 +74,8 @@ class SqlAlchemyEntitlementAccessReader:
 
 
 class SqlAlchemyEntitlementRepository:
+    """在工作空间隔离下维护套餐、功能设置、用量和幂等用量记录。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -334,6 +338,8 @@ class SqlAlchemyEntitlementRepository:
 
 
 class SqlAlchemyEntitlementUnitOfWork:
+    """保证权益、用量、审计和 Outbox 使用同一 Session 提交。"""
+
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
         self._state: ContextVar[

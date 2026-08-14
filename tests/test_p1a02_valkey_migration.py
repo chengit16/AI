@@ -1,3 +1,5 @@
+"""验证 P1A-02 Redis 到 Valkey 的配置和编排迁移。"""
+
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch

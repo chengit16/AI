@@ -1,3 +1,5 @@
+"""文档解析结果、结构化块、错误和任务端口的公开入口。"""
+
 from ai_platform_worker.modules.ingestion.domain.documents import (
     Chunk,
     ChunkSourcePosition,

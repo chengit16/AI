@@ -1,3 +1,5 @@
+"""把可信请求上下文和授权事实交给统一策略决策点执行。"""
+
 from __future__ import annotations
 
 from uuid import UUID, uuid4

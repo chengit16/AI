@@ -1,3 +1,5 @@
+"""定义 API 与 Worker 共用的索引版本、构建块和 Adapter 端口。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,6 +15,8 @@ IndexSecurityLevel = Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
 
 @dataclass(frozen=True)
 class ClaimedIndexVersion:
+    """记录 Worker 已领取的索引版本、租约和构建所需文档事实。"""
+
     index_version_id: UUID
     workspace_id: UUID
     knowledge_base_id: UUID
@@ -37,6 +41,8 @@ class ClaimedIndexVersion:
 
 @dataclass(frozen=True)
 class BuiltIndexChunk:
+    """保存索引构建后的规范文本、向量、权限元数据和来源位置。"""
+
     index_version_id: UUID
     chunk_id: UUID
     workspace_id: UUID
@@ -61,6 +67,8 @@ class BuiltIndexChunk:
 
 
 class IndexVersionStore(Protocol):
+    """以租约领取待构建索引版本，并原子写回成功、重试或失败状态。"""
+
     def ensure_queued(
         self,
         *,
@@ -101,10 +109,14 @@ class IndexVersionStore(Protocol):
 
 
 class IndexArtifactStorage(Protocol):
+    """读取解析产物并原子替换某文档版本的全部索引分块。"""
+
     def read_artifact(self, version: ClaimedIndexVersion) -> bytes: ...
 
 
 class EmbeddingAdapter(Protocol):
+    """批量生成固定维度向量，输入顺序与输出顺序必须严格一致。"""
+
     model_version: str
     dimension: int
 

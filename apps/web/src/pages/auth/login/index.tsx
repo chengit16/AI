@@ -1,4 +1,4 @@
-/** 登录与个人账号注册入口，建立服务端 Session 和默认个人空间上下文。 */
+/** @description 登录与个人账号注册入口，建立服务端 Session 和默认个人空间上下文。 */
 import { useMutation } from "@tanstack/react-query";
 import { Alert, Button, Form, Input, Segmented } from "antd";
 import { ArrowRight, LockKeyhole, UserRound } from "lucide-react";

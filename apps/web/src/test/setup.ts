@@ -1,3 +1,4 @@
+/** @description Vitest 浏览器环境断言和清理钩子的统一测试初始化。 */
 import "@testing-library/jest-dom/vitest";
 
 Object.defineProperty(window, "matchMedia", {

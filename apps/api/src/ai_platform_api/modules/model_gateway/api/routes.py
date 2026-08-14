@@ -1,3 +1,5 @@
+"""映射模型供应商治理、能力探测和运行配置发布 HTTP 协议。"""
+
 from dataclasses import asdict
 from typing import Annotated, cast
 from uuid import UUID
@@ -57,6 +59,8 @@ def list_model_providers(
         Depends(model_provider_configuration_service),
     ],
 ) -> ModelProviderConfigurationListResponse:
+    """列出模型供应商集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return ModelProviderConfigurationListResponse(
         items=[_response(item) for item in service.list_configurations(context)]
@@ -79,6 +83,8 @@ def create_model_provider(
         Depends(model_provider_configuration_service),
     ],
 ) -> ModelProviderConfigurationResponse:
+    """创建模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return _response(
         service.create(
@@ -111,6 +117,8 @@ def rotate_model_provider_credential(
         Depends(model_provider_configuration_service),
     ],
 ) -> ModelProviderConfigurationResponse:
+    """处理轮换模型供应商凭据；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return _response(
         service.rotate_credential(
@@ -137,6 +145,8 @@ def review_model_provider_data_policy(
         Depends(model_provider_configuration_service),
     ],
 ) -> ModelProviderConfigurationResponse:
+    """审核模型供应商数据策略；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return _response(
         service.review_data_policy(
@@ -167,6 +177,8 @@ def probe_model_provider(
         Depends(model_provider_configuration_service),
     ],
 ) -> ModelProviderConfigurationResponse:
+    """探测模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return _response(service.probe(context, provider_id))
 
@@ -186,6 +198,8 @@ def activate_model_provider(
         Depends(model_provider_configuration_service),
     ],
 ) -> ModelProviderConfigurationResponse:
+    """启用模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return _response(service.activate(context, provider_id))
 
@@ -205,6 +219,8 @@ def disable_model_provider(
         Depends(model_provider_configuration_service),
     ],
 ) -> ModelProviderConfigurationResponse:
+    """停用模型供应商；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return _response(service.disable(context, provider_id))
 
@@ -251,6 +267,8 @@ def list_ai_runtime_configs(
         Depends(ai_runtime_configuration_service),
     ],
 ) -> AiRuntimeConfigListResponse:
+    """列出AI运行时配置集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return AiRuntimeConfigListResponse(
         items=[_runtime_response(item) for item in service.list_configurations(context)]
@@ -271,6 +289,8 @@ def get_current_ai_runtime_config(
         Depends(ai_runtime_configuration_service),
     ],
 ) -> CurrentAiRuntimeConfigResponse:
+    """获取当前AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     current = service.current_configuration(context)
     return CurrentAiRuntimeConfigResponse(
@@ -294,6 +314,8 @@ def create_ai_runtime_config(
         Depends(ai_runtime_configuration_service),
     ],
 ) -> AiRuntimeConfigResponse:
+    """创建AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     return _runtime_response(
         service.create(
@@ -336,6 +358,8 @@ def activate_ai_runtime_config(
         Depends(ai_runtime_configuration_service),
     ],
 ) -> AiRuntimeConfigPublicationResponse:
+    """启用AI运行时配置；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
+
     response.headers["Cache-Control"] = "no-store"
     publication = service.activate(context, runtime_config_version_id)
     return AiRuntimeConfigPublicationResponse(**asdict(publication))

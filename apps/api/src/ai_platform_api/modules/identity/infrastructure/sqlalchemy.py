@@ -1,3 +1,5 @@
+"""实现账号、空间注册和身份读取的 PostgreSQL Adapter。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -157,6 +159,8 @@ class SqlAlchemyIdentityReader(IdentityReader):
 
 
 class SqlAlchemyApiKeyWriter:
+    """在工作空间隔离下写入和撤销 API Key 摘要，永不持久化明文。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -194,6 +198,8 @@ class SqlAlchemyApiKeyWriter:
 
 
 class SqlAlchemyIdentityUnitOfWork(IdentityUnitOfWork):
+    """保证 API Key 状态变化使用显式 SQLAlchemy Session 提交。"""
+
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
         self._state: ContextVar[tuple[Session, SqlAlchemyApiKeyWriter] | None] = ContextVar(
@@ -240,6 +246,8 @@ class SqlAlchemyIdentityUnitOfWork(IdentityUnitOfWork):
 
 
 class SqlAlchemyRegistrationWriter:
+    """一次写入账号、个人空间、所有者成员、系统角色和默认权益。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 

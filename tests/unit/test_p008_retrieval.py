@@ -1,3 +1,5 @@
+"""验证 P0-08 检索范围、RRF、精读预算和引用规则。"""
+
 from dataclasses import dataclass, field
 from uuid import UUID
 

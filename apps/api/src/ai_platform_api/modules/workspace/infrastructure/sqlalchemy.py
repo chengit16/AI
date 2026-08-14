@@ -1,3 +1,5 @@
+"""实现同 SQL 工作空间隔离资源查询与共享事务 UoW。"""
+
 from collections.abc import Callable
 from types import TracebackType
 from uuid import UUID
@@ -15,6 +17,8 @@ from ai_platform_api.persistence.tables import workspace_resources
 
 
 class SqlAlchemyWorkspaceResourceRepository:
+    """使用复合工作空间条件读写资源，跨空间标识不会返回记录。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -49,6 +53,8 @@ class SqlAlchemyWorkspaceResourceRepository:
 
 
 class SqlAlchemyWorkspaceUnitOfWork:
+    """保证资源、审计和 Outbox 使用同一 SQLAlchemy Session 提交。"""
+
     def __init__(
         self,
         session_factory: Callable[[], Session],

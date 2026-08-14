@@ -1,3 +1,5 @@
+"""验证 P1D-01 知识库、文档、版本和发布指针约束。"""
+
 from __future__ import annotations
 
 import os

@@ -1,3 +1,7 @@
+/**
+ * @description 当前工作空间动态菜单查询 Hook
+ * 服务端快照是菜单事实来源，静态注册表只提供组件映射能力。
+ */
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -11,6 +15,12 @@ import { iconByKey, staticWorkspaceNavigation } from "@/config/resources";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 import { useSessionStore } from "@/store/session";
 
+/**
+ * 返回当前空间菜单发布、有效角色、可见导航和加载错误状态。
+ *
+ * 个人空间没有部门角色继承，因此只在企业空间查询有效角色；菜单不存在发布快照时
+ * 使用注册表导航兼容本地初始空间，首次发布后完全以服务端快照为准。
+ */
 export function useWorkspaceMenuNavigation() {
   const workspaceId = useSessionStore((state) => state.workspaceId);
   const accountId = useSessionStore((state) => state.accountId);
@@ -29,6 +39,7 @@ export function useWorkspaceMenuNavigation() {
     ),
     staleTime: 0,
   });
+  // 发布快照只携带数据，组件与图标始终从本地白名单解析，防止服务端配置执行任意代码。
   const navigation = useMemo(
     () =>
       release.data?.snapshot
@@ -36,6 +47,7 @@ export function useWorkspaceMenuNavigation() {
         : staticWorkspaceNavigation,
     [release.data, roles.data],
   );
+  // 权限码集合只裁剪按钮和页面入口，后端 PDP 仍对每次请求独立授权。
   const visiblePermissionCodes = useMemo(() => {
     if (!release.data?.snapshot) {
       return new Set(

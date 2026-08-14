@@ -1,3 +1,4 @@
+/** @description AI 运行配置版本、激活状态和追溯字段表格。 */
 import { Button, Popconfirm, Table, Tag } from "antd";
 import type { TableColumnsType } from "antd";
 import { Rocket } from "lucide-react";
@@ -8,10 +9,15 @@ import { StateView } from "@/components/StateView/StateView";
 import { formatTimestamp } from "../config";
 
 interface RuntimeTableProps {
+  /** 全部不可变运行配置版本。 */
   items: readonly AiRuntimeConfig[];
+  /** 当前发布指针指向的版本 ID；未发布时为空。 */
   currentId: string | null;
+  /** 版本清单是否正在加载。 */
   isLoading: boolean;
+  /** 发布命令是否正在提交。 */
   isActivating: boolean;
+  /** 请求原子发布指定运行配置版本。 */
   onActivate: (runtimeConfigVersionId: string) => void;
 }
 

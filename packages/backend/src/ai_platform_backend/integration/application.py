@@ -1,3 +1,5 @@
+"""实现带租约、有限重试和发布结果回写的 Outbox Dispatcher。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -9,6 +11,8 @@ from ai_platform_backend.integration.domain import OutboxLeaseStore, TaskPublish
 
 @dataclass(frozen=True)
 class DispatchResult:
+    """汇总本轮 Outbox 领取、发布、重试和死信数量。"""
+
     claimed: int
     published: int
     retried: int
@@ -42,6 +46,9 @@ class OutboxDispatcher:
         self._clock = clock
 
     def dispatch_once(self) -> DispatchResult:
+        """按租约领取一批 Outbox 事件，确认发布后完成，失败则有限重试或死信。"""
+
+        # 1. 先按租约领取到期事件；其他 Worker 在租约到期前不能重复发布同一批次。
         now = self._clock()
         batch = self._store.claim_due(
             worker_id=self._worker_id,
@@ -52,6 +59,7 @@ class OutboxDispatcher:
         )
         published = retried = 0
         dead_lettered = batch.dead_lettered
+        # 2. 每条事件独立发布和回写，单条失败不会阻断批次内其他事件。
         for lease in batch.events:
             try:
                 self._publisher.publish(lease.event)
@@ -73,12 +81,14 @@ class OutboxDispatcher:
                 elif status == "pending":
                     retried += 1
                 continue
+            # 3. 只有 Broker 确认后才标记已发布；丢失租约时不冒充成功。
             if self._store.mark_published(
                 event_id=lease.event.event_id,
                 worker_id=self._worker_id,
                 published_at=self._clock(),
             ):
                 published += 1
+        # 4. 返回本轮可观测结果，不把异常文本或敏感 Broker 细节带出边界。
         return DispatchResult(
             claimed=len(batch.events),
             published=published,

@@ -1,3 +1,5 @@
+"""验证 P1B-03 多级部门、岗位和成员归属 PostgreSQL 约束。"""
+
 from __future__ import annotations
 
 import os

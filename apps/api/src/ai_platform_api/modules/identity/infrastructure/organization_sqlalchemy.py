@@ -1,3 +1,5 @@
+"""实现组织树、岗位和成员归属的 PostgreSQL Repository 与 UoW。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -48,6 +50,8 @@ SessionFactory = Callable[[], Session]
 
 
 class SqlAlchemyOrganizationRepository:
+    """在工作空间隔离下维护部门闭包、职位和成员组织归属。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -405,6 +409,8 @@ class SqlAlchemyOrganizationRepository:
 
 
 class SqlAlchemyOrganizationUnitOfWork:
+    """保证组织、角色版本、审计和 Outbox 使用同一 Session 提交。"""
+
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
         self._state: ContextVar[

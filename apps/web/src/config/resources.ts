@@ -1,3 +1,7 @@
+/**
+ * @description 生成资源注册表的前端消费映射
+ * 集中维护页面组件、图标、静态回退导航与 permission_code 绑定。
+ */
 import {
   Activity,
   Cpu,
@@ -10,9 +14,11 @@ import {
 
 import { resourceRegistry } from "@/config/resourceRegistry.generated";
 
+/** 按不可变页面资源 ID 查找静态组件和路由声明。 */
 export const pageById = new Map(
   resourceRegistry.page_resources.map((resource) => [resource.page_resource_id, resource]),
 );
+/** 服务端菜单可引用的图标白名单，禁止快照加载任意组件。 */
 export const iconByKey = {
   activity: Activity,
   cpu: Cpu,
@@ -22,10 +28,12 @@ export const iconByKey = {
   "users-round": UsersRound,
 } satisfies Record<string, LucideIcon>;
 
+/** 按组件键暴露类型安全的页面路由表。 */
 export const pageRoutes = Object.fromEntries(
   resourceRegistry.page_resources.map((resource) => [resource.component_key, resource.route]),
 ) as Record<(typeof resourceRegistry.page_resources)[number]["component_key"], string>;
 
+/** 空间级菜单尚未发布时使用的已授权页面导航。 */
 export const staticWorkspaceNavigation = resourceRegistry.menus
   .filter((menu) => {
     const page = menu.page_resource_id ? pageById.get(menu.page_resource_id) : undefined;
@@ -50,6 +58,7 @@ export const staticWorkspaceNavigation = resourceRegistry.menus
   })
   .sort((left, right) => left.sortOrder - right.sortOrder);
 
+/** 仅平台管理员入口使用的平台级静态导航。 */
 export const staticPlatformNavigation = resourceRegistry.menus
   .filter((menu) => {
     const page = menu.page_resource_id ? pageById.get(menu.page_resource_id) : undefined;

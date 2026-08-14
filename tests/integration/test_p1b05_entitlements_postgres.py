@@ -1,3 +1,5 @@
+"""验证 P1B-05 权益、开关、额度和并发用量账本。"""
+
 from __future__ import annotations
 
 import os

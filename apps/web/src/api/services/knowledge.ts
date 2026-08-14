@@ -1,12 +1,22 @@
+/**
+ * @description 知识生产 API Service
+ * 只负责契约化请求与 multipart 组装，权限、状态机和上传安全由服务端执行。
+ */
 import type { components } from "@/api/generated/platform-api.v1";
 import { apiRequest } from "@/api/client";
 
+/** 知识库列表使用的服务端范围化摘要。 */
 export type KnowledgeBaseSummary = components["schemas"]["KnowledgeBaseSummaryResponse"];
+/** 文档及其最新版本、发布状态和可执行动作摘要。 */
 export type KnowledgeDocumentSummary = components["schemas"]["KnowledgeDocumentSummaryResponse"];
+/** 文档解析、OCR 和索引前处理任务的可见状态。 */
 export type IngestionJob = components["schemas"]["IngestionJobResponse"];
+/** 新建知识库时允许提交的契约字段。 */
 export type CreateKnowledgeBaseRequest = components["schemas"]["CreateKnowledgeBaseRequest"];
+/** 上传完成后返回的文档、版本和异步任务标识。 */
 export type DocumentUploadResponse = components["schemas"]["DocumentUploadResponse"];
 
+/** 查询当前空间可见的知识库摘要。 */
 export async function getKnowledgeBases(workspaceId: string, signal?: AbortSignal) {
   const response = await apiRequest<components["schemas"]["KnowledgeBaseListResponse"]>(
     `/api/v1/workspaces/${workspaceId}/knowledge-bases`,
@@ -15,6 +25,7 @@ export async function getKnowledgeBases(workspaceId: string, signal?: AbortSigna
   return response.items;
 }
 
+/** 查询知识库内经过服务端资源范围和字段策略投影的文档摘要。 */
 export async function getKnowledgeDocuments(
   workspaceId: string,
   knowledgeBaseId: string,
@@ -27,6 +38,7 @@ export async function getKnowledgeDocuments(
   return response.items;
 }
 
+/** 查询知识库入库任务，供页面轮询活动任务及展示稳定失败码。 */
 export async function getKnowledgeIngestionJobs(
   workspaceId: string,
   knowledgeBaseId: string,
@@ -39,6 +51,7 @@ export async function getKnowledgeIngestionJobs(
   return response.items;
 }
 
+/** 创建工作空间知识库；服务端负责名称、配额和写权限校验。 */
 export function createKnowledgeBase(workspaceId: string, body: CreateKnowledgeBaseRequest) {
   return apiRequest<components["schemas"]["KnowledgeBaseResponse"]>(
     `/api/v1/workspaces/${workspaceId}/knowledge-bases`,
@@ -53,6 +66,7 @@ interface UploadKnowledgeDocumentParams {
   securityLevel: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
 }
 
+/** 上传文档首版并创建安全扫描与解析任务。 */
 export function uploadKnowledgeDocument(
   workspaceId: string,
   knowledgeBaseId: string,
@@ -69,6 +83,7 @@ export function uploadKnowledgeDocument(
   );
 }
 
+/** 为现有文档上传不可变新版本，不直接改变当前发布指针。 */
 export function uploadKnowledgeDocumentVersion(
   workspaceId: string,
   knowledgeBaseId: string,
@@ -83,6 +98,7 @@ export function uploadKnowledgeDocumentVersion(
   );
 }
 
+/** 确认解析版本就绪；内容摘要和状态转换由服务端校验。 */
 export function markKnowledgeDocumentVersionReady(
   workspaceId: string,
   knowledgeBaseId: string,
@@ -96,6 +112,7 @@ export function markKnowledgeDocumentVersionReady(
   );
 }
 
+/** 发布已就绪版本并更新服务端当前版本指针。 */
 export function publishKnowledgeDocumentVersion(
   workspaceId: string,
   knowledgeBaseId: string,
@@ -108,6 +125,7 @@ export function publishKnowledgeDocumentVersion(
   );
 }
 
+/** 对后端允许重试的失败任务发起一次人工重新排队。 */
 export function retryKnowledgeIngestionJob(workspaceId: string, ingestionJobId: string) {
   return apiRequest<IngestionJob>(
     `/api/v1/workspaces/${workspaceId}/ingestion-jobs/${ingestionJobId}/retry`,

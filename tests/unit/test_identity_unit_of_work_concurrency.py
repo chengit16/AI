@@ -1,3 +1,5 @@
+"""验证身份模块共享 UoW 在并发请求间隔离 Session 状态。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable

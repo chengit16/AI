@@ -1,4 +1,4 @@
-/** UnoCSS 配置测试，验证项目复合断点会进入真实生成产物。 */
+/** @description UnoCSS 配置测试，验证项目复合断点会进入真实生成产物。 */
 import { createGenerator } from "unocss";
 import { describe, expect, it } from "vitest";
 

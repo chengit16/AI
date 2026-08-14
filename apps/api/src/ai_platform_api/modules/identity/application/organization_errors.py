@@ -1,3 +1,5 @@
+"""定义组织管理用例的拒绝、不存在、冲突和校验错误。"""
+
 from ai_platform_api.common.errors import PlatformError
 
 
@@ -14,8 +16,12 @@ class OrganizationConflictError(PlatformError):
 
 
 class OrganizationNotFoundError(PlatformError):
+    """表示组织未找到错误，由协议层映射为稳定错误码。"""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
 class OrganizationValidationError(PlatformError):
+    """表示组织校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"

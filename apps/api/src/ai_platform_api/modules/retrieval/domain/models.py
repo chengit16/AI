@@ -1,3 +1,5 @@
+"""定义检索范围、索引块、候选、证据和引用领域模型。"""
+
 from dataclasses import dataclass, replace
 from typing import Literal, Protocol
 from uuid import UUID
@@ -36,6 +38,8 @@ class AuthorizedSearchScope:
 
 @dataclass(frozen=True)
 class IndexedChunk:
+    """保存可搜索分块的文本、向量、权限元数据和来源位置。"""
+
     chunk_id: UUID
     workspace_id: UUID
     knowledge_base_id: UUID
@@ -56,6 +60,8 @@ class IndexedChunk:
 
 @dataclass(frozen=True)
 class StoredChunk:
+    """保存从检索存储读取的分块事实，不携带跨空间数据。"""
+
     chunk_id: UUID
     workspace_id: UUID
     knowledge_base_id: UUID
@@ -79,6 +85,8 @@ class StoredChunk:
 
 @dataclass(frozen=True)
 class ChannelCandidate:
+    """记录单个关键词或向量通道中的候选排名与原始分数。"""
+
     chunk: StoredChunk
     channel: SearchChannel
     rank: int
@@ -87,6 +95,8 @@ class ChannelCandidate:
 
 @dataclass(frozen=True)
 class SearchCandidate:
+    """汇总多通道融合分数、重排分数和可引用分块。"""
+
     chunk: StoredChunk
     keyword_rank: int | None
     vector_rank: int | None
@@ -98,6 +108,8 @@ class SearchCandidate:
 
 @dataclass(frozen=True)
 class RetrievalBudget:
+    """限制召回候选、最终结果、总字符数和各通道查询规模。"""
+
     per_channel_candidates: int = 20
     rerank_candidates: int = 10
     final_candidates: int = 5
@@ -125,12 +137,16 @@ class RetrievalBudget:
 
 @dataclass(frozen=True)
 class Evidence:
+    """保存回答可使用的分块文本、来源位置和策略版本。"""
+
     chunk: StoredChunk
     score: float
 
 
 @dataclass(frozen=True)
 class RetrievalResult:
+    """返回授权后的证据集合及本次检索使用的稳定策略版本。"""
+
     evidence: tuple[Evidence, ...]
     reranker_used: bool
     keyword_candidate_count: int
@@ -142,6 +158,8 @@ class RetrievalResult:
 
 @dataclass(frozen=True)
 class Citation:
+    """把答案引用绑定到文档版本、分块、来源位置和签发时策略版本。"""
+
     chunk_id: UUID
     document_id: UUID
     document_version_id: UUID
@@ -152,6 +170,8 @@ class Citation:
 
 
 class EmbeddingProvider(Protocol):
+    """为查询文本生成固定维度向量，失败时不得回退为无授权搜索。"""
+
     model_version: str
     dimension: int
 
@@ -159,12 +179,16 @@ class EmbeddingProvider(Protocol):
 
 
 class Reranker(Protocol):
+    """为查询和候选文本返回一一对应的相关性分数。"""
+
     model_version: str
 
     def score(self, query: str, passages: tuple[str, ...]) -> tuple[float, ...]: ...
 
 
 class SearchIndex(Protocol):
+    """在工作空间和授权条件内执行关键词与向量搜索。"""
+
     def keyword_search(
         self,
         scope: AuthorizedSearchScope,

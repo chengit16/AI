@@ -1,3 +1,5 @@
+"""定义统一策略请求、范围决策和默认拒绝决策端口。"""
+
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 from uuid import UUID
@@ -10,6 +12,8 @@ DataScopeType = Literal["workspace", "department_tree", "self", "resource"]
 
 @dataclass(frozen=True)
 class ResourceReference:
+    """标识授权请求中的资源类型、工作空间和可选具体资源。"""
+
     resource_type: str
     resource_id: UUID
     workspace_id: UUID
@@ -18,6 +22,8 @@ class ResourceReference:
 
 @dataclass(frozen=True)
 class PolicyRequest:
+    """定义策略操作的请求字段与协议校验边界。"""
+
     context: RequestContext
     permission_code: str
     resource: ResourceReference
@@ -39,6 +45,8 @@ class ResourceScope:
 
 @dataclass(frozen=True)
 class PolicyDecision:
+    """返回允许/拒绝结论、数据范围、字段掩码和可解释原因。"""
+
     decision_id: UUID
     decision: Decision
     permission_code: str
@@ -63,4 +71,6 @@ class PolicyDecision:
 
 
 class PolicyDecisionPoint(Protocol):
+    """对可信主体、动作和资源执行统一策略决策，未知情况默认拒绝。"""
+
     def decide(self, request: PolicyRequest) -> PolicyDecision: ...

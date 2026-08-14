@@ -1,3 +1,4 @@
+/** @description API Client 会话、错误转换与请求边界测试。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiRequest, configureApiClient } from "@/api/client";

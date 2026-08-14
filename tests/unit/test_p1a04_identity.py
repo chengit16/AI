@@ -1,3 +1,5 @@
+"""验证 P1A-04 认证、会话、加密和可信请求上下文。"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

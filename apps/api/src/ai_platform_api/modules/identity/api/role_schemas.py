@@ -1,3 +1,5 @@
+"""定义角色、绑定和继承结果接口的请求与响应 Schema。"""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -7,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CreateRoleRequest(BaseModel):
+    """定义创建角色操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     role_key: str = Field(min_length=3, max_length=64)
@@ -14,12 +18,16 @@ class CreateRoleRequest(BaseModel):
 
 
 class RoleStatusRequest(BaseModel):
+    """定义角色状态操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     active: bool
 
 
 class RoleResponse(BaseModel):
+    """定义角色操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     role_id: UUID
@@ -31,12 +39,16 @@ class RoleResponse(BaseModel):
 
 
 class RoleListResponse(BaseModel):
+    """定义角色列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[RoleResponse]
 
 
 class CreateRoleBindingRequest(BaseModel):
+    """定义创建角色绑定操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     role_id: UUID
@@ -69,6 +81,8 @@ class CreateRoleBindingRequest(BaseModel):
 
 
 class RoleBindingResponse(BaseModel):
+    """定义角色绑定操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     binding_id: UUID
@@ -81,6 +95,8 @@ class RoleBindingResponse(BaseModel):
 
 
 class EffectiveRoleSourceResponse(BaseModel):
+    """定义有效角色来源操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     scope_type: Literal["workspace", "department", "member"]
@@ -88,6 +104,8 @@ class EffectiveRoleSourceResponse(BaseModel):
 
 
 class EffectiveRoleResponse(BaseModel):
+    """定义有效角色操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     role_id: UUID
@@ -97,6 +115,8 @@ class EffectiveRoleResponse(BaseModel):
 
 
 class EffectiveRoleSetResponse(BaseModel):
+    """定义有效角色集合操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     account_id: UUID

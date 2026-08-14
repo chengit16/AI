@@ -1,3 +1,7 @@
+/**
+ * @description 企业组织管理业务 Hook
+ * 组合部门、岗位、成员 Query 与写操作，并维护层级状态变化后的缓存一致性。
+ */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
@@ -20,8 +24,11 @@ import type {
 } from "./OrganizationForms";
 
 interface Options {
+  /** 当前企业空间 ID；未解析空间时为空。 */
   workspaceId: string | null;
+  /** 页面确认当前空间为企业且允许发起查询后置为 `true`。 */
   enabled: boolean;
+  /** 任一组织表单成功提交后的统一关闭回调。 */
   closeForm: () => void;
 }
 

@@ -1,3 +1,5 @@
+"""装配 FastAPI 请求依赖、可信上下文和各业务模块服务。"""
+
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -141,6 +143,8 @@ class ApplicationContainer:
 
 
 def build_application_container(settings: Settings) -> ApplicationContainer:
+    """装配应用服务及基础设施适配器，集中维护进程级依赖生命周期。"""
+
     verify_release_compatibility(
         settings.release_manifest_path,
         settings.compatibility_matrix_path,

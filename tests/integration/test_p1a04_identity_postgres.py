@@ -1,3 +1,5 @@
+"""验证 P1A-04 PostgreSQL 认证、会话和凭证安全边界。"""
+
 from __future__ import annotations
 
 import os

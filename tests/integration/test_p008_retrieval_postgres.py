@@ -1,3 +1,5 @@
+"""验证 P0-08 PostgreSQL 混合检索、精读和引用链路。"""
+
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass

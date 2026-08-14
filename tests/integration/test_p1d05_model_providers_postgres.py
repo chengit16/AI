@@ -1,3 +1,5 @@
+"""验证 P1D-05 模型供应商、加密凭证和治理状态持久化。"""
+
 from __future__ import annotations
 
 import os

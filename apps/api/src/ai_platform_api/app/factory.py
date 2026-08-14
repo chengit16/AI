@@ -1,3 +1,5 @@
+"""创建 FastAPI 应用并集中注册中间件、Router 与生命周期门禁。"""
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -36,6 +38,8 @@ def create_app(
     settings: Settings | None = None,
     container: ApplicationContainer | None = None,
 ) -> FastAPI:
+    """创建 FastAPI 应用并安装路由、中间件和统一错误映射。"""
+
     resolved_settings = settings or get_settings()
     dependencies = container or build_application_container(resolved_settings)
     if dependencies.settings != resolved_settings:

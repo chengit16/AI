@@ -1,3 +1,5 @@
+"""验证共享数据库引擎、Schema 和 Session 基线。"""
+
 from ai_platform_api.persistence.database import PlatformDatabase
 from sqlalchemy import text
 

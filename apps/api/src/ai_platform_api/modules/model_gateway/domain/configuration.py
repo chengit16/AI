@@ -1,3 +1,5 @@
+"""定义供应商配置、凭证版本、政策审核和能力探测领域模型。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,6 +21,8 @@ CredentialStatus = Literal["active", "revoked"]
 
 @dataclass(frozen=True)
 class ModelProviderConfiguration:
+    """记录模型供应商地址、合规审核、能力探测和启用状态。"""
+
     provider_id: UUID
     provider_key: str
     display_name: str
@@ -57,6 +61,8 @@ class ModelProviderConfiguration:
 
 @dataclass(frozen=True)
 class ModelProviderCredential:
+    """保存供应商凭据的信封密文、轮换版本和撤销状态。"""
+
     credential_id: UUID
     provider_id: UUID
     credential_version: int
@@ -69,6 +75,8 @@ class ModelProviderCredential:
 
 @dataclass(frozen=True)
 class CapabilityProbeResult:
+    """描述供应商连通性探测后的可用能力或稳定错误码。"""
+
     status: Literal["passed", "failed"]
     capabilities: frozenset[ModelCapability]
     error_code: str | None = None
@@ -84,6 +92,8 @@ class RuntimeProviderAccess:
 
 
 class ModelProviderRepository(Protocol):
+    """维护平台级供应商配置及唯一活动凭据版本。"""
+
     def is_platform_administrator(self, account_id: UUID) -> bool: ...
 
     def list_configurations(self) -> tuple[ModelProviderConfiguration, ...]: ...
@@ -106,6 +116,8 @@ class ModelProviderRepository(Protocol):
 
 
 class PlatformAuditWriter(Protocol):
+    """记录不隶属于单个工作空间的供应商管理审计。"""
+
     def add(
         self,
         *,
@@ -120,6 +132,8 @@ class PlatformAuditWriter(Protocol):
 
 
 class ModelProviderUnitOfWork(Protocol):
+    """保证供应商配置、凭据轮换和平台审计原子提交。"""
+
     @property
     def providers(self) -> ModelProviderRepository: ...
 
@@ -139,6 +153,8 @@ class ModelProviderUnitOfWork(Protocol):
 
 
 class CapabilityProbe(Protocol):
+    """通过供应商公开接口验证声明能力，失败时返回稳定错误码。"""
+
     def probe(
         self,
         *,
@@ -150,10 +166,14 @@ class CapabilityProbe(Protocol):
 
 
 class CredentialCipher(Protocol):
+    """使用关联数据加解密供应商凭据，防止密文跨供应商替换。"""
+
     def encrypt(self, plaintext: str, *, associated_data: bytes) -> EncryptedSecret: ...
 
     def decrypt(self, secret: EncryptedSecret, *, associated_data: bytes) -> str: ...
 
 
 class ProviderBaseUrlPolicy(Protocol):
+    """规范化供应商地址并拒绝本地或私有网络的 SSRF 风险。"""
+
     def normalize_and_validate(self, value: str) -> str: ...

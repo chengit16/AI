@@ -1,3 +1,5 @@
+"""定义统一权限与菜单发布接口的请求、响应和输入校验 Schema。"""
+
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -6,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class RolePermissionEntry(BaseModel):
+    """定义角色权限条目的协议字段和序列化边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     permission_code: str = Field(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$")
@@ -35,18 +39,24 @@ class RolePermissionEntry(BaseModel):
 
 
 class ReplaceRolePermissionsRequest(BaseModel):
+    """定义替换角色权限集合操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[RolePermissionEntry] = Field(max_length=200)
 
 
 class RolePermissionListResponse(BaseModel):
+    """定义角色权限列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[RolePermissionEntry]
 
 
 class WorkspaceMenuOverrideEntry(BaseModel):
+    """定义工作空间菜单覆盖条目的协议字段和序列化边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     menu_id: UUID
@@ -59,12 +69,16 @@ class WorkspaceMenuOverrideEntry(BaseModel):
 
 
 class ReplaceWorkspaceMenuConfigurationRequest(BaseModel):
+    """定义替换工作空间菜单配置操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[WorkspaceMenuOverrideEntry] = Field(max_length=500)
 
 
 class WorkspaceMenuConfigurationResponse(BaseModel):
+    """定义工作空间菜单配置操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     workspace_id: UUID
@@ -73,6 +87,8 @@ class WorkspaceMenuConfigurationResponse(BaseModel):
 
 
 class RoleMenuVisibilityEntry(BaseModel):
+    """定义角色菜单可见性条目的协议字段和序列化边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     menu_id: UUID
@@ -80,12 +96,16 @@ class RoleMenuVisibilityEntry(BaseModel):
 
 
 class ReplaceRoleMenuVisibilityRequest(BaseModel):
+    """定义替换角色菜单可见性操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[RoleMenuVisibilityEntry] = Field(max_length=500)
 
 
 class RoleMenuVisibilityResponse(BaseModel):
+    """定义角色菜单可见性操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     role_id: UUID
@@ -93,6 +113,8 @@ class RoleMenuVisibilityResponse(BaseModel):
 
 
 class MenuReleaseDecisionRequest(BaseModel):
+    """定义菜单发布决策操作的请求字段与协议校验边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     approved: bool
@@ -106,6 +128,8 @@ class MenuReleaseDecisionRequest(BaseModel):
 
 
 class MenuReleaseResponse(BaseModel):
+    """定义菜单发布操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     release_id: UUID
@@ -133,6 +157,8 @@ class MenuReleaseResponse(BaseModel):
 
 
 class MenuReleaseSnapshotMenuEntry(BaseModel):
+    """定义菜单发布快照菜单条目的协议字段和序列化边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     menu_id: UUID
@@ -150,6 +176,8 @@ class MenuReleaseSnapshotMenuEntry(BaseModel):
 
 
 class MenuReleaseSnapshotRoleMenuEntry(BaseModel):
+    """定义菜单发布快照角色菜单条目的协议字段和序列化边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     role_id: UUID
@@ -158,6 +186,8 @@ class MenuReleaseSnapshotRoleMenuEntry(BaseModel):
 
 
 class MenuReleaseSnapshotApiBindingEntry(BaseModel):
+    """定义菜单发布快照API绑定条目的协议字段和序列化边界。"""
+
     model_config = ConfigDict(extra="forbid")
 
     menu_id: UUID
@@ -166,6 +196,8 @@ class MenuReleaseSnapshotApiBindingEntry(BaseModel):
 
 
 class MenuReleaseSnapshotResponse(BaseModel):
+    """定义菜单发布快照操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     schema_version: int = Field(ge=1)
@@ -178,12 +210,16 @@ class MenuReleaseSnapshotResponse(BaseModel):
 
 
 class MenuReleaseListResponse(BaseModel):
+    """定义菜单发布列表操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     items: list[MenuReleaseResponse]
 
 
 class CurrentMenuReleaseResponse(BaseModel):
+    """定义当前菜单发布操作的稳定响应结构。"""
+
     model_config = ConfigDict(extra="forbid")
 
     item: MenuReleaseResponse | None

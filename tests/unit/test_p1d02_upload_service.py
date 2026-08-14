@@ -1,3 +1,5 @@
+"""验证 P1D-02 上传对象写入、事务回滚和入库任务创建。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

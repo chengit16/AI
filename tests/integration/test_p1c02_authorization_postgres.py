@@ -1,3 +1,5 @@
+"""验证 P1C-02 PostgreSQL 角色授权和数据级 ABAC。"""
+
 from __future__ import annotations
 
 import os

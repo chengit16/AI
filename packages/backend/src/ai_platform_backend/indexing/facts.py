@@ -1,3 +1,5 @@
+"""定义索引事实表引用和统一元数据命名约定。"""
+
 from sqlalchemy import Column, Integer, MetaData, String, Table
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 

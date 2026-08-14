@@ -1,3 +1,5 @@
+"""验证角色授权、菜单配置和菜单发布 HTTP 安全边界。"""
+
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast

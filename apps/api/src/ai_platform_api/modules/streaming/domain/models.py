@@ -1,3 +1,5 @@
+"""定义 SSE Run、持久化事件、回放结果和存储端口。"""
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Protocol
@@ -31,6 +33,8 @@ class StreamPolicy:
 
 @dataclass(frozen=True)
 class StreamRun:
+    """记录一次流式生成所属空间、会话、消息、终态和事件保留时间。"""
+
     run_id: UUID
     workspace_id: UUID
     conversation_id: UUID
@@ -43,6 +47,8 @@ class StreamRun:
 
 @dataclass(frozen=True)
 class StreamEvent:
+    """保存 Run 内严格递增序号、稳定事件标识、追踪上下文和载荷。"""
+
     event_id: UUID
     event_type: SseEventType
     workspace_id: UUID
@@ -76,12 +82,16 @@ class StreamEvent:
 
 @dataclass(frozen=True)
 class StreamReplay:
+    """返回游标后的事件、Run 状态及是否需要用最终快照恢复。"""
+
     events: tuple[StreamEvent, ...]
     final_run: StreamRun
     snapshot_required: bool
 
 
 class StreamStore(Protocol):
+    """原子维护 Run、事件序号、终态快照和按工作空间隔离的游标回放。"""
+
     def start_run(
         self,
         workspace_id: UUID,

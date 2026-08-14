@@ -1,3 +1,5 @@
+"""验证 P1D-02 MinIO 工作空间对象隔离和受控读写。"""
+
 from __future__ import annotations
 
 import os

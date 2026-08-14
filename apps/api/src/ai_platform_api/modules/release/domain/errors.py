@@ -1,3 +1,5 @@
+"""定义发布清单格式和组件组合不兼容错误。"""
+
 from dataclasses import dataclass
 from typing import ClassVar
 

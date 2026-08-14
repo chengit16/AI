@@ -1,3 +1,5 @@
+"""验证 P1D-06 运行配置装配、调用追溯和错误映射。"""
+
 from __future__ import annotations
 
 import json

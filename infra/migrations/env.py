@@ -1,3 +1,5 @@
+"""配置 Alembic 在线与离线 Migration 的 Schema 和数据库连接来源。"""
+
 import os
 from logging.config import fileConfig
 

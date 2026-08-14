@@ -1,3 +1,5 @@
+"""定义套餐、功能开关和用量用例的稳定错误语义。"""
+
 from ai_platform_api.common.errors import PlatformError
 
 
@@ -20,12 +22,18 @@ class QuotaExceededError(PlatformError):
 
 
 class EntitlementConflictError(PlatformError):
+    """表示权益冲突错误，由协议层映射为稳定错误码。"""
+
     error_code = "ENTITLEMENT_CONFLICT"
 
 
 class EntitlementNotFoundError(PlatformError):
+    """表示权益未找到错误，由协议层映射为稳定错误码。"""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
 class EntitlementValidationError(PlatformError):
+    """表示权益校验错误，由协议层映射为稳定错误码。"""
+
     error_code = "VALIDATION_ERROR"

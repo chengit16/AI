@@ -1,3 +1,5 @@
+"""提供进程内默认拒绝策略实现，供本地验证和统一 PDP 装配使用。"""
+
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
@@ -11,6 +13,8 @@ from ai_platform_api.modules.authorization.domain.policy import (
 
 @dataclass(frozen=True)
 class PolicyGrant:
+    """表示静态策略中的主体、动作、资源和工作空间授权条件。"""
+
     permissions: frozenset[str]
     field_masks: dict[str, frozenset[str]] = field(default_factory=dict)
     resource_ids: dict[str, frozenset[UUID]] = field(default_factory=dict)

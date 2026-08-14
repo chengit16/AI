@@ -1,3 +1,5 @@
+"""验证 P1A-05 Outbox Dispatcher、任务信封和幂等消费者。"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

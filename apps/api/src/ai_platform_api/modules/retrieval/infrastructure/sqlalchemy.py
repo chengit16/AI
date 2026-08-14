@@ -1,3 +1,5 @@
+"""实现带工作空间和资源范围过滤的 PostgreSQL 混合检索索引。"""
+
 from collections.abc import Sequence
 from uuid import UUID
 
@@ -15,6 +17,8 @@ from ai_platform_api.persistence.tables import retrieval_chunks
 
 
 def scope_conditions(scope: AuthorizedSearchScope) -> tuple[ColumnElement[bool], ...]:
+    """处理作用域条件，在基础设施边界维持稳定领域对象映射。"""
+
     conditions: list[ColumnElement[bool]] = [
         retrieval_chunks.c.workspace_id == scope.workspace_id,
         retrieval_chunks.c.active.is_(True),
@@ -36,6 +40,8 @@ def scope_conditions(scope: AuthorizedSearchScope) -> tuple[ColumnElement[bool],
 
 
 def stored_chunk(mapping: RowMapping) -> StoredChunk:
+    """处理已存储分块，在基础设施边界维持稳定领域对象映射。"""
+
     return StoredChunk(
         chunk_id=mapping["chunk_id"],
         workspace_id=mapping["workspace_id"],
@@ -51,6 +57,8 @@ def stored_chunk(mapping: RowMapping) -> StoredChunk:
 
 
 class SqlAlchemySearchIndex:
+    """在工作空间和授权条件下执行 PostgreSQL 关键词与 pgvector 搜索。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 

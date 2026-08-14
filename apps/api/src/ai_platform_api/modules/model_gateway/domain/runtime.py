@@ -1,3 +1,5 @@
+"""定义不可变运行配置、组件版本、发布指针和调用记录领域模型。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -23,6 +25,8 @@ InvocationStatus = Literal["running", "succeeded", "degraded", "failed", "reject
 
 @dataclass(frozen=True)
 class RuntimeComponentVersions:
+    """冻结一次 AI 运行所依赖的检索、安全及后置接口版本。"""
+
     chunking: str
     embedding: str
     index_schema: str
@@ -37,6 +41,8 @@ class RuntimeComponentVersions:
 
 @dataclass(frozen=True)
 class RuntimeRouteDraft:
+    """描述创建运行配置时尚未绑定供应商配置版本的路由。"""
+
     provider_id: UUID
     priority: int
     model_id: str
@@ -47,6 +53,8 @@ class RuntimeRouteDraft:
 
 @dataclass(frozen=True)
 class RuntimeRouteSnapshot:
+    """冻结供应商版本、模型能力、优先级和成本的运行路由。"""
+
     route_id: UUID
     provider_id: UUID
     provider_configuration_version: int
@@ -61,6 +69,8 @@ class RuntimeRouteSnapshot:
 
 @dataclass(frozen=True)
 class AiRuntimeConfigVersion:
+    """表示内容寻址且发布后不可变的 AI 运行配置版本。"""
+
     runtime_config_version_id: UUID
     version_number: int
     display_name: str
@@ -76,6 +86,8 @@ class AiRuntimeConfigVersion:
 
 @dataclass(frozen=True)
 class AiRuntimeConfigPublication:
+    """记录当前发布配置及用于缓存失效的递增代次。"""
+
     runtime_config_version_id: UUID
     generation: int
     published_by_account_id: UUID
@@ -84,6 +96,8 @@ class AiRuntimeConfigPublication:
 
 @dataclass(frozen=True)
 class RuntimeInvocationOutcome:
+    """汇总一次模型调用的配置、尝试链、凭据版本和最终状态。"""
+
     request: ModelRequest
     runtime_config_version_id: UUID
     status: InvocationStatus
@@ -95,6 +109,8 @@ class RuntimeInvocationOutcome:
 
 
 class RuntimeConfigurationRepository(Protocol):
+    """管理不可变运行配置版本及唯一当前发布指针。"""
+
     def is_platform_administrator(self, account_id: UUID) -> bool: ...
 
     def list_configurations(self) -> tuple[AiRuntimeConfigVersion, ...]: ...
@@ -119,6 +135,8 @@ class RuntimeConfigurationRepository(Protocol):
 
 
 class RuntimeConfigAuditWriter(Protocol):
+    """记录运行配置创建和发布的操作者与追踪上下文。"""
+
     def add(
         self,
         *,
@@ -133,6 +151,8 @@ class RuntimeConfigAuditWriter(Protocol):
 
 
 class RuntimeConfigurationUnitOfWork(Protocol):
+    """保证运行配置、发布指针和平台审计原子提交。"""
+
     @property
     def runtime_configs(self) -> RuntimeConfigurationRepository: ...
 
@@ -152,10 +172,14 @@ class RuntimeConfigurationUnitOfWork(Protocol):
 
 
 class RuntimeConfigurationReader(Protocol):
+    """向调用路径提供当前发布配置和关联供应商凭据。"""
+
     def current(self) -> AiRuntimeConfigVersion | None: ...
 
 
 class RuntimeInvocationStore(Protocol):
+    """持久化模型调用的开始事实与最终结果，供审计和成本追踪。"""
+
     def reserve(self, request: ModelRequest, runtime_config_version_id: UUID) -> None: ...
 
     def complete(self, outcome: RuntimeInvocationOutcome) -> None: ...

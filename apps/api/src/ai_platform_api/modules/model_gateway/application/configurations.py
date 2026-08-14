@@ -1,3 +1,5 @@
+"""编排供应商创建、凭证轮换、数据政策复核、探测和启停事务。"""
+
 from __future__ import annotations
 
 import re
@@ -61,6 +63,8 @@ class ModelProviderConfigurationService:
     def list_configurations(
         self, context: PlatformRequestContext
     ) -> tuple[ModelProviderConfiguration, ...]:
+        """仅向平台管理员返回脱敏供应商配置，绝不返回凭据明文。"""
+
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
             return unit_of_work.providers.list_configurations()
@@ -78,6 +82,9 @@ class ModelProviderConfigurationService:
         declared_capabilities: frozenset[ModelCapability],
         api_key: str,
     ) -> ModelProviderConfiguration:
+        """校验供应商地址和合规字段后保存配置及首个加密凭据版本。"""
+
+        # 1. 先校验纯输入字段，再验证管理员，未授权请求不能触发 DNS 或主密钥操作。
         normalized_key = provider_key.strip().casefold()
         normalized_name = display_name.strip()
         normalized_model = probe_model_id.strip()
@@ -96,6 +103,7 @@ class ModelProviderConfigurationService:
         # 管理员校验先于 DNS 和主密钥读取，未授权账号不能借配置接口消耗外部资源。
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
+        # 2. 地址通过 SSRF 策略后构造草稿配置，并用关联数据加密首个凭据版本。
         normalized_url = self._base_url_policy.normalize_and_validate(base_url)
         now = datetime.now(UTC)
         provider_id = uuid4()
@@ -134,6 +142,7 @@ class ModelProviderConfigurationService:
             account_id=context.account_id,
             occurred_at=now,
         )
+        # 3. 配置、活动凭据和平台审计同事务提交，任何唯一约束冲突整体回滚。
         try:
             with self._unit_of_work as unit_of_work:
                 self._require_administrator(unit_of_work, context.account_id)
@@ -152,6 +161,9 @@ class ModelProviderConfigurationService:
         *,
         api_key: str,
     ) -> ModelProviderConfiguration:
+        """创建新加密凭据版本并撤销旧版本，明文不进入日志或事件。"""
+
+        # 1. 锁定供应商后分配单调凭据版本，新密钥只在内存中参与加密。
         if not api_key.strip() or len(api_key) > 4096:
             raise ModelProviderConfigurationInvalidError
         now = datetime.now(UTC)
@@ -166,6 +178,7 @@ class ModelProviderConfigurationService:
                 account_id=context.account_id,
                 occurred_at=now,
             )
+            # 2. 凭据变化使旧探测结论失效，供应商必须重新探测才能再次启用。
             updated = replace(
                 current,
                 probe_status="not_run",
@@ -177,6 +190,7 @@ class ModelProviderConfigurationService:
                 updated_at=now,
                 version=current.version + 1,
             )
+            # 3. 新凭据、配置退回草稿和审计记录同事务提交。
             unit_of_work.providers.replace_active_credential(credential)
             unit_of_work.providers.save_configuration(updated)
             self._audit(
@@ -202,6 +216,9 @@ class ModelProviderConfigurationService:
         policy_url: str | None,
         policy_version: str | None,
     ) -> ModelProviderConfiguration:
+        """记录供应商数据政策审核结论，驳回原因和审核人可追溯。"""
+
+        # 1. 先校验保留期、训练用途和政策版本之间的合规组合。
         normalized_policy_url = _validated_policy_url(policy_url)
         normalized_policy_version = policy_version.strip() if policy_version else None
         if (
@@ -223,6 +240,7 @@ class ModelProviderConfigurationService:
             current = self._require_configuration(unit_of_work, provider_id, for_update=True)
             if approved and current.location == "external" and normalized_policy_url is None:
                 raise ModelProviderConfigurationInvalidError
+            # 2. 政策变化会把活动供应商退回草稿，避免继续沿用过期审核结论。
             updated = replace(
                 current,
                 policy_review_status="approved" if approved else "rejected",
@@ -238,6 +256,7 @@ class ModelProviderConfigurationService:
                 updated_at=now,
                 version=current.version + 1,
             )
+            # 3. 审核结论、审核人和平台审计同事务提交。
             unit_of_work.providers.save_configuration(updated)
             self._audit(
                 unit_of_work,
@@ -259,12 +278,16 @@ class ModelProviderConfigurationService:
         context: PlatformRequestContext,
         provider_id: UUID,
     ) -> ModelProviderConfiguration:
+        """使用短暂解密的凭据探测声明能力，只持久化能力和稳定错误码。"""
+
+        # 1. 只读事务取得配置和活动密文，随后在事务外短暂解密并执行网络探测。
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
             current = self._require_configuration(unit_of_work, provider_id)
             credential = unit_of_work.providers.get_active_credential(provider_id)
             if credential is None:
                 raise ModelProviderCredentialUnavailableError
+        # 2. 明文仅传给探测 Adapter，不进入领域对象、日志、审计或事件。
         api_key = self._cipher.decrypt(
             credential.envelope,
             associated_data=_credential_associated_data(credential),
@@ -276,6 +299,7 @@ class ModelProviderConfigurationService:
             capabilities=current.declared_capabilities,
         )
         now = datetime.now(UTC)
+        # 3. 写回前重新锁定并比对配置与凭据版本，拒绝覆盖并发轮换结果。
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
             latest = self._require_configuration(unit_of_work, provider_id, for_update=True)
@@ -294,6 +318,7 @@ class ModelProviderConfigurationService:
                 updated_at=now,
                 version=latest.version + 1,
             )
+            # 4. 只持久化能力、状态和稳定错误码；探测失败仍保存结果后再向调用方报错。
             unit_of_work.providers.save_configuration(updated)
             self._audit(
                 unit_of_work,
@@ -315,6 +340,8 @@ class ModelProviderConfigurationService:
     def activate(
         self, context: PlatformRequestContext, provider_id: UUID
     ) -> ModelProviderConfiguration:
+        """仅允许合规审核和能力探测均通过的供应商进入活动状态。"""
+
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
@@ -339,6 +366,8 @@ class ModelProviderConfigurationService:
     def disable(
         self, context: PlatformRequestContext, provider_id: UUID
     ) -> ModelProviderConfiguration:
+        """停用供应商配置，后续运行路由不得再选择该供应商。"""
+
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
             self._require_administrator(unit_of_work, context.account_id)
