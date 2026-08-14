@@ -1734,6 +1734,13 @@ workflow_runs = Table(
     Column("idempotency_key", String(128), nullable=False),
     Column("request_hash", String(64), nullable=False),
     Column("input_payload", JSONB, nullable=False),
+    Column("output_payload", JSONB, nullable=True),
+    Column("executor_version", String(64), nullable=True),
+    Column("execution_budget", JSONB, nullable=True),
+    Column("steps_executed", Integer, nullable=False, server_default="0"),
+    Column("model_calls", Integer, nullable=False, server_default="0"),
+    Column("retrieval_calls", Integer, nullable=False, server_default="0"),
+    Column("output_bytes", Integer, nullable=False, server_default="0"),
     Column("trace_id", String(32), nullable=False),
     Column("traceparent", String(128), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
@@ -1773,7 +1780,7 @@ workflow_runs = Table(
         name="fk_workflow_runs_requester",
     ),
     CheckConstraint(
-        "status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')",
+        "status IN ('queued', 'running', 'waiting_approval', 'succeeded', 'failed', 'cancelled')",
         name="ck_workflow_runs_status",
     ),
     CheckConstraint(
@@ -1782,7 +1789,11 @@ workflow_runs = Table(
     ),
     CheckConstraint("version >= 1", name="ck_workflow_runs_version"),
     CheckConstraint(
-        "(status IN ('queued', 'running') AND completed_at IS NULL) OR "
+        "steps_executed >= 0 AND model_calls >= 0 AND retrieval_calls >= 0 AND output_bytes >= 0",
+        name="ck_workflow_runs_usage",
+    ),
+    CheckConstraint(
+        "(status IN ('queued', 'running', 'waiting_approval') AND completed_at IS NULL) OR "
         "(status IN ('succeeded', 'failed', 'cancelled') AND completed_at IS NOT NULL)",
         name="ck_workflow_runs_completion",
     ),
@@ -1792,6 +1803,125 @@ Index(
     workflow_runs.c.workspace_id,
     workflow_runs.c.workflow_id,
     workflow_runs.c.created_at,
+)
+
+workflow_run_steps = Table(
+    "workflow_run_steps",
+    metadata,
+    Column("workflow_step_id", UUID(as_uuid=True), primary_key=True),
+    Column("workflow_run_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("node_id", String(64), nullable=False),
+    Column("node_type", String(32), nullable=False),
+    Column("sequence_no", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("input_payload", JSONB, nullable=True),
+    Column("output_payload", JSONB, nullable=True),
+    Column("branch_key", String(64), nullable=True),
+    Column("policy_decision_id", UUID(as_uuid=True), nullable=True),
+    Column("policy_version", Integer, nullable=True),
+    Column("started_at", DateTime(timezone=True), nullable=True),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    UniqueConstraint(
+        "workflow_run_id",
+        "node_id",
+        name="uq_workflow_run_steps_node",
+    ),
+    UniqueConstraint(
+        "workflow_step_id",
+        "workflow_run_id",
+        "workspace_id",
+        name="uq_workflow_run_steps_identity",
+    ),
+    ForeignKeyConstraint(
+        ["workflow_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.workflow_runs.workflow_run_id",
+            f"{SCHEMA_TOKEN}.workflow_runs.workspace_id",
+        ],
+        name="fk_workflow_run_steps_run",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("sequence_no >= 1", name="ck_workflow_run_steps_sequence"),
+    CheckConstraint(
+        "node_type IN "
+        "('trigger', 'condition', 'knowledge_retrieval', 'model', 'approval', 'result')",
+        name="ck_workflow_run_steps_node_type",
+    ),
+    CheckConstraint(
+        "status IN ('running', 'waiting_approval', 'succeeded', 'skipped', 'failed')",
+        name="ck_workflow_run_steps_status",
+    ),
+    CheckConstraint(
+        "(status = 'running' AND started_at IS NOT NULL AND completed_at IS NULL) OR "
+        "(status = 'waiting_approval' AND started_at IS NOT NULL AND completed_at IS NULL) OR "
+        "(status IN ('succeeded', 'failed') AND started_at IS NOT NULL "
+        "AND completed_at IS NOT NULL) OR "
+        "(status = 'skipped' AND started_at IS NULL AND completed_at IS NOT NULL)",
+        name="ck_workflow_run_steps_timestamps",
+    ),
+)
+Index(
+    "ix_workflow_run_steps_run_sequence",
+    workflow_run_steps.c.workflow_run_id,
+    workflow_run_steps.c.sequence_no,
+)
+
+workflow_node_attempts = Table(
+    "workflow_node_attempts",
+    metadata,
+    Column("workflow_attempt_id", UUID(as_uuid=True), primary_key=True),
+    Column("workflow_step_id", UUID(as_uuid=True), nullable=False),
+    Column("workflow_run_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("attempt_no", Integer, nullable=False),
+    Column("executor_version", String(64), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("input_hash", String(64), nullable=False),
+    Column("output_hash", String(64), nullable=True),
+    Column("usage", JSONB, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    UniqueConstraint(
+        "workflow_step_id",
+        "attempt_no",
+        name="uq_workflow_node_attempts_number",
+    ),
+    ForeignKeyConstraint(
+        ["workflow_step_id", "workflow_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.workflow_run_steps.workflow_step_id",
+            f"{SCHEMA_TOKEN}.workflow_run_steps.workflow_run_id",
+            f"{SCHEMA_TOKEN}.workflow_run_steps.workspace_id",
+        ],
+        name="fk_workflow_node_attempts_step",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("attempt_no >= 1", name="ck_workflow_node_attempts_number"),
+    CheckConstraint(
+        "status IN ('running', 'succeeded', 'failed')",
+        name="ck_workflow_node_attempts_status",
+    ),
+    CheckConstraint(
+        "input_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_workflow_node_attempts_input_hash",
+    ),
+    CheckConstraint(
+        "output_hash IS NULL OR output_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_workflow_node_attempts_output_hash",
+    ),
+    CheckConstraint(
+        "(status = 'running' AND completed_at IS NULL) OR "
+        "(status IN ('succeeded', 'failed') AND completed_at IS NOT NULL)",
+        name="ck_workflow_node_attempts_completion",
+    ),
+)
+Index(
+    "ix_workflow_node_attempts_run",
+    workflow_node_attempts.c.workflow_run_id,
+    workflow_node_attempts.c.started_at,
 )
 
 index_versions = indexing_tables.index_versions.to_metadata(metadata)

@@ -127,12 +127,21 @@ from ai_platform_api.modules.retrieval.infrastructure.planning_sqlalchemy import
 from ai_platform_api.modules.retrieval.infrastructure.reranking import (
     DeterministicLexicalReranker,
 )
+from ai_platform_api.modules.retrieval.infrastructure.sqlalchemy import SqlAlchemySearchIndex
 from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
 from ai_platform_api.modules.streaming.domain.models import StreamPolicy
 from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
     SqlAlchemyStreamUnitOfWork,
 )
+from ai_platform_api.modules.workflow.application.executor import (
+    GovernedWorkflowModelInvoker,
+    WorkflowRunExecutor,
+)
 from ai_platform_api.modules.workflow.application.service import WorkflowDefinitionService
+from ai_platform_api.modules.workflow.infrastructure.execution_sqlalchemy import (
+    SqlAlchemyWorkflowExecutionStore,
+    SqlAlchemyWorkflowKnowledgeRetriever,
+)
 from ai_platform_api.modules.workflow.infrastructure.sqlalchemy import (
     SqlAlchemyWorkflowUnitOfWork,
 )
@@ -174,6 +183,7 @@ class ApplicationContainer:
     retrieval_planning: BoundedRetrievalPlanningService | None = None
     retrieval_evidence: RetrievalEvidenceService | None = None
     workflows: WorkflowDefinitionService | None = None
+    workflow_run_executor: WorkflowRunExecutor | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
@@ -305,13 +315,14 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             replay_limit_bytes=settings.stream_replay_limit_bytes,
         ),
     )
+    model_context = AuthorizedModelContextBuilder(field_projection, rag_safety)
     assistant_run_executor = AssistantRunExecutor(
         assistant_conversations,
         retrieval_planning,
         retrieval_evidence,
         runtime_reader,
         model_runtime,
-        AuthorizedModelContextBuilder(field_projection, rag_safety),
+        model_context,
         streaming,
         delta_batch_characters=settings.stream_delta_batch_characters,
     )
@@ -353,6 +364,16 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             retrieval_planning=retrieval_planning,
             retrieval_evidence=retrieval_evidence,
             workflows=workflows,
+            workflow_run_executor=WorkflowRunExecutor(
+                SqlAlchemyWorkflowExecutionStore(database.sessions),
+                policy,
+                SqlAlchemyWorkflowKnowledgeRetriever(
+                    database.sessions,
+                    policy,
+                    SqlAlchemySearchIndex,
+                ),
+                GovernedWorkflowModelInvoker(runtime_reader, model_runtime, model_context),
+            ),
             rag_safety=rag_safety,
             authentication=AuthenticationService(
                 repository=reader,

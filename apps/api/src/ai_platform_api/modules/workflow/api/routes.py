@@ -3,7 +3,7 @@
 from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, status
 
 from ai_platform_api.common.api_errors import error_responses
 from ai_platform_api.common.request_context import RequestContext
@@ -30,6 +30,7 @@ from ai_platform_api.modules.workflow.api.schemas import (
     WorkflowRunResponse,
     WorkflowVersionResponse,
 )
+from ai_platform_api.modules.workflow.application.executor import WorkflowRunExecutor
 from ai_platform_api.modules.workflow.application.service import (
     WorkflowDefinition,
     WorkflowDefinitionService,
@@ -51,6 +52,15 @@ def workflow_service(request: Request) -> WorkflowDefinitionService:
     if not isinstance(service, WorkflowDefinitionService):
         raise RuntimeError("工作流服务尚未完成装配")
     return service
+
+
+def workflow_run_executor(request: Request) -> WorkflowRunExecutor:
+    """从应用容器解析受限执行器，Router 不直接调度节点 Adapter。"""
+
+    executor = getattr(request.app.state, "workflow_run_executor", None)
+    if not isinstance(executor, WorkflowRunExecutor):
+        raise RuntimeError("工作流执行器尚未完成装配")
+    return executor
 
 
 @router.post(
@@ -208,25 +218,28 @@ def create_workflow_run(
     workspace_id: UUID,
     workflow_id: UUID,
     body: CreateWorkflowRunRequest,
+    background_tasks: BackgroundTasks,
     idempotency_key: Annotated[
         str,
         Header(alias="Idempotency-Key", min_length=8, max_length=128),
     ],
     context: Annotated[RequestContext, Depends(trusted_request_context)],
     service: Annotated[WorkflowDefinitionService, Depends(workflow_service)],
+    executor: Annotated[WorkflowRunExecutor, Depends(workflow_run_executor)],
 ) -> WorkflowRunResponse:
-    """幂等创建当前发布版本的排队运行；节点执行在 P1F-02 接入。"""
+    """幂等创建排队运行，并在响应提交后触发一次受限本地执行。"""
 
     _require_workspace_path(context, workspace_id)
-    return _run(
-        service.create_run(
-            context,
-            workflow_id=workflow_id,
-            workflow_version_id=body.workflow_version_id,
-            idempotency_key=idempotency_key,
-            input_payload=body.input_payload,
-        )
+    run = service.create_run(
+        context,
+        workflow_id=workflow_id,
+        workflow_version_id=body.workflow_version_id,
+        idempotency_key=idempotency_key,
+        input_payload=body.input_payload,
     )
+    # 重复幂等请求可能再次调度，但数据库 queued -> running 条件保证节点只执行一次。
+    background_tasks.add_task(executor.execute, context, run.workflow_run_id)
+    return _run(run)
 
 
 @router.get(
@@ -328,16 +341,18 @@ def _run(
     projection: FieldProjectionService | None = None,
     field_mask: frozenset[str] = frozenset(),
 ) -> WorkflowRunResponse:
-    """转换运行事实；读取接口在序列化前移除无权查看的输入。"""
+    """转换运行事实；读取接口在序列化前移除无权查看的输入与输出。"""
 
     visible_input: dict[str, object] | None = value.input_payload
+    visible_output: dict[str, object] | None = value.output_payload
     if projection is not None:
         visible = projection.response(
             "workflow_instance",
-            {"input": value.input_payload},
+            {"input": value.input_payload, "output": value.output_payload},
             field_mask,
         )
         visible_input = cast("dict[str, object] | None", visible.get("input"))
+        visible_output = cast("dict[str, object] | None", visible.get("output"))
     return WorkflowRunResponse(
         workflow_run_id=value.workflow_run_id,
         workflow_id=value.workflow_id,
@@ -346,6 +361,12 @@ def _run(
         requested_by_account_id=value.requested_by_account_id,
         status=value.status,
         input_payload=visible_input,
+        output_payload=visible_output,
+        executor_version=value.executor_version,
+        steps_executed=value.steps_executed,
+        model_calls=value.model_calls,
+        retrieval_calls=value.retrieval_calls,
+        output_bytes=value.output_bytes,
         created_at=value.created_at,
         updated_at=value.updated_at,
         completed_at=value.completed_at,

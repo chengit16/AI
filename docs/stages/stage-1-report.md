@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1F-02` 受限工作流节点执行器待开始 |
+| 当前节点 | `P1F-03` 多级审批定义与计算待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -553,6 +553,19 @@
 - 当前边界：本节点只建立定义、版本、发布和运行事实，不执行节点、不实现审批链或页面。`P1F-02` 继续实现受限节点执行器；不引入用户脚本、外部写操作、SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：`ad51fca`。
 
+### P1F-02 受限工作流节点执行器
+
+- 状态：通过。
+- 节点与配置：固定 `workflow-executor-v1` 按冻结 DAG 的稳定拓扑顺序执行 Trigger、Condition、Knowledge Retrieval、Model、Approval 和 Result 六类节点。节点只接受固定声明式配置，发布图中出现额外字段、任意脚本、表达式或外部写操作入口时以 `WORKFLOW_NODE_CONFIG_INVALID` 失败关闭；条件分支只激活匹配边或 `default`，未选路径保留 `skipped` 步骤事实。
+- 授权与模型边界：每个活动节点执行前重新调用 PDP，不沿用创建 Run 时的授权；Knowledge Retrieval 额外复核 `knowledge.document.read`、当前活动索引、资源范围、字段遮罩和最高密级。Model 节点只读取冻结 `AiRuntimeConfigVersion`，知识正文按非可信证据经过字段投影和 RAG 安全检查，供应商选择、数据政策、重试、熔断、凭据和成本限制继续由统一模型网关负责。
+- 预算与失败关闭：每个 Run 在 `queued → running` 条件认领时冻结最多 100 个步骤、5 次模型调用、5 次知识检索、30 秒、单步骤 64 KiB 和累计输出 256 KiB 的执行预算。下一节点和外部调用在产生副作用前预检容量，节点输出再执行确定性 JSON 大小与摘要检查；超限返回 `WORKFLOW_BUDGET_EXCEEDED`，未知 Adapter 失败收敛为 `WORKFLOW_NODE_EXECUTION_FAILED`，不保存原始异常正文。
+- 执行事实：Revision `20260815_0032` 新增 `workflow_run_steps`、`workflow_node_attempts`，并为 `workflow_runs` 增加最终输出、执行器版本、冻结预算和实际用量。Run 使用数据库 `queued → running` 条件认领避免重复执行；Step、Attempt 和 Run 单向进入成功、跳过、等待或失败状态，成功、失败及审批等待转换与审计、Outbox 共用短事务。Approval 在本节点只把 Run 推进到 `waiting_approval`，审批链计算和恢复由 `P1F-03/04` 接管。
+- 契约与字段：运行响应新增 `output_payload`、`executor_version` 和执行用量字段，新增字段带默认值以保持 P1F-01 OpenAPI 消费兼容；输入与输出均在序列化前执行字段级 ABAC。错误目录新增 `WORKFLOW_NODE_CONFIG_INVALID`、`WORKFLOW_BUDGET_EXCEEDED` 和 `WORKFLOW_NODE_EXECUTION_FAILED`，OpenAPI、React/Python 生成类型、ReleaseManifest、兼容矩阵和平台 Revision 期望同步更新。
+- 自动验收：执行器单元和 PostgreSQL 专项覆盖六类节点、条件选支与跳过路径、重复认领、逐节点 PDP、知识与模型有界上下文、预算调用前拦截、失败 Step/Attempt 收敛、终态审计与 Outbox、审批等待及数据库终态保护。统一 `./scripts/verify` 全部通过，包括 React `28/28`、Python `383/383`、Ruff、mypy strict（397 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建。
+- 数据库与 HTTP：Migration `base → head → base → head` 通过；`./platform restart` 后平台就绪，`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260815_0032`、Valkey 和 Worker 八项诊断通过。使用全合成个人账号完成注册、登录、创建分支工作流、发布、创建 Run 和读取终态的真实认证 HTTP 闭环，最终状态为 `succeeded`、结果为 `manual: 1800`，执行 3 个活动节点且模型与检索调用均为 0。
+- 当前边界：本节点不实现审批链、审批通过后的恢复、异常动作或页面；工作流页面入口继续停用到 `P1F-05`。真实模型供应商仍为 `not_configured`，模型节点功能门禁使用合成 Adapter 和既有 Mock 模型网关验证，不扩展 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：待回填。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -563,4 +576,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1F-01`，当前进入 `P1F-02`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前统一门禁与 Revision `20260815_0031` 八项容器诊断均通过，工作流定义、不可变版本、发布和运行事实已经闭环；阶段整体结论仍等待节点执行器、多级审批、联合验收等业务节点和阶段端到端门禁完成。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1F-02`，当前进入 `P1F-03`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前统一门禁与 Revision `20260815_0032` 八项容器诊断均通过，工作流定义、不可变版本、受限节点执行和审批等待已经闭环；阶段整体结论仍等待多级审批、工作流页面、联合验收等业务节点和阶段端到端门禁完成。

@@ -25,7 +25,14 @@ WorkflowNodeType = Literal[
     "result",
 ]
 WorkflowStatus = Literal["active", "archived"]
-WorkflowRunStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
+WorkflowRunStatus = Literal[
+    "queued",
+    "running",
+    "waiting_approval",
+    "succeeded",
+    "failed",
+    "cancelled",
+]
 
 WORKFLOW_NODE_TYPES = frozenset(
     {
@@ -140,7 +147,7 @@ class WorkflowPublication:
 
 @dataclass(frozen=True)
 class WorkflowRun:
-    """记录一次运行冻结的工作流版本和输入；节点执行由 P1F-02 接管。"""
+    """记录一次运行冻结的工作流版本、输入、执行预算和最终输出。"""
 
     workflow_run_id: UUID
     workflow_id: UUID
@@ -158,6 +165,13 @@ class WorkflowRun:
     completed_at: datetime | None
     error_code: str | None
     version: int
+    output_payload: dict[str, object] | None = None
+    executor_version: str | None = None
+    execution_budget: dict[str, int] | None = None
+    steps_executed: int = 0
+    model_calls: int = 0
+    retrieval_calls: int = 0
+    output_bytes: int = 0
 
 
 class WorkflowWriteConflictError(Exception):

@@ -238,7 +238,7 @@ class SqlAlchemyWorkflowRepository(WorkflowRepository):
                 workflow_versions.c.workflow_version_id == workflow_version_id,
             )
         ).one_or_none()
-        return _version(row) if row is not None else None
+        return workflow_version_from_row(row) if row is not None else None
 
     def set_publication(self, publication: WorkflowPublication) -> None:
         statement = postgresql_insert(workflow_publications).values(
@@ -289,9 +289,10 @@ class SqlAlchemyWorkflowRepository(WorkflowRepository):
                 workflow_runs.c.idempotency_key == idempotency_key,
             )
         ).one_or_none()
-        return _run(row) if row is not None else None
+        return workflow_run_from_row(row) if row is not None else None
 
     def add_run(self, run: WorkflowRun) -> None:
+        # 1. 新运行一次写入冻结版本、输入和初始预算计数，后续只能由执行状态机单向推进。
         try:
             self._session.execute(
                 insert(workflow_runs).values(
@@ -304,6 +305,13 @@ class SqlAlchemyWorkflowRepository(WorkflowRepository):
                     idempotency_key=run.idempotency_key,
                     request_hash=run.request_hash,
                     input_payload=run.input_payload,
+                    output_payload=run.output_payload,
+                    executor_version=run.executor_version,
+                    execution_budget=run.execution_budget,
+                    steps_executed=run.steps_executed,
+                    model_calls=run.model_calls,
+                    retrieval_calls=run.retrieval_calls,
+                    output_bytes=run.output_bytes,
                     trace_id=run.trace_id,
                     traceparent=run.traceparent,
                     created_at=run.created_at,
@@ -313,6 +321,7 @@ class SqlAlchemyWorkflowRepository(WorkflowRepository):
                     version=run.version,
                 )
             )
+        # 2. 幂等键竞争与其他约束冲突使用不同领域原因，调用方据此决定复用还是失败。
         except IntegrityError as error:
             if _constraint_name(error) == "uq_workflow_runs_idempotency":
                 raise WorkflowWriteConflictError("idempotency") from error
@@ -331,7 +340,7 @@ class SqlAlchemyWorkflowRepository(WorkflowRepository):
                 workflow_runs.c.workflow_run_id == workflow_run_id,
             )
         ).one_or_none()
-        return _run(row) if row is not None else None
+        return workflow_run_from_row(row) if row is not None else None
 
 
 class SqlAlchemyWorkflowUnitOfWork(WorkflowUnitOfWork):
@@ -433,7 +442,9 @@ def _draft(row: Row[Any]) -> WorkflowDraft:
     )
 
 
-def _version(row: Row[Any]) -> WorkflowVersion:
+def workflow_version_from_row(row: Row[Any]) -> WorkflowVersion:
+    """把工作流版本数据库行转换为不可变领域事实。"""
+
     return WorkflowVersion(
         row.workflow_version_id,
         row.workflow_id,
@@ -458,7 +469,9 @@ def _publication(row: Row[Any]) -> WorkflowPublication:
     )
 
 
-def _run(row: Row[Any]) -> WorkflowRun:
+def workflow_run_from_row(row: Row[Any]) -> WorkflowRun:
+    """把工作流运行数据库行转换为执行与读取共用的领域事实。"""
+
     return WorkflowRun(
         row.workflow_run_id,
         row.workflow_id,
@@ -476,6 +489,13 @@ def _run(row: Row[Any]) -> WorkflowRun:
         row.completed_at,
         row.error_code,
         row.version,
+        cast("dict[str, object] | None", row.output_payload),
+        row.executor_version,
+        cast("dict[str, int] | None", row.execution_budget),
+        row.steps_executed,
+        row.model_calls,
+        row.retrieval_calls,
+        row.output_bytes,
     )
 
 

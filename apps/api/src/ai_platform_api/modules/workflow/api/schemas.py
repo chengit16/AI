@@ -189,9 +189,23 @@ class WorkflowRunResponse(BaseModel):
     workspace_id: UUID
     workflow_version_id: UUID
     requested_by_account_id: UUID
-    status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
+    status: Literal[
+        "queued",
+        "running",
+        "waiting_approval",
+        "succeeded",
+        "failed",
+        "cancelled",
+    ]
     # 字段级 ABAC 无权读取输入时返回 null，避免原始值先进入响应再由前端隐藏。
     input_payload: dict[str, object] | None
+    # 输出和输入使用同一资源的独立字段策略，任一字段无权读取时只返回 null。
+    output_payload: dict[str, object] | None = None
+    executor_version: str | None = None
+    steps_executed: int = 0
+    model_calls: int = 0
+    retrieval_calls: int = 0
+    output_bytes: int = 0
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None

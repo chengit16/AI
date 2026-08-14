@@ -95,7 +95,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260815_0031"
+    assert current_revision(connection, schema) == "20260815_0032"
     assert business_tables(connection, schema) == {
         "accounts",
         "agent_publications",
@@ -149,7 +149,9 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "workspace_usage_records",
         "workspaces",
         "workflow_drafts",
+        "workflow_node_attempts",
         "workflow_publications",
+        "workflow_run_steps",
         "workflow_runs",
         "workflow_versions",
         "workflows",
@@ -173,7 +175,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260815_0031"
+    assert current_revision(connection, schema) == "20260815_0032"
     assert schema_snapshot(connection, schema) == first_head
 
 

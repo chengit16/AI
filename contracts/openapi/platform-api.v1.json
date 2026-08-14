@@ -12560,7 +12560,7 @@
           "工作流"
         ],
         "summary": "Create Workflow Run",
-        "description": "幂等创建当前发布版本的排队运行；节点执行在 P1F-02 接入。",
+        "description": "幂等创建排队运行，并在响应提交后触发一次受限本地执行。",
         "operationId": "createWorkflowRun",
         "parameters": [
           {
@@ -18118,6 +18118,7 @@
             "enum": [
               "queued",
               "running",
+              "waiting_approval",
               "succeeded",
               "failed",
               "cancelled"
@@ -18135,6 +18136,49 @@
               }
             ],
             "title": "Input Payload"
+          },
+          "output_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Payload"
+          },
+          "executor_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executor Version"
+          },
+          "steps_executed": {
+            "type": "integer",
+            "title": "Steps Executed",
+            "default": 0
+          },
+          "model_calls": {
+            "type": "integer",
+            "title": "Model Calls",
+            "default": 0
+          },
+          "retrieval_calls": {
+            "type": "integer",
+            "title": "Retrieval Calls",
+            "default": 0
+          },
+          "output_bytes": {
+            "type": "integer",
+            "title": "Output Bytes",
+            "default": 0
           },
           "created_at": {
             "type": "string",

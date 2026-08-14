@@ -1419,7 +1419,7 @@ export type paths = {
     readonly put?: never;
     /**
      * Create Workflow Run
-     * @description 幂等创建当前发布版本的排队运行；节点执行在 P1F-02 接入。
+     * @description 幂等创建排队运行，并在响应提交后触发一次受限本地执行。
      */
     readonly post: operations["createWorkflowRun"];
     readonly delete?: never;
@@ -3797,8 +3797,24 @@ export type components = {
       readonly created_at: string;
       /** Error Code */
       readonly error_code: string | null;
+      /** Executor Version */
+      readonly executor_version?: string | null;
       /** Input Payload */
       readonly input_payload: {
+        readonly [key: string]: unknown;
+      } | null;
+      /**
+       * Model Calls
+       * @default 0
+       */
+      readonly model_calls: number;
+      /**
+       * Output Bytes
+       * @default 0
+       */
+      readonly output_bytes: number;
+      /** Output Payload */
+      readonly output_payload?: {
         readonly [key: string]: unknown;
       } | null;
       /**
@@ -3807,10 +3823,21 @@ export type components = {
        */
       readonly requested_by_account_id: string;
       /**
+       * Retrieval Calls
+       * @default 0
+       */
+      readonly retrieval_calls: number;
+      /**
        * Status
        * @enum {string}
        */
-      readonly status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+      readonly status:
+        "queued" | "running" | "waiting_approval" | "succeeded" | "failed" | "cancelled";
+      /**
+       * Steps Executed
+       * @default 0
+       */
+      readonly steps_executed: number;
       /**
        * Updated At
        * Format: date-time

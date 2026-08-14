@@ -896,9 +896,17 @@ class WorkflowRunResponse(typing.TypedDict):
     completed_at: str | None
     created_at: str
     error_code: str | None
+    executor_version: typing.NotRequired[str | None]
     input_payload: dict[str, object] | None
+    model_calls: typing.NotRequired[int]
+    output_bytes: typing.NotRequired[int]
+    output_payload: typing.NotRequired[dict[str, object] | None]
     requested_by_account_id: str
-    status: typing.Literal["queued", "running", "succeeded", "failed", "cancelled"]
+    retrieval_calls: typing.NotRequired[int]
+    status: typing.Literal[
+        "queued", "running", "waiting_approval", "succeeded", "failed", "cancelled"
+    ]
+    steps_executed: typing.NotRequired[int]
     updated_at: str
     version: int
     workflow_id: str

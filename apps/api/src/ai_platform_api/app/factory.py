@@ -42,6 +42,7 @@ def create_app(
 ) -> FastAPI:
     """创建 FastAPI 应用并安装路由、中间件和统一错误映射。"""
 
+    # 1. 配置与容器必须来自同一启动快照，避免服务读取到彼此矛盾的运行参数。
     resolved_settings = settings or get_settings()
     dependencies = container or build_application_container(resolved_settings)
     if dependencies.settings != resolved_settings:
@@ -54,6 +55,7 @@ def create_app(
         finally:
             dependencies.close()
 
+    # 2. 应用生命周期统一接管容器关闭，并把领域能力显式暴露给依赖解析函数。
     application = FastAPI(
         title="AI 智能平台 API",
         summary="个人空间与企业空间共用的平台服务接口",
@@ -93,6 +95,8 @@ def create_app(
     application.state.retrieval_planning_service = dependencies.retrieval_planning
     application.state.retrieval_evidence_service = dependencies.retrieval_evidence
     application.state.workflow_definition_service = dependencies.workflows
+    application.state.workflow_run_executor = dependencies.workflow_run_executor
+    # 3. 中间件、错误映射和 Router 在状态装配后注册，所有业务入口共享同一安全边界。
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)
