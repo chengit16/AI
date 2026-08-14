@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1E-04` RAG 安全防护待开始 |
+| 当前节点 | `P1E-05` HTTP SSE、心跳、事件持久化和 `Last-Event-ID` 回放待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -500,9 +500,22 @@
 - 证据与冲突：新增不可变 `retrieval_evidence_sets` 和 `retrieval_evidence_items`，通过数据库触发器拒绝更新与删除。首期对同标题来源中的数字/期限和否定语义差异进行确定性冲突标记；引用始终绑定文档、版本、Chunk、Hash 和来源位置，伪造引用、基础事实冲突与证据不足均失败关闭或降级。
 - 运行装配：新增授权复核、证据处理和重排 Adapter，Revision `20260815_0028` 已接入应用启动和 ReleaseManifest/兼容矩阵；不新增模型供应商调用，不实现 SSE 问答输出，下一节点继续处理 Prompt Injection、投毒、泄漏和外发防护。
 - 自动验收：P1E-03 单元专项 `7/7`，PostgreSQL 当前证据/撤权/不可变快照专项 `1/1`，P1E-02 与 P1E-03 PostgreSQL 联合回归 `2/2`，Migration 往返 `3/3`；统一 `./scripts/verify` 通过，React `21/21`、Python `337/337`、Ruff、mypy strict（364 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建全部通过。
-- 容器与环境：`./platform restart` 完成 API、Worker、Web、Migration 和基础设施重建，启动器等待七项服务健康并输出平台就绪，Migration Revision 目标为 `20260815_0028`。本终端随后执行 `./platform doctor` 时因沙箱无法访问 Docker Engine 返回 `Docker Engine 未运行`，因此八项诊断保持未单独计入通过，不影响已完成的代码门禁和本地 PostgreSQL 集成验收。
+- 容器与环境：`./platform restart` 完成 API、Worker、Web、Migration 和基础设施重建，启动器等待七项服务健康并输出平台就绪，Migration Revision 为 `20260815_0028`。后续在相同代码与 Revision 上补跑 `./platform doctor`，Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项诊断全部通过。
 - 当前边界：本节点不实现 Prompt Injection/投毒安全策略、SSE 传输、问答页面或真实模型调用；不引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。真实供应商质量、Linux 和容量认证继续保持 `not_configured`/`not_run`。
 - 提交：`f188278`。
+
+### P1E-04 RAG 安全防护
+
+- 状态：通过。
+- 统一安全门：新增 API 与 Worker 可共用的 `RagSafetyGate`，固定版本 `rag-safety-v2`。检测文本统一执行 NFKC 规范化、零宽字符移除、空白折叠、分隔符压缩与受控 Base64 解码，安全判定只保存策略版本和稳定原因码，拒绝时不回显原始攻击文本。
+- 输入与改写边界：用户问题在 Embedding、检索和模型消息构造前检查，命中直接 Prompt Injection、敏感信息索取或跨空间范围扩张时失败关闭；查询改写逐条复核新增范围和文档标识，引用未授权资源时不会执行关键词或向量搜索。
+- 非可信证据：知识正文先经过字段级 ABAC 投影，再执行间接注入、秘密标记和外发指令检测。通过检查的内容以固定 `<untrusted_evidence>` 标签包装后进入模型上下文；拒绝时不返回任何证据文本，文档内容不能升级为系统指令。
+- 模型出口：模型输出包含授权决定、审批状态、敏感标记或外部工具参数时统一返回 `POLICY_DENIED`。调用事实记录为 `rejected`，保留错误码与尝试轨迹，但不保存被拒绝的模型正文；模型文本不能替代后端 PDP、审批服务或工具授权。
+- 配置兼容：不可变运行配置必须使用当前安全门版本，旧 `rag-safety-v1` 不能继续创建；React 运行配置默认值同步为 `rag-safety-v2`。本节点未新增 Migration，数据库 Revision 保持 `20260815_0028`。
+- 自动验收：`p0-11-v1` 的直接/间接注入、Unicode/Base64 混淆、查询改写越权和模型输出越权固定样本，以及检索前短路、字段投影顺序、证据边界和拒绝调用事实专项 `14/14` 通过。统一 `./scripts/verify` 全部通过，包括 React `21/21`、Python `353/353`、Ruff、mypy strict（366 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建。
+- 容器与环境：以最终工作树执行 `./platform restart` 后平台就绪；`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260815_0028`、Valkey 和 Worker 八项诊断全部通过。
+- 当前边界：本节点提供确定性首期安全基线，不宣称替代后续持续红队、供应商内容安全或 LLM Grading。HTTP SSE、事件持久化和断点回放进入 `P1E-05`；不引入 SaaS、Go 运行层、真实多源连接器、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`6e11901`。
 
 ## 4. 当前限制
 
@@ -513,4 +526,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-03`，当前进入 `P1E-04`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。`./platform doctor` 的 Docker Engine 访问限制已如实记录，未被计入阶段通过结论。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-04`，当前进入 `P1E-05`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前代码门禁与 Revision `20260815_0028` 八项容器诊断均通过，阶段整体结论仍等待后续业务节点及阶段端到端门禁完成。
