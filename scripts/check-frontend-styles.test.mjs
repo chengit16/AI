@@ -1,4 +1,4 @@
-/** UnoCSS 门禁测试，覆盖有效配置与生产环境无法提取的动态类名。 */
+/** UnoCSS 门禁测试，覆盖静态提取、迁移边界与关闭 Preflight 后的边框约束。 */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -34,9 +34,59 @@ test("接受唯一配置和完整静态类名", () => {
     {
       ...validFiles,
       "apps/web/src/Page.tsx":
-        '/** 禁止使用 `bg-${color}` 这类动态 Utility。 */\nexport const value = "bg-brand text-text";',
+        '/** 禁止使用 `bg-${color}` 这类动态 Utility。 */\nexport const Page = () => <div className="border border-solid border-border bg-brand text-text" />;',
     },
     (root) => assert.deepEqual(collectStyleViolations(root), []),
+  );
+});
+
+test("拒绝关闭 Preflight 后缺少显式样式的方向边框", () => {
+  withProject(
+    {
+      ...validFiles,
+      "apps/web/src/Page.tsx":
+        'export const Page = () => <div className="border-b border-border tablet-down:border-r" />;',
+    },
+    (root) => {
+      const violations = collectStyleViolations(root);
+      assert.equal(violations.length, 2);
+      assert.ok(
+        violations.every(({ message }) =>
+          message.includes("必须配套显式 border-style"),
+        ),
+      );
+    },
+  );
+});
+
+test("拒绝 UnoCSS 迁移完成后重新引入 CSS Module", () => {
+  withProject(
+    {
+      ...validFiles,
+      "apps/web/src/Page.module.css": ".page { display: grid; }",
+    },
+    (root) => {
+      const violations = collectStyleViolations(root);
+      assert.equal(violations.length, 1);
+      assert.match(violations[0].message, /禁止重新引入 CSS Module/);
+    },
+  );
+});
+
+test("拒绝保留没有实际消费者的 CSS Token", () => {
+  withProject(
+    {
+      ...validFiles,
+      "apps/web/src/styles/tokens.css": ":root { --color-unused: #fff; }",
+    },
+    (root) => {
+      const violations = collectStyleViolations(root);
+      assert.equal(violations.length, 1);
+      assert.match(
+        violations[0].message,
+        /CSS Token --color-unused 没有实际消费者/,
+      );
+    },
   );
 });
 

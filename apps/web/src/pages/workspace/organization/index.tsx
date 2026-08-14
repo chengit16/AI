@@ -204,7 +204,7 @@ export default function WorkspaceOrganizationPage() {
         className="ui-surface-panel mb-6 overflow-hidden"
         aria-labelledby="department-section-title"
       >
-        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+        <div className="flex items-center justify-between border-b border-b-solid border-border px-6 py-5">
           <div>
             <h2 className="m-0 text-[17px]" id="department-section-title">
               部门层级
@@ -227,7 +227,7 @@ export default function WorkspaceOrganizationPage() {
         className="ui-surface-panel mb-6 overflow-hidden"
         aria-labelledby="position-section-title"
       >
-        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+        <div className="flex items-center justify-between border-b border-b-solid border-border px-6 py-5">
           <div>
             <h2 className="m-0 text-[17px]" id="position-section-title">
               岗位清单

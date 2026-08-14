@@ -126,8 +126,8 @@ export function AppShell() {
         collapsed ? "grid-cols-[72px_minmax(0,1fr)]" : "grid-cols-[240px_minmax(0,1fr)]",
       )}
     >
-      <aside className="sticky top-0 z-10 flex h-[100dvh] flex-col overflow-hidden border-r border-nav-divider bg-nav-bg text-nav-text nav-mobile:hidden landscape-mobile:hidden">
-        <div className="flex h-16 items-center border-b border-nav-divider px-[18px]">
+      <aside className="sticky top-0 z-10 flex h-[100dvh] flex-col overflow-hidden border-r border-r-solid border-nav-divider bg-nav-bg text-nav-text nav-mobile:hidden landscape-mobile:hidden">
+        <div className="flex h-16 items-center border-b border-b-solid border-nav-divider px-[18px]">
           <PlatformMark compact={collapsed} />
         </div>
         <div
@@ -153,7 +153,7 @@ export function AppShell() {
       </aside>
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-8 flex min-h-16 items-center justify-between gap-4 border-b border-border bg-topbar px-[clamp(18px,3vw,40px)] py-2.5 nav-mobile:min-h-15 nav-mobile:px-3 nav-mobile:py-2 landscape-mobile:min-h-15 landscape-mobile:px-3 landscape-mobile:py-2">
+        <header className="sticky top-0 z-8 flex min-h-16 items-center justify-between gap-4 border-b border-b-solid border-border bg-topbar px-[clamp(18px,3vw,40px)] py-2.5 nav-mobile:min-h-15 nav-mobile:px-3 nav-mobile:py-2 landscape-mobile:min-h-15 landscape-mobile:px-3 landscape-mobile:py-2">
           <Button
             className="hidden flex-none nav-mobile:!inline-flex nav-mobile:basis-10 landscape-mobile:!inline-flex landscape-mobile:basis-11"
             aria-label="打开主导航"

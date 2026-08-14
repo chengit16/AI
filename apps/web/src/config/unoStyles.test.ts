@@ -27,4 +27,14 @@ describe("UnoCSS 项目 Variant", () => {
     expect(css).toContain("@media (max-width: 900px) and (max-height: 500px)");
     expect(css).toMatch(/display:\s*none;/);
   });
+
+  it.each([
+    ["p-5", "--space-5"],
+    ["gap-3", "--space-3"],
+  ])("让 %s 使用项目语义间距 %s", async (utility, token) => {
+    const generator = await createGenerator(unoConfig);
+    const { css } = await generator.generate(utility);
+
+    expect(css).toContain(`var(${token})`);
+  });
 });

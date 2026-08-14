@@ -66,7 +66,7 @@ export default function StatusPage() {
             </div>
           </section>
           <section className="ui-surface-panel mt-6 overflow-hidden">
-            <div className="flex items-center justify-between gap-4 border-b border-border-soft px-6 py-5">
+            <div className="flex items-center justify-between gap-4 border-b border-b-solid border-border-soft px-6 py-5">
               <h2 className="m-0 text-[17px]">服务检查</h2>
               <span className="text-xs text-text-muted">
                 {health.data ? `${Object.keys(health.data.checks).length} 项` : "--"}
@@ -75,7 +75,7 @@ export default function StatusPage() {
             <div>
               {Object.entries(health.data?.checks ?? {}).map(([name, status]) => (
                 <div
-                  className="flex items-center justify-between gap-4 border-b border-border-soft px-6 py-5"
+                  className="flex items-center justify-between gap-4 border-b border-b-solid border-border-soft px-6 py-5"
                   key={name}
                 >
                   <span className="flex items-center gap-3">

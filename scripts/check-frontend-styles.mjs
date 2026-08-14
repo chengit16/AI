@@ -30,8 +30,49 @@ function walk(directory) {
   });
 }
 
+function walkAllFiles(directory) {
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? walkAllFiles(entryPath) : [entryPath];
+  });
+}
+
 function lineOf(source, offset) {
   return source.slice(0, offset).split("\n").length;
+}
+
+/**
+ * 识别关闭 Preflight 后缺少 border-style 的方向边框。
+ *
+ * UnoCSS 的 `border-b` 等 Utility 只声明宽度，浏览器默认 `border-style: none`；
+ * 因此同一静态类名集合必须显式提供对应方向或全方向的实线样式。
+ */
+function missingBorderStyles(className) {
+  const tokens = className.split(/\s+/).filter(Boolean);
+  const tokenSet = new Set(tokens);
+  const violations = [];
+  for (const token of tokens) {
+    const match = token.match(
+      /^(?<variants>(?:[^:\s]+:)*)!?border(?:-(?<direction>[trblxy]))?(?:-(?<width>\d+|\[[^\]]+\]))?$/,
+    );
+    if (!match?.groups || match.groups.width === "0") continue;
+
+    const variants = match.groups.variants ?? "";
+    const direction = match.groups.direction;
+    const acceptableStyles = [
+      `${variants}border-solid`,
+      ...(direction ? [`${variants}border-${direction}-solid`] : []),
+    ];
+    if (variants) {
+      acceptableStyles.push("border-solid");
+      if (direction) acceptableStyles.push(`border-${direction}-solid`);
+    }
+    if (!acceptableStyles.some((style) => tokenSet.has(style))) {
+      violations.push(token);
+    }
+  }
+  return violations;
 }
 
 /**
@@ -44,6 +85,36 @@ export function collectStyleViolations(root = projectRoot) {
   const violations = [];
   const webRoot = path.join(root, "apps/web");
   const sourceRoot = path.join(webRoot, "src");
+  for (const filePath of walkAllFiles(sourceRoot).filter((candidate) =>
+    candidate.endsWith(".module.css"),
+  )) {
+    violations.push({
+      filePath,
+      line: 1,
+      message: "UnoCSS 迁移完成后禁止重新引入 CSS Module",
+    });
+  }
+  const tokenPath = path.join(sourceRoot, "styles/tokens.css");
+  if (fs.existsSync(tokenPath)) {
+    const tokenSource = fs.readFileSync(tokenPath, "utf8");
+    const consumerSource = [
+      ...walkAllFiles(sourceRoot).filter((filePath) => filePath !== tokenPath),
+      path.join(webRoot, "uno.config.ts"),
+    ]
+      .filter((filePath) => fs.existsSync(filePath))
+      .map((filePath) => fs.readFileSync(filePath, "utf8"))
+      .join("\n");
+    for (const match of tokenSource.matchAll(/--(?<name>[a-z0-9-]+)\s*:/g)) {
+      const tokenName = match.groups?.name;
+      if (tokenName && !consumerSource.includes(`--${tokenName}`)) {
+        violations.push({
+          filePath: tokenPath,
+          line: lineOf(tokenSource, match.index),
+          message: `CSS Token --${tokenName} 没有实际消费者`,
+        });
+      }
+    }
+  }
   const configPaths = walk(webRoot).filter(
     (filePath) => path.basename(filePath) === "uno.config.ts",
   );
@@ -127,6 +198,29 @@ export function collectStyleViolations(root = projectRoot) {
           message:
             "禁止动态拼接 UnoCSS Utility，请改用完整类名映射或最小 Safelist",
         });
+      }
+      if (
+        ts.isJsxAttribute(node) &&
+        node.name.getText(sourceFile) === "className"
+      ) {
+        const literals = [];
+        function collectStaticClassNames(child) {
+          if (ts.isStringLiteralLike(child)) literals.push(child);
+          ts.forEachChild(child, collectStaticClassNames);
+        }
+        collectStaticClassNames(node);
+        for (const literal of literals) {
+          for (const borderClass of missingBorderStyles(literal.text)) {
+            const { line } = sourceFile.getLineAndCharacterOfPosition(
+              literal.getStart(sourceFile),
+            );
+            violations.push({
+              filePath,
+              line: line + 1,
+              message: `关闭 Preflight 时 ${borderClass} 必须配套显式 border-style`,
+            });
+          }
+        }
       }
       ts.forEachChild(node, visit);
     }

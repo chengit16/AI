@@ -87,7 +87,7 @@ export default function LoginPage() {
             个人空间开箱即用，企业空间保留组织、成员和套餐治理能力。
           </p>
         </div>
-        <dl className="m-0 grid grid-cols-3 border-t border-nav-separator tablet-down:hidden">
+        <dl className="m-0 grid grid-cols-3 border-t border-t-solid border-nav-separator tablet-down:hidden">
           <div className="pr-3 pt-5">
             <dt className="text-xs text-nav-muted">运行方式</dt>
             <dd className="mb-0 ml-0 mr-0 mt-2 font-700">本地 Docker</dd>

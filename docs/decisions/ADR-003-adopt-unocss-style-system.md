@@ -92,7 +92,7 @@
 ## 后续事项
 
 - `P1S-01` 固定依赖版本、`uno.config.ts`、`cn()`、断点、Safelist 和 Preflight 策略。
-- `P1S-05` 完成后更新实际 CSS Module 数量、保留原因和构建产物结果。
+- `P1S-05` 已完成：CSS Module 从 12 个归零，仅保留职责明确的 `tokens.css` 与 `global.css` 共 107 行；生产构建和全页面多视口验收通过，完成态门禁禁止重新引入 CSS Module、无消费者 Token 和无显式样式的边框宽度 Utility。
 - `P1E-06` 问答页面和 `P1F-05` 工作流审批页面必须在 `P1S-05` 后按 UnoCSS 主路径建设。
 - 主色调、字体和暗色模式仍在 `P1G-04` 统一评审，不与本次工具迁移混合决定。
 

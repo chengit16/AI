@@ -145,7 +145,7 @@ export default function WorkspaceOverviewPage() {
       </section>
 
       <section className="ui-surface-panel mt-6" aria-labelledby="quota-title">
-        <div className="flex items-center justify-between border-b border-border px-6 py-5 phone-down:p-5">
+        <div className="flex items-center justify-between border-b border-b-solid border-border px-6 py-5 phone-down:p-5">
           <div>
             <h2 className="m-0 text-[17px]" id="quota-title">
               资源配额
@@ -165,7 +165,7 @@ export default function WorkspaceOverviewPage() {
                 : Math.min(100, Math.round((quota.used_value / quota.limit_value) * 100));
             return (
               <article
-                className="min-w-0 border-r border-border-soft p-5 last:border-r-0 desktop-down:border-b phone-down:border-r-0"
+                className="min-w-0 border-r border-r-solid border-border-soft p-5 last:border-r-0 desktop-down:border-b desktop-down:border-b-solid phone-down:border-r-0"
                 key={quota.metric}
               >
                 <div className="flex justify-between gap-2">

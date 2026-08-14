@@ -251,7 +251,7 @@ HTTP Method 和参数位置以 OpenAPI 契约为准，不根据 CRUD 名称自�
 - 全局语义变量继续统一放在 `styles/tokens.css`，UnoCSS Theme 和 Shortcut 只引用这些 CSS Variables；业务 JSX 不散落重复十六进制颜色。
 - Ant Design 组件 Token 继续由 `ConfigProvider` 管理。组件样式优先使用 Theme/Component Token，不用高优先级 Utility 强行覆盖内部结构。
 - `styles/global.css` 只维护 Reset、基础排版、触控目标、`:focus-visible`、`prefers-reduced-motion` 和经过批准的全局 Ant Design 修正。
-- 复杂父子选择器、复合宽高媒体查询、Ant Design 内部选择器和难以清晰表达的交互状态允许保留 CSS Module；文件必须就近维护并在注释中说明不能使用普通 Utility 的原因。
+- `P1S-05` 完成后禁止新增 CSS Module。复杂父子选择器、复合宽高媒体查询、Ant Design 内部选择器和难以清晰表达的交互状态先使用显式 Variant、Theme Token 或带页面根作用域的受控全局规则；确需恢复局部 CSS 文件时必须先形成范围决策并同步自动门禁。
 - 不新增 Less、SCSS、TailwindCSS 或 styled-components，不引入与 UnoCSS 并行的第二套 Utility 体系。
 
 ### 11.2 UnoCSS 使用约束
@@ -262,10 +262,12 @@ HTTP Method 和参数位置以 OpenAPI 契约为准，不根据 CRUD 名称自�
 - 有限动态集合必须使用显式类名映射；确实来自外部注册配置且不能静态枚举时，才在 `uno.config.ts` 维护最小 Safelist 并说明来源和退出条件。
 - 高频且稳定的视觉组合可以定义 Shortcut，例如页面区块、状态容器和紧凑操作组；Shortcut 必须表达语义、保持职责单一，不能隐藏整个页面的任意样式。
 - Utility Class 过长并混合多个交互状态时，先拆分组件或提取有限 Shortcut；不能为了删除 CSS 文件损害 JSX 可读性。
+- 关闭 Preflight 后，边框宽度 Utility 不会自动获得 `border-style`；必须在相同 Variant 下配套 `border-solid` 或对应方向的 `border-*-solid`，并由样式门禁阻断遗漏。
 
 ### 11.3 Token、断点与例外
 
-- 使用 CSS 自定义属性表达颜色、间距、圆角、阴影、层级和动效；UnoCSS 中使用任意值时也必须引用语义变量。
+- 使用 CSS 自定义属性表达颜色、间距、圆角、阴影、层级和动效；UnoCSS Theme 中的 `1/2/3/4/5/6/8` 间距刻度必须映射 `--space-*`，任意值也必须引用语义变量。
+- `tokens.css` 只保留有实际消费者的变量；删除页面或视觉能力时同步删除失效 Token，自动门禁拒绝无消费者 Token。
 - UnoCSS 固定项目断点并保持现有 `560/600/720/820/1024px` 行为；不能直接套用默认断点导致导航、表格和弹窗布局变化。
 - `max-width: 900px` 且 `max-height: 500px` 等横屏复合条件保留为受控 CSS 或显式自定义 Variant，并补充中文注释。
 - 禁止使用内联样式承载可复用视觉规则；只允许运行时坐标、按业务数据计算的尺寸或组件 API 明确要求的局部值。

@@ -28,13 +28,15 @@ pnpm verify
 | 供应链状态      | `scripts/check_release_readiness.py`            | 开发门禁校验本地可执行项；正式发布门禁额外要求镜像扫描和 Linux 验收证据                        |
 | Python 架构     | `scripts/check_architecture.py`                 | 正式领域分层目录出现后自动检查 Domain、Application、API 与 Infrastructure 依赖方向             |
 | React 架构      | `scripts/check-frontend-architecture.mjs`       | 解析静态 Import、再导出和字符串动态 Import，阻止公共层反向依赖页面等违规关系                   |
-| UnoCSS 样式架构 | `scripts/check-frontend-styles.mjs`             | 固定唯一配置、关闭 Preflight、禁止额外预设和动态 Utility 拼接，保证生产构建可静态提取          |
+| UnoCSS 样式架构 | `scripts/check-frontend-styles.mjs`             | 固定配置和 Preflight；禁止额外预设、动态 Utility、CSS Module、无消费者 Token 和无样式边框     |
 | 契约漂移        | `tests/contract/test_contracts.py`              | FastAPI 完整 OpenAPI 输出必须与仓库基线一致；JSON Schema 和 Golden Fixtures 必须有效           |
 | 契约兼容        | `scripts/check_contract_compatibility.py`       | 相对指定 Git 基线检查文件删除、路径/操作/响应删除、属性删除、类型变化、枚举收紧和新增必填字段  |
 | Web 质量        | pnpm scripts                                    | Prettier、ESLint、TypeScript、Vitest 和生产构建                                                |
 | Python 质量     | uv tools                                        | Ruff 格式、Ruff Lint、mypy strict 和完整 pytest                                                |
 
 架构检查采用渐进生效：当前阶段 0 的过渡文件不会因为目标目录尚未建立而被迫重排；阶段 1 创建正式目录后，新增违规 Import 会立即失败。
+
+UnoCSS 迁移完成后，样式门禁按完成态执行：`apps/web/src` 不得重新引入 CSS Module；`tokens.css` 的变量必须在源码或 UnoCSS Theme 中有实际消费者；关闭 Preflight 时，边框宽度 Utility 必须在相同 Variant 下配套全方向或对应方向的 `border-solid`。这些检查只覆盖可确定的结构违规，视觉层级、响应式布局和可访问性仍需真实浏览器验收。
 
 ## 3. 契约兼容基线
 
