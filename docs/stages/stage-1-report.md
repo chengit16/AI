@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1E-05` HTTP SSE、心跳、事件持久化和 `Last-Event-ID` 回放待开始 |
+| 当前节点 | `P1E-06` 问答、来源、流式恢复与反馈页面待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -23,7 +23,7 @@
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
 | 数据范围 | 仅使用合成个人与企业数据 |
-| 模型范围 | 默认 Mock Provider；真实供应商由平台配置后单独验收 |
+| 模型范围 | 自动化功能门禁使用 Mock Provider；真实供应商由平台配置后单独验收 |
 
 ## 3. 节点验证记录
 
@@ -517,13 +517,26 @@
 - 当前边界：本节点提供确定性首期安全基线，不宣称替代后续持续红队、供应商内容安全或 LLM Grading。HTTP SSE、事件持久化和断点回放进入 `P1E-05`；不引入 SaaS、Go 运行层、真实多源连接器、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：`6e11901`。
 
+### P1E-05 HTTP SSE 与断点回放
+
+- 状态：通过。
+- 运行与终态：用户消息提交事务同时创建稳定助手消息占位和 `queued` Run。本地后台执行器按数据库状态只认领一次，重复调度或 SSE 重连不会重新检索和调用模型；Run 始终使用提交时冻结的 `AgentRelease` 与 `AiRuntimeConfigVersion`。完成路径原子保存助手正文、审计和 Outbox，失败路径只保存稳定错误码，不把供应商异常或模型正文写入日志与失败消息。
+- 事件与事务：正式 API 复用阶段 0 `stream_runs/events` 事实，但每次创建、追加、结束和回放都使用独立短事务，SSE 等待期间不占用数据库 Session。事件按锁定 Run 后的严格递增序号写入，`event_id` 重试幂等，终态后拒绝追加；默认保留 24 小时，单次回放上限为 5000 条或 10 MiB。
+- HTTP SSE：新增授权接口 `GET /api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/runs/{run_id}/events`。响应发送 `no-cache/no-transform` 与禁用代理缓冲头，`Last-Event-ID` 只补发该持久化事件后的同一 Run 事件；等待期每 15 秒发送不写库、不占序号的 SSE 注释心跳。Run 已结束且全部事件已确认时返回 `message.snapshot`，快照信封使用稳定派生 ID 但不发送 SSE `id` 行，因此浏览器不会把非持久化 ID 作为下一次回放游标。
+- 安全与恢复：读取事件前先执行工作空间、会话创建者、成员状态、注册 Permission 和后端 PDP 校验；跨空间 Run、未知游标、过期事件和事件数/字节超限失败关闭。`p0-11-v1` 两个 SSE 样本直接绑定重连不重复生成和 5000 条/10 MiB 预算行为；超限错误引导客户端改读最终消息快照，不放宽回放范围。
+- 契约与数据：OpenAPI 新增 API 074，并与会话只读菜单 164 绑定；`ResourceRegistry`、React/Python 生成契约、ReleaseManifest 和兼容矩阵同步更新。Revision `20260815_0029` 幂等写入静态菜单接口数据库镜像，不修改阶段 0 已有流表结构。
+- 自动验收：执行器、SSE 安全集、心跳、快照、阶段 0 流式回归和真实 PostgreSQL/HTTP 专项 `20/20` 通过。统一 `./scripts/verify` 全部通过，包括 React `21/21`、Python `358/358`、Ruff、mypy strict（370 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建。
+- 容器与边界：以最终工作树执行 `./platform restart` 后平台就绪，`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、Revision `20260815_0029`、Valkey 和 Worker 八项全部通过。当前公共本地实例尚未预置不可删除 Mock Provider 与当前运行配置，因此本节点不把真实浏览器问答生成误报为通过；该集成缺口必须在 `P1E-06` 页面闭环或最迟 `P1G-02` 前完成。真实供应商、Linux、容量和 AI 质量继续为 `not_configured`/`not_run`，且未引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`6f0124e`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
+- 公共本地实例尚未预置不可删除 Mock Provider 与当前运行配置；自动化 Mock 门禁已经通过，但浏览器问答闭环仍等待后续节点消除该集成缺口。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机兼容和生产容量结论。
 - 当前没有真实企业客户，阶段 1 使用固定的合成企业空间完成产品与安全验收。
 - 镜像扫描未获外发授权，状态为 `not_configured`；正式发布门禁已明确失败，不影响后续本地 MVP 功能节点。
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-04`，当前进入 `P1E-05`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前代码门禁与 Revision `20260815_0028` 八项容器诊断均通过，阶段整体结论仍等待后续业务节点及阶段端到端门禁完成。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-05`，当前进入 `P1E-06`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前代码门禁与 Revision `20260815_0029` 八项容器诊断均通过，阶段整体结论仍等待后续业务节点、Mock 运行配置集成缺口和阶段端到端门禁完成。
