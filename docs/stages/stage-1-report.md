@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1E-06` 问答、来源、流式恢复与反馈页面待开始 |
+| 当前节点 | `P1F-01` 工作流草稿、不可变版本、发布和运行事实模型待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -529,14 +529,26 @@
 - 容器与边界：以最终工作树执行 `./platform restart` 后平台就绪，`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、Revision `20260815_0029`、Valkey 和 Worker 八项全部通过。当前公共本地实例尚未预置不可删除 Mock Provider 与当前运行配置，因此本节点不把真实浏览器问答生成误报为通过；该集成缺口必须在 `P1E-06` 页面闭环或最迟 `P1G-02` 前完成。真实供应商、Linux、容量和 AI 质量继续为 `not_configured`/`not_run`，且未引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
 - 提交：`6f0124e`。
 
+### P1E-06 问答页面与反馈闭环
+
+- 状态：通过。
+- 本地零配置运行：新增固定 ID 和固定 Key 的内置 Mock Provider、加密凭据与当前 `AiRuntimeConfigVersion` 自举。本地启动时仅在没有真实当前配置时创建或恢复内置资源；已有真实当前配置绝不覆盖，只有真实草稿但未发布时失败关闭。Mock Adapter 只接受内置 Provider 身份，并且只能在 `local/test` 环境启用，生产环境不能借配置误开启。
+- 问答与恢复：新增当前账号私有会话列表、消息提交、活动 Run 恢复、HTTP SSE 心跳解析、`Last-Event-ID` 断点重连、严格顺序检查和不污染持久化游标的 `message.snapshot` 处理。刷新后恢复会话、消息和终态；连接建立失败继续使用原持久化游标重连，不把本地临时状态当作服务端事实。
+- 取消、来源与反馈：前端提供活动 Run 停止入口，后端只允许会话创建者取消所属活动 Run，并原子保存取消后的助手消息终态。来源抽屉在展示前重新校验当前权限、文档版本和索引状态，撤权或失效时只返回不可查看状态。支持 `helpful`、`unhelpful`、问题标签、自由评论与不可变修订版本；评论不进入审计、Outbox、SSE 事件或日志。真实浏览器验收发现并修复 Ant Design 数组校验缺少 `type: "array"` 导致已选标签仍不能提交的问题，并增加组件回归测试。
+- 契约与数据：Revision `20260815_0030` 新增 `message_feedbacks`；资源注册表升级至版本 11，共 58 项 Permission、8 个 Page、79 个 API、75 个 Menu 和 72 个 Binding。OpenAPI、React/Python 生成类型、ReleaseManifest 与兼容矩阵同步更新。
+- 自动验收：本地 Mock 单元 `4/4`、Mock 自举 PostgreSQL `2/2`、助手交互与 Migration PostgreSQL 专项 `8/8` 通过；统一 `./scripts/verify` 全部通过，包括 React `28/28`、Python `366/366`、Ruff、mypy strict（377 个源文件）、注释、UnoCSS、架构、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、契约兼容和生产构建。
+- 浏览器与容器：使用全合成新个人账号完成首次 Mock 问答、流式进行态、刷新恢复、来源不可查看降级、有帮助与需要改进反馈、取消入口及即时取消请求验收；修复后的负反馈显示“反馈已保存”。390×844 移动端问答页面无重叠或横向溢出。`./platform restart` 后平台就绪，`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260815_0030`、Valkey 和 Worker 八项全部通过。
+- 当前边界：内置 Mock 只证明本地功能与协议闭环，不代替真实供应商兼容性和 AI 质量验收。真实供应商、Linux、容量、镜像扫描和 AI 质量继续保持 `not_configured`/`not_run`；不引入 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`2175d3e`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
-- 公共本地实例尚未预置不可删除 Mock Provider 与当前运行配置；自动化 Mock 门禁已经通过，但浏览器问答闭环仍等待后续节点消除该集成缺口。
+- 本地开发实例已具备受环境和固定身份约束的内置 Mock Provider 与当前运行配置自举，浏览器问答可以零配置闭环；该结果不替代真实供应商验收。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机兼容和生产容量结论。
 - 当前没有真实企业客户，阶段 1 使用固定的合成企业空间完成产品与安全验收。
 - 镜像扫描未获外发授权，状态为 `not_configured`；正式发布门禁已明确失败，不影响后续本地 MVP 功能节点。
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-05`，当前进入 `P1E-06`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前代码门禁与 Revision `20260815_0029` 八项容器诊断均通过，阶段整体结论仍等待后续业务节点、Mock 运行配置集成缺口和阶段端到端门禁完成。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-06`，当前进入 `P1F-01`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前统一门禁与 Revision `20260815_0030` 八项容器诊断均通过，本地 Mock 问答集成缺口已经关闭；阶段整体结论仍等待后续工作流、审批、联合验收等业务节点和阶段端到端门禁完成。
