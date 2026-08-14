@@ -20,7 +20,7 @@
 
 - `apps/web` 的新增和修改执行 `docs/governance/frontend-code-standards.md`。
 - 前端接口以仓库 `contracts/` 为事实来源，不使用其他项目的 Apifox 定义或统一响应类型。
-- 新代码保持 React 19、TanStack Query、Zustand、Ant Design 6、Fetch/SSE 和 CSS Token 技术边界，不照搬参考项目的旧版本或专属依赖。
+- 新代码保持 React 19、TanStack Query、Zustand、Ant Design 6、Fetch/SSE、UnoCSS 主样式路径和 CSS Token 技术边界，不照搬参考项目的旧版本或专属依赖。
 
 ## Python 后端代码规范
 

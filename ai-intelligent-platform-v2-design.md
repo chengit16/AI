@@ -2176,7 +2176,7 @@ GPT 中转的 `base_url`、API Key、模型 ID/别名、能力和数据政策均
 | 领域 | 已确定默认基线 | 约束 |
 | --- | --- | --- |
 | 开发与构建 | Node.js 24 LTS + pnpm、Python 3.12 + uv、Docker Engine + Compose v2 | 通过 `.node-version` 和 `package.json#engines` 固定 Node.js 24，提交锁文件并固定基础镜像摘要；macOS 以 Docker Desktop 为参考运行时，其他兼容运行时需要单独验证 |
-| Web 前端 | React 19、TypeScript、Vite、React Router、TanStack Query、Zustand、Ant Design | React Router 承载动态菜单路由，TanStack Query 管理服务端状态，Zustand 只保存会话和界面状态；页面路由和操作点从菜单发布快照生成，前端权限只负责体验，不能作为安全边界 |
+| Web 前端 | React 19、TypeScript、Vite、React Router、TanStack Query、Zustand、Ant Design、UnoCSS | React Router 承载动态菜单路由，TanStack Query 管理服务端状态，Zustand 只保存会话和界面状态；UnoCSS 承担常规页面样式，语义 Token、Ant Design Theme 和必要复杂 CSS 保持独立边界；前端权限只负责体验，不能作为安全边界 |
 | 平台 API | Python 3.12、FastAPI、Pydantic 2 | 模块化单体；业务模块不能直接访问模型供应商、跨工作空间数据或其他模块私有表 |
 | 数据访问与迁移 | SQLAlchemy 2、Alembic、PostgreSQL 16 | 所有工作空间业务查询强制注入 `workspace_id`；Migration 只能向前演进并在升级前备份 |
 | 异步任务 | Celery + Valkey，PostgreSQL 保存任务事实状态 | 采用至少一次投递语义；任务必须幂等，Valkey 中的数据不能作为最终业务状态 |
@@ -2196,7 +2196,7 @@ GPT 中转的 `base_url`、API Key、模型 ID/别名、能力和数据政策均
 
 ### 21.14 Web 前端代码规范
 
-Web 前端以 `digitizing` React 项目的成熟工程规则作为参考，但只采用与当前平台匹配的目录分层、职责拆分、严格类型、公共组件兼容、命名、测试和质量门禁。平台继续使用 React 19、TanStack Query、Zustand、Ant Design 6、Fetch/SSE、CSS/CSS Modules 和仓库契约，不引入参考项目的 axios、ahooks、Less、TailwindCSS、styled-components、`@seakoi/console-kit`、`@seakoi/corebox` 或 Apifox 事实源。完整规范见 [`docs/governance/frontend-code-standards.md`](./docs/governance/frontend-code-standards.md)。
+Web 前端以 `digitizing` React 项目的成熟工程规则作为参考，但只采用与当前平台匹配的目录分层、职责拆分、严格类型、公共组件兼容、命名、测试和质量门禁。平台继续使用 React 19、TanStack Query、Zustand、Ant Design 6、Fetch/SSE 和仓库契约，并按 [`ADR-003`](./docs/decisions/ADR-003-adopt-unocss-style-system.md) 采用 UnoCSS 主样式路径、CSS 语义 Token、Ant Design Theme 与必要复杂 CSS；不引入参考项目的 axios、ahooks、Less、TailwindCSS、styled-components、`@seakoi/console-kit`、`@seakoi/corebox` 或 Apifox 事实源。完整规范见 [`docs/governance/frontend-code-standards.md`](./docs/governance/frontend-code-standards.md)。
 
 ### 21.15 后端代码规范
 

@@ -26,7 +26,7 @@
 | 客户端状态 | Zustand 5 | 只保存跨组件或跨路由的客户端状态 |
 | UI | Ant Design 6 | 主题通过 `ConfigProvider` 和语义 Token 管理 |
 | 图标 | `lucide-react` | 统一使用线性 SVG 图标，不使用 Emoji 充当结构图标 |
-| 样式 | CSS、CSS Modules、Ant Design Token | 不新增 Less、TailwindCSS 或 styled-components |
+| 样式 | UnoCSS、CSS Token、必要 CSS Modules、Ant Design Token | UnoCSS 是新增和迁移页面主路径；复杂选择器和全局规则保留 CSS |
 | 测试 | Vitest、Testing Library | 测试用户可观察行为，不依赖组件内部实现 |
 
 版本升级必须先验证 React、TypeScript、Vite、Ant Design 和测试工具的兼容性，不因参考项目使用旧版本而降级当前技术栈。
@@ -34,6 +34,8 @@
 ## 3. 目录结构与职责
 
 阶段 1 的目标目录如下：
+
+`apps/web/uno.config.ts` 统一维护 UnoCSS Theme、断点、Shortcut、Safelist 和扫描边界；业务模块不得创建第二套 UnoCSS 配置。
 
 ```text
 apps/web/src/
@@ -87,7 +89,7 @@ apps/web/src/
 | API Service | camelCase | `knowledgeBase.ts`、`workspaceMember.ts` |
 | 类型文件 | 固定 `types.ts` | `types.ts` |
 | 配置和工具 | 固定或 camelCase | `config.ts`、`queryKeys.ts`、`formatCitation.ts` |
-| CSS Modules | 与组件同名 | `WorkspaceSwitcher.module.css` |
+| 例外 CSS Modules | 与组件同名并说明保留原因 | `WorkspaceSwitcher.module.css` |
 
 ### 4.2 标识符
 
@@ -241,15 +243,35 @@ HTTP Method 和参数位置以 OpenAPI 契约为准，不根据 CRUD 名称自�
 
 ## 11. 样式规范
 
-- 全局语义变量统一放在 `styles/tokens.css`，Ant Design 组件 Token 统一放在主题配置中。
-- 页面和组件新增样式优先使用 `*.module.css`；应用壳层和全局语义类可以使用经过命名约束的普通 CSS。
-- 使用 CSS 自定义属性表达颜色、间距、圆角、阴影、层级和动效，业务组件不散落重复十六进制颜色。
-- 不新增 Less、SCSS、TailwindCSS、UnoCSS 或 styled-components，除非经过独立架构决策确认迁移收益。
-- 禁止使用内联样式承载可复用视觉规则；只允许动态尺寸、坐标或组件 API 明确要求的局部值。
-- 禁止无理由使用 `!important`；覆盖 Ant Design 时优先使用主题 Token、组件 Token或局部作用域容器。
-- Class 名应表达组件和状态语义；普通 CSS 延续 BEM 风格，CSS Modules 使用 camelCase 局部名称。
+本项目按 [`ADR-003`](../decisions/ADR-003-adopt-unocss-style-system.md) 采用“UnoCSS 为主、语义 CSS 为辅”的样式体系。
+
+### 11.1 样式职责
+
+- 新增和迁移页面的普通布局、间距、尺寸、排版、颜色、边框和单一断点响应式优先使用 UnoCSS，不再默认创建页面级 CSS Module。
+- 全局语义变量继续统一放在 `styles/tokens.css`，UnoCSS Theme 和 Shortcut 只引用这些 CSS Variables；业务 JSX 不散落重复十六进制颜色。
+- Ant Design 组件 Token 继续由 `ConfigProvider` 管理。组件样式优先使用 Theme/Component Token，不用高优先级 Utility 强行覆盖内部结构。
+- `styles/global.css` 只维护 Reset、基础排版、触控目标、`:focus-visible`、`prefers-reduced-motion` 和经过批准的全局 Ant Design 修正。
+- 复杂父子选择器、复合宽高媒体查询、Ant Design 内部选择器和难以清晰表达的交互状态允许保留 CSS Module；文件必须就近维护并在注释中说明不能使用普通 Utility 的原因。
+- 不新增 Less、SCSS、TailwindCSS 或 styled-components，不引入与 UnoCSS 并行的第二套 Utility 体系。
+
+### 11.2 UnoCSS 使用约束
+
+- 使用官方 Vite 插件和项目根 `uno.config.ts`；默认关闭 Preflight，避免覆盖现有全局样式和 Ant Design。
+- React 只通过 `className` 使用 Utility，不启用 Attributify；图标继续使用 `lucide-react`，不引入 UnoCSS 图标预设。
+- 条件样式使用统一 `cn()` 工具或完整类名数组。禁止 `bg-${color}`、`grid-cols-${count}` 等无法被静态扫描可靠发现的动态拼接。
+- 有限动态集合必须使用显式类名映射；确实来自外部注册配置且不能静态枚举时，才在 `uno.config.ts` 维护最小 Safelist 并说明来源和退出条件。
+- 高频且稳定的视觉组合可以定义 Shortcut，例如页面区块、状态容器和紧凑操作组；Shortcut 必须表达语义、保持职责单一，不能隐藏整个页面的任意样式。
+- Utility Class 过长并混合多个交互状态时，先拆分组件或提取有限 Shortcut；不能为了删除 CSS 文件损害 JSX 可读性。
+
+### 11.3 Token、断点与例外
+
+- 使用 CSS 自定义属性表达颜色、间距、圆角、阴影、层级和动效；UnoCSS 中使用任意值时也必须引用语义变量。
+- UnoCSS 固定项目断点并保持现有 `560/600/720/820/1024px` 行为；不能直接套用默认断点导致导航、表格和弹窗布局变化。
+- `max-width: 900px` 且 `max-height: 500px` 等横屏复合条件保留为受控 CSS 或显式自定义 Variant，并补充中文注释。
+- 禁止使用内联样式承载可复用视觉规则；只允许运行时坐标、按业务数据计算的尺寸或组件 API 明确要求的局部值。
+- 禁止无理由使用 `!important`；覆盖 Ant Design 时优先使用 Theme Token、组件 Token 或局部作用域容器。
 - 动画只使用 `transform` 和 `opacity` 等低成本属性，并支持 `prefers-reduced-motion`。
-- 主题颜色在阶段 1 业务页面齐备后统一评审，当前阶段不因代码规范调整主色调。
+- 主题颜色、字体和暗色模式在阶段 1 业务页面齐备后统一评审，不与 UnoCSS 工具迁移混合决定。
 
 ## 12. 导入、导出与格式化
 
@@ -418,9 +440,11 @@ pnpm --filter @ai-platform/web build
 | axios 统一客户端 | 不采用 | 使用 Fetch Client、TanStack Query 和独立 SSE Client |
 | ahooks `useRequest` | 不采用 | 服务端状态统一由 TanStack Query 管理 |
 | `@seakoi/console-kit`、`@seakoi/corebox` | 不采用 | 没有当前平台依赖和领域价值 |
-| Less、TailwindCSS、styled-components | 不采用 | 使用 CSS、CSS Modules 和 Ant Design Token |
+| Less、TailwindCSS、styled-components | 不采用 | 使用 UnoCSS、CSS Token、必要 CSS 和 Ant Design Token |
 | Apifox 作为接口事实源 | 不采用 | 使用仓库 OpenAPI、SSE、错误码和领域契约 |
 | React 18、Router 6、Ant Design 5、Vite 5 | 不采用 | 保持当前 React 19、Router 8、Ant Design 6、Vite 8 |
+| UnoCSS 主样式路径 | 采用 | 按 `ADR-003` 渐进迁移，保留语义 Token、全局规则和必要复杂 CSS |
+| 纯 UnoCSS 并删除全部 CSS | 不采用 | Ant Design 覆盖、全局可访问性和复杂复合选择器继续使用受控 CSS |
 | 所有导出和 Props 强制完整 JSDoc | 部分采用 | 跨文件公共导出必须说明；私有小组件和简单 Props 不机械要求 |
 | 未经要求禁止新增测试 | 不采用 | 测试覆盖随节点风险和安全边界增加 |
 
@@ -435,5 +459,7 @@ pnpm --filter @ai-platform/web build
 5. 引入仅作用于暂存文件的 Husky、lint-staged 和 commitlint。
 6. 随动态菜单、空间切换和首批业务页面验证规范，并根据真实问题修订阈值。
 7. 将注释质量检查接入每个前端节点的验收，新增和实际修改文件阻断，历史文件先告警。
+
+UnoCSS 迁移按阶段 1 的 `P1S-01`～`P1S-05` 独立执行：先接入工具和 Token，再迁移公共壳层、普通页面与复杂页面，最后清理无引用 CSS 并完成视觉验收。迁移期间允许两套样式共存，但新页面必须使用 UnoCSS 主路径；`P1E-06` 和 `P1F-05` 开始前完成 `P1S-05`。
 
 任何规则调整必须更新本文档、相关配置和验证报告，不能只修改说明而不更新执行门禁。
