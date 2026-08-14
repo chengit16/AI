@@ -6,8 +6,8 @@
 | --- | --- |
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
-| 报告日期 | 2026-08-14 |
-| 当前节点 | `P1E-01` 会话消息与系统助手待开始；`P1Q-02` 长函数内部注释治理已完成 |
+| 报告日期 | 2026-08-15 |
+| 当前节点 | `P1E-02` 权限前过滤与混合检索待开始 |
 | `core_functional` | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -462,6 +462,20 @@
 - 当前代码治理：为应用组合根、可信身份上下文、授权注册表与 PDP、菜单发布、组织和角色继承、配额、知识事实、模型网关、混合检索、SSE 回放、索引构建、入库任务、租约和 Outbox 等长流程补齐业务阶段说明；前端 API、模型与组织 Hook、复杂页面和集成测试回调同步治理。100 行以上保留函数均记录事务、注册表校验或可审计调用轨迹必须保持整体可读的具体原因。
 - 自动验收：TypeScript 与 Python 门禁均覆盖 30 行触发、60 行拒绝/接受、100 行拒绝/接受、编号断裂和嵌套函数边界，前端额外覆盖纯 JSX 排版，专项测试各 `13/13` 通过。统一 `./scripts/verify` 全部通过，包括 Prettier、ESLint、TypeScript、React `21/21`、生产构建、Ruff、mypy strict（333 个源文件）、Python `320/320`、架构依赖、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链、UnoCSS 和契约兼容检查；真实 PostgreSQL、Valkey、MinIO 与 Tika 集成测试均通过。
 - 当前边界：本节点只增加规范、静态门禁、接受测试和维护性注释，不改变业务逻辑、接口、数据库或运行架构；不新增 SaaS、Go 运行层、真实连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`cb71ed0`。
+
+### P1E-01 会话消息与系统助手发布快照
+
+- 状态：通过。
+- 事实模型：新增工作空间隔离的 `Agent`、不可变 `AgentRelease`、当前发布指针、创建者私有 `Conversation`、`Message`、不可变 `MessagePart` 与 `AssistantRun`。每个事实保留账号、工作空间、版本、时间和 Trace 关联，数据库 Trigger 拒绝修改或删除历史 Part 与发布快照。
+- 私密边界：个人与企业空间复用同一会话模型，仅允许有效浏览器成员创建和读取本人会话；企业管理员不会因管理角色自动获得成员私聊读取权。归档保持幂等，存在活动 Run 时拒绝归档，跨空间、伪造工作空间路径和非浏览器身份均失败关闭。
+- 排队与冻结：用户消息按账号、工作空间和 `Idempotency-Key` 幂等提交；相同 Key 不同请求摘要返回冲突。消息、Part、`queued` Run、审计和 Outbox 同事务提交，同一会话只允许一个活动 Run；Run 固定指向提交时的系统 `AgentRelease` 与 `AiRuntimeConfigVersion`，后续发布不改写历史运行。
+- 系统助手：空间首次创建会话时，按当前不可变运行配置创建或复用系统知识助手发布；运行配置变化后生成新 Release 并原子推进当前发布，历史会话和 Run 仍能追溯原版本。本节点只建立事实与排队入口，不调用模型、不执行检索，也不提前实现 SSE。
+- 契约与权限：OpenAPI 新增会话创建、列表、消息列表、用户消息提交和归档 5 个操作；统一注册表新增 4 项 Permission、4 个动作菜单和 5 条菜单接口绑定，系统所有者与成员获得私有会话权限，后端创建者校验继续独立于 RBAC。React/Python 生成类型、错误目录、ReleaseManifest 和兼容矩阵同步更新。
+- Migration：`20260815_0025` 建立助手事实、不可变保护和权限回填；`20260815_0026` 以独立幂等 Revision 补齐菜单接口数据库镜像，使已应用早期 `0025` 的本地库和全新 Schema 得到一致结果。空 Schema 完整升级、降级与再次升级的结构快照一致。
+- 自动验收：P1E PostgreSQL/HTTP 专项 `2/2`，Migration、资源注册表、Worker Revision 与应用装配联合回归 `25/25`。统一 `./scripts/verify` 全部通过，包括 React `21/21`、Python `322/322`、Ruff、mypy strict（347 个源文件）、格式、类型、生产构建、注释、UnoCSS、架构、OpenAPI/生成契约、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链和契约兼容检查。
+- 容器验收：重建 API、Worker、Web 与 Migration 镜像后，公共数据库从 `20260815_0025` 正常推进到 `20260815_0026`；Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项诊断全部通过。
+- 当前边界：模型调用、权限前过滤、查询改写、混合检索、重排、精读、引用验证和 SSE 仍按计划进入 `P1E-02`～`P1E-05`；不引入 Durable Run、Channel Gateway、多模态图片问答或真实多源连接器。
 - 提交：待本节点独立提交。
 
 ## 4. 当前限制
@@ -473,4 +487,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1D-08`，当前进入 `P1E-01`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1E-01`，当前进入 `P1E-02`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。

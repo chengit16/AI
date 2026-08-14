@@ -44,6 +44,10 @@ OWNER_PERMISSION_CODES = (
     "knowledge.ingestion.read",
     "knowledge.ingestion.retry",
     "knowledge.production.access",
+    "assistant.conversation.create",
+    "assistant.conversation.read",
+    "assistant.conversation.archive",
+    "assistant.message.create",
     "organization.assignment.read",
     "organization.assignment.write",
     "organization.department.create",
@@ -72,6 +76,10 @@ MEMBER_PERMISSION_CODES = (
     "workspace.entitlement.read",
     "workspace.membership.leave",
     "workspace.overview.access",
+    "assistant.conversation.create",
+    "assistant.conversation.read",
+    "assistant.conversation.archive",
+    "assistant.message.create",
 )
 
 

@@ -1566,6 +1566,314 @@ index_versions = indexing_tables.index_versions.to_metadata(metadata)
 document_index_publications = indexing_tables.document_index_publications.to_metadata(metadata)
 retrieval_chunks = indexing_tables.retrieval_chunks.to_metadata(metadata)
 
+agents = Table(
+    "agents",
+    metadata,
+    Column("agent_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_key", String(64), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("workspace_id", "agent_key", name="uq_agents_workspace_key"),
+    UniqueConstraint("agent_id", "workspace_id", name="uq_agents_id_workspace"),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_agents_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agents_creator",
+    ),
+    CheckConstraint("status IN ('active', 'disabled')", name="ck_agents_status"),
+    CheckConstraint("version >= 1", name="ck_agents_version"),
+)
+
+agent_releases = Table(
+    "agent_releases",
+    metadata,
+    Column("release_id", UUID(as_uuid=True), primary_key=True),
+    Column("agent_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
+    Column("config_hash", String(64), nullable=False),
+    Column("released_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("released_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("agent_id", "version", name="uq_agent_releases_version"),
+    UniqueConstraint("release_id", "workspace_id", name="uq_agent_releases_id_workspace"),
+    ForeignKeyConstraint(
+        ["agent_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.agents.agent_id", f"{SCHEMA_TOKEN}.agents.workspace_id"],
+        name="fk_agent_releases_agent",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["runtime_config_version_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_config_versions.runtime_config_version_id"],
+        name="fk_agent_releases_runtime_config",
+    ),
+    ForeignKeyConstraint(
+        ["released_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_releases_releaser",
+    ),
+    CheckConstraint("version >= 1", name="ck_agent_releases_version"),
+    CheckConstraint("status = 'released'", name="ck_agent_releases_status"),
+    CheckConstraint(
+        "config_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_releases_config_hash",
+    ),
+)
+Index(
+    "ix_agent_releases_runtime_config",
+    agent_releases.c.runtime_config_version_id,
+    agent_releases.c.released_at,
+)
+
+agent_publications = Table(
+    "agent_publications",
+    metadata,
+    Column("agent_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("release_id", UUID(as_uuid=True), nullable=False),
+    Column("generation", Integer, nullable=False),
+    Column("published_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["agent_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.agents.agent_id", f"{SCHEMA_TOKEN}.agents.workspace_id"],
+        name="fk_agent_publications_agent",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["release_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_releases.release_id",
+            f"{SCHEMA_TOKEN}.agent_releases.workspace_id",
+        ],
+        name="fk_agent_publications_release",
+    ),
+    ForeignKeyConstraint(
+        ["published_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_publications_publisher",
+    ),
+    CheckConstraint("generation >= 1", name="ck_agent_publications_generation"),
+)
+
+conversations = Table(
+    "conversations",
+    metadata,
+    Column("conversation_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("title", String(200), nullable=True),
+    Column("status", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "conversation_id",
+        "workspace_id",
+        name="uq_conversations_id_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_conversations_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_conversations_creator",
+    ),
+    CheckConstraint("status IN ('active', 'archived')", name="ck_conversations_status"),
+    CheckConstraint("version >= 1", name="ck_conversations_version"),
+    CheckConstraint(
+        "title IS NULL OR char_length(btrim(title)) BETWEEN 1 AND 200",
+        name="ck_conversations_title",
+    ),
+)
+Index(
+    "ix_conversations_workspace_creator_time",
+    conversations.c.workspace_id,
+    conversations.c.created_by_account_id,
+    conversations.c.updated_at,
+)
+
+messages = Table(
+    "messages",
+    metadata,
+    Column("message_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("conversation_id", UUID(as_uuid=True), nullable=False),
+    Column("role", String(32), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("message_id", "workspace_id", name="uq_messages_id_workspace"),
+    ForeignKeyConstraint(
+        ["conversation_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.conversations.conversation_id",
+            f"{SCHEMA_TOKEN}.conversations.workspace_id",
+        ],
+        name="fk_messages_conversation",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_messages_creator",
+    ),
+    CheckConstraint(
+        "role IN ('system', 'user', 'assistant', 'tool')",
+        name="ck_messages_role",
+    ),
+    CheckConstraint(
+        "status IN ('streaming', 'completed', 'failed')",
+        name="ck_messages_status",
+    ),
+    CheckConstraint("version >= 1", name="ck_messages_version"),
+)
+Index(
+    "ix_messages_workspace_conversation_time",
+    messages.c.workspace_id,
+    messages.c.conversation_id,
+    messages.c.created_at,
+)
+
+message_parts = Table(
+    "message_parts",
+    metadata,
+    Column("part_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("message_id", UUID(as_uuid=True), nullable=False),
+    Column("sequence_no", Integer, nullable=False),
+    Column("part_type", String(32), nullable=False),
+    Column("text_content", Text, nullable=True),
+    Column("object_ref", String(2048), nullable=True),
+    Column("media_type", String(255), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("message_id", "sequence_no", name="uq_message_parts_sequence"),
+    ForeignKeyConstraint(
+        ["message_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.messages.message_id", f"{SCHEMA_TOKEN}.messages.workspace_id"],
+        name="fk_message_parts_message",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("sequence_no >= 1", name="ck_message_parts_sequence"),
+    CheckConstraint("part_type IN ('text', 'image_ref')", name="ck_message_parts_type"),
+    CheckConstraint(
+        "(part_type = 'text' AND text_content IS NOT NULL AND char_length(text_content) >= 1 "
+        "AND object_ref IS NULL AND media_type IS NULL) OR "
+        "(part_type = 'image_ref' AND text_content IS NULL AND object_ref IS NOT NULL "
+        "AND media_type LIKE 'image/%')",
+        name="ck_message_parts_content",
+    ),
+)
+
+assistant_runs = Table(
+    "assistant_runs",
+    metadata,
+    Column("run_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("conversation_id", UUID(as_uuid=True), nullable=False),
+    Column("user_message_id", UUID(as_uuid=True), nullable=False),
+    Column("assistant_message_id", UUID(as_uuid=True), nullable=True),
+    Column("agent_release_id", UUID(as_uuid=True), nullable=False),
+    Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    UniqueConstraint(
+        "workspace_id",
+        "requested_by_account_id",
+        "idempotency_key",
+        name="uq_assistant_runs_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["conversation_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.conversations.conversation_id",
+            f"{SCHEMA_TOKEN}.conversations.workspace_id",
+        ],
+        name="fk_assistant_runs_conversation",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["user_message_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.messages.message_id", f"{SCHEMA_TOKEN}.messages.workspace_id"],
+        name="fk_assistant_runs_user_message",
+    ),
+    ForeignKeyConstraint(
+        ["assistant_message_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.messages.message_id", f"{SCHEMA_TOKEN}.messages.workspace_id"],
+        name="fk_assistant_runs_assistant_message",
+    ),
+    ForeignKeyConstraint(
+        ["agent_release_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_releases.release_id",
+            f"{SCHEMA_TOKEN}.agent_releases.workspace_id",
+        ],
+        name="fk_assistant_runs_agent_release",
+    ),
+    ForeignKeyConstraint(
+        ["runtime_config_version_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_config_versions.runtime_config_version_id"],
+        name="fk_assistant_runs_runtime_config",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_assistant_runs_requester",
+    ),
+    CheckConstraint(
+        "status IN ('queued', 'running', 'completed', 'failed', 'cancelled')",
+        name="ck_assistant_runs_status",
+    ),
+    CheckConstraint(
+        "(status IN ('queued', 'running') AND completed_at IS NULL) OR "
+        "(status IN ('completed', 'failed', 'cancelled') AND completed_at IS NOT NULL)",
+        name="ck_assistant_runs_completion",
+    ),
+    CheckConstraint(
+        "request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_assistant_runs_request_hash",
+    ),
+    CheckConstraint("trace_id ~ '^[0-9a-f]{32}$'", name="ck_assistant_runs_trace_id"),
+)
+Index(
+    "ix_assistant_runs_workspace_time",
+    assistant_runs.c.workspace_id,
+    assistant_runs.c.created_at,
+)
+Index(
+    "uq_assistant_runs_active_conversation",
+    assistant_runs.c.conversation_id,
+    unique=True,
+    postgresql_where=assistant_runs.c.status.in_(("queued", "running")),
+)
+
 stream_runs = Table(
     "stream_runs",
     metadata,

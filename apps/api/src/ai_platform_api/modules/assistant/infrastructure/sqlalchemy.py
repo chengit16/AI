@@ -1,0 +1,570 @@
+"""实现会话、消息、系统助手发布和运行事实的 PostgreSQL Adapter。"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Callable
+from contextvars import ContextVar
+from datetime import datetime
+from types import TracebackType
+from typing import Any, Literal, cast
+from uuid import UUID, uuid4
+
+from ai_platform_backend.integration.sqlalchemy import (
+    SqlAlchemyAuditWriter,
+    SqlAlchemyOutboxWriter,
+)
+from sqlalchemy import CursorResult, func, insert, select, text, update
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.engine import Row
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from ai_platform_api.modules.assistant.domain.models import (
+    AgentRelease,
+    AssistantRepository,
+    AssistantRun,
+    AssistantUnitOfWork,
+    AssistantWriteConflictError,
+    Conversation,
+    Message,
+    MessagePart,
+    MessageSubmission,
+    RuntimeConfigSnapshot,
+)
+from ai_platform_api.persistence.tables import (
+    agent_publications,
+    agent_releases,
+    agents,
+    ai_runtime_config_publication,
+    ai_runtime_config_versions,
+    assistant_runs,
+    conversations,
+    message_parts,
+    messages,
+    workspace_memberships,
+    workspaces,
+)
+
+SessionFactory = Callable[[], Session]
+SYSTEM_AGENT_KEY = "system_knowledge"
+SYSTEM_AGENT_NAME = "系统知识助手"
+
+
+class SqlAlchemyAssistantRepository(AssistantRepository):
+    """在单个事务中维护创建者私有会话和不可变运行快照。"""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_active_member(self, workspace_id: UUID, account_id: UUID) -> bool:
+        return bool(
+            self._session.scalar(
+                select(func.count())
+                .select_from(workspace_memberships)
+                .join(workspaces, workspaces.c.workspace_id == workspace_memberships.c.workspace_id)
+                .where(
+                    workspace_memberships.c.workspace_id == workspace_id,
+                    workspace_memberships.c.account_id == account_id,
+                    workspace_memberships.c.status == "active",
+                    workspaces.c.status == "active",
+                )
+            )
+        )
+
+    def get_current_runtime_config(self) -> RuntimeConfigSnapshot | None:
+        row = self._session.execute(
+            select(
+                ai_runtime_config_versions.c.runtime_config_version_id,
+                ai_runtime_config_versions.c.content_hash,
+            )
+            .join(
+                ai_runtime_config_publication,
+                ai_runtime_config_publication.c.runtime_config_version_id
+                == ai_runtime_config_versions.c.runtime_config_version_id,
+            )
+            .where(ai_runtime_config_publication.c.publication_key == "current")
+        ).one_or_none()
+        if row is None:
+            return None
+        return RuntimeConfigSnapshot(row.runtime_config_version_id, row.content_hash)
+
+    def get_or_create_system_release(
+        self,
+        *,
+        workspace_id: UUID,
+        account_id: UUID,
+        runtime_config: RuntimeConfigSnapshot,
+        released_at: datetime,
+    ) -> AgentRelease:
+        """按空间串行创建系统助手，并在运行配置变化时发布新快照。"""
+
+        # 1. 空间级事务锁覆盖首次 Agent 与 Release 创建，避免空表场景无法使用行锁。
+        self._session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:workspace_id), 58101)"),
+            {"workspace_id": str(workspace_id)},
+        )
+        agent_id = self._session.scalar(
+            select(agents.c.agent_id).where(
+                agents.c.workspace_id == workspace_id,
+                agents.c.agent_key == SYSTEM_AGENT_KEY,
+                agents.c.status == "active",
+            )
+        )
+        if agent_id is None:
+            agent_id = uuid4()
+            self._session.execute(
+                insert(agents).values(
+                    agent_id=agent_id,
+                    workspace_id=workspace_id,
+                    agent_key=SYSTEM_AGENT_KEY,
+                    name=SYSTEM_AGENT_NAME,
+                    status="active",
+                    created_by_account_id=account_id,
+                    created_at=released_at,
+                    updated_at=released_at,
+                    version=1,
+                )
+            )
+
+        # 2. 当前发布已绑定相同运行配置时直接复用；旧 Release 永不更新。
+        current_row = self._session.execute(
+            select(agent_releases)
+            .join(
+                agent_publications,
+                agent_publications.c.release_id == agent_releases.c.release_id,
+            )
+            .where(agent_publications.c.agent_id == agent_id)
+        ).one_or_none()
+        if (
+            current_row is not None
+            and current_row.runtime_config_version_id == runtime_config.runtime_config_version_id
+        ):
+            return _release(current_row)
+
+        # 3. 新 Release 摘要同时绑定 Agent 身份、版本、运行配置 ID 和配置内容摘要。
+        version = (
+            int(
+                self._session.scalar(
+                    select(func.max(agent_releases.c.version)).where(
+                        agent_releases.c.agent_id == agent_id
+                    )
+                )
+                or 0
+            )
+            + 1
+        )
+        release_id = uuid4()
+        config_hash = _release_hash(
+            agent_id=agent_id,
+            version=version,
+            runtime_config=runtime_config,
+        )
+        self._session.execute(
+            insert(agent_releases).values(
+                release_id=release_id,
+                agent_id=agent_id,
+                workspace_id=workspace_id,
+                version=version,
+                status="released",
+                runtime_config_version_id=runtime_config.runtime_config_version_id,
+                config_hash=config_hash,
+                released_by_account_id=account_id,
+                released_at=released_at,
+            )
+        )
+        generation = int(current_row.version if current_row is not None else 0) + 1
+        statement = postgresql_insert(agent_publications).values(
+            agent_id=agent_id,
+            workspace_id=workspace_id,
+            release_id=release_id,
+            generation=generation,
+            published_by_account_id=account_id,
+            published_at=released_at,
+        )
+        statement = statement.on_conflict_do_update(
+            index_elements=[agent_publications.c.agent_id],
+            set_={
+                "release_id": release_id,
+                "generation": generation,
+                "published_by_account_id": account_id,
+                "published_at": released_at,
+            },
+        )
+        self._session.execute(statement)
+        return AgentRelease(
+            release_id,
+            agent_id,
+            workspace_id,
+            version,
+            runtime_config.runtime_config_version_id,
+            config_hash,
+            released_at,
+        )
+
+    def add_conversation(self, conversation: Conversation) -> None:
+        try:
+            self._session.execute(
+                insert(conversations).values(
+                    conversation_id=conversation.conversation_id,
+                    workspace_id=conversation.workspace_id,
+                    created_by_account_id=conversation.created_by_account_id,
+                    title=conversation.title,
+                    status=conversation.status,
+                    created_at=conversation.created_at,
+                    updated_at=conversation.updated_at,
+                    version=conversation.version,
+                )
+            )
+        except IntegrityError as error:
+            raise AssistantWriteConflictError("write") from error
+
+    def list_conversations(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[Conversation, ...]:
+        rows = self._session.execute(
+            select(conversations)
+            .where(
+                conversations.c.workspace_id == workspace_id,
+                conversations.c.created_by_account_id == account_id,
+            )
+            .order_by(conversations.c.updated_at.desc(), conversations.c.conversation_id)
+            .limit(limit)
+        )
+        return tuple(_conversation(row) for row in rows)
+
+    def get_conversation(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        account_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> Conversation | None:
+        statement = select(conversations).where(
+            conversations.c.workspace_id == workspace_id,
+            conversations.c.conversation_id == conversation_id,
+            conversations.c.created_by_account_id == account_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
+        return _conversation(row) if row is not None else None
+
+    def save_conversation(self, conversation: Conversation) -> None:
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(conversations)
+                .where(
+                    conversations.c.workspace_id == conversation.workspace_id,
+                    conversations.c.conversation_id == conversation.conversation_id,
+                    conversations.c.version == conversation.version - 1,
+                )
+                .values(
+                    status=conversation.status,
+                    title=conversation.title,
+                    updated_at=conversation.updated_at,
+                    version=conversation.version,
+                )
+            ),
+        )
+        if result.rowcount != 1:
+            raise AssistantWriteConflictError("write")
+
+    def list_messages(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[Message, ...]:
+        rows = self._session.execute(
+            select(messages)
+            .where(
+                messages.c.workspace_id == workspace_id,
+                messages.c.conversation_id == conversation_id,
+            )
+            .order_by(messages.c.created_at, messages.c.message_id)
+            .limit(limit)
+        )
+        return tuple(self._message(row) for row in rows)
+
+    def get_submission(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        idempotency_key: str,
+    ) -> MessageSubmission | None:
+        run_row = self._session.execute(
+            select(assistant_runs).where(
+                assistant_runs.c.workspace_id == workspace_id,
+                assistant_runs.c.requested_by_account_id == account_id,
+                assistant_runs.c.idempotency_key == idempotency_key,
+            )
+        ).one_or_none()
+        if run_row is None:
+            return None
+        message_row = self._session.execute(
+            select(messages).where(messages.c.message_id == run_row.user_message_id)
+        ).one()
+        return MessageSubmission(self._message(message_row), _run(run_row))
+
+    def has_active_run(self, workspace_id: UUID, conversation_id: UUID) -> bool:
+        return bool(
+            self._session.scalar(
+                select(func.count())
+                .select_from(assistant_runs)
+                .where(
+                    assistant_runs.c.workspace_id == workspace_id,
+                    assistant_runs.c.conversation_id == conversation_id,
+                    assistant_runs.c.status.in_(("queued", "running")),
+                )
+            )
+        )
+
+    def add_submission(self, submission: MessageSubmission) -> None:
+        message = submission.message
+        run = submission.run
+        try:
+            # 1. 先写消息头和全部不可变 Part，Run 外键只能引用完整的用户输入事实。
+            self._session.execute(
+                insert(messages).values(
+                    message_id=message.message_id,
+                    workspace_id=message.workspace_id,
+                    conversation_id=message.conversation_id,
+                    role=message.role,
+                    status=message.status,
+                    created_by_account_id=message.created_by_account_id,
+                    created_at=message.created_at,
+                    updated_at=message.updated_at,
+                    version=message.version,
+                )
+            )
+            self._session.execute(
+                insert(message_parts),
+                [
+                    {
+                        "part_id": part.part_id,
+                        "workspace_id": message.workspace_id,
+                        "message_id": part.message_id,
+                        "sequence_no": part.sequence_no,
+                        "part_type": part.part_type,
+                        "text_content": part.text,
+                        "object_ref": None,
+                        "media_type": None,
+                        "created_at": part.created_at,
+                    }
+                    for part in message.parts
+                ],
+            )
+            # 2. 最后写入冻结发布与运行配置的排队 Run；任一步冲突都由外层事务整体回滚。
+            self._session.execute(
+                insert(assistant_runs).values(
+                    run_id=run.run_id,
+                    workspace_id=run.workspace_id,
+                    conversation_id=run.conversation_id,
+                    user_message_id=run.user_message_id,
+                    assistant_message_id=run.assistant_message_id,
+                    agent_release_id=run.agent_release_id,
+                    runtime_config_version_id=run.runtime_config_version_id,
+                    requested_by_account_id=run.requested_by_account_id,
+                    status=run.status,
+                    idempotency_key=run.idempotency_key,
+                    request_hash=run.request_hash,
+                    trace_id=run.trace_id,
+                    traceparent=run.traceparent,
+                    created_at=run.created_at,
+                    updated_at=run.updated_at,
+                    completed_at=run.completed_at,
+                    error_code=run.error_code,
+                )
+            )
+        except IntegrityError as error:
+            constraint_name = _constraint_name(error)
+            reason: Literal["idempotency", "conversation_busy"] = (
+                "conversation_busy"
+                if constraint_name == "uq_assistant_runs_active_conversation"
+                else "idempotency"
+            )
+            raise AssistantWriteConflictError(reason) from error
+
+    def _message(self, row: Row[Any]) -> Message:
+        part_rows = self._session.execute(
+            select(message_parts)
+            .where(message_parts.c.message_id == row.message_id)
+            .order_by(message_parts.c.sequence_no)
+        )
+        parts = tuple(
+            MessagePart(
+                part.part_id,
+                part.message_id,
+                part.sequence_no,
+                "text",
+                cast(str, part.text_content),
+                part.created_at,
+            )
+            for part in part_rows
+        )
+        return Message(
+            row.message_id,
+            row.workspace_id,
+            row.conversation_id,
+            row.role,
+            row.status,
+            parts,
+            row.created_by_account_id,
+            row.created_at,
+            row.updated_at,
+            row.version,
+        )
+
+
+class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
+    """为助手事实提供不可嵌套的显式 SQLAlchemy 事务边界。"""
+
+    def __init__(self, session_factory: SessionFactory) -> None:
+        self._session_factory = session_factory
+        self._state: ContextVar[
+            tuple[
+                Session,
+                SqlAlchemyAssistantRepository,
+                SqlAlchemyAuditWriter,
+                SqlAlchemyOutboxWriter,
+            ]
+            | None
+        ] = ContextVar("assistant_unit_of_work", default=None)
+
+    def __enter__(self) -> SqlAlchemyAssistantUnitOfWork:
+        if self._state.get() is not None:
+            raise RuntimeError("Assistant Unit of Work 不允许重复进入")
+        session = self._session_factory()
+        self._state.set(
+            (
+                session,
+                SqlAlchemyAssistantRepository(session),
+                SqlAlchemyAuditWriter(session),
+                SqlAlchemyOutboxWriter(session),
+            )
+        )
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        state = self._state.get()
+        if state is not None:
+            if exc_type is not None:
+                state[0].rollback()
+            state[0].close()
+            self._state.set(None)
+
+    @property
+    def assistant(self) -> SqlAlchemyAssistantRepository:
+        return self._require_state()[1]
+
+    @property
+    def audit(self) -> SqlAlchemyAuditWriter:
+        return self._require_state()[2]
+
+    @property
+    def outbox(self) -> SqlAlchemyOutboxWriter:
+        return self._require_state()[3]
+
+    def commit(self) -> None:
+        self._require_state()[0].commit()
+
+    def _require_state(
+        self,
+    ) -> tuple[
+        Session,
+        SqlAlchemyAssistantRepository,
+        SqlAlchemyAuditWriter,
+        SqlAlchemyOutboxWriter,
+    ]:
+        state = self._state.get()
+        if state is None:
+            raise RuntimeError("Assistant Unit of Work 尚未进入事务范围")
+        return state
+
+
+def _release(row: Row[Any]) -> AgentRelease:
+    return AgentRelease(
+        row.release_id,
+        row.agent_id,
+        row.workspace_id,
+        row.version,
+        row.runtime_config_version_id,
+        row.config_hash,
+        row.released_at,
+    )
+
+
+def _conversation(row: Row[Any]) -> Conversation:
+    return Conversation(
+        row.conversation_id,
+        row.workspace_id,
+        row.created_by_account_id,
+        row.title,
+        row.status,
+        row.created_at,
+        row.updated_at,
+        row.version,
+    )
+
+
+def _run(row: Row[Any]) -> AssistantRun:
+    return AssistantRun(
+        row.run_id,
+        row.workspace_id,
+        row.conversation_id,
+        row.user_message_id,
+        row.assistant_message_id,
+        row.agent_release_id,
+        row.runtime_config_version_id,
+        row.requested_by_account_id,
+        row.status,
+        row.idempotency_key,
+        row.request_hash,
+        row.trace_id,
+        row.traceparent,
+        row.created_at,
+        row.updated_at,
+        row.completed_at,
+        row.error_code,
+    )
+
+
+def _release_hash(
+    *,
+    agent_id: UUID,
+    version: int,
+    runtime_config: RuntimeConfigSnapshot,
+) -> str:
+    canonical = json.dumps(
+        {
+            "agent_id": str(agent_id),
+            "agent_key": SYSTEM_AGENT_KEY,
+            "release_schema_version": 1,
+            "runtime_config_content_hash": runtime_config.content_hash,
+            "runtime_config_version_id": str(runtime_config.runtime_config_version_id),
+            "version": version,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _constraint_name(error: IntegrityError) -> str | None:
+    diagnostic = getattr(error.orig, "diag", None)
+    value = getattr(diagnostic, "constraint_name", None)
+    return value if isinstance(value, str) else None

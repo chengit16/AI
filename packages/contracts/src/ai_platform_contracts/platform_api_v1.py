@@ -36,6 +36,22 @@ class AssignMemberOrganizationRequest(typing.TypedDict):
     primary_department_id: typing.NotRequired[str | None]
 
 
+class AssistantRunResponse(typing.TypedDict):
+    agent_release_id: str
+    assistant_message_id: str | None
+    completed_at: str | None
+    conversation_id: str
+    created_at: str
+    error_code: str | None
+    run_id: str
+    runtime_config_version_id: str
+    status: typing.Literal["queued", "running", "completed", "failed", "cancelled"]
+    trace_id: str
+    updated_at: str
+    user_message_id: str
+    workspace_id: str
+
+
 class AuthenticationContextResponse(typing.TypedDict):
     actor_id: str
     authentication_method: str
@@ -61,12 +77,31 @@ class Body_uploadKnowledgeDocumentVersion(typing.TypedDict):
     file: str
 
 
+class ConversationListResponse(typing.TypedDict):
+    items: list[ConversationResponse]
+
+
+class ConversationResponse(typing.TypedDict):
+    conversation_id: str
+    created_at: str
+    created_by_account_id: str
+    status: typing.Literal["active", "archived"]
+    title: str | None
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
 class CreateAiRuntimeConfigRequest(typing.TypedDict):
     components: RuntimeComponentVersionsSchema
     display_name: str
     policy: GatewayPolicySchema
     routes: list[RuntimeRouteRequest]
     system_prompt_template: str
+
+
+class CreateConversationRequest(typing.TypedDict):
+    title: typing.NotRequired[str | None]
 
 
 class CreateDepartmentRequest(typing.TypedDict):
@@ -115,6 +150,11 @@ class CreateKnowledgeBaseRequest(typing.TypedDict):
     name: str
 
 
+class CreateMessagePartRequest(typing.TypedDict):
+    text: str
+    type: str
+
+
 class CreateModelProviderRequest(typing.TypedDict):
     adapter_kind: typing.NotRequired[str]
     api_key: str
@@ -143,6 +183,10 @@ class CreateRoleBindingRequest(typing.TypedDict):
 class CreateRoleRequest(typing.TypedDict):
     name: str
     role_key: str
+
+
+class CreateUserMessageRequest(typing.TypedDict):
+    parts: list[CreateMessagePartRequest]
 
 
 class CurrentAiRuntimeConfigResponse(typing.TypedDict):
@@ -470,6 +514,30 @@ class MenuReleaseSnapshotRoleMenuEntry(typing.TypedDict):
     visible: bool
 
 
+class MessageListResponse(typing.TypedDict):
+    items: list[MessageResponse]
+
+
+class MessagePartResponse(typing.TypedDict):
+    part_id: str
+    sequence_no: int
+    text: str
+    type: str
+
+
+class MessageResponse(typing.TypedDict):
+    conversation_id: str
+    created_at: str
+    created_by_account_id: str
+    message_id: str
+    parts: list[MessagePartResponse]
+    role: typing.Literal["system", "user", "assistant", "tool"]
+    status: typing.Literal["streaming", "completed", "failed"]
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
 class ModelProviderConfigurationListResponse(typing.TypedDict):
     items: list[ModelProviderConfigurationResponse]
 
@@ -669,6 +737,11 @@ class UploadMetadataResponse(typing.TypedDict):
     media_type: str
     scan_status: typing.NotRequired[str]
     size_bytes: int
+
+
+class UserMessageCreatedResponse(typing.TypedDict):
+    message: MessageResponse
+    run: AssistantRunResponse
 
 
 class WorkspaceInvitationResponse(typing.TypedDict):

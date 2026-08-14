@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 8,
+  "registry_version": 9,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -52,6 +52,10 @@
     ,{ "code": "knowledge.document.read", "resource_type": "document", "action": "read", "scope": "resource", "status": "active" }
     ,{ "code": "knowledge.ingestion.read", "resource_type": "document", "action": "read_ingestion", "scope": "resource", "status": "active" }
     ,{ "code": "knowledge.ingestion.retry", "resource_type": "ingestion_job", "action": "retry", "scope": "resource", "status": "active" }
+    ,{ "code": "assistant.conversation.create", "resource_type": "conversation", "action": "create", "scope": "workspace", "status": "active" }
+    ,{ "code": "assistant.conversation.read", "resource_type": "conversation", "action": "read", "scope": "workspace", "status": "active" }
+    ,{ "code": "assistant.conversation.archive", "resource_type": "conversation", "action": "archive", "scope": "resource", "status": "active" }
+    ,{ "code": "assistant.message.create", "resource_type": "message", "action": "create", "scope": "workspace", "status": "active" }
   ],
   "page_resources": [
     {
@@ -200,7 +204,12 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000065", "api_key": "knowledge.base.list", "operation_id": "listKnowledgeBases", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases", "access_level": "authorized", "permission_code": "knowledge.base.read", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000066", "api_key": "knowledge.document.list", "operation_id": "listKnowledgeDocuments", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents", "access_level": "authorized", "permission_code": "knowledge.document.read", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000067", "api_key": "knowledge.ingestion.list", "operation_id": "listKnowledgeIngestionJobs", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/ingestion-jobs", "access_level": "authorized", "permission_code": "knowledge.ingestion.read", "risk_level": "normal", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000068", "api_key": "knowledge.ingestion.retry", "operation_id": "retryKnowledgeIngestionJob", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/ingestion-jobs/{ingestion_job_id}/retry", "access_level": "authorized", "permission_code": "knowledge.ingestion.retry", "risk_level": "high", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000068", "api_key": "knowledge.ingestion.retry", "operation_id": "retryKnowledgeIngestionJob", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/ingestion-jobs/{ingestion_job_id}/retry", "access_level": "authorized", "permission_code": "knowledge.ingestion.retry", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000069", "api_key": "assistant.conversation.create", "operation_id": "createAssistantConversation", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations", "access_level": "authorized", "permission_code": "assistant.conversation.create", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000070", "api_key": "assistant.conversation.list", "operation_id": "listAssistantConversations", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations", "access_level": "authorized", "permission_code": "assistant.conversation.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000071", "api_key": "assistant.message.list", "operation_id": "listAssistantMessages", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages", "access_level": "authorized", "permission_code": "assistant.conversation.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000072", "api_key": "assistant.message.create", "operation_id": "createAssistantUserMessage", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages", "access_level": "authorized", "permission_code": "assistant.message.create", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000073", "api_key": "assistant.conversation.archive", "operation_id": "archiveAssistantConversation", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/archive", "access_level": "authorized", "permission_code": "assistant.conversation.archive", "risk_level": "normal", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -259,6 +268,10 @@
     { "menu_id": "82000000-0000-4000-8000-000000000147", "menu_key": "navigation.workspace.knowledge.document_query", "parent_menu_key": "navigation.workspace.knowledge", "name": "查看文档", "menu_type": "action", "page_resource_id": null, "permission_code": "knowledge.document.read", "icon_key": null, "sort_order": 180, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000148", "menu_key": "navigation.workspace.knowledge.ingestion_query", "parent_menu_key": "navigation.workspace.knowledge", "name": "查看入库任务", "menu_type": "action", "page_resource_id": null, "permission_code": "knowledge.ingestion.read", "icon_key": null, "sort_order": 190, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000149", "menu_key": "navigation.workspace.knowledge.ingestion_retry", "parent_menu_key": "navigation.workspace.knowledge", "name": "重试入库任务", "menu_type": "action", "page_resource_id": null, "permission_code": "knowledge.ingestion.retry", "icon_key": null, "sort_order": 200, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000163", "menu_key": "navigation.workspace.knowledge.conversation_create", "parent_menu_key": "navigation.workspace.knowledge", "name": "创建知识问答会话", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.conversation.create", "icon_key": null, "sort_order": 210, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000164", "menu_key": "navigation.workspace.knowledge.conversation_query", "parent_menu_key": "navigation.workspace.knowledge", "name": "查看知识问答会话", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.conversation.read", "icon_key": null, "sort_order": 220, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000165", "menu_key": "navigation.workspace.knowledge.conversation_archive", "parent_menu_key": "navigation.workspace.knowledge", "name": "归档知识问答会话", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.conversation.archive", "icon_key": null, "sort_order": 230, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000166", "menu_key": "navigation.workspace.knowledge.message_create", "parent_menu_key": "navigation.workspace.knowledge", "name": "发起知识问答", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.message.create", "icon_key": null, "sort_order": 240, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000152", "menu_key": "navigation.platform.models.provider_query", "parent_menu_key": "navigation.platform.models", "name": "查看模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000153", "menu_key": "navigation.platform.models.provider_create", "parent_menu_key": "navigation.platform.models", "name": "创建模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000154", "menu_key": "navigation.platform.models.credential_rotate", "parent_menu_key": "navigation.platform.models", "name": "轮换模型凭证", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
@@ -332,6 +345,11 @@
     { "menu_id": "82000000-0000-4000-8000-000000000146", "api_resource_id": "81000000-0000-4000-8000-000000000065", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000147", "api_resource_id": "81000000-0000-4000-8000-000000000066", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000148", "api_resource_id": "81000000-0000-4000-8000-000000000067", "action_type": "query" },
-    { "menu_id": "82000000-0000-4000-8000-000000000149", "api_resource_id": "81000000-0000-4000-8000-000000000068", "action_type": "mutation" }
+    { "menu_id": "82000000-0000-4000-8000-000000000149", "api_resource_id": "81000000-0000-4000-8000-000000000068", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000163", "api_resource_id": "81000000-0000-4000-8000-000000000069", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000164", "api_resource_id": "81000000-0000-4000-8000-000000000070", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000164", "api_resource_id": "81000000-0000-4000-8000-000000000071", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000166", "api_resource_id": "81000000-0000-4000-8000-000000000072", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000165", "api_resource_id": "81000000-0000-4000-8000-000000000073", "action_type": "mutation" }
   ]
 }

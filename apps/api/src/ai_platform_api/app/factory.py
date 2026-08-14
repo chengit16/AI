@@ -13,6 +13,7 @@ from ai_platform_api.app.errors import register_error_handlers
 from ai_platform_api.app.trace_middleware import TraceContextMiddleware
 from ai_platform_api.common.api_errors import ErrorResponse
 from ai_platform_api.config import Settings, get_settings
+from ai_platform_api.modules.assistant.api.routes import router as assistant_router
 from ai_platform_api.modules.authorization.api.routes import (
     menu_router,
 )
@@ -84,6 +85,7 @@ def create_app(
     )
     application.state.ai_runtime_configuration_service = dependencies.ai_runtime_configurations
     application.state.model_runtime_service = dependencies.model_runtime
+    application.state.assistant_conversation_service = dependencies.assistant_conversations
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware)
     register_error_handlers(application, dependencies.errors)
@@ -98,4 +100,5 @@ def create_app(
     application.include_router(knowledge_router, prefix="/api/v1")
     application.include_router(model_provider_router, prefix="/api/v1")
     application.include_router(ai_runtime_router, prefix="/api/v1")
+    application.include_router(assistant_router, prefix="/api/v1")
     return application

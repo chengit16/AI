@@ -5,6 +5,10 @@ from pathlib import Path
 
 from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.assistant.application.service import AssistantConversationService
+from ai_platform_api.modules.assistant.infrastructure.sqlalchemy import (
+    SqlAlchemyAssistantUnitOfWork,
+)
 from ai_platform_api.modules.authorization.application.field_registry import (
     load_field_policy_registry,
 )
@@ -125,6 +129,7 @@ class ApplicationContainer:
     model_provider_configurations: ModelProviderConfigurationService | None = None
     ai_runtime_configurations: AiRuntimeConfigurationService | None = None
     model_runtime: RuntimeModelGatewayService | None = None
+    assistant_conversations: AssistantConversationService | None = None
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
     )
@@ -203,6 +208,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     ai_runtime_configurations = AiRuntimeConfigurationService(
         SqlAlchemyRuntimeConfigurationUnitOfWork(database.sessions)
     )
+    assistant_conversations = AssistantConversationService(
+        SqlAlchemyAssistantUnitOfWork(database.sessions)
+    )
     # 3. 容器接管全部资源；构造中途失败时按依赖逆序关闭，避免泄漏连接和缓存客户端。
     try:
         return ApplicationContainer(
@@ -236,6 +244,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 model_provider_configurations,
                 OpenAiCompatibleRuntimeProviderFactory(provider_url_policy),
             ),
+            assistant_conversations=assistant_conversations,
             authentication=AuthenticationService(
                 repository=reader,
                 sessions=sessions,
