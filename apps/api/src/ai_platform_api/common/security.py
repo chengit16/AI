@@ -88,3 +88,35 @@ class EnvelopeSecretCipher:
             associated_data,
         )
         return plaintext.decode("utf-8")
+
+    def rewrap(
+        self,
+        secret: EncryptedSecret,
+        *,
+        new_master_key: MasterKeyFile,
+        associated_data: bytes,
+    ) -> EncryptedSecret:
+        """只用新主密钥重包裹数据密钥，保持供应商凭据正文密文不变。"""
+
+        if secret.key_version != self._master_key.version:
+            raise ValueError("凭证主密钥版本不匹配")
+        if new_master_key.version <= self._master_key.version:
+            raise ValueError("新主密钥版本必须单调递增")
+        data_key = AESGCM(self._master_key.load()).decrypt(
+            secret.data_key_nonce,
+            secret.encrypted_data_key,
+            associated_data,
+        )
+        new_nonce = os.urandom(12)
+        return EncryptedSecret(
+            key_version=new_master_key.version,
+            encrypted_data_key=AESGCM(new_master_key.load()).encrypt(
+                new_nonce,
+                data_key,
+                associated_data,
+            ),
+            data_key_nonce=new_nonce,
+            ciphertext=secret.ciphertext,
+            data_nonce=secret.data_nonce,
+            last_four=secret.last_four,
+        )

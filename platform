@@ -24,6 +24,35 @@ compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
+env_value() {
+  local key="$1" fallback="${2:-}"
+  local value
+  value="$(awk -F= -v key="$key" '$1 == key {print substr($0, index($0, "=") + 1)}' "$ENV_FILE" | tail -n 1)"
+  printf '%s' "${value:-$fallback}"
+}
+
+resolve_local_path() {
+  local value="$1"
+  if [[ "$value" == /* ]]; then
+    printf '%s' "$value"
+  else
+    printf '%s' "$PROJECT_DIR/${value#./}"
+  fi
+}
+
+run_python() {
+  if [[ -x "$PROJECT_DIR/.venv/bin/python" ]]; then
+    "$PROJECT_DIR/.venv/bin/python" "$@"
+  else
+    require_command uv
+    uv run --locked python "$@"
+  fi
+}
+
+canonicalize_local_path() {
+  run_python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=False))' "$1"
+}
+
 ensure_environment() {
   if [[ ! -f "$ENV_FILE" ]]; then
     cp "$DEFAULT_ENV_FILE" "$ENV_FILE"
@@ -31,20 +60,19 @@ ensure_environment() {
   fi
 
   # 本地数据与密钥目录由 .env 配置，主密钥生成在独立函数中完成。
-  local root_path
-  root_path="$(awk -F= '$1 == "AI_PLATFORM_ROOT" {print substr($0, index($0, "=") + 1)}' "$ENV_FILE" | tail -n 1)"
-  root_path="${root_path:-./.ai-platform}"
-  if [[ "$root_path" != /* ]]; then
-    root_path="$PROJECT_DIR/${root_path#./}"
-  fi
+  local root_path backup_root
+  root_path="$(resolve_local_path "$(env_value AI_PLATFORM_ROOT ./.ai-platform)")"
+  backup_root="$(resolve_local_path "$(env_value AI_PLATFORM_BACKUP_ROOT ./AIPlatformBackups)")"
   export AI_PLATFORM_ROOT="$root_path"
+  export AI_PLATFORM_BACKUP_ROOT="$backup_root"
   mkdir -p \
     "$root_path/data/postgres" \
     "$root_path/data/valkey" \
     "$root_path/data/objects" \
     "$root_path/logs" \
     "$root_path/runtime" \
-    "$root_path/secrets"
+    "$root_path/secrets" \
+    "$backup_root"
 }
 
 ensure_master_key() {
@@ -69,6 +97,43 @@ ensure_task_signing_key() {
   fi
   chmod 600 "$signing_key"
   [[ "$(wc -c <"$signing_key" | tr -d ' ')" == "32" ]] || fail "内部任务签名密钥长度必须为 32 字节"
+}
+
+ensure_backup_key() {
+  local backup_key="$AI_PLATFORM_ROOT/secrets/backup-encryption.key"
+  [[ ! -L "$backup_key" ]] || fail "恢复包加密密钥不能是符号链接"
+  if [[ ! -f "$backup_key" ]]; then
+    umask 077
+    openssl rand 32 >"$backup_key"
+    log "已生成独立恢复包加密密钥；机器外恢复前必须另行安全保管该文件"
+  fi
+  chmod 600 "$backup_key"
+  [[ "$(wc -c <"$backup_key" | tr -d ' ')" == "32" ]] || fail "恢复包加密密钥长度必须为 32 字节"
+}
+
+export_local_service_settings() {
+  local postgres_user postgres_password postgres_database postgres_port
+  postgres_user="$(env_value POSTGRES_USER ai_platform)"
+  postgres_password="$(env_value POSTGRES_PASSWORD local-development-only)"
+  postgres_database="$(env_value POSTGRES_DB ai_platform)"
+  postgres_port="$(env_value POSTGRES_PORT 5432)"
+  export AI_PLATFORM_DATABASE_URL="postgresql+psycopg://${postgres_user}:${postgres_password}@127.0.0.1:${postgres_port}/${postgres_database}"
+  export AI_PLATFORM_MINIO_ENDPOINT="http://127.0.0.1:$(env_value MINIO_API_PORT 9000)"
+  export AI_PLATFORM_MINIO_ACCESS_KEY="$(env_value MINIO_ROOT_USER ai-platform-local)"
+  export AI_PLATFORM_MINIO_SECRET_KEY="$(env_value MINIO_ROOT_PASSWORD local-development-only)"
+  export AI_PLATFORM_MINIO_BUCKET="$(env_value MINIO_BUCKET ai-platform-documents)"
+}
+
+set_env_value() {
+  local key="$1" value="$2" temporary
+  temporary="$(mktemp "${TMPDIR:-/tmp}/ai-platform-env.XXXXXX")"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { found = 0 }
+    index($0, key "=") == 1 { print key "=" value; found = 1; next }
+    { print }
+    END { if (!found) print key "=" value }
+  ' "$ENV_FILE" >"$temporary"
+  mv "$temporary" "$ENV_FILE"
 }
 
 check_runtime() {
@@ -199,6 +264,187 @@ platform_admin() {
   log "平台管理员状态已更新: $login_name -> $status_value"
 }
 
+backup_local() {
+  # 1. 固定本次备份的本地依赖、密钥和输出边界，禁止把恢复包写回事实数据目录。
+  check_runtime
+  ensure_environment
+  require_command openssl
+  ensure_master_key
+  ensure_task_signing_key
+  ensure_backup_key
+  export_local_service_settings
+  compose ps --services --status running | grep -qx postgres || fail "PostgreSQL 尚未运行"
+  compose ps --services --status running | grep -qx minio || fail "MinIO 尚未运行"
+
+  local requested_output="${1:-}" output_path timestamp revision local_data_root
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  if [[ -n "$requested_output" ]]; then
+    output_path="$(resolve_local_path "$requested_output")"
+  else
+    output_path="$AI_PLATFORM_BACKUP_ROOT/ai-platform-$timestamp.aiprb"
+  fi
+  output_path="$(canonicalize_local_path "$output_path")"
+  local_data_root="$(canonicalize_local_path "$AI_PLATFORM_ROOT")"
+  [[ "$output_path" == *.aiprb ]] || fail "恢复包文件必须使用 .aiprb 后缀"
+  [[ "$output_path" != "$local_data_root" && "$output_path" != "$local_data_root/"* ]] || \
+    fail "恢复包输出路径不能位于本地事实数据目录内"
+  [[ ! -e "$output_path" && ! -L "$output_path" ]] || fail "恢复包输出路径已经存在"
+  mkdir -p "$(dirname "$output_path")"
+
+  # 2. 停写前先关闭已知对象缺口；数据库与对象快照随后在同一停写窗口取得。
+  run_python scripts/check_object_references.py || fail "对象引用不一致，拒绝创建恢复包"
+  revision="$(compose exec -T postgres psql -U "$(env_value POSTGRES_USER ai_platform)" -d "$(env_value POSTGRES_DB ai_platform)" -Atqc 'SELECT version_num FROM public.alembic_version')"
+  revision="$(printf '%s' "$revision" | tr -d '[:space:]')"
+  [[ -n "$revision" ]] || fail "无法读取当前数据库 Revision"
+
+  # 停止所有业务写入方和 MinIO 后再取得数据库逻辑快照与对象物理快照，保证两者同一停写窗口。
+  (
+    local staging stopped
+    staging="$(mktemp -d "${TMPDIR:-/tmp}/ai-platform-backup.XXXXXX")"
+    stopped=0
+    cleanup_backup() {
+      rm -rf -- "$staging"
+      if (( stopped == 1 )); then
+        compose up -d minio api worker >/dev/null 2>&1 || true
+      fi
+    }
+    trap cleanup_backup EXIT
+    mkdir -p "$staging/secrets"
+    stopped=1
+    compose stop api worker minio >/dev/null
+    compose exec -T postgres pg_dump \
+      --format=custom --no-owner --no-privileges \
+      -U "$(env_value POSTGRES_USER ai_platform)" \
+      -d "$(env_value POSTGRES_DB ai_platform)" >"$staging/database.dump"
+    run_python scripts/local_recovery.py snapshot-objects \
+      --source-root "$AI_PLATFORM_ROOT/data/objects" \
+      --output "$staging/objects.tar"
+    cp "$AI_PLATFORM_ROOT/secrets/master.key" "$staging/secrets/master.key"
+    cp "$AI_PLATFORM_ROOT/secrets/task-signing.key" "$staging/secrets/task-signing.key"
+    printf '%s\n' "$(env_value MASTER_KEY_VERSION 1)" >"$staging/secrets/master.key.version"
+    chmod 600 "$staging/secrets/"*
+    run_python scripts/local_recovery.py pack \
+      --staging-root "$staging" \
+      --output "$output_path" \
+      --key-file "$AI_PLATFORM_ROOT/secrets/backup-encryption.key" \
+      --schema-revision "$revision"
+    compose up -d minio api worker >/dev/null
+    stopped=0
+  )
+  # 3. 业务容器全部恢复健康后才向调用方宣告备份成功。
+  wait_until_healthy
+  log "加密恢复包已创建: $output_path"
+}
+
+restore_local() {
+  # 1. 先验证破坏性确认参数，再生成可独立回退的操作前恢复包。
+  local requested_bundle="${1:-}" confirmation="${2:-}"
+  [[ -n "$requested_bundle" && "$confirmation" == "--confirm-replace" ]] || \
+    fail "用法: ./platform restore <bundle.aiprb> --confirm-replace"
+  check_runtime
+  ensure_environment
+  ensure_backup_key
+  export_local_service_settings
+
+  local bundle_path timestamp pre_restore
+  bundle_path="$(canonicalize_local_path "$(resolve_local_path "$requested_bundle")")"
+  [[ -f "$bundle_path" && ! -L "$bundle_path" ]] || fail "恢复包不存在或不是普通文件"
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  pre_restore="$AI_PLATFORM_BACKUP_ROOT/pre-restore-$timestamp.aiprb"
+  backup_local "$pre_restore"
+
+  (
+    local staging restored previous_objects restored_version
+    staging="$(mktemp -d "${TMPDIR:-/tmp}/ai-platform-restore.XXXXXX")"
+    restored="$staging/restored"
+    previous_objects="$AI_PLATFORM_ROOT/runtime/objects-before-restore-$timestamp"
+    # 子 Shell 无论正常结束还是因 set -e 中止，都会清理可能含明文密钥的解包目录。
+    trap 'rm -rf -- "$staging"' EXIT
+
+    # 2. 在停止服务前完成认证、路径和摘要验证，非法恢复包不得触碰现有事实。
+    run_python scripts/local_recovery.py unpack \
+      --bundle "$bundle_path" \
+      --target-root "$restored" \
+      --key-file "$AI_PLATFORM_ROOT/secrets/backup-encryption.key"
+
+    # 3. 停止全部状态写入方后替换数据库、对象和文件密钥；失败时保持服务停止。
+    compose stop api worker minio valkey >/dev/null
+    compose exec -T postgres pg_restore \
+      --clean --if-exists --exit-on-error --no-owner --no-privileges \
+      -U "$(env_value POSTGRES_USER ai_platform)" \
+      -d "$(env_value POSTGRES_DB ai_platform)" <"$restored/database.dump"
+    mv "$AI_PLATFORM_ROOT/data/objects" "$previous_objects"
+    mkdir -p "$AI_PLATFORM_ROOT/data/objects"
+    run_python scripts/local_recovery.py restore-objects \
+      --snapshot "$restored/objects.tar" \
+      --target-root "$AI_PLATFORM_ROOT/data/objects"
+    install -m 600 "$restored/secrets/master.key" "$AI_PLATFORM_ROOT/secrets/master.key"
+    install -m 600 "$restored/secrets/task-signing.key" "$AI_PLATFORM_ROOT/secrets/task-signing.key"
+    restored_version="$(tr -d '[:space:]' <"$restored/secrets/master.key.version")"
+    [[ "$restored_version" =~ ^[1-9][0-9]*$ ]] || fail "恢复包主密钥版本无效"
+    set_env_value MASTER_KEY_VERSION "$restored_version"
+
+    # 4. 清空可重建状态、迁移 Schema 并执行对象与八项诊断，全部通过后删除旧对象副本。
+    compose start valkey >/dev/null
+    compose exec -T valkey valkey-cli FLUSHALL >/dev/null
+    compose exec -T valkey valkey-cli BGREWRITEAOF >/dev/null || true
+    compose run --rm migrate >/dev/null
+    compose up -d --remove-orphans >/dev/null
+    wait_until_healthy
+    export_local_service_settings
+    run_python scripts/check_object_references.py || fail "恢复后对象引用不一致"
+    doctor
+    rm -rf -- "$previous_objects"
+  )
+  log "恢复完成；操作前快照保留在: $pre_restore"
+}
+
+rotate_master_key() {
+  # 1. 主密钥跨介质更新无法形成单一事务，因此先创建最终回退点并准备下一版本密钥。
+  [[ "${1:-}" == "--confirm" ]] || fail "用法: ./platform rotate-master-key --confirm"
+  check_runtime
+  ensure_environment
+  require_command openssl
+  ensure_backup_key
+  export_local_service_settings
+
+  local timestamp safety_backup old_version new_version current_key next_key previous_key
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  safety_backup="$AI_PLATFORM_BACKUP_ROOT/pre-key-rotation-$timestamp.aiprb"
+  backup_local "$safety_backup"
+  old_version="$(env_value MASTER_KEY_VERSION 1)"
+  [[ "$old_version" =~ ^[1-9][0-9]*$ ]] || fail "当前主密钥版本无效"
+  (( old_version < 2147483647 )) || fail "主密钥版本已经达到支持上限"
+  new_version=$((old_version + 1))
+  current_key="$AI_PLATFORM_ROOT/secrets/master.key"
+  next_key="$AI_PLATFORM_ROOT/secrets/master.key.next"
+  previous_key="$AI_PLATFORM_ROOT/secrets/master.key.previous"
+  [[ ! -e "$next_key" && ! -e "$previous_key" ]] || fail "存在未清理的主密钥轮换文件"
+  umask 077
+  openssl rand 32 >"$next_key"
+  chmod 600 "$next_key"
+
+  # 2. API 停止期间以单一数据库事务重包裹全部数据密钥，失败则继续保留旧文件密钥。
+  compose stop api >/dev/null
+  if ! run_python scripts/rotate_master_key.py \
+    --old-key-file "$current_key" --old-version "$old_version" \
+    --new-key-file "$next_key" --new-version "$new_version"; then
+    rm -f -- "$next_key"
+    compose start api >/dev/null
+    fail "凭据数据密钥重包裹失败，数据库已回滚"
+  fi
+
+  # 3. 数据库提交后再提升文件密钥和版本配置，健康诊断通过才删除旧密钥回退文件。
+  mv "$current_key" "$previous_key"
+  mv "$next_key" "$current_key"
+  set_env_value MASTER_KEY_VERSION "$new_version"
+  compose up -d --force-recreate api >/dev/null
+  wait_until_healthy
+  doctor
+  rm -f -- "$previous_key"
+  log "主密钥轮换完成: version=$new_version；轮换前恢复包: $safety_backup"
+}
+
 doctor() {
   check_runtime
   ensure_environment
@@ -276,6 +522,11 @@ usage() {
   status   显示容器与健康状态
   logs     查看最近日志，可追加服务名
   admin    本地授予或撤销平台管理员: admin <grant|revoke> <login_name>
+  backup   创建默认路径的加密恢复包，可追加输出路径
+  restore  从恢复包替换本地数据: restore <bundle> --confirm-replace
+  export   与 backup 使用同一版本化加密格式，必须指定输出路径
+  import   与 restore 使用同一校验和恢复流程，必须显式确认替换
+  rotate-master-key  备份后重包裹供应商凭据并轮换本地主密钥
   doctor   执行服务与基础设施诊断
 EOF
 }
@@ -288,6 +539,11 @@ case "$command_name" in
   status) status ;;
   logs) shift; logs "$@" ;;
   admin) shift; platform_admin "$@" ;;
+  backup) shift; backup_local "$@" ;;
+  restore) shift; restore_local "$@" ;;
+  export) shift; [[ -n "${1:-}" ]] || fail "用法: ./platform export <output.aiprb>"; backup_local "$@" ;;
+  import) shift; restore_local "$@" ;;
+  rotate-master-key) shift; rotate_master_key "$@" ;;
   doctor) doctor ;;
   *) usage; [[ -z "$command_name" ]] || exit 1 ;;
 esac

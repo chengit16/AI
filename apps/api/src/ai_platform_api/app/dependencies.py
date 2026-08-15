@@ -261,7 +261,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         secret_key=settings.minio_secret_key.get_secret_value(),
         bucket=settings.minio_bucket,
     )
-    secret_cipher = EnvelopeSecretCipher(MasterKeyFile(settings.master_key_path))
+    secret_cipher = EnvelopeSecretCipher(
+        MasterKeyFile(settings.master_key_path, settings.master_key_version)
+    )
     provider_url_policy = StrictProviderBaseUrlPolicy(settings.model_provider_allowed_hosts)
     model_provider_configurations = ModelProviderConfigurationService(
         SqlAlchemyModelProviderUnitOfWork(database.sessions),
