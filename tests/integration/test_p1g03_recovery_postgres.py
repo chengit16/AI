@@ -114,6 +114,8 @@ def _migration_config(database_url: str, schema: str = "public") -> Config:
     )
     config.set_main_option("sqlalchemy.url", database_url)
     config.set_main_option("ai_platform_schema", schema)
+    # 联合演练由平台注入主库地址；显式属性保证恢复 Migration 始终落到本次临时数据库。
+    config.attributes["ai_platform_database_url"] = database_url
     return config
 
 

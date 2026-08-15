@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "drill_id": "p2-11-v1",
+  "status": "frozen",
+  "baseline_ref": "contracts/reliability/reliability-baseline.v1.json",
+  "source_scenarios_ref": "tests/fixtures/reliability/p2-01-v1.json",
+  "synthetic": true,
+  "description": "在同一次本地演练中复用已验收的恢复与故障注入能力，验证事实恢复、派生数据重建、实例切换、积压恢复、幂等和恢复后授权边界。",
+  "execution_policy": {
+    "preflight_command": "./platform doctor",
+    "recovery_command": "./platform doctor",
+    "stop_scenarios_on_preflight_failure": true,
+    "always_run_recovery_check": true,
+    "failure_mode": "fail_closed",
+    "evidence_path": ".ai-platform/evidence/p2-11-latest.json"
+  },
+  "required_components": [
+    "postgresql",
+    "minio",
+    "object_snapshot",
+    "derived_index",
+    "worker_lease",
+    "api_instance",
+    "sse_notification",
+    "valkey",
+    "outbox",
+    "authorization"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "p211-database-restore-001",
+      "title": "PostgreSQL 逻辑备份恢复与 Migration 往返",
+      "component": "postgresql",
+      "source_case_refs": ["p201-recovery-object-missing-011"],
+      "pytest_node": "tests/integration/test_p1g03_recovery_postgres.py::test_logical_database_dump_restores_to_clean_database_and_survives_migration_cycle",
+      "verified_invariants": ["business_fact_single_writer", "workspace_isolation_after_recovery"],
+      "success_criteria": "全新数据库可从固定 Revision 的逻辑备份恢复，Migration 往返后核心合成事实计数与边界保持一致。"
+    },
+    {
+      "scenario_id": "p211-minio-reference-002",
+      "title": "MinIO 对象引用完整性与缺失检测",
+      "component": "minio",
+      "source_case_refs": ["p201-recovery-object-missing-011"],
+      "pytest_node": "tests/integration/test_p1g03_recovery_postgres.py::test_database_object_references_match_minio_and_detect_missing_objects",
+      "verified_invariants": ["business_fact_single_writer", "workspace_isolation_after_recovery"],
+      "success_criteria": "数据库对象引用全部可解析，主动移除合成对象后校验器必须稳定发现缺失。"
+    },
+    {
+      "scenario_id": "p211-object-snapshot-003",
+      "title": "对象快照往返与非空目标保护",
+      "component": "object_snapshot",
+      "source_case_refs": ["p201-recovery-object-missing-011"],
+      "pytest_node": "tests/unit/test_p1g03_local_recovery.py::test_object_snapshot_roundtrip_and_nonempty_target_guard",
+      "verified_invariants": ["business_fact_single_writer", "workspace_isolation_after_recovery"],
+      "success_criteria": "对象快照摘要在往返后保持一致，非空目标目录必须失败关闭且不能覆盖既有内容。"
+    },
+    {
+      "scenario_id": "p211-index-rebuild-004",
+      "title": "异常活动索引撤销与事实重建",
+      "component": "derived_index",
+      "source_case_refs": ["p201-index-embedding-outage-003", "p201-index-artifact-corrupt-004"],
+      "pytest_node": "tests/integration/test_p204_index_maintenance_postgres.py::test_missing_complete_candidate_disables_bad_surface_and_rebuilds",
+      "verified_invariants": ["derived_index_rebuildable", "business_fact_single_writer"],
+      "success_criteria": "不存在完整候选时先关闭异常查询面，再从已提交事实生成唯一完整索引并原子恢复服务。"
+    },
+    {
+      "scenario_id": "p211-worker-lease-005",
+      "title": "Worker 租约过期与迟到结果隔离",
+      "component": "worker_lease",
+      "source_case_refs": ["p201-ingestion-duplicate-001", "p201-ingestion-lease-timeout-002"],
+      "pytest_node": "tests/integration/test_p202_ingestion_attempts_postgres.py::test_attempt_history_prevents_stale_claim_and_duplicate_side_effect",
+      "verified_invariants": ["immutable_attempt_history", "duplicate_delivery_zero_side_effects"],
+      "success_criteria": "恢复执行创建新 Attempt，过期认领和迟到结果不能覆盖新执行或产生重复副作用。"
+    },
+    {
+      "scenario_id": "p211-api-switch-006",
+      "title": "API 实例切换与原 Run 断点恢复",
+      "component": "api_instance",
+      "source_case_refs": ["p201-api-instance-interrupt-005"],
+      "pytest_node": "tests/integration/test_p205_streaming_valkey.py::test_two_instances_share_wakeup_and_resume_same_postgres_run",
+      "verified_invariants": ["sse_postgresql_fact_authority", "workspace_isolation_after_recovery"],
+      "success_criteria": "两个实例共享 PostgreSQL 事实与无正文唤醒，替代实例从原事件游标恢复且不创建新 Run。"
+    },
+    {
+      "scenario_id": "p211-sse-notification-loss-007",
+      "title": "SSE 通知丢失后的有界数据库轮询",
+      "component": "sse_notification",
+      "source_case_refs": ["p201-sse-notification-reorder-006"],
+      "pytest_node": "tests/integration/test_p205_streaming_valkey.py::test_lost_notification_falls_back_to_bounded_postgres_polling",
+      "verified_invariants": ["sse_postgresql_fact_authority", "duplicate_delivery_zero_side_effects"],
+      "success_criteria": "通知全部丢失时仍在五秒预算内从 PostgreSQL 读到严格递增且无重复的持久化事件。"
+    },
+    {
+      "scenario_id": "p211-valkey-outage-008",
+      "title": "Valkey 不可用时 SSE 事实提交与回放",
+      "component": "valkey",
+      "source_case_refs": ["p201-api-instance-interrupt-005", "p201-sse-notification-reorder-006"],
+      "pytest_node": "tests/integration/test_p205_streaming_valkey.py::test_valkey_outage_does_not_block_stream_fact_commit",
+      "verified_invariants": ["sse_postgresql_fact_authority", "business_fact_single_writer"],
+      "success_criteria": "通知层不可达不能阻断事件事务提交，无通知实例仍能从 PostgreSQL 恢复同一事实。"
+    },
+    {
+      "scenario_id": "p211-outbox-backlog-009",
+      "title": "Outbox 投递失败、租约过期与积压恢复",
+      "component": "outbox",
+      "source_case_refs": ["p201-outbox-backlog-timeout-009"],
+      "pytest_node": "tests/integration/test_p1a05_outbox_recovery.py::test_dispatch_failure_is_retried_and_lease_expiry_recovers",
+      "verified_invariants": ["audit_outbox_atomicity", "duplicate_delivery_zero_side_effects"],
+      "success_criteria": "投递失败形成有限重试，租约过期后可重新认领并恢复，不遗留不可解释的积压。"
+    },
+    {
+      "scenario_id": "p211-outbox-duplicate-010",
+      "title": "Outbox 重复投递与消费者幂等",
+      "component": "outbox",
+      "source_case_refs": ["p201-outbox-duplicate-008"],
+      "pytest_node": "tests/integration/test_p1a05_outbox_recovery.py::test_duplicate_task_is_consumed_once_with_continued_trace",
+      "verified_invariants": ["audit_outbox_atomicity", "duplicate_delivery_zero_side_effects"],
+      "success_criteria": "同一事件重复到达只执行一次业务投影，消费回执和 Trace 仍保持连续可追溯。"
+    },
+    {
+      "scenario_id": "p211-restored-boundary-011",
+      "title": "恢复后个人与企业身份权限边界",
+      "component": "authorization",
+      "source_case_refs": ["p201-recovery-object-missing-011", "p201-authorization-cache-stale-007"],
+      "pytest_node": "tests/integration/test_p1g02_dataset_postgres.py::test_loaded_identity_roles_and_passwords_keep_expected_boundaries",
+      "verified_invariants": ["workspace_isolation_after_recovery", "authorization_revocation_fail_closed"],
+      "success_criteria": "恢复的合成账号、角色和密码保持个人/企业边界，错误主体不能获得跨空间权限。"
+    },
+    {
+      "scenario_id": "p211-revocation-fail-closed-012",
+      "title": "撤权通知丢失后的四表面失败关闭",
+      "component": "authorization",
+      "source_case_refs": ["p201-authorization-cache-stale-007"],
+      "pytest_node": "tests/integration/test_p209_authorization_propagation_postgres.py::test_dropped_invalidation_rejects_all_surfaces_within_five_seconds",
+      "verified_invariants": ["authorization_revocation_fail_closed", "workspace_isolation_after_recovery"],
+      "success_criteria": "撤权通知丢失且旧缓存持续存在时，菜单、接口、检索和字段投影均在五秒内失败关闭。"
+    }
+  ]
+}

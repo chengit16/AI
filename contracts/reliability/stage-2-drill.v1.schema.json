@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/reliability/stage-2-drill.v1.schema.json",
+  "title": "阶段 2 联合故障演练清单 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "drill_id",
+    "status",
+    "baseline_ref",
+    "source_scenarios_ref",
+    "synthetic",
+    "description",
+    "execution_policy",
+    "required_components",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "drill_id": { "const": "p2-11-v1" },
+    "status": { "const": "frozen" },
+    "baseline_ref": {
+      "const": "contracts/reliability/reliability-baseline.v1.json"
+    },
+    "source_scenarios_ref": {
+      "const": "tests/fixtures/reliability/p2-01-v1.json"
+    },
+    "synthetic": { "const": true },
+    "description": { "$ref": "#/$defs/text" },
+    "execution_policy": { "$ref": "#/$defs/execution_policy" },
+    "required_components": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/component" }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 12,
+      "items": { "$ref": "#/$defs/scenario" }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{2,95}$"
+    },
+    "component": {
+      "enum": [
+        "postgresql",
+        "minio",
+        "object_snapshot",
+        "derived_index",
+        "worker_lease",
+        "api_instance",
+        "sse_notification",
+        "valkey",
+        "outbox",
+        "authorization"
+      ]
+    },
+    "execution_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preflight_command",
+        "recovery_command",
+        "stop_scenarios_on_preflight_failure",
+        "always_run_recovery_check",
+        "failure_mode",
+        "evidence_path"
+      ],
+      "properties": {
+        "preflight_command": { "const": "./platform doctor" },
+        "recovery_command": { "const": "./platform doctor" },
+        "stop_scenarios_on_preflight_failure": { "const": true },
+        "always_run_recovery_check": { "const": true },
+        "failure_mode": { "const": "fail_closed" },
+        "evidence_path": {
+          "const": ".ai-platform/evidence/p2-11-latest.json"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "title",
+        "component",
+        "source_case_refs",
+        "pytest_node",
+        "verified_invariants",
+        "success_criteria"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^p211-[a-z0-9-]+-[0-9]{3}$"
+        },
+        "title": { "$ref": "#/$defs/text" },
+        "component": { "$ref": "#/$defs/component" },
+        "source_case_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^p201-[a-z0-9-]+-[0-9]{3}$"
+          }
+        },
+        "pytest_node": {
+          "type": "string",
+          "pattern": "^tests/(?:integration|unit)/test_[a-z0-9_]+\\.py::test_[a-z0-9_]+$"
+        },
+        "verified_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "success_criteria": { "$ref": "#/$defs/text" }
+      }
+    }
+  }
+}
