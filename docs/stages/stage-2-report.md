@@ -7,7 +7,7 @@
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P2-05` 跨实例 SSE 通知与恢复进行中 |
+| 当前节点 | `P2-06` 可观测性基线进行中 |
 | 阶段可靠性 | `not_run` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
@@ -72,6 +72,15 @@
 - 自动验收：P2-04 PostgreSQL 场景 `5/5`，覆盖健康零差异、损坏活动索引切换完整旧候选、无候选撤销并重建、全量重建重放幂等及恢复预算清理；统一 `./scripts/verify` 通过 React `37/37`、Python `480/480`、Ruff format/lint `438` 个文件、mypy strict `438` 个源文件、Migration 往返、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。
 - 容器验收：`./platform start` 正常完成现有数据 `0037 → 0038` 升级，`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker 和 Scheduler 共 13 项通过。真实 Celery 投递 `platform.indexing.inspect.v1` 后由 Indexing Worker 写入 `inspection|1|0|0|0`，证明扫描 1 份已发布合成文档且无差异、修复或重建。
 
+### P2-05 跨实例 SSE 通知与恢复
+
+- 状态：已完成，实现提交 `0319abc`，恢复预算修正提交 `52dcf4b`。
+- 架构决策：接受 [`ADR-005`](../decisions/ADR-005-cross-instance-sse-wakeup.md)，采用 Valkey Pub/Sub 无正文唤醒与 PostgreSQL 有界轮询兜底，不引入 Valkey Streams。PostgreSQL 继续唯一保存 Run、事件、严格序号、游标保留期和最终快照；通知频道只包含版本前缀与 Run UUID，载荷固定为 `1`，不能成为事实或直接返回客户端。
+- 提交与恢复：创建 Run、追加事件和写入终态都在数据库事务成功提交后才尽力发布通知。SSE 连接先订阅目标 Run，收到通知后仍按可信工作空间和 `Last-Event-ID` 回查 PostgreSQL；通知丢失、订阅失败、Valkey 不可达或连接中断时，继续按默认 250 毫秒、配置上限 4 秒的周期轮询，为 5 秒恢复门禁保留查询与传输余量，不重新创建 Run，不持有长数据库事务。
+- 安全与顺序：两个独立服务实例共享事实库和通知层时，读实例只得到原 Run 的严格递增事件；关闭写实例后，替代实例可从原事件 ID 继续回放且 `last_sequence_no` 保持不变。跨工作空间回放失败关闭，同会话第二个活动 Run 被拒绝；`message.snapshot` 和 24 小时事件/游标语义未改变，OpenAPI/SSE V1 无破坏性变化。
+- 故障与时限：真实 PostgreSQL/Valkey 专项 `4/4`，覆盖跨实例唤醒与替代实例恢复、全部通知丢失后的数据库轮询、20 个跨实例恢复样本和 Valkey 不可达。20 个样本按 `P2-01` nearest-rank 口径均在 `p99 <= 5s` 门禁内；500 条 SSE 条件容量认证仍为 `not_run`，实际双 API 进程停止与联合故障演练继续由 `P2-11` 执行。
+- 自动验收：P2-05 单元 `6/6`，相关 SSE/应用回归 `27/27`；统一 `./scripts/verify` 通过 React `37/37`、Python `490/490`、Ruff format/lint `441` 个文件、mypy strict `441` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。`./platform start` 重建真实 API 装配后，`./platform doctor` 的 13 项诊断全部通过，数据库 Revision 保持 `20260815_0038`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -81,4 +90,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P2-01`～`P2-04` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检和安全重建，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-05`。
+`not_run`。`P2-01`～`P2-05` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检、安全重建和跨实例 SSE 恢复，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-06`。

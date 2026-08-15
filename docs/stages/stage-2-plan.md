@@ -4,7 +4,7 @@
 
 阶段 2 将阶段 1 已通过的本地个人版与企业版 MVP 提升为可稳定运营、可恢复、可追溯的数据与运行平台，重点完成任务可靠性、索引重建、跨实例 SSE、可观测性、Outbox 运营、权限传播和数据生命周期。
 
-阶段 2 继续使用 React + Python 模块化单体 + Worker + PostgreSQL + Valkey + MinIO + Tika，不因为可靠性建设提前引入 Go、微服务或新消息中间件。是否采用 Valkey Streams 或其他跨实例通知实现，必须先在 `P2-01` 固定需求和失败语义，再在 `P2-05` 通过故障与恢复证据决策；PostgreSQL 始终保留 SSE 和业务事实写入权。
+阶段 2 继续使用 React + Python 模块化单体 + Worker + PostgreSQL + Valkey + MinIO + Tika，不因为可靠性建设提前引入 Go、微服务或新消息中间件。`P2-05` 已按 [`ADR-005`](../decisions/ADR-005-cross-instance-sse-wakeup.md) 选择 Valkey Pub/Sub 无正文唤醒与 PostgreSQL 有界轮询兜底，不采用 Valkey Streams；PostgreSQL 始终保留 SSE 和业务事实写入权。
 
 ## 2. 继承基线
 
@@ -71,4 +71,3 @@ flowchart LR
 ## 7. 阶段关闭口径
 
 阶段 2 只有在 `P2-01`～`P2-12` 全部完成、阶段可靠性结论为 `passed`、数据恢复/重建/删除/权限传播证据可追溯且 `stage-2-complete` 标签创建后才能关闭。真实供应商、AI 质量、Linux、镜像扫描和容量状态继续独立披露；它们不应被错误改写，但正式生产发布仍受既有供应链门禁约束。
-
