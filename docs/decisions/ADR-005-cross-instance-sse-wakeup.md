@@ -43,7 +43,7 @@ Streams 可以消费确认、重放和保留消息，但平台仍必须回查 Po
 1. `TransactionalStreamService` 只有在 PostgreSQL 事务提交成功后才发布唤醒。创建 Run、追加事件和写入终态都会通知；通知失败不得改变已提交业务返回值。
 2. 唤醒频道使用版本化前缀和不可枚举的 Run UUID，消息载荷固定为 `1`。通知中不出现工作空间、会话、消息、事件 Payload、Trace 或正文。
 3. 每条 SSE 连接只订阅目标 Run。收到信号只表示“数据库中可能有新事实”，调用方必须重新执行按可信工作空间隔离的 PostgreSQL 回放，不能直接向客户端转发通知载荷。
-4. Pub/Sub 允许丢失、重复和乱序。无通知、订阅失败、连接中断或超时均继续按 `stream_poll_interval_ms` 回查 PostgreSQL；默认 250 毫秒，配置边界为 50～5000 毫秒。
+4. Pub/Sub 允许丢失、重复和乱序。无通知、订阅失败、连接中断或超时均继续按 `stream_poll_interval_ms` 回查 PostgreSQL；默认 250 毫秒，配置边界为 50～4000 毫秒，为 5 秒恢复门禁保留至少 1 秒查询与传输余量。
 5. API 实例之间不需要粘性会话，也不保存进程内游标。客户端重连其他实例时继续携带最后一个持久化 `Last-Event-ID`；`message.snapshot` 不产生新的 SSE 游标。
 6. 当前不采用 Valkey Streams。只有有界轮询无法满足经过容量验收的恢复目标，或出现必须独立于 PostgreSQL 保存通知消费进度的明确需求时，才创建新 ADR 重新评估。
 

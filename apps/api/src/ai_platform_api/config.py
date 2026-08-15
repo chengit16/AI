@@ -74,8 +74,8 @@ class Settings(BaseSettings):
             raise ValueError("SSE 单次回放字节数必须位于 1 KiB 到 50 MiB 之间")
         if not 1 <= self.stream_heartbeat_seconds <= 60:
             raise ValueError("SSE 心跳间隔必须位于 1 到 60 秒之间")
-        if not 50 <= self.stream_poll_interval_ms <= 5_000:
-            raise ValueError("SSE 数据库轮询间隔必须位于 50 到 5000 毫秒之间")
+        if not 50 <= self.stream_poll_interval_ms <= 4_000:
+            raise ValueError("SSE 数据库轮询间隔必须位于 50 到 4000 毫秒之间")
         if not 0.05 <= self.stream_notification_connect_timeout_seconds <= 5:
             raise ValueError("SSE 通知连接超时必须位于 0.05 到 5 秒之间")
         if not 64 <= self.stream_delta_batch_characters <= 4_096:

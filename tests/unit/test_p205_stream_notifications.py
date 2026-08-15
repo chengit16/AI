@@ -172,3 +172,11 @@ def test_notification_connect_timeout_is_bounded(timeout_seconds: float) -> None
             environment="test",
             stream_notification_connect_timeout_seconds=timeout_seconds,
         )
+
+
+@pytest.mark.parametrize("poll_interval_ms", [49, 4_001])
+def test_fallback_poll_interval_reserves_replay_budget(poll_interval_ms: int) -> None:
+    """轮询最长保留一秒查询余量，避免配置本身耗尽五秒跨实例恢复预算。"""
+
+    with pytest.raises(ValueError, match="SSE 数据库轮询间隔"):
+        Settings(environment="test", stream_poll_interval_ms=poll_interval_ms)
