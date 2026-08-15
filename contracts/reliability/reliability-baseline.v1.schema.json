@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/reliability/reliability-baseline.v1.schema.json",
+  "title": "AI 智能平台可靠性基线 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "status",
+    "measurement_policy",
+    "invariants",
+    "metrics",
+    "retention_policies",
+    "authorization_propagation",
+    "failure_classes"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "baseline_id": {
+      "type": "string",
+      "pattern": "^p2-[0-9]{2}-v[1-9][0-9]*$"
+    },
+    "status": { "const": "frozen" },
+    "measurement_policy": { "$ref": "#/$defs/measurement_policy" },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/invariant" }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/metric" }
+    },
+    "retention_policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/retention_policy" }
+    },
+    "authorization_propagation": {
+      "$ref": "#/$defs/authorization_propagation"
+    },
+    "failure_classes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/failure_class" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{2,95}$"
+    },
+    "non_empty_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "non_empty_text_list": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/non_empty_text" }
+    },
+    "measurement_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "percentile_method",
+        "percentile_minimum_samples",
+        "insufficient_sample_status",
+        "clock",
+        "failed_samples_included"
+      ],
+      "properties": {
+        "percentile_method": { "const": "nearest_rank" },
+        "percentile_minimum_samples": { "type": "integer", "minimum": 20 },
+        "insufficient_sample_status": { "const": "not_run" },
+        "clock": { "const": "monotonic" },
+        "failed_samples_included": { "const": true }
+      }
+    },
+    "invariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invariant_id",
+        "statement",
+        "fact_sources",
+        "failure_result"
+      ],
+      "properties": {
+        "invariant_id": { "$ref": "#/$defs/identifier" },
+        "statement": { "$ref": "#/$defs/non_empty_text" },
+        "fact_sources": { "$ref": "#/$defs/non_empty_text_list" },
+        "failure_result": {
+          "enum": ["fail_closed", "repair_required", "release_blocked"]
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "description",
+        "aggregation",
+        "operator",
+        "threshold",
+        "unit",
+        "measurement_window_seconds",
+        "minimum_sample_count",
+        "insufficient_sample_status",
+        "fact_sources",
+        "failure_condition"
+      ],
+      "properties": {
+        "metric_id": { "$ref": "#/$defs/identifier" },
+        "description": { "$ref": "#/$defs/non_empty_text" },
+        "aggregation": { "enum": ["p99", "max", "ratio", "count"] },
+        "operator": {
+          "enum": ["less_than_or_equal", "equal", "greater_than_or_equal"]
+        },
+        "threshold": { "type": "number", "minimum": 0 },
+        "unit": { "enum": ["seconds", "ratio", "count"] },
+        "measurement_window_seconds": { "type": "integer", "minimum": 60 },
+        "minimum_sample_count": { "type": "integer", "minimum": 1 },
+        "insufficient_sample_status": { "const": "not_run" },
+        "fact_sources": { "$ref": "#/$defs/non_empty_text_list" },
+        "failure_condition": { "$ref": "#/$defs/non_empty_text" }
+      }
+    },
+    "retention_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource",
+        "duration_seconds",
+        "disposition",
+        "justification"
+      ],
+      "properties": {
+        "resource": { "$ref": "#/$defs/identifier" },
+        "duration_seconds": { "type": "integer", "minimum": 60 },
+        "disposition": { "enum": ["delete", "minimize_then_retain"] },
+        "justification": { "$ref": "#/$defs/non_empty_text" }
+      }
+    },
+    "authorization_propagation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revocation_deadline_seconds",
+        "aggregation",
+        "minimum_sample_count",
+        "surfaces",
+        "source_of_truth",
+        "notification_failure_mode",
+        "stale_cache_behavior"
+      ],
+      "properties": {
+        "revocation_deadline_seconds": { "type": "integer", "minimum": 1 },
+        "aggregation": { "const": "p99" },
+        "minimum_sample_count": { "type": "integer", "minimum": 20 },
+        "surfaces": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["menu", "api", "retrieval", "field_projection"] }
+        },
+        "source_of_truth": { "const": "postgresql_policy_version" },
+        "notification_failure_mode": { "const": "fail_closed" },
+        "stale_cache_behavior": { "const": "reject_and_revalidate" }
+      }
+    },
+    "failure_class": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class_id",
+        "description",
+        "default_response",
+        "required_evidence"
+      ],
+      "properties": {
+        "class_id": {
+          "enum": [
+            "timeout",
+            "duplicate",
+            "out_of_order",
+            "partial_failure",
+            "dependency_unavailable",
+            "recovery_integrity",
+            "authorization_propagation",
+            "observability_leak"
+          ]
+        },
+        "description": { "$ref": "#/$defs/non_empty_text" },
+        "default_response": {
+          "enum": [
+            "finite_retry",
+            "deduplicate",
+            "reject",
+            "fail_closed",
+            "repair"
+          ]
+        },
+        "required_evidence": { "$ref": "#/$defs/non_empty_text_list" }
+      }
+    }
+  }
+}

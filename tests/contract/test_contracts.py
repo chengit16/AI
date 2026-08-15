@@ -127,6 +127,13 @@ def test_frozen_release_manifest_contract() -> None:
     )
 
 
+def test_reliability_baseline_contract() -> None:
+    assert_valid(
+        "reliability/reliability-baseline.v1.schema.json",
+        "reliability/reliability-baseline.v1.json",
+    )
+
+
 def test_integration_event_rejects_invalid_traceparent() -> None:
     fixture = load_json(CONTRACTS / "fixtures/integration-event.v1.valid.json")
     fixture["traceparent"] = "invalid"

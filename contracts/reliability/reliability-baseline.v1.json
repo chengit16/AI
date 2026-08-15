@@ -1,0 +1,373 @@
+{
+  "schema_version": 1,
+  "baseline_id": "p2-01-v1",
+  "status": "frozen",
+  "measurement_policy": {
+    "percentile_method": "nearest_rank",
+    "percentile_minimum_samples": 20,
+    "insufficient_sample_status": "not_run",
+    "clock": "monotonic",
+    "failed_samples_included": true
+  },
+  "invariants": [
+    {
+      "invariant_id": "business_fact_single_writer",
+      "statement": "每类业务事实只有一个授权写入模块，通知、缓存和派生索引不能反向覆盖事实。",
+      "fact_sources": ["数据库提交记录", "模块写入权注册表", "不可变审计记录"],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "duplicate_delivery_zero_side_effects",
+      "statement": "任务和 Outbox 重复投递不能产生重复业务事实、对象、发布指针、索引或外部副作用。",
+      "fact_sources": ["消费幂等记录", "业务聚合版本", "对象与索引摘要"],
+      "failure_result": "repair_required"
+    },
+    {
+      "invariant_id": "immutable_attempt_history",
+      "statement": "任务每次尝试只追加且不可覆盖，恢复操作必须创建新 Attempt 并关联操作者与 Trace。",
+      "fact_sources": [
+        "Job Attempt 事实",
+        "数据库不可变触发器",
+        "恢复审计记录"
+      ],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "derived_index_rebuildable",
+      "statement": "全部派生索引都能从已提交业务事实和对象摘要重建，失败构建不能成为可查询版本。",
+      "fact_sources": [
+        "文档与 Chunk 事实",
+        "索引版本与发布指针",
+        "对象摘要校验"
+      ],
+      "failure_result": "repair_required"
+    },
+    {
+      "invariant_id": "sse_postgresql_fact_authority",
+      "statement": "PostgreSQL 中的 Run、Message 和 SSE 事件是恢复事实，跨实例通知只负责唤醒且允许丢失。",
+      "fact_sources": [
+        "Assistant Run 事实",
+        "Message 与 Message Part 事实",
+        "SSE 事件与严格递增序号"
+      ],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "workspace_isolation_after_recovery",
+      "statement": "故障恢复、重放、重建和删除前后都必须保持工作空间隔离，不能扩大资源或字段范围。",
+      "fact_sources": [
+        "可信 RequestContext",
+        "策略版本与资源范围",
+        "恢复后越权回归结果"
+      ],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "authorization_revocation_fail_closed",
+      "statement": "撤权必须在固定时限内传播到菜单、接口、检索和字段投影；通知或缓存异常时默认拒绝。",
+      "fact_sources": [
+        "策略版本提交时间",
+        "各授权表面生效时间",
+        "策略拒绝审计"
+      ],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "audit_outbox_atomicity",
+      "statement": "高风险业务事实、审计和 Outbox 必须同事务提交，重复发布由消费者幂等边界吸收。",
+      "fact_sources": [
+        "数据库事务标识",
+        "不可变审计记录",
+        "Outbox 与消费幂等记录"
+      ],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "lifecycle_complete_deletion",
+      "statement": "删除必须覆盖可删除业务事实、对象、索引、缓存和事件，并留下最小化可校验证明。",
+      "fact_sources": [
+        "生命周期任务与 Attempt",
+        "对象和索引清单",
+        "最小删除证明"
+      ],
+      "failure_result": "repair_required"
+    },
+    {
+      "invariant_id": "sensitive_observability_data_forbidden",
+      "statement": "日志、指标、Trace 和告警不得保存凭据、文档正文、Prompt 原文或未授权字段。",
+      "fact_sources": [
+        "可观测性字段注册表",
+        "敏感模式扫描结果",
+        "高风险操作审计"
+      ],
+      "failure_result": "release_blocked"
+    }
+  ],
+  "metrics": [
+    {
+      "metric_id": "ingestion_recovery_duration_seconds",
+      "description": "可重试入库故障从首次失败到任务恢复成功的持续时间。",
+      "aggregation": "p99",
+      "operator": "less_than_or_equal",
+      "threshold": 180,
+      "unit": "seconds",
+      "measurement_window_seconds": 3600,
+      "minimum_sample_count": 20,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "Ingestion Job 状态时间线",
+        "Job Stage 与 Job Attempt 时间线"
+      ],
+      "failure_condition": "任何失败样本被剔除、p99 超过 180 秒或恢复产生重复事实时失败。"
+    },
+    {
+      "metric_id": "duplicate_side_effect_ratio",
+      "description": "重复任务或事件投递产生第二份业务副作用的比例。",
+      "aggregation": "ratio",
+      "operator": "equal",
+      "threshold": 0,
+      "unit": "ratio",
+      "measurement_window_seconds": 86400,
+      "minimum_sample_count": 20,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": ["消费幂等记录", "业务聚合版本", "对象与索引摘要差异"],
+      "failure_condition": "任一重复投递新增业务事实、对象、发布指针、索引或外部副作用时失败。"
+    },
+    {
+      "metric_id": "index_reference_inconsistency_count",
+      "description": "活动索引中文档、版本、Chunk、对象摘要或发布引用不一致的数量。",
+      "aggregation": "count",
+      "operator": "equal",
+      "threshold": 0,
+      "unit": "count",
+      "measurement_window_seconds": 3600,
+      "minimum_sample_count": 1,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "索引一致性巡检结果",
+        "文档与 Chunk 事实",
+        "活动索引发布指针"
+      ],
+      "failure_condition": "巡检发现任一活动索引引用不存在、已撤权或摘要不一致时失败。"
+    },
+    {
+      "metric_id": "sse_cross_instance_recovery_seconds",
+      "description": "API 实例中断后，客户端连接其他实例并从 PostgreSQL 游标继续回放的持续时间。",
+      "aggregation": "p99",
+      "operator": "less_than_or_equal",
+      "threshold": 5,
+      "unit": "seconds",
+      "measurement_window_seconds": 3600,
+      "minimum_sample_count": 20,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "客户端断线与重连时间",
+        "SSE Last-Event-ID",
+        "PostgreSQL Run 与事件序号"
+      ],
+      "failure_condition": "p99 超过 5 秒，或恢复创建新 Run、丢失序号、跨空间回放时失败。"
+    },
+    {
+      "metric_id": "authorization_revocation_propagation_seconds",
+      "description": "撤权事务提交到全部授权表面拒绝旧权限的持续时间。",
+      "aggregation": "p99",
+      "operator": "less_than_or_equal",
+      "threshold": 5,
+      "unit": "seconds",
+      "measurement_window_seconds": 3600,
+      "minimum_sample_count": 20,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "策略版本提交时间",
+        "菜单、接口、检索和字段投影探针",
+        "策略缓存版本"
+      ],
+      "failure_condition": "p99 超过 5 秒，或任一表面在通知异常时继续接受旧权限时失败。"
+    },
+    {
+      "metric_id": "outbox_oldest_pending_age_seconds",
+      "description": "处于可投递状态的最老 Outbox 记录年龄。",
+      "aggregation": "max",
+      "operator": "less_than_or_equal",
+      "threshold": 300,
+      "unit": "seconds",
+      "measurement_window_seconds": 300,
+      "minimum_sample_count": 1,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "Outbox 创建时间与投递状态",
+        "Dispatcher Attempt 与死信记录"
+      ],
+      "failure_condition": "最老可投递记录超过 300 秒，或积压恢复产生重复副作用时失败。"
+    },
+    {
+      "metric_id": "high_risk_audit_coverage_ratio",
+      "description": "登记为高风险的成功或拒绝操作具有完整审计事实的比例。",
+      "aggregation": "ratio",
+      "operator": "greater_than_or_equal",
+      "threshold": 1,
+      "unit": "ratio",
+      "measurement_window_seconds": 86400,
+      "minimum_sample_count": 20,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "高风险操作注册表",
+        "业务提交或拒绝事实",
+        "不可变审计记录"
+      ],
+      "failure_condition": "任一高风险操作缺少主体、空间、资源、动作、策略版本或 Trace 时失败。"
+    },
+    {
+      "metric_id": "workspace_delete_completion_seconds",
+      "description": "工作空间删除从受理到全部可删除数据完成清理并生成证明的持续时间。",
+      "aggregation": "p99",
+      "operator": "less_than_or_equal",
+      "threshold": 3600,
+      "unit": "seconds",
+      "measurement_window_seconds": 604800,
+      "minimum_sample_count": 20,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "生命周期任务与 Attempt 时间线",
+        "业务、对象、索引、缓存清单",
+        "最小删除证明"
+      ],
+      "failure_condition": "p99 超过 3600 秒，或删除后仍可查询可删除数据、证明无法校验时失败。"
+    },
+    {
+      "metric_id": "recovery_validation_failure_count",
+      "description": "完成恢复或重建后，引用、对象、权限和数据库一致性校验的失败数量。",
+      "aggregation": "count",
+      "operator": "equal",
+      "threshold": 0,
+      "unit": "count",
+      "measurement_window_seconds": 3600,
+      "minimum_sample_count": 1,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "恢复 Manifest 与摘要",
+        "数据库完整性检查",
+        "对象、索引和权限回归结果"
+      ],
+      "failure_condition": "恢复后任一必需对象缺失、摘要漂移、引用失效或授权范围扩大时失败。"
+    },
+    {
+      "metric_id": "critical_trace_coverage_ratio",
+      "description": "HTTP、任务、检索、模型、工作流、审批和 Outbox 关键路径可由同一 Trace 关联的比例。",
+      "aggregation": "ratio",
+      "operator": "greater_than_or_equal",
+      "threshold": 0.99,
+      "unit": "ratio",
+      "measurement_window_seconds": 86400,
+      "minimum_sample_count": 20,
+      "insufficient_sample_status": "not_run",
+      "fact_sources": [
+        "Trace Span",
+        "业务事实 trace_id",
+        "任务与 Outbox traceparent"
+      ],
+      "failure_condition": "覆盖率低于 0.99，或 Trace 包含凭据、正文、Prompt 原文和受限字段时失败。"
+    }
+  ],
+  "retention_policies": [
+    {
+      "resource": "sse_events_and_cursors",
+      "duration_seconds": 86400,
+      "disposition": "delete",
+      "justification": "维持已冻结的 24 小时 Last-Event-ID 恢复窗口，过期后只允许读取最终消息快照。"
+    },
+    {
+      "resource": "job_attempts",
+      "duration_seconds": 7776000,
+      "disposition": "delete",
+      "justification": "保留 90 天用于任务恢复、故障定位和重试行为复核，超期按生命周期策略清理。"
+    },
+    {
+      "resource": "outbox_dead_letters",
+      "duration_seconds": 7776000,
+      "disposition": "delete",
+      "justification": "保留 90 天用于人工恢复、幂等核对和失败分类，正文与凭据不得进入死信。"
+    },
+    {
+      "resource": "delivered_outbox_records",
+      "duration_seconds": 2592000,
+      "disposition": "delete",
+      "justification": "已投递 Outbox 保留 30 天用于投递对账，业务事实和审计由各自策略保留。"
+    },
+    {
+      "resource": "audit_and_usage_records",
+      "duration_seconds": 31536000,
+      "disposition": "minimize_then_retain",
+      "justification": "审计和用量保留 365 天用于安全追溯与用量对账，只保存实现目的所需的最小字段。"
+    },
+    {
+      "resource": "minimal_deletion_proofs",
+      "duration_seconds": 31536000,
+      "disposition": "minimize_then_retain",
+      "justification": "删除证明保留 365 天，只记录范围、摘要、完成时间和执行 Trace，不保留被删除正文。"
+    }
+  ],
+  "authorization_propagation": {
+    "revocation_deadline_seconds": 5,
+    "aggregation": "p99",
+    "minimum_sample_count": 20,
+    "surfaces": ["menu", "api", "retrieval", "field_projection"],
+    "source_of_truth": "postgresql_policy_version",
+    "notification_failure_mode": "fail_closed",
+    "stale_cache_behavior": "reject_and_revalidate"
+  },
+  "failure_classes": [
+    {
+      "class_id": "timeout",
+      "description": "处理超过阶段预算、租约或用户可见截止时间。",
+      "default_response": "finite_retry",
+      "required_evidence": ["开始与截止时间", "Attempt 与租约事实", "最终终态"]
+    },
+    {
+      "class_id": "duplicate",
+      "description": "相同幂等身份的命令、任务或事件被投递一次以上。",
+      "default_response": "deduplicate",
+      "required_evidence": ["幂等身份", "首次处理事实", "副作用差异"]
+    },
+    {
+      "class_id": "out_of_order",
+      "description": "通知或执行信号到达顺序与已提交事实顺序不一致。",
+      "default_response": "reject",
+      "required_evidence": ["持久化序号", "到达顺序", "重放结果"]
+    },
+    {
+      "class_id": "partial_failure",
+      "description": "跨数据库、对象、索引、缓存或通知步骤只完成了一部分。",
+      "default_response": "repair",
+      "required_evidence": ["步骤完成清单", "补偿或恢复 Attempt", "一致性校验"]
+    },
+    {
+      "class_id": "dependency_unavailable",
+      "description": "对象、解析、Embedding、Valkey 或其他依赖暂时不可用。",
+      "default_response": "finite_retry",
+      "required_evidence": ["稳定错误码", "有限重试次数", "依赖恢复后结果"]
+    },
+    {
+      "class_id": "recovery_integrity",
+      "description": "恢复或重建输入缺失、摘要不一致或输出引用无法校验。",
+      "default_response": "fail_closed",
+      "required_evidence": ["恢复 Manifest", "输入与输出摘要", "引用和权限校验"]
+    },
+    {
+      "class_id": "authorization_propagation",
+      "description": "权限版本已经提交，但缓存或授权表面仍观察到旧版本。",
+      "default_response": "fail_closed",
+      "required_evidence": [
+        "策略版本提交时间",
+        "各授权表面生效时间",
+        "旧版本拒绝结果"
+      ]
+    },
+    {
+      "class_id": "observability_leak",
+      "description": "日志、指标、Trace 或告警尝试记录凭据、正文、Prompt 或未授权字段。",
+      "default_response": "fail_closed",
+      "required_evidence": ["字段注册表", "脱敏结果", "敏感模式扫描结果"]
+    }
+  ]
+}

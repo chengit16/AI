@@ -1,0 +1,491 @@
+{
+  "schema_version": 1,
+  "dataset_version": "p2-01-v1",
+  "baseline_ref": "contracts/reliability/reliability-baseline.v1.json",
+  "synthetic": true,
+  "description": "阶段 2 可靠性故障注入基线。全部标识、内容、依赖故障和预期结果均为本地合成数据。",
+  "categories": [
+    "timeout",
+    "duplicate",
+    "out_of_order",
+    "partial_failure",
+    "dependency_unavailable",
+    "recovery_integrity",
+    "authorization_propagation",
+    "observability_leak"
+  ],
+  "cases": [
+    {
+      "case_id": "p201-ingestion-duplicate-001",
+      "category": "duplicate",
+      "component": "ingestion_worker",
+      "synthetic": true,
+      "preconditions": [
+        "同一合成文档已创建一条待处理入库任务。",
+        "消费幂等存储和对象存储可用。"
+      ],
+      "fault_injection": {
+        "injection_point": "ingestion.delivery.before_ack",
+        "trigger": "在首次处理已提交但确认前重复投递相同任务信封。",
+        "occurrences": 2
+      },
+      "steps": [
+        "执行首次入库投递并在确认点制造断连。",
+        "重复投递相同任务标识与 Trace。",
+        "核对任务、产物、Chunk 和发布指针数量。"
+      ],
+      "expected": {
+        "terminal_state": "recovered",
+        "verified_invariants": [
+          "duplicate_delivery_zero_side_effects",
+          "immutable_attempt_history",
+          "audit_outbox_atomicity"
+        ],
+        "error_code": null,
+        "retryable": false,
+        "maximum_recovery_seconds": 180,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "not_applicable",
+        "evidence_sources": [
+          "任务与 Attempt 事实",
+          "消费幂等记录",
+          "解析产物和 Chunk 摘要"
+        ]
+      },
+      "cleanup": ["删除本场景创建的合成工作空间 Schema 和对象前缀。"]
+    },
+    {
+      "case_id": "p201-ingestion-lease-timeout-002",
+      "category": "timeout",
+      "component": "ingestion_worker",
+      "synthetic": true,
+      "preconditions": [
+        "合成入库任务已被 Worker 认领。",
+        "任务最大尝试次数固定且时钟可控。"
+      ],
+      "fault_injection": {
+        "injection_point": "ingestion.lease.after_claim",
+        "trigger": "暂停 Worker 直到租约过期，并重复触发到最大尝试次数。",
+        "occurrences": 3
+      },
+      "steps": [
+        "认领任务并冻结 Worker。",
+        "推进合成时钟使租约过期并执行回收。",
+        "达到有限尝试上限后核对稳定终态和历史 Attempt。"
+      ],
+      "expected": {
+        "terminal_state": "failed",
+        "verified_invariants": [
+          "immutable_attempt_history",
+          "duplicate_delivery_zero_side_effects"
+        ],
+        "error_code": "INGESTION_WORKER_LEASE_EXPIRED",
+        "retryable": false,
+        "maximum_recovery_seconds": 180,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "not_applicable",
+        "evidence_sources": [
+          "租约获取与过期时间",
+          "只追加 Attempt",
+          "任务稳定错误码"
+        ]
+      },
+      "cleanup": ["释放合成租约并清理测试任务事实。"]
+    },
+    {
+      "case_id": "p201-index-embedding-outage-003",
+      "category": "dependency_unavailable",
+      "component": "index_worker",
+      "synthetic": true,
+      "preconditions": ["解析产物及摘要已提交。", "索引版本尚未发布。"],
+      "fault_injection": {
+        "injection_point": "index.embedding.request",
+        "trigger": "确定性 Embedding Adapter 在前两次调用返回可重试不可用错误。",
+        "occurrences": 2
+      },
+      "steps": [
+        "启动合成索引构建。",
+        "注入两次依赖不可用并记录 Attempt。",
+        "恢复 Adapter 后重试并原子发布唯一索引版本。"
+      ],
+      "expected": {
+        "terminal_state": "recovered",
+        "verified_invariants": [
+          "derived_index_rebuildable",
+          "duplicate_delivery_zero_side_effects",
+          "immutable_attempt_history"
+        ],
+        "error_code": "INDEX_EMBEDDING_UNAVAILABLE",
+        "retryable": true,
+        "maximum_recovery_seconds": 180,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "not_applicable",
+        "evidence_sources": [
+          "索引构建 Attempt",
+          "Embedding 请求结果",
+          "索引版本和发布指针"
+        ]
+      },
+      "cleanup": ["删除未发布索引前缀和本场景活动索引。"]
+    },
+    {
+      "case_id": "p201-index-artifact-corrupt-004",
+      "category": "recovery_integrity",
+      "component": "index_worker",
+      "synthetic": true,
+      "preconditions": [
+        "合成解析产物已保存并登记原始摘要。",
+        "当前活动索引仍可服务。"
+      ],
+      "fault_injection": {
+        "injection_point": "index.artifact.after_read",
+        "trigger": "将本次读取结果替换为摘要不一致的合成损坏产物。",
+        "occurrences": 1
+      },
+      "steps": [
+        "读取解析产物及登记摘要。",
+        "注入摘要漂移后执行构建校验。",
+        "确认失败构建不可见且旧索引指针未改变。"
+      ],
+      "expected": {
+        "terminal_state": "rejected",
+        "verified_invariants": [
+          "derived_index_rebuildable",
+          "business_fact_single_writer"
+        ],
+        "error_code": "INDEX_ARTIFACT_CHANGED",
+        "retryable": false,
+        "maximum_recovery_seconds": null,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "not_applicable",
+        "evidence_sources": [
+          "登记摘要与读取摘要",
+          "失败索引版本状态",
+          "活动发布指针"
+        ]
+      },
+      "cleanup": ["清除注入的损坏读取结果和失败构建前缀。"]
+    },
+    {
+      "case_id": "p201-api-instance-interrupt-005",
+      "category": "partial_failure",
+      "component": "api_instance",
+      "synthetic": true,
+      "preconditions": [
+        "两个本地 API 实例共享 PostgreSQL 事件事实。",
+        "合成 Run 已追加至少三个持久化事件。"
+      ],
+      "fault_injection": {
+        "injection_point": "api.sse.after_event_flush",
+        "trigger": "首个实例发送事件后立即中断连接和进程。",
+        "occurrences": 1
+      },
+      "steps": [
+        "记录客户端最后确认的 Last-Event-ID。",
+        "中断当前 API 实例。",
+        "连接另一实例并按游标回放到原 Run 终态。"
+      ],
+      "expected": {
+        "terminal_state": "recovered",
+        "verified_invariants": [
+          "sse_postgresql_fact_authority",
+          "workspace_isolation_after_recovery",
+          "duplicate_delivery_zero_side_effects"
+        ],
+        "error_code": null,
+        "retryable": true,
+        "maximum_recovery_seconds": 5,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "fail_closed",
+        "evidence_sources": [
+          "断线与重连时间",
+          "原 Run 标识",
+          "持久化事件序号与客户端接收序号"
+        ]
+      },
+      "cleanup": ["恢复被中断实例并删除合成 Run、消息和事件。"]
+    },
+    {
+      "case_id": "p201-sse-notification-reorder-006",
+      "category": "out_of_order",
+      "component": "sse_notification",
+      "synthetic": true,
+      "preconditions": [
+        "PostgreSQL 已提交严格递增的合成 SSE 事件。",
+        "跨实例通知层可注入延迟与丢失。"
+      ],
+      "fault_injection": {
+        "injection_point": "sse.notification.before_publish",
+        "trigger": "丢失中间通知并在后续通知之后补发旧通知。",
+        "occurrences": 2
+      },
+      "steps": [
+        "提交连续事件但改变通知到达顺序。",
+        "由接收实例从 PostgreSQL 当前游标读取。",
+        "核对客户端只观察到严格递增且无缺口的持久化序号。"
+      ],
+      "expected": {
+        "terminal_state": "recovered",
+        "verified_invariants": [
+          "sse_postgresql_fact_authority",
+          "duplicate_delivery_zero_side_effects"
+        ],
+        "error_code": null,
+        "retryable": true,
+        "maximum_recovery_seconds": 5,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "not_applicable",
+        "evidence_sources": [
+          "通知到达顺序",
+          "PostgreSQL 事件序号",
+          "客户端最终游标"
+        ]
+      },
+      "cleanup": ["清空合成通知流和持久化事件。"]
+    },
+    {
+      "case_id": "p201-authorization-cache-stale-007",
+      "category": "authorization_propagation",
+      "component": "authorization_cache",
+      "synthetic": true,
+      "preconditions": [
+        "合成企业成员当前具有菜单、接口、检索和字段访问权限。",
+        "四个授权表面均记录当前策略版本。"
+      ],
+      "fault_injection": {
+        "injection_point": "authorization.cache.invalidation",
+        "trigger": "提交撤权事务后丢弃缓存失效通知并保留旧缓存项。",
+        "occurrences": 1
+      },
+      "steps": [
+        "提交合成成员撤权并记录策略版本时间。",
+        "阻断缓存失效通知。",
+        "在四个授权表面使用旧上下文访问并测量拒绝时间。"
+      ],
+      "expected": {
+        "terminal_state": "rejected",
+        "verified_invariants": [
+          "authorization_revocation_fail_closed",
+          "workspace_isolation_after_recovery"
+        ],
+        "error_code": "POLICY_UNAVAILABLE",
+        "retryable": true,
+        "maximum_recovery_seconds": 5,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "fail_closed",
+        "evidence_sources": [
+          "策略版本提交时间",
+          "四个授权表面的拒绝结果",
+          "缓存版本与重新校验记录"
+        ]
+      },
+      "cleanup": ["删除合成缓存项并恢复测试成员原授权。"]
+    },
+    {
+      "case_id": "p201-outbox-duplicate-008",
+      "category": "duplicate",
+      "component": "outbox_dispatcher",
+      "synthetic": true,
+      "preconditions": [
+        "合成业务事务已原子写入审计和一条 Outbox。",
+        "消费者幂等存储可用。"
+      ],
+      "fault_injection": {
+        "injection_point": "outbox.dispatch.after_consume",
+        "trigger": "消费者完成副作用后丢失确认，使 Dispatcher 再次投递相同事件。",
+        "occurrences": 2
+      },
+      "steps": [
+        "投递并消费合成事件。",
+        "在确认前注入连接中断。",
+        "重复投递并核对消费记录、聚合版本和副作用数量。"
+      ],
+      "expected": {
+        "terminal_state": "recovered",
+        "verified_invariants": [
+          "audit_outbox_atomicity",
+          "duplicate_delivery_zero_side_effects"
+        ],
+        "error_code": null,
+        "retryable": false,
+        "maximum_recovery_seconds": 300,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "not_applicable",
+        "evidence_sources": [
+          "Outbox 投递 Attempt",
+          "消费幂等记录",
+          "业务聚合版本"
+        ]
+      },
+      "cleanup": ["删除合成消费者状态和 Outbox 测试记录。"]
+    },
+    {
+      "case_id": "p201-outbox-backlog-timeout-009",
+      "category": "timeout",
+      "component": "outbox_dispatcher",
+      "synthetic": true,
+      "preconditions": [
+        "合成 Outbox 队列包含不同工作空间的待投递记录。",
+        "最老记录创建时间和时钟可控。"
+      ],
+      "fault_injection": {
+        "injection_point": "outbox.dispatch.before_claim",
+        "trigger": "暂停 Dispatcher 直到最老待投递记录接近 300 秒门禁。",
+        "occurrences": 1
+      },
+      "steps": [
+        "停止 Dispatcher 并推进合成时钟。",
+        "恢复 Dispatcher 并有界认领积压。",
+        "核对最老年龄、工作空间隔离、顺序和重复副作用。"
+      ],
+      "expected": {
+        "terminal_state": "recovered",
+        "verified_invariants": [
+          "audit_outbox_atomicity",
+          "workspace_isolation_after_recovery",
+          "duplicate_delivery_zero_side_effects"
+        ],
+        "error_code": null,
+        "retryable": true,
+        "maximum_recovery_seconds": 300,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "not_applicable",
+        "evidence_sources": [
+          "Outbox 创建与认领时间",
+          "Dispatcher Attempt",
+          "消费幂等记录"
+        ]
+      },
+      "cleanup": ["清除合成积压及消费者幂等记录。"]
+    },
+    {
+      "case_id": "p201-lifecycle-partial-delete-010",
+      "category": "partial_failure",
+      "component": "lifecycle_worker",
+      "synthetic": true,
+      "preconditions": [
+        "合成工作空间包含业务事实、对象、索引、缓存和可删除事件。",
+        "删除清单与摘要已经冻结。"
+      ],
+      "fault_injection": {
+        "injection_point": "lifecycle.delete.after_database",
+        "trigger": "数据库清理提交后、对象与索引清理前中断 Worker。",
+        "occurrences": 1
+      },
+      "steps": [
+        "启动合成工作空间删除并完成数据库步骤。",
+        "中断后由新 Attempt 从冻结清单恢复。",
+        "校验全部可删除位置并生成最小删除证明。"
+      ],
+      "expected": {
+        "terminal_state": "recovered",
+        "verified_invariants": [
+          "lifecycle_complete_deletion",
+          "immutable_attempt_history",
+          "workspace_isolation_after_recovery"
+        ],
+        "error_code": null,
+        "retryable": true,
+        "maximum_recovery_seconds": 3600,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "fail_closed",
+        "evidence_sources": [
+          "冻结删除清单",
+          "生命周期 Attempt",
+          "对象与索引校验",
+          "最小删除证明"
+        ]
+      },
+      "cleanup": ["删除最小证明之外的全部合成场景数据。"]
+    },
+    {
+      "case_id": "p201-recovery-object-missing-011",
+      "category": "recovery_integrity",
+      "component": "recovery_service",
+      "synthetic": true,
+      "preconditions": [
+        "合成恢复包 Manifest 已登记数据库、对象、索引和密钥版本摘要。",
+        "恢复目标为空环境。"
+      ],
+      "fault_injection": {
+        "injection_point": "recovery.object.before_verify",
+        "trigger": "从合成恢复包中移除一个 Manifest 声明的必需对象。",
+        "occurrences": 1
+      },
+      "steps": [
+        "读取并校验恢复包 Manifest。",
+        "注入必需对象缺失后执行恢复。",
+        "确认恢复失败且不发布部分数据库或索引。"
+      ],
+      "expected": {
+        "terminal_state": "failed",
+        "verified_invariants": [
+          "workspace_isolation_after_recovery",
+          "derived_index_rebuildable",
+          "business_fact_single_writer"
+        ],
+        "error_code": "OBJECT_STORAGE_UNAVAILABLE",
+        "retryable": true,
+        "maximum_recovery_seconds": null,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "fail_closed",
+        "evidence_sources": [
+          "恢复 Manifest",
+          "缺失对象标识与摘要",
+          "未发布恢复环境状态"
+        ]
+      },
+      "cleanup": ["销毁失败恢复环境和合成恢复包副本。"]
+    },
+    {
+      "case_id": "p201-observability-sensitive-012",
+      "category": "observability_leak",
+      "component": "observability_pipeline",
+      "synthetic": true,
+      "preconditions": [
+        "结构化日志、指标标签、Trace 属性和告警字段均使用显式注册表。",
+        "合成请求包含 SYNTHETIC_SENSITIVE_MARKER。"
+      ],
+      "fault_injection": {
+        "injection_point": "observability.attribute.before_export",
+        "trigger": "尝试把未登记的合成敏感字段加入日志、Span 和告警属性。",
+        "occurrences": 3
+      },
+      "steps": [
+        "执行包含合成敏感标记的高风险拒绝路径。",
+        "在三个导出通道注入未登记字段。",
+        "核对导出被拒绝或脱敏且审计不复制敏感值。"
+      ],
+      "expected": {
+        "terminal_state": "rejected",
+        "verified_invariants": [
+          "sensitive_observability_data_forbidden",
+          "audit_outbox_atomicity"
+        ],
+        "error_code": "POLICY_DENIED",
+        "retryable": false,
+        "maximum_recovery_seconds": null,
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "authorization_behavior": "fail_closed",
+        "evidence_sources": [
+          "可观测性字段注册表",
+          "导出前脱敏结果",
+          "敏感模式扫描报告"
+        ]
+      },
+      "cleanup": ["删除合成日志、Trace、指标和告警测试数据。"]
+    }
+  ]
+}

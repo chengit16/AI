@@ -2,17 +2,18 @@
 
 ## 1. 目录职责
 
-| 目录 | 内容 |
-| --- | --- |
-| `openapi/` | OpenAPI 3.1 HTTP 接口契约 |
-| `domain/` | 核心标识、消息和后置扩展接口的数据契约 |
-| `policy/` | 跨进程策略请求与决策结果契约 |
+| 目录             | 内容                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| `openapi/`       | OpenAPI 3.1 HTTP 接口契约                                    |
+| `domain/`        | 核心标识、消息和后置扩展接口的数据契约                       |
+| `policy/`        | 跨进程策略请求与决策结果契约                                 |
 | `authorization/` | Permission、页面、接口、系统菜单和字段敏感级别的版本化注册表 |
-| `sse/` | SSE 消息事件信封契约 |
-| `events/` | Transactional Outbox 集成事件与内部签名任务信封契约 |
-| `errors/` | 稳定错误码目录 |
-| `release/` | `ReleaseManifest`、兼容矩阵及运行组合规则 |
-| `fixtures/` | Python 和未来 Go 实现共用的 Golden Fixtures |
+| `sse/`           | SSE 消息事件信封契约                                         |
+| `events/`        | Transactional Outbox 集成事件与内部签名任务信封契约          |
+| `errors/`        | 稳定错误码目录                                               |
+| `release/`       | `ReleaseManifest`、兼容矩阵及运行组合规则                    |
+| `reliability/`   | 可靠性不变量、SLO、保留期、传播时限和故障场景契约            |
+| `fixtures/`      | Python 和未来 Go 实现共用的 Golden Fixtures                  |
 
 ## 2. 版本规则
 
