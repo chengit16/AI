@@ -238,6 +238,7 @@ def _resource_reference(
                 "ingestion_job_id",
                 "conversation_id",
                 "approval_policy_id",
+                "approval_instance_id",
                 "workflow_run_id",
                 "workflow_id",
             )
@@ -259,6 +260,7 @@ def _resource_reference(
             "ingestion_job_id",
             "conversation_id",
             "approval_policy_id",
+            "approval_instance_id",
             "workflow_run_id",
             "workflow_id",
         )

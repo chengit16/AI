@@ -30,10 +30,26 @@ class AiRuntimeConfigResponse(typing.TypedDict):
     version_number: int
 
 
+class ApprovalActionRequest(typing.TypedDict):
+    idempotency_key: str
+    reason_code: typing.NotRequired[str | None]
+
+
 class ApprovalApproverSourceDocument(typing.TypedDict):
     levels_up: typing.NotRequired[int | None]
     reference_ids: list[str]
     source_type: typing.Literal["accounts", "roles", "department_managers", "upper_managers"]
+
+
+class ApprovalAssignmentResponse(typing.TypedDict):
+    approval_assignment_id: str
+    approval_level_id: str
+    approver_account_id: str
+    created_at: str
+    decided_at: str | None
+    status: typing.Literal["waiting", "pending", "approved", "rejected", "transferred", "cancelled"]
+    transferred_to_account_id: str | None
+    version: int
 
 
 class ApprovalChainResponse(typing.TypedDict):
@@ -45,10 +61,43 @@ class ApprovalChainResponse(typing.TypedDict):
     workspace_id: str
 
 
+class ApprovalCommandResponse(typing.TypedDict):
+    instance: ApprovalInstanceResponse
+    replayed: bool
+
+
 class ApprovalFieldConditionDocument(typing.TypedDict):
     expected: typing.NotRequired[object | None]
     field_path: str
     operator: typing.Literal["eq", "ne", "gt", "gte", "lt", "lte", "in", "contains", "exists"]
+
+
+class ApprovalInstanceListResponse(typing.TypedDict):
+    items: list[ApprovalInstanceResponse]
+
+
+class ApprovalInstanceResponse(typing.TypedDict):
+    approval_instance_id: str
+    approval_policy_id: str | None
+    approval_policy_version_id: str | None
+    assignments: list[ApprovalAssignmentResponse]
+    chain_digest: str
+    completed_at: str | None
+    created_at: str
+    current_sequence_no: int
+    levels: list[ApprovalLevelResponse]
+    operation: str
+    personal_owner_confirmation: bool
+    requester_account_id: str
+    resource_id: str | None
+    resource_type: str
+    status: typing.Literal["pending", "approved", "rejected", "withdrawn"]
+    subject_digest: str
+    updated_at: str
+    version: int
+    workflow_run_id: str | None
+    workflow_step_id: str | None
+    workspace_id: str
 
 
 class ApprovalLevelDocument(typing.TypedDict):
@@ -59,6 +108,24 @@ class ApprovalLevelDocument(typing.TypedDict):
     sources: list[ApprovalApproverSourceDocument]
     timeout_action: typing.NotRequired[typing.Literal["escalate", "transfer", "reject", "wait"]]
     timeout_after_minutes: typing.NotRequired[int]
+
+
+class ApprovalLevelResponse(typing.TypedDict):
+    activated_at: str | None
+    approval_level_id: str
+    completed_at: str | None
+    fallback_activated: bool
+    fallback_approver_account_ids: list[str]
+    mode: typing.Literal["any", "all"]
+    reminded_at: str | None
+    reminder_after_minutes: int
+    reminder_at: str | None
+    sequence_no: int
+    status: typing.Literal["waiting", "active", "approved", "rejected", "withdrawn"]
+    timeout_action: typing.Literal["escalate", "transfer", "reject", "wait"]
+    timeout_after_minutes: int
+    timeout_at: str | None
+    version: int
 
 
 class ApprovalPolicyDefinitionDocument(typing.TypedDict):
@@ -391,6 +458,10 @@ class DocumentVersionUploadResponse(typing.TypedDict):
     document_version: DocumentVersionResponse
     source: DocumentSourceResponse
     upload: UploadMetadataResponse
+
+
+class DueApprovalResponse(typing.TypedDict):
+    items: list[ApprovalCommandResponse]
 
 
 class EffectiveRoleResponse(typing.TypedDict):
@@ -896,12 +967,29 @@ class RuntimeRouteResponse(typing.TypedDict):
     route_id: str
 
 
+class StartApprovalInstanceRequest(typing.TypedDict):
+    department_ids: typing.NotRequired[list[str]]
+    fields: typing.NotRequired[dict[str, object]]
+    idempotency_key: str
+    operation: str
+    resource_id: typing.NotRequired[str | None]
+    resource_type: str
+    risk_level: typing.Literal["normal", "high", "critical"]
+    security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+
+
 class SubmitMessageFeedbackRequest(typing.TypedDict):
     comment: typing.NotRequired[str | None]
     issue_codes: typing.NotRequired[
         list[typing.Literal["incorrect", "missing_source", "source_mismatch", "unsafe", "other"]]
     ]
     rating: typing.Literal["helpful", "unhelpful"]
+
+
+class TransferApprovalRequest(typing.TypedDict):
+    idempotency_key: str
+    reason_code: typing.NotRequired[str | None]
+    target_account_id: str
 
 
 class UpdateWorkflowDraftRequest(typing.TypedDict):

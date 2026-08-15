@@ -25,6 +25,7 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityReader,
     SqlAlchemyRegistrationUnitOfWork,
 )
+from ai_platform_api.modules.workflow.application.approvals import ApprovalPolicyService
 from ai_platform_api.modules.workflow.application.executor import WorkflowRunExecutor
 from ai_platform_api.modules.workflow.application.service import WorkflowDefinitionService
 from ai_platform_api.modules.workflow.domain.execution import (
@@ -35,6 +36,9 @@ from ai_platform_api.modules.workflow.domain.models import (
     WorkflowEdge,
     WorkflowGraph,
     WorkflowNode,
+)
+from ai_platform_api.modules.workflow.infrastructure.approvals_sqlalchemy import (
+    SqlAlchemyApprovalPolicyUnitOfWork,
 )
 from ai_platform_api.modules.workflow.infrastructure.execution_sqlalchemy import (
     SqlAlchemyWorkflowExecutionStore,
@@ -134,6 +138,7 @@ def execution_database() -> Iterator[ExecutionHarness]:
         SqlAlchemyPolicyGrantRepository(sessions),
         field_registry,
     )
+    approval_policies = ApprovalPolicyService(SqlAlchemyApprovalPolicyUnitOfWork(sessions))
     try:
         yield ExecutionHarness(
             engine,
@@ -149,6 +154,7 @@ def execution_database() -> Iterator[ExecutionHarness]:
                 policy,
                 UnexpectedKnowledge(),
                 UnexpectedModels(),
+                approvals=approval_policies,
             ),
         )
     finally:
@@ -353,4 +359,5 @@ def test_approval_node_stops_run_in_waiting_state(
     assert run.status == "waiting_approval"
     assert run.completed_at is None
     assert [step.status for step in steps] == ["succeeded", "waiting_approval"]
-    assert steps[-1].output_payload["subject"] == "synthetic-approval-001"
+    assert UUID(steps[-1].output_payload["approval_instance_id"])
+    assert "subject" not in steps[-1].output_payload

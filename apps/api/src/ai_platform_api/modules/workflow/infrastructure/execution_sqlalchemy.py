@@ -34,6 +34,7 @@ from ai_platform_api.modules.retrieval.domain.models import (
     SearchIndex,
     Visibility,
 )
+from ai_platform_api.modules.workflow.domain.approval_runtime import ApprovalRuntimeState
 from ai_platform_api.modules.workflow.domain.execution import (
     WorkflowExecutionBudget,
     WorkflowExecutionClaim,
@@ -45,6 +46,10 @@ from ai_platform_api.modules.workflow.domain.execution import (
     WorkflowRunStep,
 )
 from ai_platform_api.modules.workflow.domain.models import WorkflowRun
+from ai_platform_api.modules.workflow.infrastructure.approval_runtime_sqlalchemy import (
+    SqlAlchemyApprovalRuntimeRepository,
+    record_embedded_approval_created,
+)
 from ai_platform_api.modules.workflow.infrastructure.sqlalchemy import (
     workflow_run_from_row,
     workflow_version_from_row,
@@ -110,7 +115,21 @@ class SqlAlchemyWorkflowExecutionStore(WorkflowExecutionStore):
             ).one_or_none()
             if version_row is None:
                 raise WorkflowExecutionStateError("工作流冻结版本不存在")
-            # 2. queued 和版本号构成条件认领；预算与执行器版本在取得执行权时一并冻结。
+            resolved_budget = _execution_budget(row.execution_budget, budget)
+            if row.executor_version is not None and row.executor_version != executor_version:
+                raise WorkflowExecutionStateError("工作流执行器版本与冻结版本不一致")
+            steps = tuple(
+                _step_from_row(step)
+                for step in session.execute(
+                    select(workflow_run_steps)
+                    .where(
+                        workflow_run_steps.c.workflow_run_id == workflow_run_id,
+                        workflow_run_steps.c.workspace_id == context.workspace_id,
+                    )
+                    .order_by(workflow_run_steps.c.sequence_no)
+                )
+            )
+            # 2. 首次认领冻结预算；审批恢复只复用原预算和历史步骤，不重置累计用量。
             result = cast(
                 CursorResult[Any],
                 session.execute(
@@ -123,7 +142,7 @@ class SqlAlchemyWorkflowExecutionStore(WorkflowExecutionStore):
                     .values(
                         status="running",
                         executor_version=executor_version,
-                        execution_budget=budget.document(),
+                        execution_budget=resolved_budget.document(),
                         updated_at=now,
                         version=row.version + 1,
                     )
@@ -131,15 +150,21 @@ class SqlAlchemyWorkflowExecutionStore(WorkflowExecutionStore):
             )
             if result.rowcount != 1:
                 return None
+            # 3. 返回值携带提交前已读取的历史步骤，执行器据此重建活动边而不重放外部调用。
             run = replace(
                 workflow_run_from_row(row),
                 status="running",
                 executor_version=executor_version,
-                execution_budget=budget.document(),
+                execution_budget=resolved_budget.document(),
                 updated_at=now,
                 version=row.version + 1,
             )
-            return WorkflowExecutionClaim(run, workflow_version_from_row(version_row), budget)
+            return WorkflowExecutionClaim(
+                run,
+                workflow_version_from_row(version_row),
+                resolved_budget,
+                steps,
+            )
 
     def start_step(
         self,
@@ -208,8 +233,13 @@ class SqlAlchemyWorkflowExecutionStore(WorkflowExecutionStore):
         workflow_step_id: UUID,
         workflow_attempt_id: UUID,
         *,
+        approval_state: ApprovalRuntimeState,
         output_payload: dict[str, object],
         output_hash: str,
+        steps_executed: int,
+        model_calls: int,
+        retrieval_calls: int,
+        output_bytes: int,
         now: datetime,
     ) -> None:
         with self._session_factory() as session, session.begin():
@@ -226,19 +256,24 @@ class SqlAlchemyWorkflowExecutionStore(WorkflowExecutionStore):
                 .where(workflow_run_steps.c.workflow_step_id == workflow_step_id)
                 .values(status="waiting_approval", output_payload=output_payload)
             )
-            session.execute(
-                update(workflow_node_attempts)
-                .where(
-                    workflow_node_attempts.c.workflow_attempt_id == workflow_attempt_id,
-                    workflow_node_attempts.c.status == "running",
-                )
-                .values(
-                    status="succeeded",
-                    output_hash=output_hash,
-                    completed_at=now,
-                )
+            attempt_result = cast(
+                CursorResult[Any],
+                session.execute(
+                    update(workflow_node_attempts)
+                    .where(
+                        workflow_node_attempts.c.workflow_attempt_id == workflow_attempt_id,
+                        workflow_node_attempts.c.status == "running",
+                    )
+                    .values(
+                        status="succeeded",
+                        output_hash=output_hash,
+                        completed_at=now,
+                    )
+                ),
             )
-            # 2. Run 与审批步骤在同一事务进入等待态，并同步产生不含业务载荷的审计和事件。
+            if attempt_result.rowcount != 1:
+                raise WorkflowExecutionStateError("审批等待尝试不存在或状态冲突")
+            # 2. Run、审批实例与审批步骤在同一事务进入等待态，不能出现孤立等待事实。
             run = session.execute(
                 select(workflow_runs)
                 .where(workflow_runs.c.workflow_run_id == step.workflow_run_id)
@@ -246,10 +281,27 @@ class SqlAlchemyWorkflowExecutionStore(WorkflowExecutionStore):
             ).one()
             if run.status != "running":
                 raise WorkflowExecutionStateError("工作流运行不能进入审批等待态")
+            instance = approval_state.instance
+            if (
+                instance.workflow_run_id != run.workflow_run_id
+                or instance.workflow_step_id != step.workflow_step_id
+                or instance.workspace_id != run.workspace_id
+            ):
+                raise WorkflowExecutionStateError("审批实例与工作流等待步骤不匹配")
+            SqlAlchemyApprovalRuntimeRepository(session).add_state(approval_state)
+            record_embedded_approval_created(session, context, approval_state)
             session.execute(
                 update(workflow_runs)
                 .where(workflow_runs.c.workflow_run_id == run.workflow_run_id)
-                .values(status="waiting_approval", updated_at=now, version=run.version + 1)
+                .values(
+                    status="waiting_approval",
+                    steps_executed=steps_executed,
+                    model_calls=model_calls,
+                    retrieval_calls=retrieval_calls,
+                    output_bytes=output_bytes,
+                    updated_at=now,
+                    version=run.version + 1,
+                )
             )
             _record_run_transition(
                 session,
@@ -491,6 +543,41 @@ def _step_values(step: WorkflowRunStep) -> dict[str, object]:
         "completed_at": step.completed_at,
         "error_code": step.error_code,
     }
+
+
+def _step_from_row(row: Row[Any]) -> WorkflowRunStep:
+    return WorkflowRunStep(
+        row.workflow_step_id,
+        row.workflow_run_id,
+        row.workspace_id,
+        row.node_id,
+        row.node_type,
+        row.sequence_no,
+        cast(Any, row.status),
+        cast("dict[str, object] | None", row.input_payload),
+        cast("dict[str, object] | None", row.output_payload),
+        row.branch_key,
+        row.policy_decision_id,
+        row.policy_version,
+        row.started_at,
+        row.completed_at,
+        row.error_code,
+    )
+
+
+def _execution_budget(
+    document: object,
+    default: WorkflowExecutionBudget,
+) -> WorkflowExecutionBudget:
+    if document is None:
+        return default
+    if not isinstance(document, dict) or set(document) != set(default.document()):
+        raise WorkflowExecutionStateError("工作流冻结预算结构无效")
+    try:
+        values = {key: int(value) for key, value in document.items()}
+        return WorkflowExecutionBudget(**values)
+    except (TypeError, ValueError) as error:
+        raise WorkflowExecutionStateError("工作流冻结预算数值无效") from error
 
 
 def _attempt_values(attempt: WorkflowNodeAttempt) -> dict[str, object]:

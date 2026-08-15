@@ -29,12 +29,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 13
-    assert len(resource_registry.permissions) == 69
+    assert resource_registry.registry_version == 14
+    assert len(resource_registry.permissions) == 76
     assert len(resource_registry.page_resources) == 9
-    assert len(resource_registry.api_resources) == 92
-    assert len(resource_registry.menus) == 86
-    assert len(resource_registry.menu_api_bindings) == 85
+    assert len(resource_registry.api_resources) == 100
+    assert len(resource_registry.menus) == 93
+    assert len(resource_registry.menu_api_bindings) == 93
     assert registry_openapi_violations() == ()
 
 
@@ -142,7 +142,7 @@ def test_registry_rejects_menu_api_permission_mismatch_and_unbound_api() -> None
             *valid.menu_api_bindings[1:-1],
             MenuApiBinding(
                 valid.menu_api_bindings[-1].menu_id,
-                UUID("81000000-0000-4000-8000-000000000099"),
+                UUID("81000000-0000-4000-8000-000000000999"),
                 "mutation",
             ),
         ),

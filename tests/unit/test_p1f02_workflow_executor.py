@@ -15,6 +15,12 @@ from ai_platform_api.modules.authorization.domain.policy import (
     ResourceScope,
 )
 from ai_platform_api.modules.workflow.application.executor import WorkflowRunExecutor
+from ai_platform_api.modules.workflow.domain.approval_runtime import ApprovalRuntimeState
+from ai_platform_api.modules.workflow.domain.approvals import (
+    ApprovalChain,
+    ApprovalSubject,
+    ResolvedApprovalLevel,
+)
 from ai_platform_api.modules.workflow.domain.execution import (
     WorkflowExecutionBudget,
     WorkflowExecutionClaim,
@@ -49,6 +55,7 @@ class MemoryExecutionStore:
         self.version = version
         self.steps: dict[UUID, WorkflowRunStep] = {}
         self.attempts: dict[UUID, WorkflowNodeAttempt] = {}
+        self.approval_state: ApprovalRuntimeState | None = None
 
     def claim(
         self,
@@ -65,15 +72,25 @@ class MemoryExecutionStore:
             or context.user_id != self.run.requested_by_account_id
         ):
             return None
+        resolved_budget = (
+            WorkflowExecutionBudget(**self.run.execution_budget)
+            if self.run.execution_budget is not None
+            else budget
+        )
         self.run = replace(
             self.run,
             status="running",
             executor_version=executor_version,
-            execution_budget=budget.document(),
+            execution_budget=resolved_budget.document(),
             updated_at=now,
             version=self.run.version + 1,
         )
-        return WorkflowExecutionClaim(self.run, self.version, budget)
+        return WorkflowExecutionClaim(
+            self.run,
+            self.version,
+            resolved_budget,
+            tuple(sorted(self.steps.values(), key=lambda item: item.sequence_no)),
+        )
 
     def start_step(self, step: WorkflowRunStep, attempt: WorkflowNodeAttempt) -> None:
         self.steps[step.workflow_step_id] = step
@@ -114,8 +131,13 @@ class MemoryExecutionStore:
         workflow_step_id: UUID,
         workflow_attempt_id: UUID,
         *,
+        approval_state: ApprovalRuntimeState,
         output_payload: dict[str, object],
         output_hash: str,
+        steps_executed: int,
+        model_calls: int,
+        retrieval_calls: int,
+        output_bytes: int,
         now: datetime,
     ) -> None:
         del context
@@ -130,9 +152,14 @@ class MemoryExecutionStore:
             output_hash=output_hash,
             completed_at=now,
         )
+        self.approval_state = approval_state
         self.run = replace(
             self.run,
             status="waiting_approval",
+            steps_executed=steps_executed,
+            model_calls=model_calls,
+            retrieval_calls=retrieval_calls,
+            output_bytes=output_bytes,
             updated_at=now,
             version=self.run.version + 1,
         )
@@ -271,6 +298,36 @@ class SyntheticModels:
         del context, run, node, security_level
         self.calls.append((prompt, knowledge))
         return WorkflowModelResult("合成模型结果", 12, 5, 100, False)
+
+
+class SyntheticApprovals:
+    """为工作流审批节点返回固定个人所有者确认链。"""
+
+    def preview_chain(
+        self,
+        context: RequestContext,
+        *,
+        subject: ApprovalSubject,
+    ) -> ApprovalChain:
+        assert context.workspace_id == subject.workspace_id
+        return ApprovalChain(
+            subject.workspace_id,
+            None,
+            None,
+            True,
+            (
+                ResolvedApprovalLevel(
+                    1,
+                    "all",
+                    (ACCOUNT_ID,),
+                    10,
+                    30,
+                    "wait",
+                    (),
+                ),
+            ),
+            "f" * 64,
+        )
 
 
 def request_context() -> RequestContext:
@@ -438,11 +495,33 @@ def test_approval_node_pauses_without_executing_result() -> None:
         AllowPolicy(),
         SyntheticKnowledge(),
         SyntheticModels(),
+        approvals=SyntheticApprovals(),
     ).execute(request_context(), RUN_ID)
 
     assert result.status == "waiting_approval"
     assert store.run.status == "waiting_approval"
     assert [step.node_id for step in store.steps.values()] == ["trigger", "approval"]
+    assert store.approval_state is not None
+
+    # 审批事务会把等待步骤改为成功并重新排队；恢复后只执行尚未出现的 Result 节点。
+    approval_step = next(step for step in store.steps.values() if step.node_id == "approval")
+    store.steps[approval_step.workflow_step_id] = replace(
+        approval_step,
+        status="succeeded",
+        output_payload={**(approval_step.output_payload or {}), "approval_status": "approved"},
+        completed_at=datetime.now(UTC),
+    )
+    store.run = replace(store.run, status="queued", version=store.run.version + 1)
+    resumed = WorkflowRunExecutor(
+        store,
+        AllowPolicy(),
+        SyntheticKnowledge(),
+        SyntheticModels(),
+        approvals=SyntheticApprovals(),
+    ).execute(request_context(), RUN_ID)
+
+    assert resumed.status == "succeeded"
+    assert [step.node_id for step in store.steps.values()] == ["trigger", "approval", "result"]
 
 
 def test_invalid_config_and_output_budget_fail_closed() -> None:

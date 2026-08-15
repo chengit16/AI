@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
-from typing import cast
+from typing import Protocol, cast
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from ai_platform_api.common.errors import PlatformError
@@ -35,6 +35,15 @@ from ai_platform_api.modules.model_gateway.domain.models import (
 )
 from ai_platform_api.modules.model_gateway.domain.runtime import (
     RuntimeConfigurationReader,
+)
+from ai_platform_api.modules.workflow.domain.approval_runtime import (
+    ApprovalRuntimeState,
+    create_approval_runtime,
+)
+from ai_platform_api.modules.workflow.domain.approvals import (
+    ApprovalChain,
+    ApprovalRiskLevel,
+    ApprovalSubject,
 )
 from ai_platform_api.modules.workflow.domain.execution import (
     DEFAULT_WORKFLOW_EXECUTION_BUDGET,
@@ -111,6 +120,7 @@ class _NodeOutcome:
     branch_key: str | None = None
     waiting_approval: bool = False
     usage: dict[str, object] | None = None
+    approval_state: ApprovalRuntimeState | None = None
 
 
 @dataclass
@@ -123,6 +133,17 @@ class _ExecutionState:
     output_bytes: int = 0
     active_step_id: UUID | None = None
     active_attempt_id: UUID | None = None
+
+
+class WorkflowApprovalResolver(Protocol):
+    """按当前组织与冻结策略版本解析审批链，执行器不直接读取策略表。"""
+
+    def preview_chain(
+        self,
+        context: RequestContext,
+        *,
+        subject: ApprovalSubject,
+    ) -> ApprovalChain: ...
 
 
 class GovernedWorkflowModelInvoker:
@@ -219,12 +240,14 @@ class WorkflowRunExecutor:
         knowledge: WorkflowKnowledgeRetriever,
         models: WorkflowModelInvoker,
         *,
+        approvals: WorkflowApprovalResolver | None = None,
         budget: WorkflowExecutionBudget = DEFAULT_WORKFLOW_EXECUTION_BUDGET,
     ) -> None:
         self._store = store
         self._policy = policy
         self._knowledge = knowledge
         self._models = models
+        self._approvals = approvals
         self._budget = budget
 
     def execute(
@@ -234,6 +257,7 @@ class WorkflowRunExecutor:
     ) -> WorkflowRunExecutionResult:
         """执行一次非持久调度；数据库条件认领保证重复调用不会重复执行节点。"""
 
+        # 1. 条件认领同时取得冻结版本、历史步骤和累计预算，审批恢复不会重置执行事实。
         claim = self._store.claim(
             context,
             workflow_run_id,
@@ -243,7 +267,13 @@ class WorkflowRunExecutor:
         )
         if claim is None:
             return WorkflowRunExecutionResult(False, None)
-        state = _ExecutionState()
+        state = _ExecutionState(
+            steps_executed=claim.run.steps_executed,
+            model_calls=claim.run.model_calls,
+            retrieval_calls=claim.run.retrieval_calls,
+            output_bytes=claim.run.output_bytes,
+        )
+        # 2. 节点异常统一收敛为稳定错误码，并由 Store 原子关闭当前 Step、Attempt 与 Run。
         try:
             _validate_executable_graph(claim.version.graph)
             status = self._execute_graph(
@@ -251,6 +281,7 @@ class WorkflowRunExecutor:
                 claim.run,
                 claim.version.graph,
                 claim.budget,
+                claim.steps,
                 state,
             )
             return WorkflowRunExecutionResult(True, status)
@@ -272,6 +303,7 @@ class WorkflowRunExecutor:
         run: WorkflowRun,
         graph: WorkflowGraph,
         budget: WorkflowExecutionBudget,
+        existing_steps: tuple[WorkflowRunStep, ...],
         state: _ExecutionState,
     ) -> str:
         """按拓扑顺序传播活动边；未被分支选择的节点会留下 skipped 事实。"""
@@ -284,9 +316,35 @@ class WorkflowRunExecutor:
         active_nodes = {graph.entry_node_id}
         selected_edges: set[str] = set()
         result_outputs: dict[str, object] = {}
-        # 1. 拓扑顺序保证依赖先完成；活动集合只由已选择的上游边扩展。
+        steps_by_node = {step.node_id: step for step in existing_steps}
+        if len(steps_by_node) != len(existing_steps) or any(
+            node_id not in nodes for node_id in steps_by_node
+        ):
+            raise WorkflowNodeExecutionError
+        # 1. 先回放已提交步骤以重建活动边和输出；恢复执行不能再次调用历史模型或检索节点。
         for sequence_no, node_id in enumerate(_topological_order(graph), start=1):
             node = nodes[node_id]
+            existing = steps_by_node.get(node_id)
+            if existing is not None:
+                if existing.sequence_no != sequence_no:
+                    raise WorkflowNodeExecutionError
+                if existing.status == "skipped":
+                    if node_id in active_nodes:
+                        raise WorkflowNodeExecutionError
+                    continue
+                if (
+                    existing.status != "succeeded"
+                    or existing.output_payload is None
+                    or node_id not in active_nodes
+                ):
+                    raise WorkflowNodeExecutionError
+                outputs[node_id] = existing.output_payload
+                if node.node_type == "result":
+                    result_outputs[node_id] = existing.output_payload.get("value")
+                for edge in _select_edges(node, outgoing[node_id], existing.branch_key):
+                    selected_edges.add(edge.edge_id)
+                    active_nodes.add(edge.target_node_id)
+                continue
             if node_id not in active_nodes:
                 self._store.skip_step(_skipped_step(run, node, sequence_no, datetime.now(UTC)))
                 continue
@@ -339,12 +397,19 @@ class WorkflowRunExecutor:
             state.output_bytes += output_size
             _require_budget(state, budget, started)
             if outcome.waiting_approval:
+                if outcome.approval_state is None:
+                    raise WorkflowNodeExecutionError
                 self._store.wait_for_approval(
                     context,
                     state.active_step_id,
                     state.active_attempt_id,
+                    approval_state=outcome.approval_state,
                     output_payload=outcome.output,
                     output_hash=output_hash,
+                    steps_executed=state.steps_executed,
+                    model_calls=state.model_calls,
+                    retrieval_calls=state.retrieval_calls,
+                    output_bytes=state.output_bytes,
                     now=datetime.now(UTC),
                 )
                 state.active_step_id = None
@@ -466,15 +531,43 @@ class WorkflowRunExecutor:
                     "estimated_cost_microunits": model.estimated_cost_microunits,
                 },
             )
+        # 3. Approval 只冻结审批实例并暂停 Run；Result 仍是无外部副作用的确定性投影。
         if node.node_type == "approval":
-            subject = _optional_path_value(node, "subject_path", root)
+            if self._approvals is None or state.active_step_id is None:
+                raise WorkflowNodeConfigError
+            subject_value = _optional_path_value(node, "subject_path", root)
+            fields = _approval_fields(subject_value)
+            approval_subject = ApprovalSubject(
+                run.workspace_id,
+                run.requested_by_account_id,
+                _optional_string_config(node, "resource_type", "workflow.approval"),
+                _optional_string_config(node, "operation", "submit"),
+                run.workflow_run_id,
+                _uuid_tuple_config(node, "department_ids"),
+                _approval_security_level(node),
+                cast(ApprovalRiskLevel, node.config.get("risk_level", "normal")),
+                fields,
+            )
+            chain = self._approvals.preview_chain(context, subject=approval_subject)
+            approval_state = create_approval_runtime(
+                chain,
+                approval_subject,
+                idempotency_key=f"workflow:{run.workflow_run_id}:{node.node_id}",
+                trace_id=run.trace_id,
+                traceparent=run.traceparent,
+                now=datetime.now(UTC),
+                workflow_run_id=run.workflow_run_id,
+                workflow_step_id=state.active_step_id,
+            )
             return _NodeOutcome(
                 {
                     "risk_level": node.config.get("risk_level", "normal"),
-                    "subject": subject,
+                    "approval_instance_id": str(approval_state.instance.approval_instance_id),
+                    "chain_digest": approval_state.instance.chain_digest,
                     "dependency_node_ids": sorted(dependencies),
                 },
                 waiting_approval=True,
+                approval_state=approval_state,
             )
         if node.node_type == "result":
             source_path = node.config.get("source_path")
@@ -523,7 +616,17 @@ def _config_contract(node_type: str) -> tuple[set[str], set[str]]:
             },
             {"runtime_config_version_id", "prompt_template"},
         ),
-        "approval": ({"risk_level", "subject_path"}, set()),
+        "approval": (
+            {
+                "risk_level",
+                "subject_path",
+                "resource_type",
+                "operation",
+                "department_ids",
+                "security_level",
+            },
+            set(),
+        ),
         "result": ({"source_path"}, set()),
     }
     try:
@@ -552,6 +655,10 @@ def _validate_node_values(node: WorkflowNode) -> None:
         if node.config.get("risk_level", "normal") not in {"normal", "high", "critical"}:
             raise WorkflowNodeConfigError
         _optional_path_config(node, "subject_path")
+        _optional_string_config(node, "resource_type", "workflow.approval")
+        _optional_string_config(node, "operation", "submit")
+        _uuid_tuple_config(node, "department_ids")
+        _approval_security_level(node)
     if node.node_type == "result":
         _optional_path_config(node, "source_path")
 
@@ -702,6 +809,43 @@ def _string_config(node: WorkflowNode, key: str) -> str:
     if not isinstance(value, str) or not value.strip() or len(value) > 8_000:
         raise WorkflowNodeConfigError
     return value
+
+
+def _optional_string_config(node: WorkflowNode, key: str, default: str) -> str:
+    value = node.config.get(key, default)
+    if not isinstance(value, str) or not value.strip() or len(value) > 128:
+        raise WorkflowNodeConfigError
+    return value.strip()
+
+
+def _uuid_tuple_config(node: WorkflowNode, key: str) -> tuple[UUID, ...]:
+    value = node.config.get(key, [])
+    if not isinstance(value, list) or len(value) > 100:
+        raise WorkflowNodeConfigError
+    try:
+        result = tuple(sorted((UUID(str(item)) for item in value), key=lambda item: item.int))
+    except (TypeError, ValueError) as error:
+        raise WorkflowNodeConfigError from error
+    if len(result) != len(set(result)):
+        raise WorkflowNodeConfigError
+    return result
+
+
+def _approval_security_level(node: WorkflowNode) -> SecurityLevel:
+    value = node.config.get("security_level", "PUBLIC")
+    if value not in _SECURITY_LEVELS:
+        raise WorkflowNodeConfigError
+    return cast(SecurityLevel, value)
+
+
+def _approval_fields(value: object | None) -> dict[str, object]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        if any(not isinstance(key, str) for key in value):
+            raise WorkflowNodeConfigError
+        return cast(dict[str, object], value)
+    return {"value": value}
 
 
 def _integer_config(

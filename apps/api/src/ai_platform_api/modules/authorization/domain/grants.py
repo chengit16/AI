@@ -15,6 +15,13 @@ from ai_platform_api.modules.authorization.domain.policy import DataScopeType
 
 OWNER_PERMISSION_CODES = (
     "approval.chain.preview",
+    "approval.instance.approve",
+    "approval.instance.create",
+    "approval.instance.process_due",
+    "approval.instance.read",
+    "approval.instance.reject",
+    "approval.instance.transfer",
+    "approval.instance.withdraw",
     "approval.policy.create",
     "approval.policy.read",
     "approval.policy.update",
@@ -85,6 +92,12 @@ OWNER_PERMISSION_CODES = (
 )
 MEMBER_PERMISSION_CODES = (
     "approval.chain.preview",
+    "approval.instance.approve",
+    "approval.instance.create",
+    "approval.instance.read",
+    "approval.instance.reject",
+    "approval.instance.transfer",
+    "approval.instance.withdraw",
     "authorization.effective_role.read",
     "authorization.menu_release.read",
     "workspace.context.switch",

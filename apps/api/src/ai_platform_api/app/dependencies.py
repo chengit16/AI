@@ -133,12 +133,16 @@ from ai_platform_api.modules.streaming.domain.models import StreamPolicy
 from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
     SqlAlchemyStreamUnitOfWork,
 )
+from ai_platform_api.modules.workflow.application.approval_runtime import ApprovalInstanceService
 from ai_platform_api.modules.workflow.application.approvals import ApprovalPolicyService
 from ai_platform_api.modules.workflow.application.executor import (
     GovernedWorkflowModelInvoker,
     WorkflowRunExecutor,
 )
 from ai_platform_api.modules.workflow.application.service import WorkflowDefinitionService
+from ai_platform_api.modules.workflow.infrastructure.approval_runtime_sqlalchemy import (
+    SqlAlchemyApprovalRuntimeUnitOfWork,
+)
 from ai_platform_api.modules.workflow.infrastructure.approvals_sqlalchemy import (
     SqlAlchemyApprovalPolicyUnitOfWork,
 )
@@ -189,6 +193,7 @@ class ApplicationContainer:
     workflows: WorkflowDefinitionService | None = None
     workflow_run_executor: WorkflowRunExecutor | None = None
     approval_policies: ApprovalPolicyService | None = None
+    approval_instances: ApprovalInstanceService | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
@@ -281,6 +286,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     )
     workflows = WorkflowDefinitionService(SqlAlchemyWorkflowUnitOfWork(database.sessions))
     approval_policies = ApprovalPolicyService(SqlAlchemyApprovalPolicyUnitOfWork(database.sessions))
+    approval_instances = ApprovalInstanceService(
+        SqlAlchemyApprovalRuntimeUnitOfWork(database.sessions),
+        approval_policies,
+    )
     policy = RbacPolicyDecisionPoint(resource_registry, policy_reader, field_registry)
     retrieval_planning = BoundedRetrievalPlanningService(
         SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
@@ -371,6 +380,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             retrieval_evidence=retrieval_evidence,
             workflows=workflows,
             approval_policies=approval_policies,
+            approval_instances=approval_instances,
             workflow_run_executor=WorkflowRunExecutor(
                 SqlAlchemyWorkflowExecutionStore(database.sessions),
                 policy,
@@ -380,6 +390,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                     SqlAlchemySearchIndex,
                 ),
                 GovernedWorkflowModelInvoker(runtime_reader, model_runtime, model_context),
+                approvals=approval_policies,
             ),
             rag_safety=rag_safety,
             authentication=AuthenticationService(

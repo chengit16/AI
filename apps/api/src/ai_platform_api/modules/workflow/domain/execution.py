@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
+from ai_platform_api.modules.workflow.domain.approval_runtime import ApprovalRuntimeState
 from ai_platform_api.modules.workflow.domain.models import (
     WorkflowNode,
     WorkflowRun,
@@ -64,11 +65,12 @@ DEFAULT_WORKFLOW_EXECUTION_BUDGET = WorkflowExecutionBudget()
 
 @dataclass(frozen=True)
 class WorkflowExecutionClaim:
-    """返回成功认领的 Run、冻结版本和本次执行预算。"""
+    """返回成功认领的 Run、冻结版本、预算和已有步骤快照。"""
 
     run: WorkflowRun
     version: WorkflowVersion
     budget: WorkflowExecutionBudget
+    steps: tuple[WorkflowRunStep, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -184,8 +186,13 @@ class WorkflowExecutionStore(Protocol):
         workflow_step_id: UUID,
         workflow_attempt_id: UUID,
         *,
+        approval_state: ApprovalRuntimeState,
         output_payload: dict[str, object],
         output_hash: str,
+        steps_executed: int,
+        model_calls: int,
+        retrieval_calls: int,
+        output_bytes: int,
         now: datetime,
     ) -> None: ...
 

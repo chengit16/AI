@@ -2034,6 +2034,322 @@ Index(
     workflow_node_attempts.c.started_at,
 )
 
+approval_instances = Table(
+    "approval_instances",
+    metadata,
+    Column("approval_instance_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("approval_policy_id", UUID(as_uuid=True), nullable=True),
+    Column("approval_policy_version_id", UUID(as_uuid=True), nullable=True),
+    Column("requester_account_id", UUID(as_uuid=True), nullable=False),
+    Column("resource_type", String(128), nullable=False),
+    Column("operation", String(128), nullable=False),
+    Column("resource_id", UUID(as_uuid=True), nullable=True),
+    Column("subject_digest", String(64), nullable=False),
+    Column("chain_digest", String(64), nullable=False),
+    Column("personal_owner_confirmation", Boolean, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("current_sequence_no", Integer, nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("workflow_run_id", UUID(as_uuid=True), nullable=True),
+    Column("workflow_step_id", UUID(as_uuid=True), nullable=True),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(128), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "approval_instance_id",
+        "workspace_id",
+        name="uq_approval_instances_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "requester_account_id",
+        "idempotency_key",
+        name="uq_approval_instances_request_idempotency",
+    ),
+    UniqueConstraint(
+        "workflow_step_id",
+        name="uq_approval_instances_workflow_step",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_approval_instances_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["requester_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_approval_instances_requester",
+    ),
+    ForeignKeyConstraint(
+        ["approval_policy_id", "workspace_id", "approval_policy_version_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_policy_versions.approval_policy_id",
+            f"{SCHEMA_TOKEN}.approval_policy_versions.workspace_id",
+            f"{SCHEMA_TOKEN}.approval_policy_versions.approval_policy_version_id",
+        ],
+        name="fk_approval_instances_policy_version",
+    ),
+    ForeignKeyConstraint(
+        ["workflow_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.workflow_runs.workflow_run_id",
+            f"{SCHEMA_TOKEN}.workflow_runs.workspace_id",
+        ],
+        name="fk_approval_instances_workflow_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workflow_step_id", "workflow_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.workflow_run_steps.workflow_step_id",
+            f"{SCHEMA_TOKEN}.workflow_run_steps.workflow_run_id",
+            f"{SCHEMA_TOKEN}.workflow_run_steps.workspace_id",
+        ],
+        name="fk_approval_instances_workflow_step",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "status IN ('pending', 'approved', 'rejected', 'withdrawn')",
+        name="ck_approval_instances_status",
+    ),
+    CheckConstraint("current_sequence_no BETWEEN 1 AND 5", name="ck_approval_instances_sequence"),
+    CheckConstraint("version >= 1", name="ck_approval_instances_version"),
+    CheckConstraint(
+        "subject_digest ~ '^[0-9a-f]{64}$' AND chain_digest ~ '^[0-9a-f]{64}$' "
+        "AND request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_approval_instances_digests",
+    ),
+    CheckConstraint(
+        "idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'",
+        name="ck_approval_instances_idempotency",
+    ),
+    CheckConstraint(
+        "(approval_policy_id IS NULL AND approval_policy_version_id IS NULL) OR "
+        "(approval_policy_id IS NOT NULL AND approval_policy_version_id IS NOT NULL)",
+        name="ck_approval_instances_policy_pair",
+    ),
+    CheckConstraint(
+        "(workflow_run_id IS NULL AND workflow_step_id IS NULL) OR "
+        "(workflow_run_id IS NOT NULL AND workflow_step_id IS NOT NULL)",
+        name="ck_approval_instances_workflow_pair",
+    ),
+    CheckConstraint(
+        "(status = 'pending' AND completed_at IS NULL) OR "
+        "(status IN ('approved', 'rejected', 'withdrawn') AND completed_at IS NOT NULL)",
+        name="ck_approval_instances_completion",
+    ),
+)
+Index(
+    "ix_approval_instances_workspace_time",
+    approval_instances.c.workspace_id,
+    approval_instances.c.created_at,
+)
+Index(
+    "ix_approval_instances_requester_status",
+    approval_instances.c.workspace_id,
+    approval_instances.c.requester_account_id,
+    approval_instances.c.status,
+)
+
+approval_instance_levels = Table(
+    "approval_instance_levels",
+    metadata,
+    Column("approval_level_id", UUID(as_uuid=True), primary_key=True),
+    Column("approval_instance_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("sequence_no", Integer, nullable=False),
+    Column("mode", String(16), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("reminder_after_minutes", Integer, nullable=False),
+    Column("timeout_after_minutes", Integer, nullable=False),
+    Column("timeout_action", String(32), nullable=False),
+    Column("fallback_approver_account_ids", ARRAY(UUID(as_uuid=True)), nullable=False),
+    Column("fallback_activated", Boolean, nullable=False),
+    Column("reminder_at", DateTime(timezone=True), nullable=True),
+    Column("reminded_at", DateTime(timezone=True), nullable=True),
+    Column("timeout_at", DateTime(timezone=True), nullable=True),
+    Column("activated_at", DateTime(timezone=True), nullable=True),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "approval_instance_id",
+        "sequence_no",
+        name="uq_approval_instance_levels_sequence",
+    ),
+    UniqueConstraint(
+        "approval_level_id",
+        "approval_instance_id",
+        "workspace_id",
+        name="uq_approval_instance_levels_identity",
+    ),
+    ForeignKeyConstraint(
+        ["approval_instance_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_instances.approval_instance_id",
+            f"{SCHEMA_TOKEN}.approval_instances.workspace_id",
+        ],
+        name="fk_approval_instance_levels_instance",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("sequence_no BETWEEN 1 AND 5", name="ck_approval_instance_levels_sequence"),
+    CheckConstraint("mode IN ('any', 'all')", name="ck_approval_instance_levels_mode"),
+    CheckConstraint(
+        "status IN ('waiting', 'active', 'approved', 'rejected', 'withdrawn')",
+        name="ck_approval_instance_levels_status",
+    ),
+    CheckConstraint(
+        "timeout_action IN ('escalate', 'transfer', 'reject', 'wait')",
+        name="ck_approval_instance_levels_timeout_action",
+    ),
+    CheckConstraint(
+        "reminder_after_minutes >= 1 AND timeout_after_minutes > reminder_after_minutes",
+        name="ck_approval_instance_levels_timeouts",
+    ),
+    CheckConstraint("version >= 1", name="ck_approval_instance_levels_version"),
+)
+Index(
+    "ix_approval_instance_levels_due",
+    approval_instance_levels.c.workspace_id,
+    approval_instance_levels.c.status,
+    approval_instance_levels.c.timeout_at,
+    approval_instance_levels.c.reminder_at,
+)
+
+approval_assignments = Table(
+    "approval_assignments",
+    metadata,
+    Column("approval_assignment_id", UUID(as_uuid=True), primary_key=True),
+    Column("approval_instance_id", UUID(as_uuid=True), nullable=False),
+    Column("approval_level_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("approver_account_id", UUID(as_uuid=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("transferred_to_account_id", UUID(as_uuid=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("decided_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "approval_level_id",
+        "approver_account_id",
+        name="uq_approval_assignments_level_approver",
+    ),
+    UniqueConstraint(
+        "approval_assignment_id",
+        "approval_instance_id",
+        "workspace_id",
+        name="uq_approval_assignments_identity",
+    ),
+    ForeignKeyConstraint(
+        ["approval_level_id", "approval_instance_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_instance_levels.approval_level_id",
+            f"{SCHEMA_TOKEN}.approval_instance_levels.approval_instance_id",
+            f"{SCHEMA_TOKEN}.approval_instance_levels.workspace_id",
+        ],
+        name="fk_approval_assignments_level",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["approver_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_approval_assignments_approver",
+    ),
+    ForeignKeyConstraint(
+        ["transferred_to_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_approval_assignments_transfer_target",
+    ),
+    CheckConstraint(
+        "status IN ('waiting', 'pending', 'approved', 'rejected', 'transferred', 'cancelled')",
+        name="ck_approval_assignments_status",
+    ),
+    CheckConstraint(
+        "(status = 'transferred' AND transferred_to_account_id IS NOT NULL) OR "
+        "(status != 'transferred' AND transferred_to_account_id IS NULL)",
+        name="ck_approval_assignments_transfer",
+    ),
+    CheckConstraint("version >= 1", name="ck_approval_assignments_version"),
+)
+Index(
+    "ix_approval_assignments_account_status",
+    approval_assignments.c.workspace_id,
+    approval_assignments.c.approver_account_id,
+    approval_assignments.c.status,
+)
+
+approval_actions = Table(
+    "approval_actions",
+    metadata,
+    Column("approval_action_id", UUID(as_uuid=True), primary_key=True),
+    Column("approval_instance_id", UUID(as_uuid=True), nullable=False),
+    Column("approval_level_id", UUID(as_uuid=True), nullable=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_account_id", UUID(as_uuid=True), nullable=False),
+    Column("action", String(32), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("target_account_id", UUID(as_uuid=True), nullable=True),
+    Column("reason_code", String(128), nullable=True),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "approval_instance_id",
+        "actor_account_id",
+        "idempotency_key",
+        name="uq_approval_actions_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["approval_instance_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_instances.approval_instance_id",
+            f"{SCHEMA_TOKEN}.approval_instances.workspace_id",
+        ],
+        name="fk_approval_actions_instance",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["approval_level_id", "approval_instance_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_instance_levels.approval_level_id",
+            f"{SCHEMA_TOKEN}.approval_instance_levels.approval_instance_id",
+            f"{SCHEMA_TOKEN}.approval_instance_levels.workspace_id",
+        ],
+        name="fk_approval_actions_level",
+    ),
+    ForeignKeyConstraint(
+        ["actor_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_approval_actions_actor",
+    ),
+    ForeignKeyConstraint(
+        ["target_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_approval_actions_target",
+    ),
+    CheckConstraint(
+        "action IN ('approve', 'reject', 'transfer', 'withdraw', 'remind', 'escalate', "
+        "'timeout_transfer', 'timeout_reject', 'timeout_wait')",
+        name="ck_approval_actions_action",
+    ),
+    CheckConstraint(
+        "idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'",
+        name="ck_approval_actions_idempotency",
+    ),
+    CheckConstraint(
+        "reason_code IS NULL OR reason_code ~ '^[a-z][a-z0-9_.-]{0,127}$'",
+        name="ck_approval_actions_reason",
+    ),
+)
+Index(
+    "ix_approval_actions_instance_time",
+    approval_actions.c.approval_instance_id,
+    approval_actions.c.occurred_at,
+)
+
 index_versions = indexing_tables.index_versions.to_metadata(metadata)
 document_index_publications = indexing_tables.document_index_publications.to_metadata(metadata)
 retrieval_chunks = indexing_tables.retrieval_chunks.to_metadata(metadata)
