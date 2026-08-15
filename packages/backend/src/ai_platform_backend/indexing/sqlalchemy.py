@@ -48,7 +48,105 @@ def switch_active_document_index(
         .with_for_update()
     ).scalar_one_or_none()
 
-    # 2. 先撤销旧 Chunk；即使目标版本尚无索引，也不能继续召回已过期文档版本。
+    # 2. 即使目标版本尚无索引，也必须先撤销旧版本，不能继续召回已过期正文。
+    _clear_document_index_activation(
+        session,
+        workspace_id=workspace_id,
+        document_id=document_id,
+        changed_at=activated_at,
+    )
+    if candidate is None:
+        return None
+
+    # 3. 目标版本、Chunk 和当前索引指针在同一事务中启用，对检索端一次可见。
+    _activate_document_index_version_locked(
+        session,
+        workspace_id=workspace_id,
+        document_id=document_id,
+        document_version_id=document_version_id,
+        index_version_id=candidate,
+        activated_at=activated_at,
+    )
+    return cast(UUID, candidate)
+
+
+def activate_document_index_version(
+    session: Session,
+    *,
+    workspace_id: UUID,
+    document_id: UUID,
+    document_version_id: UUID,
+    index_version_id: UUID,
+    activated_at: datetime,
+) -> bool:
+    """原子启用巡检已验证完整的指定索引版本，不自行选择其他候选。"""
+
+    # 1. 当前业务发布版本拥有优先写入权；巡检不能把历史文档版本重新暴露。
+    current_version_id = session.execute(
+        select(document_publications.c.current_document_version_id)
+        .where(
+            document_publications.c.workspace_id == workspace_id,
+            document_publications.c.document_id == document_id,
+        )
+        .with_for_update()
+    ).scalar_one_or_none()
+    if current_version_id != document_version_id:
+        return False
+    candidate = session.execute(
+        select(index_versions.c.index_version_id)
+        .where(
+            index_versions.c.workspace_id == workspace_id,
+            index_versions.c.document_id == document_id,
+            index_versions.c.document_version_id == document_version_id,
+            index_versions.c.index_version_id == index_version_id,
+            index_versions.c.status.in_(("ready", "active", "retired")),
+        )
+        .with_for_update()
+    ).scalar_one_or_none()
+    if candidate is None:
+        return False
+    # 2. 指定候选通过上层完整性校验后，清理旧活动面并在同一事务切换全部引用。
+    _clear_document_index_activation(
+        session,
+        workspace_id=workspace_id,
+        document_id=document_id,
+        changed_at=activated_at,
+    )
+    _activate_document_index_version_locked(
+        session,
+        workspace_id=workspace_id,
+        document_id=document_id,
+        document_version_id=document_version_id,
+        index_version_id=cast(UUID, candidate),
+        activated_at=activated_at,
+    )
+    return True
+
+
+def clear_document_index_activation(
+    session: Session,
+    *,
+    workspace_id: UUID,
+    document_id: UUID,
+    changed_at: datetime,
+) -> None:
+    """停用异常派生索引和发布指针，但保留仍可恢复的在途构建。"""
+
+    _clear_document_index_activation(
+        session,
+        workspace_id=workspace_id,
+        document_id=document_id,
+        changed_at=changed_at,
+    )
+
+
+def _clear_document_index_activation(
+    session: Session,
+    *,
+    workspace_id: UUID,
+    document_id: UUID,
+    changed_at: datetime,
+) -> None:
     session.execute(
         update(retrieval_chunks)
         .where(
@@ -65,28 +163,34 @@ def switch_active_document_index(
             index_versions.c.document_id == document_id,
             index_versions.c.status == "active",
         )
-        .values(status="retired", updated_at=activated_at)
+        .values(status="retired", updated_at=changed_at)
+    )
+    session.execute(
+        delete(document_index_publications).where(
+            document_index_publications.c.workspace_id == workspace_id,
+            document_index_publications.c.document_id == document_id,
+        )
     )
 
-    if candidate is None:
-        session.execute(
-            delete(document_index_publications).where(
-                document_index_publications.c.workspace_id == workspace_id,
-                document_index_publications.c.document_id == document_id,
-            )
-        )
-        return None
 
-    # 3. 目标版本、Chunk 和当前索引指针在同一事务中启用，对检索端一次可见。
+def _activate_document_index_version_locked(
+    session: Session,
+    *,
+    workspace_id: UUID,
+    document_id: UUID,
+    document_version_id: UUID,
+    index_version_id: UUID,
+    activated_at: datetime,
+) -> None:
     session.execute(
         update(index_versions)
-        .where(index_versions.c.index_version_id == candidate)
+        .where(index_versions.c.index_version_id == index_version_id)
         .values(status="active", activated_at=activated_at, updated_at=activated_at)
     )
     session.execute(
         update(retrieval_chunks)
         .where(
-            retrieval_chunks.c.index_version_id == candidate,
+            retrieval_chunks.c.index_version_id == index_version_id,
             retrieval_chunks.c.workspace_id == workspace_id,
             retrieval_chunks.c.document_id == document_id,
         )
@@ -96,7 +200,7 @@ def switch_active_document_index(
         workspace_id=workspace_id,
         document_id=document_id,
         document_version_id=document_version_id,
-        index_version_id=candidate,
+        index_version_id=index_version_id,
         activated_at=activated_at,
     )
     session.execute(
@@ -112,7 +216,6 @@ def switch_active_document_index(
             },
         )
     )
-    return cast(UUID, candidate)
 
 
 def deactivate_document_indexes(

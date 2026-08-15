@@ -8,6 +8,14 @@ from ai_platform_backend.indexing.domain import (
     IndexVersionStore,
 )
 from ai_platform_backend.indexing.embeddings import DeterministicHashEmbeddingAdapter
+from ai_platform_backend.indexing.maintenance import (
+    IndexCleanupResult,
+    IndexInspectionFinding,
+    IndexInspectionReport,
+    IndexMaintenanceStore,
+    IndexRebuildBatchResult,
+    IndexRepairResult,
+)
 
 __all__ = [
     "BuiltIndexChunk",
@@ -15,5 +23,11 @@ __all__ = [
     "DeterministicHashEmbeddingAdapter",
     "EmbeddingAdapter",
     "IndexArtifactStorage",
+    "IndexCleanupResult",
+    "IndexInspectionFinding",
+    "IndexInspectionReport",
+    "IndexMaintenanceStore",
+    "IndexRebuildBatchResult",
+    "IndexRepairResult",
     "IndexVersionStore",
 ]

@@ -259,6 +259,88 @@ document_index_publications = Table(
     ),
 )
 
+index_maintenance_runs = Table(
+    "index_maintenance_runs",
+    metadata,
+    Column("maintenance_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("run_kind", String(32), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=True),
+    Column("requested_by_actor_id", UUID(as_uuid=True), nullable=True),
+    Column("status", String(32), nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    Column("scanned_document_count", Integer, nullable=False),
+    Column("inconsistency_count", Integer, nullable=False),
+    Column("repaired_count", Integer, nullable=False),
+    Column("rebuild_queued_count", Integer, nullable=False),
+    Column("cleaned_chunk_count", Integer, nullable=False),
+    Column("result_digest", String(64), nullable=False),
+    CheckConstraint(
+        "run_kind IN ('inspection', 'full_rebuild', 'cleanup')",
+        name="ck_index_maintenance_runs_kind",
+    ),
+    CheckConstraint(
+        "status = 'completed'",
+        name="ck_index_maintenance_runs_status",
+    ),
+    CheckConstraint(
+        "scanned_document_count >= 0 AND inconsistency_count >= 0 "
+        "AND repaired_count >= 0 AND rebuild_queued_count >= 0 "
+        "AND cleaned_chunk_count >= 0",
+        name="ck_index_maintenance_runs_counts",
+    ),
+    CheckConstraint(
+        "completed_at >= started_at",
+        name="ck_index_maintenance_runs_time",
+    ),
+    CheckConstraint(
+        "result_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_index_maintenance_runs_digest",
+    ),
+)
+Index(
+    "ix_index_maintenance_runs_kind_time",
+    index_maintenance_runs.c.run_kind,
+    index_maintenance_runs.c.completed_at,
+)
+
+index_inspection_findings = Table(
+    "index_inspection_findings",
+    metadata,
+    Column("finding_id", UUID(as_uuid=True), primary_key=True),
+    Column("maintenance_run_id", UUID(as_uuid=True), nullable=False),
+    Column("finding_code", String(64), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("document_id", UUID(as_uuid=True), nullable=False),
+    Column("document_version_id", UUID(as_uuid=True), nullable=True),
+    Column("index_version_id", UUID(as_uuid=True), nullable=True),
+    Column("resolution", String(32), nullable=False),
+    Column("detected_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["maintenance_run_id"],
+        [f"{SCHEMA_TOKEN}.index_maintenance_runs.maintenance_run_id"],
+        name="fk_index_inspection_findings_run",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "finding_code IN ('INDEX_PUBLICATION_MISSING', "
+        "'INDEX_PUBLICATION_VERSION_MISMATCH', 'INDEX_VERSION_STATE_MISMATCH', "
+        "'INDEX_SOURCE_FACT_MISMATCH', 'INDEX_CHUNK_COUNT_MISMATCH', "
+        "'INDEX_CHUNK_REFERENCE_MISMATCH', 'INDEX_UNEXPECTED_ACTIVE_CHUNK', "
+        "'INDEX_ORPHAN_ACTIVE_VERSION')",
+        name="ck_index_inspection_findings_code",
+    ),
+    CheckConstraint(
+        "resolution IN ('unresolved', 'repaired', 'rebuild_queued')",
+        name="ck_index_inspection_findings_resolution",
+    ),
+)
+Index(
+    "ix_index_inspection_findings_run",
+    index_inspection_findings.c.maintenance_run_id,
+    index_inspection_findings.c.finding_code,
+)
+
 retrieval_chunks = Table(
     "retrieval_chunks",
     metadata,

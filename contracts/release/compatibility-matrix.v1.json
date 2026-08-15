@@ -8,7 +8,7 @@
     { "name": "web", "minimum_version": "0.0.0", "maximum_exclusive_version": "1.0.0" },
     { "name": "worker", "minimum_version": "0.0.0", "maximum_exclusive_version": "1.0.0" }
   ],
-  "database_revisions": ["20260815_0035", "20260815_0036", "20260815_0037"],
+  "database_revisions": ["20260815_0035", "20260815_0036", "20260815_0037", "20260815_0038"],
   "runtime_rules": [
     { "name": "node", "version_prefix": "24.19." },
     { "name": "python", "version_prefix": "3.12." }

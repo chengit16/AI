@@ -31,6 +31,7 @@ celery_app.conf.update(
         "platform.ingestion.ocr.v1": {"queue": "platform.ocr"},
         "platform.indexing.embed.v1": {"queue": "platform.embedding"},
         "platform.indexing.commit.v1": {"queue": "platform.indexing"},
+        "platform.indexing.inspect.v1": {"queue": "platform.indexing"},
     },
     worker_concurrency=settings.worker_concurrency,
     beat_schedule={
@@ -53,6 +54,10 @@ celery_app.conf.update(
         "commit-index-versions": {
             "task": "platform.indexing.commit.v1",
             "schedule": settings.indexing_dispatch_interval_seconds,
+        },
+        "inspect-index-consistency": {
+            "task": "platform.indexing.inspect.v1",
+            "schedule": settings.index_inspection_interval_seconds,
         },
     },
 )

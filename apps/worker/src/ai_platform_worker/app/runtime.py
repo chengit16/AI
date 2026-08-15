@@ -20,8 +20,14 @@ from ai_platform_worker.modules.indexing.application.build import (
     IndexCommitProcessor,
     IndexEmbeddingProcessor,
 )
+from ai_platform_worker.modules.indexing.application.maintenance import (
+    IndexMaintenanceProcessor,
+)
 from ai_platform_worker.modules.indexing.infrastructure.embeddings import (
     DeterministicHashEmbeddingAdapter,
+)
+from ai_platform_worker.modules.indexing.infrastructure.maintenance_sqlalchemy import (
+    SqlAlchemyIndexMaintenanceStore,
 )
 from ai_platform_worker.modules.indexing.infrastructure.object_storage import (
     MinioIndexArtifactStorage,
@@ -57,6 +63,7 @@ class WorkerRuntime:
     ingestion: IngestionJobProcessor
     embedding: IndexEmbeddingProcessor
     indexing: IndexCommitProcessor
+    index_maintenance: IndexMaintenanceProcessor
 
     def close(self) -> None:
         self.database.close()
@@ -72,6 +79,7 @@ def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntim
     worker_id = f"{socket.gethostname()}:{id(database)}"
     chinese_ocr = TikaChineseOcrAdapter(resolved.tika_url)
     tika_parser = TikaDocumentParser(resolved.tika_url)
+    embedding_adapter = DeterministicHashEmbeddingAdapter()
     # 2. 控制面和入库 Lane 各自取得短事务 Store，外部解析始终在事务之外执行。
     return WorkerRuntime(
         database=database,
@@ -120,7 +128,7 @@ def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntim
                 bucket=resolved.minio_bucket,
             ),
             StructuralChunker(),
-            DeterministicHashEmbeddingAdapter(),
+            embedding_adapter,
             IngestionLimits(
                 max_file_size_bytes=resolved.ingestion_max_file_size_bytes,
                 max_page_count=resolved.ingestion_max_page_count,
@@ -139,5 +147,12 @@ def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntim
             worker_id=worker_id,
             lease_seconds=resolved.indexing_lease_seconds,
             retry_base_seconds=resolved.indexing_retry_base_seconds,
+        ),
+        index_maintenance=IndexMaintenanceProcessor(
+            SqlAlchemyIndexMaintenanceStore(database.sessions),
+            max_attempts=resolved.indexing_max_attempts,
+            chunker_version=resolved.indexing_chunker_version,
+            embedding_model_version=embedding_adapter.model_version,
+            tokenizer_version=TOKENIZER_VERSION,
         ),
     )

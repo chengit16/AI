@@ -55,3 +55,12 @@ def test_worker_process_uses_only_its_lane_concurrency(
 def test_worker_lane_concurrency_rejects_unsafe_bounds(value: int) -> None:
     with pytest.raises(ValidationError, match="Worker Lane 并发必须位于 1 到 8 之间"):
         WorkerSettings(ocr_worker_concurrency=value)
+
+
+@pytest.mark.parametrize("value", [59, 86_401])
+def test_index_inspection_interval_rejects_unsafe_bounds(value: int) -> None:
+    with pytest.raises(
+        ValidationError,
+        match="索引巡检间隔必须位于 60 到 86400 秒之间",
+    ):
+        WorkerSettings(index_inspection_interval_seconds=value)

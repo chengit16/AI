@@ -75,6 +75,7 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
     assert "platform.ingestion.ocr.v1" in celery_app.tasks
     assert "platform.indexing.embed.v1" in celery_app.tasks
     assert "platform.indexing.commit.v1" in celery_app.tasks
+    assert "platform.indexing.inspect.v1" in celery_app.tasks
     assert celery_app.conf.task_serializer == "json"
     assert celery_app.conf.accept_content == ["json"]
     assert celery_app.conf.result_backend is None
@@ -96,8 +97,14 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
     assert celery_app.conf.beat_schedule["commit-index-versions"]["task"] == (
         "platform.indexing.commit.v1"
     )
+    assert celery_app.conf.beat_schedule["inspect-index-consistency"]["task"] == (
+        "platform.indexing.inspect.v1"
+    )
     assert celery_app.conf.task_routes["platform.ingestion.ocr.v1"]["queue"] == "platform.ocr"
     assert celery_app.conf.task_routes["platform.indexing.commit.v1"]["queue"] == (
+        "platform.indexing"
+    )
+    assert celery_app.conf.task_routes["platform.indexing.inspect.v1"]["queue"] == (
         "platform.indexing"
     )
 
@@ -114,7 +121,7 @@ def test_runtime_files_fix_shared_paths_and_health_checks() -> None:
     assert 'CMD ["uv", "run", "--no-sync", "celery"' in worker_dockerfile
     assert '"--beat"' not in worker_dockerfile
     assert "SELECT version_num FROM public.alembic_version" in platform_script
-    assert 'database_revision" == "20260815_0037"' in platform_script
+    assert 'database_revision" == "20260815_0038"' in platform_script
     assert "AI_PLATFORM_MIN_FREE_DISK_GB:-50" in platform_script
     assert "worker-control worker-parsing worker-ocr worker-embedding worker-indexing" in (
         platform_script

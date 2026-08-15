@@ -108,6 +108,24 @@ def commit_index_versions() -> dict[str, int]:
         runtime.close()
 
 
+@shared_task(name="platform.indexing.inspect.v1", ignore_result=True)
+def inspect_index_consistency() -> dict[str, int]:
+    """巡检索引引用并修复活动面；缺少完整候选时只排队安全重建。"""
+
+    settings = get_worker_settings()
+    runtime = build_worker_runtime(settings)
+    try:
+        report, repair = runtime.index_maintenance.inspect_and_repair()
+        return {
+            "scanned": report.scanned_document_count,
+            "inconsistencies": report.inconsistency_count,
+            "repaired": repair.repaired_document_count,
+            "rebuild_queued": repair.rebuild_queued_count,
+        }
+    finally:
+        runtime.close()
+
+
 @shared_task(
     name="platform.integration.consume.v1",
     bind=True,

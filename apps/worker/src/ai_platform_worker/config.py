@@ -50,6 +50,7 @@ class WorkerSettings(BaseSettings):
     indexing_max_attempts: int = 3
     indexing_retry_base_seconds: int = 5
     indexing_dispatch_interval_seconds: float = 2.0
+    index_inspection_interval_seconds: float = 300.0
     indexing_max_chunk_chars: int = 1_500
     indexing_chunk_overlap_chars: int = 150
     indexing_chunker_version: str = "structural-char-v1"
@@ -104,6 +105,8 @@ class WorkerSettings(BaseSettings):
             raise ValueError("索引任务整数参数必须为正数")
         if not 0.5 <= self.indexing_dispatch_interval_seconds <= 60:
             raise ValueError("索引任务调度间隔必须位于 0.5 到 60 秒之间")
+        if not 60 <= self.index_inspection_interval_seconds <= 86_400:
+            raise ValueError("索引巡检间隔必须位于 60 到 86400 秒之间")
         if not 0 <= self.indexing_chunk_overlap_chars < self.indexing_max_chunk_chars:
             raise ValueError("Chunk 重叠必须小于最大字符数")
         if not self.indexing_chunker_version.strip():
