@@ -7,8 +7,8 @@
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P2-11` 联合故障演练进行中 |
-| 阶段可靠性 | `not_run` |
+| 当前节点 | `P2-12` 阶段验收与关闭进行中 |
+| 阶段可靠性 | `passed` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -23,7 +23,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0040`；阶段 1 发布仍冻结在 `20260815_0035` |
+| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0041`；阶段 1 发布仍冻结在 `20260815_0035` |
 | 阶段 1 发布 | 本地 MVP `0.1.0`，ReleaseManifest 摘要 `e8983e87…b62943` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实 AI 质量 |
 
@@ -134,6 +134,16 @@
 - 数据库与自动验收：Revision `20260815_0041` 增加索引维护请求、租约、有限重试、死信和工作空间约束，Migration 往返及历史菜单升级通过。P2-10 单元 `4/4`、真实 PostgreSQL `3/3`；统一 `./scripts/verify` 通过 React `42/42`、Python `536/536`、Ruff format/lint `495` 个文件、mypy strict `495` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/生成契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。
 - 容器与浏览器验收：`./platform start` 重建当前 API、Web、Worker 和 Migration 镜像，数据库 Revision 为 `20260815_0041`，`./platform doctor` 的 13 项诊断全部通过。全合成个人空间 Owner 在真实页面登记索引巡检，Worker 完成后请求状态、一次尝试和可复算摘要正常呈现；`1440×900` 与 `390×844` 下摘要、五个页签、空态和危险操作弹窗可用，移动端页面宽度稳定为 390px，宽表格只在 328px 局部容器滚动，长确认词正确换行且控制台无错误。
 
+### P2-11 联合故障演练
+
+- 状态：已完成，实现提交 `878f7ef`。
+- 清单与契约：新增 `p2-11-v1` 全合成演练清单，以及独立的清单和证据 Draft 2020-12 JSON Schema。清单冻结 PostgreSQL、MinIO、对象快照、派生索引、Worker 租约、API 实例、SSE 通知、Valkey、Outbox 和授权 10 类组件、12 个唯一 pytest 节点，并校验 P2-01 场景、不变量、真实文件和函数 AST 引用；JSON 不具备执行任意命令的能力。
+- 执行与失败关闭：新增 `./platform drill-stage-2`。入口先执行 13 项 `doctor`，健康后一次性运行固定节点并解析 JUnit，最后无条件再次诊断；前置失败不运行场景，场景失败、缺失、跳过、无效 JUnit、pytest 非零退出或恢复诊断失败都会令整次演练失败。证据原子写入忽略目录，只包含清单摘要、Git Revision、工作区状态、时间、耗时、状态和稳定原因码，不包含 stdout、stderr、异常正文、业务载荷或凭据。
+- 联合覆盖：数据库逻辑恢复和 Migration 往返、MinIO 引用缺失检测、对象快照非空目标保护、异常索引撤销与事实重建、Worker 过期租约和迟到结果、跨 API 实例原 Run 恢复、SSE 通知丢失轮询、Valkey 不可用事实提交、Outbox 积压租约恢复与重复消费幂等、恢复后身份边界及四表面撤权均在同一入口执行。
+- 回归发现与修复：首次真实运行通过 `11/12` 并在恢复后保持 13 项健康，唯一失败暴露 `AI_PLATFORM_DATABASE_URL` 会覆盖程序化恢复测试指定的临时数据库，使 Alembic 错连主库。Migration 环境增加仅供可信程序化调用的显式数据库属性优先级，容器与普通 CLI 仍使用环境变量；修复后数据库恢复场景和完整联合清单通过。
+- 最终证据：在干净提交 `878f7efbc3bc9e82a5e2b73903ec6d25ba425280` 上运行 `./platform drill-stage-2`，12 个场景 `12/12` 通过，前置与恢复后各 13 项诊断通过，总耗时 `15.884760s`，本地证据记录 `repository_dirty=false`。该结果只证明本机小规模可靠性正确性，不替代条件容量认证。
+- 自动验收：P2-11 清单、Schema、执行、失败关闭和证据专项 `7/7`；统一 `./scripts/verify` 通过 React `42/42`、Python `543/543`、Ruff format/lint `497` 个文件、mypy strict `497` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/生成契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -143,4 +153,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P2-01`～`P2-10` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检、安全重建、跨实例 SSE 恢复、安全可观测基线、审计/用量/Outbox 运营、工作空间数据生命周期、四表面权限传播及受控运营工作台，但阶段可靠性必须等待 `P2-11` 联合演练与 `P2-12` 阶段关闭；当前进入 `P2-11`。
+`in_progress`。`P2-01`～`P2-11` 已完成，阶段可靠性联合演练为 `passed`；阶段 2 仍需由 `P2-12` 完成最终端到端门禁、ReleaseManifest、报告核对、关闭提交和 `stage-2-complete` 标签，因此尚未宣告阶段关闭。
