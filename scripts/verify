@@ -37,6 +37,9 @@ log "检查 Git Diff 格式"
 git diff --check
 git diff --cached --check
 
+log "检查阶段 1G 全合成企业数据集"
+"${PYTHON[@]}" scripts/generate_p1g01_dataset.py --check
+
 log "检查仓库敏感文件与凭证模式"
 "${PYTHON[@]}" scripts/check_repository_policy.py
 
