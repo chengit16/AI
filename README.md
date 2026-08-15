@@ -2,7 +2,7 @@
 
 本仓库用于建设同时支持个人空间和企业空间的 AI 智能平台。产品采用浏览器访问的 Web 形态，首期以 Docker Compose 在本地运行。
 
-阶段 0 已完成并冻结，当前进入阶段 1：工作空间、企业治理与知识问答 MVP。完整产品与架构设计见 [AI 智能平台 V2 架构设计](./ai-intelligent-platform-v2-design.md)，实时进度见 [项目进度看板](./docs/project-progress.md)。
+阶段 0 与阶段 1 已完成并冻结，本地个人版和企业版 MVP 已通过；当前进入阶段 2：可靠性、数据治理与运营增强。完整产品与架构设计见 [AI 智能平台 V2 架构设计](./ai-intelligent-platform-v2-design.md)，实时进度见 [项目进度看板](./docs/project-progress.md)。
 
 ## 文档入口
 
@@ -14,6 +14,8 @@
 - [阶段 1 验证报告](./docs/stages/stage-1-report.md)：阶段 1 的持续验证事实和状态口径。
 - [阶段 1 本地 MVP 发布报告](./docs/releases/stage-1-local-mvp/README.md)：本地交付范围、ReleaseManifest、验收状态和正式发布边界。
 - [本地 MVP 运维与故障处理手册](./docs/operations/local-mvp-operations.md)：启动、诊断、备份恢复、密钥轮换、升级回退和常见故障。
+- [阶段 2 实施计划](./docs/stages/stage-2-plan.md)：可靠性、跨实例 SSE、可观测性、数据生命周期和故障演练建设顺序。
+- [阶段 2 验证报告](./docs/stages/stage-2-report.md)：阶段 2 的持续验证事实、限制和结论。
 - [供应链与许可证基线](./docs/supply-chain/README.md)：生产依赖 SBOM、漏洞审计和商业发布边界。
 - [前端 UI/UX 设计基线](./docs/design/ui-ux-baseline.md)：布局、动态菜单、响应式、可访问性和阶段 1 优化清单。
 - [Web 前端代码规范](./docs/governance/frontend-code-standards.md)：React、目录、状态、接口、样式、测试和质量门禁。

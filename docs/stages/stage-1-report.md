@@ -5,9 +5,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
-| 状态 | 进行中 |
+| 状态 | 已完成，标签 `stage-1-complete` |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1G-05` 运维手册、MVP 报告和 ReleaseManifest 已通过，等待阶段关闭提交与标签 |
+| 当前节点 | 无，阶段已关闭 |
 | `core_functional` | `passed` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -651,14 +651,14 @@
 
 ### P1G-05 本地 MVP 发布准备与阶段关闭
 
-- 状态：交付物与门禁通过，等待阶段关闭提交和 `stage-1-complete` 标签。
+- 状态：通过，阶段关闭标签为 `stage-1-complete`。
 - 运维交付：新增 [`本地 MVP 运维与故障处理手册`](../operations/local-mvp-operations.md)，覆盖 macOS/Linux 状态边界、目录与密钥职责、一键启动、健康与日志定位、平台管理员、真实模型接入、加密备份恢复、导入导出、主密钥轮换、升级回退和常见故障。恢复包与独立恢复密钥的分离保管、破坏性恢复确认和失败关闭规则保持与 `ADR-004` 一致。
 - MVP 报告：新增 [`阶段 1 本地 MVP 发布报告`](../releases/stage-1-local-mvp/README.md)，汇总交付范围和验收索引；`core_functional=passed`，真实供应商与 AI 质量保持 `not_configured`，容量和 Linux 保持 `not_run`，不会把本地 Mock 或 macOS 结果描述为生产结论。
 - ReleaseManifest：生成 `0.1.0` 本地 MVP 清单，冻结 Web、API、Worker、契约源码摘要、数据库 Revision `20260815_0035`、Node `24.19.0`、Python `3.12.12` 和 7 个 `linux/arm64` 验收镜像内容摘要；清单自摘要为 `sha256:e8983e87cf681491b0173a0c2b1e8740e3e436316d45ad57b1eff568e7b62943`，生成漂移和 `p1a-02-v1` 兼容矩阵检查通过。
 - 自动与联合门禁：最终工作树执行 `./scripts/verify` 全部通过，包括 React `36/36`、Python `437/437`、Ruff、mypy strict（427 个源文件）、Prettier、ESLint、TypeScript、UnoCSS、注释、架构、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链和 Vite 生产构建。重新执行 `scripts/run_p1g02_acceptance.py`，个人/企业联合越权、安全、SSE、审批、恢复、模型故障和配额清单 `33/33` 通过。
 - 容器门禁：`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项全部通过。开发级供应链门禁为 `passed`；正式发布级门禁按设计返回 `blocked`，原因仍是镜像漏洞扫描 `not_configured` 和 Linux 宿主机验收 `not_run`，因此不创建正式发布供应链归档。
-- 当前边界：本节点关闭本地 MVP 阶段，不改变既定后置范围，不提前实现阶段 2 可靠性、阶段 3 Agent 控制面或 SaaS/Go/真实多源连接器/LLM Grading/多模态/Channel Gateway/Durable Run。阶段关闭提交必须回填本节点 SHA、给出阶段通过结论并创建 `stage-1-complete` 标签。
-- 提交：待阶段关闭提交回填。
+- 当前边界：本节点关闭本地 MVP 阶段，不改变既定后置范围，不提前实现阶段 2 可靠性、阶段 3 Agent 控制面或 SaaS/Go/真实多源连接器/LLM Grading/多模态/Channel Gateway/Durable Run。
+- 提交：`0d896a1`。
 
 ## 4. 当前限制
 
@@ -670,4 +670,6 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1G-04`，`core_functional=passed`，当前进入 `P1G-05`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前联合验收、本地加密恢复、全业务 UI/UX、统一门禁与 Revision `20260815_0035` 八项容器诊断均通过，知识问答、工作流、审批、个人/企业权限页面、跨空间安全、本地恢复、响应式和可访问性边界已经闭环；阶段整体结论只等待 `P1G-05` MVP 阶段关闭节点完成。
+`passed`。阶段 1 全部必需节点已完成，`core_functional=passed`；个人空间、企业空间、复杂组织、RBAC/ABAC、自定义菜单与接口统一权限、知识生产、模型网关、RAG 问答、SSE 断点续传、自定义工作流、多级审批、本地恢复和全业务 UI/UX 均形成自动化、容器、浏览器或故障演练证据。最终统一门禁 React `36/36`、Python `437/437`，联合清单 `33/33`，Revision `20260815_0035` 八项容器诊断通过，`0.1.0` 本地 MVP 已用 `stage-1-complete` 标签冻结。
+
+该结论不改变独立状态：真实供应商和 AI 质量为 `not_configured`，容量与 Linux 为 `not_run`，镜像扫描为 `not_configured`，正式发布门禁继续 `blocked`。阶段 2 按 [`阶段 2 实施计划`](./stage-2-plan.md) 从 `P2-01` 开始。
