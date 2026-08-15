@@ -197,6 +197,19 @@ P2-07 提供工作空间级运营 API，P2-10 已将任务、索引、Outbox、�
 
 最新结果原子写入 `.ai-platform/evidence/p2-11-latest.json`。该忽略目录只保存本机证据，不进入 Git 或业务备份；JSON 记录清单摘要、Git Revision、工作区是否干净、起止时间、耗时、检查结果和稳定原因码，不保存测试 stdout、stderr、异常正文、业务载荷或凭据。失败时先根据控制台中的测试节点和稳定原因码修复根因，确认平台诊断正常后完整重跑，不能只单独改写失败项。该演练验证小规模正确性，不代表条件容量认证。
 
+阶段关闭或本地版本切换后还应复验目标 `ReleaseManifest` 和供应链状态：
+
+```bash
+.venv/bin/python scripts/generate_release_manifest.py \
+  --inputs docs/releases/stage-2-local-reliability/release-manifest-input.v1.json \
+  --output docs/releases/stage-2-local-reliability/release-manifest.v1.json \
+  --check
+.venv/bin/python -m scripts.check_release_readiness --require development --check
+.venv/bin/python -m scripts.check_release_readiness --require release --check
+```
+
+前两项必须通过。当前正式发布检查必须因镜像扫描 `not_configured` 和 Linux 验收 `not_run` 返回非零；只有补齐可信外部证据后才允许转为 `passed`，不得为了生成发布包而手工修改状态清单。
+
 ## 8. 备份、导出、恢复与导入
 
 ### 8.1 创建恢复包

@@ -5,9 +5,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
-| 状态 | 进行中 |
+| 状态 | 已完成 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P2-12` 阶段验收与关闭进行中 |
+| 当前节点 | `P2-12` 阶段验收与关闭已完成 |
 | 阶段可靠性 | `passed` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
@@ -25,6 +25,7 @@
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
 | 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0041`；阶段 1 发布仍冻结在 `20260815_0035` |
 | 阶段 1 发布 | 本地 MVP `0.1.0`，ReleaseManifest 摘要 `e8983e87…b62943` |
+| 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实 AI 质量 |
 
 ## 3. 节点记录
@@ -144,13 +145,25 @@
 - 最终证据：在干净提交 `878f7efbc3bc9e82a5e2b73903ec6d25ba425280` 上运行 `./platform drill-stage-2`，12 个场景 `12/12` 通过，前置与恢复后各 13 项诊断通过，总耗时 `15.884760s`，本地证据记录 `repository_dirty=false`。该结果只证明本机小规模可靠性正确性，不替代条件容量认证。
 - 自动验收：P2-11 清单、Schema、执行、失败关闭和证据专项 `7/7`；统一 `./scripts/verify` 通过 React `42/42`、Python `543/543`、Ruff format/lint `497` 个文件、mypy strict `497` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/生成契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。
 
+### P2-12 阶段验收与关闭
+
+- 状态：已完成；发布兼容基线提交 `7dfa517`，阶段关闭提交在进度看板回填，关闭标签为 `stage-2-complete`。
+- ReleaseManifest：新增 [`阶段 2 本地可靠性发布报告`](../releases/stage-2-local-reliability/README.md)，生成 `0.2.0` V1 清单，固定提交 `7dfa517` 的 Web、API、Worker 与契约源码摘要、数据库 Revision `20260815_0041`、Node.js `24.19.0`、Python `3.12.12` 和 7 个 `linux/arm64` 本地验收镜像内容摘要。清单自摘要为 `sha256:17ae80eef51038152a502683c054c441a10346a45ed4db2105084ca4707b245d`，生成漂移和 `p1a-02-v1` 兼容矩阵检查通过。
+- 自动门禁：最终 `./scripts/verify` 通过 React `42/42`、Python `544/544`、Ruff format/lint `497` 个文件、mypy strict `497` 个源文件，以及前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链和生产构建。第一次受限沙箱运行只有本地端口访问被拒绝，不依赖本地服务的 `427` 项测试通过；允许访问同一组本地依赖后原样重跑，最终全量通过。
+- 运行与可靠性：`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision `20260815_0041`、Valkey、五个 Worker Lane 和 Scheduler 共 13 项通过。再次执行 `./platform drill-stage-2`，固定场景 `12/12` 通过，执行前后各 13 项诊断通过；P2-11 在干净实现提交上的 `repository_dirty=false` 证据继续作为清单实现基线，本次重跑覆盖尚未提交的 P2-12 发布文档。
+- 浏览器门禁：合成个人空间 Owner 在 `1440×900` 和 `390×844` 验收运行状态页及任务、索引、Outbox、审计与用量、生命周期五个运营页签。两个视口均只有一个 `h1`，文档宽度分别稳定为 1440px 和 390px，控制台无错误；移动端只允许页签和 328px 宽表格在局部容器滚动，导航抽屉及全部运营入口可访问。
+- 供应链边界：开发级门禁为 `passed`；正式发布级门禁按设计返回 `blocked`，原因仍为镜像漏洞扫描 `not_configured` 和 Linux 宿主机验收 `not_run`。因此不创建正式发布供应链归档，不把本地镜像内容 ID 冒充注册表多架构摘要。
+- 范围边界：本节点只关闭阶段 2，不提前实现阶段 3 Agent 控制面、阶段 4 工具副作用或阶段 5 质量与私有化能力，也不扩展 SaaS、Go、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布门禁保持阻断。
-- 阶段 2 只处理可靠性、数据治理和运营，不扩展阶段 3～5 或项目后置能力。
+- 阶段 2 已按冻结范围关闭；阶段 3～5 和项目后置能力继续按独立计划建设。
 
 ## 5. 阶段结论
 
-`in_progress`。`P2-01`～`P2-11` 已完成，阶段可靠性联合演练为 `passed`；阶段 2 仍需由 `P2-12` 完成最终端到端门禁、ReleaseManifest、报告核对、关闭提交和 `stage-2-complete` 标签，因此尚未宣告阶段关闭。
+`passed`。`P2-01`～`P2-12` 全部完成，阶段可靠性结论为 `passed`；任务恢复、Worker 隔离、索引重建、跨实例 SSE、可观测性、审计与 Outbox 运营、数据生命周期、权限传播、运营工作台和联合故障演练均形成自动化、容器、浏览器或恢复证据。最终统一门禁 React `42/42`、Python `544/544`，联合演练 `12/12`，Revision `20260815_0041` 的 13 项容器诊断通过，`0.2.0` 本地可靠性版本以 `stage-2-complete` 标签冻结。
+
+该结论不改变独立状态：真实供应商和 AI 质量为 `not_configured`，容量与 Linux 为 `not_run`，镜像扫描为 `not_configured`，正式发布门禁继续 `blocked`。下一正式建设阶段为阶段 3 Agent 控制面、发布、灰度与回滚。
