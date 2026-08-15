@@ -7,7 +7,7 @@
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P2-09` 权限传播与异常访问进行中 |
+| 当前节点 | `P2-10` 受控运营工作台进行中 |
 | 阶段可靠性 | `not_run` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
@@ -114,6 +114,16 @@
 - Migration 与专项：Revision `20260815_0040` 增加导出、清除、保留期运行和不可变删除证明事实，受限调整不可变触发器，并完成既有 Owner 权限和当前菜单快照升级。P2-08 单元、API 与真实 PostgreSQL 专项 `8/8` 通过，覆盖确定性导出、凭据排除、跨空间隔离、清除完整性、普通事务保护、边界保留期和并发幂等；Migration 往返与既有生命周期依赖回归通过。
 - 自动与容器验收：统一 `./scripts/verify` 通过 React `37/37`、Python `516/516`、Ruff format/lint `475` 个文件、mypy strict `475` 个源文件、Migration、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。`./platform start` 完成镜像重建和现有数据升级，数据库 Revision 为 `20260815_0040`，`./platform doctor` 的 13 项诊断全部通过；真实合成个人空间通过 HTTP 完成导出、保留期和业务数据清除，三项运行状态均为 `completed`。
 
+### P2-09 权限传播与异常访问
+
+- 状态：已完成，实现提交 `fbbae62`。
+- 版本事实：PostgreSQL `workspaces.role_version` 继续作为唯一策略版本事实，Valkey 只保存可丢失、可重建的版本见证，不取得授权事实写入权。Lua 原子比较支持缺失见证自举和一致版本命中；缓存旧版时先刷新见证但拒绝当前请求，未来版、损坏、协议异常、非法来源版本和 Valkey 不可用均失败关闭。
+- 统一授权表面：`PolicyRequest.surface` 固定区分菜单、API、检索和字段投影，生产 PDP 在解析当前 PostgreSQL 主体版本后统一经过版本门禁。版本异常形成零缓存时长的 `policy_unavailable` 拒绝决策，HTTP 边缘映射为可重试 `503 POLICY_UNAVAILABLE`；OpenAPI V1 与 React 生成类型同步增加兼容响应声明。
+- 前端传播：菜单发布和企业有效角色每 2 秒独立刷新，在正常网络下为 5 秒传播门禁保留余量。菜单、角色或工作空间事实任一查询异常时立即清空历史导航和按钮权限集合，桌面侧栏、移动抽屉与路由守卫不能继续使用旧快照或静态回退；接口和字段安全仍由后端 PDP 独立执行。
+- 指标与告警：新增授权决策和策略缓存 Counter，只使用服务、环境、固定表面、结论、稳定原因码和缓存状态等低基数标签，不记录权限目标、主体、工作空间、资源标识或受限正文。Prometheus 规则覆盖策略不可用、集中越权探测和异常缓存见证，本地仍只验证规则与指标事实，不冒充外部 Alertmanager 已部署。
+- 故障与时限：真实 PostgreSQL/Valkey 演练在撤销自定义角色绑定后持续写回旧版本见证，20 个样本轮换覆盖四个授权表面；全部样本先返回 `policy_unavailable`，nearest-rank `p99 <= 5s`，见证修复后按新 PostgreSQL 事实稳定返回 `permission_not_granted`。拒绝结果和指标不包含合成受限正文，跨空间和旧权限均未暴露。
+- 自动与容器验收：P2-09 单元 `10/10`、真实 PostgreSQL/Valkey `1/1`，P2-09/API/可观测联合回归 `26/26`；统一 `./scripts/verify` 通过 React `38/38`、Python `529/529`、Ruff format/lint `478` 个文件、mypy strict `478` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/生成契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。`./platform start` 重建真实 API/Web/Worker 镜像，数据库 Revision 保持 `20260815_0040`，`./platform doctor` 的 13 项诊断全部通过。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -123,4 +133,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P2-01`～`P2-08` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检、安全重建、跨实例 SSE 恢复、安全可观测基线、审计/用量/Outbox 运营及工作空间数据生命周期，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-09`。
+`not_run`。`P2-01`～`P2-09` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检、安全重建、跨实例 SSE 恢复、安全可观测基线、审计/用量/Outbox 运营、工作空间数据生命周期及四表面权限传播，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-10`。
