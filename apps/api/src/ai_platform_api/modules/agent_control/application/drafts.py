@@ -107,6 +107,13 @@ def update_draft(
             ):
                 raise AgentLifecycleConflictError
             unit_of_work.agents.add_draft_revision(revision_from_draft(updated))
+            # 新 revision 产生后，旧测试和审批只保留历史价值，不能再成为发布输入。
+            superseded_candidates = unit_of_work.agents.supersede_candidates_for_draft(
+                context.workspace_id,
+                current.draft_id,
+                through_revision=current.revision,
+                updated_at=now,
+            )
             unit_of_work.agents.add_request(
                 control_request(
                     context,
@@ -133,6 +140,7 @@ def update_draft(
                     "revision": updated.revision,
                     "config_hash": updated.config_hash,
                     "status": updated.status,
+                    "superseded_candidate_count": superseded_candidates,
                 },
             )
             unit_of_work.commit()

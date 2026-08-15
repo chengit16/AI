@@ -3134,6 +3134,97 @@ agent_evaluation_case_results = Table(
     ),
 )
 
+agent_approval_bindings = Table(
+    "agent_approval_bindings",
+    metadata,
+    Column("approval_binding_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("candidate_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_id", UUID(as_uuid=True), nullable=False),
+    Column("approval_instance_id", UUID(as_uuid=True), nullable=False),
+    Column("evaluation_run_id", UUID(as_uuid=True), nullable=False),
+    Column("evaluation_policy_version_id", UUID(as_uuid=True), nullable=False),
+    Column("approval_policy_version_id", UUID(as_uuid=True), nullable=False),
+    Column("candidate_hash", String(64), nullable=False),
+    Column("config_hash", String(64), nullable=False),
+    Column("evaluation_result_hash", String(64), nullable=False),
+    Column("subject_digest", String(64), nullable=False),
+    Column("chain_digest", String(64), nullable=False),
+    Column("personal_owner_confirmation", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "approval_binding_id",
+        "workspace_id",
+        name="uq_agent_approval_bindings_id_workspace",
+    ),
+    UniqueConstraint(
+        "candidate_id",
+        name="uq_agent_approval_bindings_candidate",
+    ),
+    UniqueConstraint(
+        "approval_instance_id",
+        name="uq_agent_approval_bindings_instance",
+    ),
+    ForeignKeyConstraint(
+        ["candidate_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_release_candidates.candidate_id",
+            f"{SCHEMA_TOKEN}.agent_release_candidates.workspace_id",
+        ],
+        name="fk_agent_approval_bindings_candidate",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["agent_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agents.agent_id",
+            f"{SCHEMA_TOKEN}.agents.workspace_id",
+        ],
+        name="fk_agent_approval_bindings_agent",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["approval_instance_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_instances.approval_instance_id",
+            f"{SCHEMA_TOKEN}.approval_instances.workspace_id",
+        ],
+        name="fk_agent_approval_bindings_instance",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["evaluation_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.evaluation_run_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.workspace_id",
+        ],
+        name="fk_agent_approval_bindings_evaluation",
+    ),
+    ForeignKeyConstraint(
+        ["evaluation_policy_version_id"],
+        [f"{SCHEMA_TOKEN}.agent_evaluation_policy_versions.evaluation_policy_version_id"],
+        name="fk_agent_approval_bindings_evaluation_policy",
+    ),
+    CheckConstraint(
+        "candidate_hash ~ '^[0-9a-f]{64}$' "
+        "AND config_hash ~ '^[0-9a-f]{64}$' "
+        "AND evaluation_result_hash ~ '^[0-9a-f]{64}$' "
+        "AND subject_digest ~ '^[0-9a-f]{64}$' "
+        "AND chain_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_approval_bindings_hashes",
+    ),
+    CheckConstraint(
+        "(personal_owner_confirmation = false) OR "
+        "approval_policy_version_id = 'a5000000-0000-4000-8000-000000000305'::uuid",
+        name="ck_agent_approval_bindings_personal_policy",
+    ),
+)
+Index(
+    "ix_agent_approval_bindings_workspace_time",
+    agent_approval_bindings.c.workspace_id,
+    agent_approval_bindings.c.created_at,
+)
+
 agent_control_requests = Table(
     "agent_control_requests",
     metadata,

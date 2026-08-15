@@ -5,6 +5,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.agent_control.application.approval import (
+    AgentApprovalContext,
+    get_agent_approval,
+    request_agent_approval,
+)
 from ai_platform_api.modules.agent_control.application.candidates import (
     request_release_candidate,
 )
@@ -24,6 +29,7 @@ from ai_platform_api.modules.agent_control.application.errors import (
     AgentIdempotencyConflictError,
     AgentLifecycleConflictError,
     AgentNotFoundError,
+    AgentReleaseApprovalRequiredError,
     AgentTestGateFailedError,
     AgentValidationError,
 )
@@ -54,6 +60,7 @@ from ai_platform_api.modules.agent_control.domain.models import (
     AgentRelease,
     AgentReleaseCandidate,
 )
+from ai_platform_api.modules.workflow.application.approval_runtime import ApprovalInstanceService
 
 __all__ = [
     "AgentConfigurationInvalidError",
@@ -62,6 +69,7 @@ __all__ = [
     "AgentIdempotencyConflictError",
     "AgentLifecycleConflictError",
     "AgentNotFoundError",
+    "AgentReleaseApprovalRequiredError",
     "AgentTestGateFailedError",
     "AgentValidationError",
     "configuration_digest",
@@ -75,9 +83,11 @@ class AgentControlService:
         self,
         unit_of_work: AgentControlUnitOfWork,
         evaluation_executor: AgentEvaluationExecutor | None = None,
+        approval_instances: ApprovalInstanceService | None = None,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._evaluation_executor = evaluation_executor
+        self._approval_instances = approval_instances
 
     def create_prompt_version(
         self,
@@ -274,6 +284,42 @@ class AgentControlService:
 
         return require_passing_evaluation(
             self._unit_of_work,
+            context,
+            candidate_id=candidate_id,
+        )
+
+    def request_approval(
+        self,
+        context: RequestContext,
+        *,
+        candidate_id: UUID,
+        idempotency_key: str,
+    ) -> AgentApprovalContext:
+        """为已通过固定测试的候选发起个人所有者或企业多级审批。"""
+
+        if self._approval_instances is None:
+            raise AgentReleaseApprovalRequiredError
+        return request_agent_approval(
+            self._unit_of_work,
+            self._approval_instances,
+            context,
+            candidate_id=candidate_id,
+            idempotency_key=idempotency_key,
+        )
+
+    def get_approval(
+        self,
+        context: RequestContext,
+        *,
+        candidate_id: UUID,
+    ) -> AgentApprovalContext:
+        """读取候选绑定的审批上下文和当前多级审批状态。"""
+
+        if self._approval_instances is None:
+            raise AgentReleaseApprovalRequiredError
+        return get_agent_approval(
+            self._unit_of_work,
+            self._approval_instances,
             context,
             candidate_id=candidate_id,
         )

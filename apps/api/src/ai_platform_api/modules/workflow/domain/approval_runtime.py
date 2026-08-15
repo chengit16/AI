@@ -163,6 +163,18 @@ class ApprovalRuntimeTransition:
 
 
 @dataclass(frozen=True)
+class ApprovalSubjectEvent:
+    """描述审批事务内由业务主题产生的最小审计和集成事件。"""
+
+    event_type: str
+    resource_type: str
+    resource_id: UUID
+    aggregate_id: UUID
+    aggregate_version: int
+    attributes: dict[str, object]
+
+
+@dataclass(frozen=True)
 class ApprovalWorkflowResume:
     """在审批事务提交后携带恢复工作流所需的最小可信上下文。"""
 
@@ -259,6 +271,22 @@ class ApprovalRuntimeDirectory(Protocol):
     ) -> frozenset[UUID]: ...
 
 
+class ApprovalSubjectLifecycle(Protocol):
+    """在审批事务内绑定业务主题，并把终态同步回业务聚合。"""
+
+    def bind(
+        self,
+        state: ApprovalRuntimeState,
+        subject: ApprovalSubject,
+    ) -> ApprovalSubjectEvent | None: ...
+
+    def apply_transition(
+        self,
+        previous: ApprovalRuntimeState,
+        transition: ApprovalRuntimeTransition,
+    ) -> ApprovalSubjectEvent | None: ...
+
+
 class ApprovalRuntimeUnitOfWork(Protocol):
     """保证审批聚合、业务状态、审计和 Outbox 使用同一数据库事务。"""
 
@@ -267,6 +295,9 @@ class ApprovalRuntimeUnitOfWork(Protocol):
 
     @property
     def directory(self) -> ApprovalRuntimeDirectory: ...
+
+    @property
+    def subjects(self) -> ApprovalSubjectLifecycle: ...
 
     @property
     def audit(self) -> AuditWriter: ...

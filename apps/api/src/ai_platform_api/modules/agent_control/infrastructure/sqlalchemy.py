@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextvars import ContextVar
+from datetime import datetime
 from types import TracebackType
 from typing import Any, Literal, cast
 from uuid import UUID
@@ -33,6 +34,9 @@ from ai_platform_api.modules.agent_control.domain.models import (
     AgentRepository,
     AgentStatus,
     AgentWriteConflictError,
+)
+from ai_platform_api.modules.agent_control.infrastructure.approval_sqlalchemy import (
+    SqlAlchemyAgentApprovalRepository,
 )
 from ai_platform_api.modules.agent_control.infrastructure.configuration_sqlalchemy import (
     SqlAlchemyAgentConfigurationRepository,
@@ -253,16 +257,76 @@ class SqlAlchemyAgentRepository(AgentRepository):
         self,
         workspace_id: UUID,
         candidate_id: UUID,
+        *,
+        for_update: bool = False,
     ) -> AgentReleaseCandidate | None:
         """读取工作空间内的单个发布候选。"""
 
-        row = self._session.execute(
-            select(agent_release_candidates).where(
-                agent_release_candidates.c.workspace_id == workspace_id,
-                agent_release_candidates.c.candidate_id == candidate_id,
-            )
-        ).one_or_none()
+        statement = select(agent_release_candidates).where(
+            agent_release_candidates.c.workspace_id == workspace_id,
+            agent_release_candidates.c.candidate_id == candidate_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
         return _candidate(row) if row is not None else None
+
+    def save_candidate(
+        self,
+        candidate: AgentReleaseCandidate,
+        *,
+        expected_version: int,
+    ) -> bool:
+        """只按乐观锁推进候选状态，不允许修改已冻结的来源字段。"""
+
+        result = cast(
+            CursorResult[Any],
+            self._session.execute(
+                update(agent_release_candidates)
+                .where(
+                    agent_release_candidates.c.workspace_id == candidate.workspace_id,
+                    agent_release_candidates.c.candidate_id == candidate.candidate_id,
+                    agent_release_candidates.c.version == expected_version,
+                )
+                .values(
+                    status=candidate.status,
+                    updated_at=candidate.updated_at,
+                    version=candidate.version,
+                )
+            ),
+        )
+        return result.rowcount == 1
+
+    def supersede_candidates_for_draft(
+        self,
+        workspace_id: UUID,
+        draft_id: UUID,
+        *,
+        through_revision: int,
+        updated_at: datetime,
+    ) -> int:
+        """新草稿 revision 产生时立即终止旧审批或旧通过证据的发布资格。"""
+
+        result = cast(
+            CursorResult[Any],
+            self._session.execute(
+                update(agent_release_candidates)
+                .where(
+                    agent_release_candidates.c.workspace_id == workspace_id,
+                    agent_release_candidates.c.draft_id == draft_id,
+                    agent_release_candidates.c.draft_revision <= through_revision,
+                    agent_release_candidates.c.status.in_(
+                        ("ready_for_approval", "approval_pending", "approved", "rejected")
+                    ),
+                )
+                .values(
+                    status="superseded",
+                    updated_at=updated_at,
+                    version=agent_release_candidates.c.version + 1,
+                )
+            ),
+        )
+        return result.rowcount
 
     def get_release(self, workspace_id: UUID, release_id: UUID) -> AgentRelease | None:
         """读取共享表中的不可变 Release，不跟随当前发布指针。"""
@@ -332,6 +396,7 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
                 SqlAlchemyAgentRepository,
                 SqlAlchemyAgentConfigurationRepository,
                 SqlAlchemyAgentEvaluationRepository,
+                SqlAlchemyAgentApprovalRepository,
                 SqlAlchemyAuditWriter,
                 SqlAlchemyOutboxWriter,
             ]
@@ -350,6 +415,7 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
                 SqlAlchemyAgentRepository(session),
                 SqlAlchemyAgentConfigurationRepository(session),
                 SqlAlchemyAgentEvaluationRepository(session),
+                SqlAlchemyAgentApprovalRepository(session),
                 SqlAlchemyAuditWriter(session),
                 SqlAlchemyOutboxWriter(session),
             )
@@ -378,7 +444,7 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
 
     @property
     def audit(self) -> SqlAlchemyAuditWriter:
-        return self._require_state()[4]
+        return self._require_state()[5]
 
     @property
     def configuration(self) -> SqlAlchemyAgentConfigurationRepository:
@@ -389,8 +455,12 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
         return self._require_state()[3]
 
     @property
+    def approval(self) -> SqlAlchemyAgentApprovalRepository:
+        return self._require_state()[4]
+
+    @property
     def outbox(self) -> SqlAlchemyOutboxWriter:
-        return self._require_state()[5]
+        return self._require_state()[6]
 
     def commit(self) -> None:
         """提交 Agent 业务事实、幂等、审计和 Outbox 的同一事务。"""
@@ -404,6 +474,7 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
         SqlAlchemyAgentRepository,
         SqlAlchemyAgentConfigurationRepository,
         SqlAlchemyAgentEvaluationRepository,
+        SqlAlchemyAgentApprovalRepository,
         SqlAlchemyAuditWriter,
         SqlAlchemyOutboxWriter,
     ]:

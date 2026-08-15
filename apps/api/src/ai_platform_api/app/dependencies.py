@@ -13,6 +13,9 @@ from ai_platform_api.app.local_mock import (
     LocalMockRuntimeBootstrap,
 )
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.agent_control.infrastructure.approval_sqlalchemy import (
+    SqlAlchemyAgentApprovalSubjectLifecycle,
+)
 from ai_platform_api.modules.assistant.application.runner import AssistantRunExecutor
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
 from ai_platform_api.modules.assistant.application.sources import AssistantSourceService
@@ -341,7 +344,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     workflows = WorkflowDefinitionService(SqlAlchemyWorkflowUnitOfWork(database.sessions))
     approval_policies = ApprovalPolicyService(SqlAlchemyApprovalPolicyUnitOfWork(database.sessions))
     approval_instances = ApprovalInstanceService(
-        SqlAlchemyApprovalRuntimeUnitOfWork(database.sessions),
+        SqlAlchemyApprovalRuntimeUnitOfWork(
+            database.sessions,
+            SqlAlchemyAgentApprovalSubjectLifecycle,
+        ),
         approval_policies,
     )
     policy = RbacPolicyDecisionPoint(

@@ -35,8 +35,11 @@ from ai_platform_api.modules.workflow.domain.approval_runtime import (
     ApprovalRuntimeTransition,
     ApprovalRuntimeUnitOfWork,
     ApprovalRuntimeWriteConflictError,
+    ApprovalSubjectEvent,
+    ApprovalSubjectLifecycle,
     ApprovalWorkflowOutcome,
 )
+from ai_platform_api.modules.workflow.domain.approvals import ApprovalSubject
 from ai_platform_api.persistence.tables import (
     approval_actions,
     approval_assignments,
@@ -48,6 +51,7 @@ from ai_platform_api.persistence.tables import (
 )
 
 SessionFactory = Callable[[], Session]
+ApprovalSubjectLifecycleFactory = Callable[[Session], ApprovalSubjectLifecycle]
 
 
 class SqlAlchemyApprovalRuntimeRepository(ApprovalRuntimeRepository):
@@ -395,16 +399,42 @@ class SqlAlchemyApprovalRuntimeDirectory(ApprovalRuntimeDirectory):
         )
 
 
+class NoopApprovalSubjectLifecycle(ApprovalSubjectLifecycle):
+    """让未注册业务扩展的审批主题保持原有独立运行行为。"""
+
+    def bind(
+        self,
+        state: ApprovalRuntimeState,
+        subject: ApprovalSubject,
+    ) -> ApprovalSubjectEvent | None:
+        del state, subject
+        return None
+
+    def apply_transition(
+        self,
+        previous: ApprovalRuntimeState,
+        transition: ApprovalRuntimeTransition,
+    ) -> ApprovalSubjectEvent | None:
+        del previous, transition
+        return None
+
+
 class SqlAlchemyApprovalRuntimeUnitOfWork(ApprovalRuntimeUnitOfWork):
     """为审批聚合、工作流业务、审计和 Outbox 提供不可嵌套事务。"""
 
-    def __init__(self, session_factory: SessionFactory) -> None:
+    def __init__(
+        self,
+        session_factory: SessionFactory,
+        subject_lifecycle_factory: ApprovalSubjectLifecycleFactory | None = None,
+    ) -> None:
         self._session_factory = session_factory
+        self._subject_lifecycle_factory = subject_lifecycle_factory
         self._state: ContextVar[
             tuple[
                 Session,
                 SqlAlchemyApprovalRuntimeRepository,
                 SqlAlchemyApprovalRuntimeDirectory,
+                ApprovalSubjectLifecycle,
                 SqlAlchemyAuditWriter,
                 SqlAlchemyOutboxWriter,
             ]
@@ -415,11 +445,17 @@ class SqlAlchemyApprovalRuntimeUnitOfWork(ApprovalRuntimeUnitOfWork):
         if self._state.get() is not None:
             raise RuntimeError("Approval Runtime Unit of Work 不允许重复进入")
         session = self._session_factory()
+        subjects = (
+            self._subject_lifecycle_factory(session)
+            if self._subject_lifecycle_factory is not None
+            else NoopApprovalSubjectLifecycle()
+        )
         self._state.set(
             (
                 session,
                 SqlAlchemyApprovalRuntimeRepository(session),
                 SqlAlchemyApprovalRuntimeDirectory(session),
+                subjects,
                 SqlAlchemyAuditWriter(session),
                 SqlAlchemyOutboxWriter(session),
             )
@@ -448,12 +484,16 @@ class SqlAlchemyApprovalRuntimeUnitOfWork(ApprovalRuntimeUnitOfWork):
         return self._require_state()[2]
 
     @property
-    def audit(self) -> SqlAlchemyAuditWriter:
+    def subjects(self) -> ApprovalSubjectLifecycle:
         return self._require_state()[3]
 
     @property
-    def outbox(self) -> SqlAlchemyOutboxWriter:
+    def audit(self) -> SqlAlchemyAuditWriter:
         return self._require_state()[4]
+
+    @property
+    def outbox(self) -> SqlAlchemyOutboxWriter:
+        return self._require_state()[5]
 
     def commit(self) -> None:
         try:
@@ -468,6 +508,7 @@ class SqlAlchemyApprovalRuntimeUnitOfWork(ApprovalRuntimeUnitOfWork):
         Session,
         SqlAlchemyApprovalRuntimeRepository,
         SqlAlchemyApprovalRuntimeDirectory,
+        ApprovalSubjectLifecycle,
         SqlAlchemyAuditWriter,
         SqlAlchemyOutboxWriter,
     ]:

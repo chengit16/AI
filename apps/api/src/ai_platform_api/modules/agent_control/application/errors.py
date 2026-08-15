@@ -33,6 +33,12 @@ class AgentTestGateFailedError(PlatformError):
     error_code = "AGENT_TEST_GATE_FAILED"
 
 
+class AgentReleaseApprovalRequiredError(PlatformError):
+    """表示候选缺少与当前摘要和测试结果匹配的有效发布审批。"""
+
+    error_code = "AGENT_RELEASE_APPROVAL_REQUIRED"
+
+
 class AgentLifecycleConflictError(PlatformError):
     """表示 Agent 状态、草稿 revision 或候选来源已经发生竞争变化。"""
 

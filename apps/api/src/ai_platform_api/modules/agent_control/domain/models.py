@@ -10,6 +10,7 @@ from uuid import UUID
 
 from ai_platform_backend.integration.domain import AuditWriter
 
+from ai_platform_api.modules.agent_control.domain.approval import AgentApprovalRepository
 from ai_platform_api.modules.agent_control.domain.configuration import (
     AgentConfigurationRepository,
 )
@@ -209,7 +210,25 @@ class AgentRepository(Protocol):
         self,
         workspace_id: UUID,
         candidate_id: UUID,
+        *,
+        for_update: bool = False,
     ) -> AgentReleaseCandidate | None: ...
+
+    def save_candidate(
+        self,
+        candidate: AgentReleaseCandidate,
+        *,
+        expected_version: int,
+    ) -> bool: ...
+
+    def supersede_candidates_for_draft(
+        self,
+        workspace_id: UUID,
+        draft_id: UUID,
+        *,
+        through_revision: int,
+        updated_at: datetime,
+    ) -> int: ...
 
     def get_release(self, workspace_id: UUID, release_id: UUID) -> AgentRelease | None: ...
 
@@ -235,6 +254,9 @@ class AgentControlUnitOfWork(Protocol):
 
     @property
     def evaluation(self) -> AgentEvaluationRepository: ...
+
+    @property
+    def approval(self) -> AgentApprovalRepository: ...
 
     @property
     def audit(self) -> AuditWriter: ...

@@ -17,6 +17,7 @@ from ai_platform_api.modules.agent_control.application.service import (
     AgentIdempotencyConflictError,
     AgentLifecycleConflictError,
 )
+from ai_platform_api.modules.agent_control.domain.approval import AgentApprovalRepository
 from ai_platform_api.modules.agent_control.domain.configuration import (
     AgentKnowledgeScopeVersion,
     AgentOutputSchemaVersion,
@@ -150,9 +151,55 @@ class MemoryAgentRepository(AgentRepository):
         self,
         workspace_id: UUID,
         candidate_id: UUID,
+        *,
+        for_update: bool = False,
     ) -> AgentReleaseCandidate | None:
+        del for_update
         value = self.candidates.get(candidate_id)
         return value if value is not None and value.workspace_id == workspace_id else None
+
+    def save_candidate(
+        self,
+        candidate: AgentReleaseCandidate,
+        *,
+        expected_version: int,
+    ) -> bool:
+        current = self.candidates.get(candidate.candidate_id)
+        if current is None or current.version != expected_version:
+            return False
+        self.candidates[candidate.candidate_id] = candidate
+        return True
+
+    def supersede_candidates_for_draft(
+        self,
+        workspace_id: UUID,
+        draft_id: UUID,
+        *,
+        through_revision: int,
+        updated_at: datetime,
+    ) -> int:
+        superseded = 0
+        for candidate_id, candidate in tuple(self.candidates.items()):
+            if (
+                candidate.workspace_id == workspace_id
+                and candidate.draft_id == draft_id
+                and candidate.draft_revision <= through_revision
+                and candidate.status
+                in {
+                    "ready_for_approval",
+                    "approval_pending",
+                    "approved",
+                    "rejected",
+                }
+            ):
+                self.candidates[candidate_id] = replace(
+                    candidate,
+                    status="superseded",
+                    updated_at=updated_at,
+                    version=candidate.version + 1,
+                )
+                superseded += 1
+        return superseded
 
     def get_release(self, workspace_id: UUID, release_id: UUID) -> AgentRelease | None:
         value = self.releases.get(release_id)
@@ -370,6 +417,7 @@ class MemoryAgentUnitOfWork:
         self.configuration = MemoryConfigurationRepository()
         # P3-02 用例不调用评估端口，仅声明结构类型以保持统一 Unit of Work 契约。
         self.evaluation = cast(AgentEvaluationRepository, object())
+        self.approval = cast(AgentApprovalRepository, object())
         self.audit = MemoryWriter()
         self.outbox = MemoryWriter()
         self.commit_count = 0

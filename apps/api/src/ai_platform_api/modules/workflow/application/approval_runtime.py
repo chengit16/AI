@@ -24,6 +24,7 @@ from ai_platform_api.modules.workflow.domain.approval_runtime import (
     ApprovalRuntimeUnitOfWork,
     ApprovalRuntimeValidationError,
     ApprovalRuntimeWriteConflictError,
+    ApprovalSubjectEvent,
     ApprovalWorkflowResume,
     apply_approval_command,
     apply_due_approval_event,
@@ -150,11 +151,24 @@ class ApprovalInstanceService:
                         raise ApprovalInstanceConflict
                     return ApprovalCommandResult(existing, True)
                 unit_of_work.runtimes.add_state(state)
+                subject_event = unit_of_work.subjects.bind(state, subject)
                 _record_created(unit_of_work, context, state)
+                if subject_event is not None:
+                    _record_subject_event(
+                        unit_of_work,
+                        context,
+                        state,
+                        subject_event,
+                        occurred_at=state.instance.created_at,
+                    )
                 unit_of_work.commit()
                 return ApprovalCommandResult(state, False)
         except ApprovalRuntimeValidationError as error:
             raise ApprovalInstanceValidation from error
+        except ApprovalRuntimeDeniedError as error:
+            raise ApprovalInstanceDenied from error
+        except ApprovalRuntimeStateError as error:
+            raise ApprovalInstanceStateConflict from error
         except ApprovalRuntimeWriteConflictError as error:
             # 唯一约束竞争可能来自同一幂等请求；回滚后重新读取才能区分回放与真实冲突。
             with self._unit_of_work as unit_of_work:
@@ -249,8 +263,20 @@ class ApprovalInstanceService:
                     now=datetime.now(UTC),
                 )
                 # 2. 审批终态和关联工作流必须在同一事务推进，Outbox 不得先于业务状态可见。
-                workflow_version = _persist_transition(unit_of_work, state, transition)
+                workflow_version, subject_event = _persist_transition(
+                    unit_of_work,
+                    state,
+                    transition,
+                )
                 _record_transition(unit_of_work, context, transition)
+                if subject_event is not None:
+                    _record_subject_event(
+                        unit_of_work,
+                        context,
+                        transition.state,
+                        subject_event,
+                        occurred_at=transition.action.occurred_at,
+                    )
                 if workflow_version is not None:
                     _record_workflow_outcome(
                         unit_of_work,
@@ -347,8 +373,20 @@ class ApprovalInstanceService:
             if transition is None:
                 return None
             # 2. 聚合、关联工作流、审计与 Outbox 共用当前短事务，提交后才允许恢复执行。
-            workflow_version = _persist_transition(unit_of_work, state, transition)
+            workflow_version, subject_event = _persist_transition(
+                unit_of_work,
+                state,
+                transition,
+            )
             _record_transition(unit_of_work, context, transition)
+            if subject_event is not None:
+                _record_subject_event(
+                    unit_of_work,
+                    context,
+                    transition.state,
+                    subject_event,
+                    occurred_at=transition.action.occurred_at,
+                )
             if workflow_version is not None:
                 _record_workflow_outcome(unit_of_work, context, transition, workflow_version)
             unit_of_work.commit()
@@ -363,19 +401,21 @@ def _persist_transition(
     unit_of_work: ApprovalRuntimeUnitOfWork,
     previous: ApprovalRuntimeState,
     transition: ApprovalRuntimeTransition,
-) -> int | None:
+) -> tuple[int | None, ApprovalSubjectEvent | None]:
     if not unit_of_work.runtimes.save_transition(
         transition,
         expected_version=previous.instance.version,
     ):
         raise ApprovalRuntimeWriteConflictError
+    subject_event = unit_of_work.subjects.apply_transition(previous, transition)
     if transition.workflow_outcome is None:
-        return None
-    return unit_of_work.runtimes.apply_workflow_outcome(
+        return None, subject_event
+    workflow_version = unit_of_work.runtimes.apply_workflow_outcome(
         transition.state,
         transition.workflow_outcome,
         now=transition.action.occurred_at,
     )
+    return workflow_version, subject_event
 
 
 def _require_state(
@@ -477,6 +517,57 @@ def _record_transition(
         f"approval.instance.{action.action}",
         action.occurred_at,
         attributes,
+    )
+
+
+def _record_subject_event(
+    unit_of_work: ApprovalRuntimeUnitOfWork,
+    context: RequestContext,
+    state: ApprovalRuntimeState,
+    event: ApprovalSubjectEvent,
+    *,
+    occurred_at: datetime,
+) -> None:
+    """把业务主题状态变化与审批事务共同写入审计和 Outbox。"""
+
+    attributes = {
+        **event.attributes,
+        "approval_instance_id": str(state.instance.approval_instance_id),
+        "approval_status": state.instance.status,
+    }
+    unit_of_work.audit.add(
+        AuditRecord(
+            audit_id=uuid4(),
+            workspace_id=state.instance.workspace_id,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            action=event.event_type,
+            resource_type=event.resource_type,
+            resource_id=event.resource_id,
+            outcome="succeeded",
+            occurred_at=occurred_at,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
+            attributes=attributes,
+        )
+    )
+    unit_of_work.outbox.add(
+        IntegrationEvent(
+            event_id=uuid4(),
+            event_type=event.event_type,
+            workspace_id=state.instance.workspace_id,
+            aggregate_id=event.aggregate_id,
+            aggregate_version=event.aggregate_version,
+            occurred_at=occurred_at,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            request_id=context.request_id,
+            payload=attributes,
+        )
     )
 
 
