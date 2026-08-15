@@ -7,12 +7,12 @@
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-08` Runtime 隔离路由 |
+| 当前节点 | `P3-09` 灰度发布与回滚 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release 与服务治理已通过 |
-| 服务发布与回滚 | `in_progress`，单版本活动 Route 已通过，Runtime、灰度与回滚待建设 |
+| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理与 Runtime 隔离已通过 |
+| 服务发布与回滚 | `in_progress`，单版本活动 Route 与 Runtime 发布装载已通过，灰度与回滚待建设 |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
 | `capacity_certification` | `not_run` |
@@ -26,7 +26,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0047` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0048` |
 | 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实供应商或 AI 质量 |
 
@@ -121,14 +121,27 @@
 - 当前边界：本节点只建立单版本活动 Route 和服务控制面事实，不提前实现 `P3-08` Runtime 快照装载与控制面故障隔离、`P3-09` 灰度/晋级/回滚或 `P3-10` 服务出口。
 - 提交：`2cf0de8`。
 
+### P3-08 Runtime 隔离路由
+
+- 状态：已完成，提交 `328bcca`。
+- 发布读取边界：接受 `ADR-008`，新增独立 `service_runtime` 模块，只从 `Service`、当前或精确 `ServiceRoute`、`AgentRelease` 和 `Agent` 发布事实构造 Runtime 快照，不导入草稿、候选、审批当前态或服务治理写 Repository。快照逐项复核工作空间、状态、Release 类型、运行配置、Route 摘要和自定义 Release 摘要；P3-09 前只接受当前 `active` 单版本 Route。
+- 故障隔离与缓存：当前 Route 正常路径优先读取 PostgreSQL，并写入默认 300 秒短租期缓存；Run 精确绑定优先读取默认 86400 秒长租期缓存。两个键使用规范 JSON 和 SHA-256 信封摘要，历史绑定写入不能覆盖当前 Route；缺失、损坏或身份错位缓存只能删除并回源发布事实。缓存不可用不阻断正常数据库读取，发布 Source 与可信缓存同时不可用时稳定返回 `SERVICE_ROUTE_UNAVAILABLE`。
+- Run 唯一绑定：新 Run 在消息、审计和 `assistant.run.queued` Outbox 同事务冻结 `service_id`、`service_route_id`、`service_route_version` 与 `agent_release_id`；执行器在检索和模型调用前重新装载精确发布快照，并使用 Release 冻结的运行配置。暂停服务在应用层拒绝新 Run，已冻结在途 Run 仍允许收敛终态；跨空间、当前 Route 与 Release 错配、历史 Route 新写入和运行后改绑由数据库最终拒绝。
+- 数据库与兼容：Revision `20260816_0048` 为 `assistant_runs` 增加三个兼容可空 Route 字段、复合外键、索引和防改绑 Trigger。Migration 只为能够唯一匹配 Route 的升级前历史 Run 回填，无法证明的记录保持完整空绑定且不能重新执行；升级后的任何新 Run 必须完整绑定。一旦存在完整绑定即拒绝降级到 `0047`。OpenAPI 以可选可空字段保持历史响应兼容，React 与 Python 类型由冻结契约重新生成。
+- 专项验收：P3-08 单元 `12/12`、阶段 1 助手执行器回归 `1/1`、真实 PostgreSQL `2/2`、完整 Migration 空库往返与 `0047 → 0048` 非空升级 `6/6`；覆盖正常装载、缓存预热、Source 故障续跑、历史绑定不污染当前键、损坏与身份错位恢复、双故障失败关闭、暂停服务、在途收敛、跨空间、历史 Route、Release 错配、改绑拒绝和无法证明的历史记录。
+- 统一门禁：`./scripts/verify` 通过 React `42/42`、Python `620/620`、Ruff format/lint `564` 个文件、mypy strict `564` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器验收：使用最终工作树重新构建 API、Migration、Web 和 Worker 镜像，公共数据库真实升级至 Revision `20260816_0048`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker Lane 和 Scheduler 共 13 项通过。本节点未增加页面，因此不执行浏览器验收。
+- 当前边界：当前 Route 在发布 Source 故障期间最多使用 300 秒可信缓存，服务暂停与 Source 故障同时发生时的主动失效由 P3-09 通过提交后事件完成。本节点不提前实现灰度稳定分配、晋级、回滚、服务出口或 Release 运营监控。
+- 提交：`328bcca`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布供应链门禁继续阻断。
-- 阶段 3 尚未完成 Runtime 隔离路由、灰度和回滚，不能把当前服务治理事实描述为完整 Agent 发布平台。
+- 阶段 3 尚未完成灰度、回滚和服务出口，不能把当前单版本 Runtime 描述为完整 Agent 发布平台。
 - LLM Grading、多模态图片问答、真实多源连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 均保持后置。
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照和 `P3-07` 服务与路由治理已通过，当前进入 `P3-08` Runtime 隔离路由；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理和 `P3-08` Runtime 隔离路由已通过，当前进入 `P3-09` 灰度发布与回滚；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
