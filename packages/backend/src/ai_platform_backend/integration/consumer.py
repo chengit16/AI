@@ -8,6 +8,7 @@ from typing import Protocol
 from uuid import UUID
 
 from ai_platform_backend.integration.domain import IntegrationEvent
+from ai_platform_backend.observability import observed_operation
 
 
 class ConsumerUnitOfWork(Protocol):
@@ -45,6 +46,7 @@ class IdempotentProjectionConsumer:
         self._consumer_name = consumer_name
         self._unit_of_work = unit_of_work
 
+    @observed_operation(component="outbox", operation="consume")
     def handle(
         self,
         event: IntegrationEvent,

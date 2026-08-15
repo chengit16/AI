@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from ai_platform_backend.integration.domain import OutboxLeaseStore, TaskPublisher
+from ai_platform_backend.observability import observed_operation
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,8 @@ class DispatchResult:
     published: int
     retried: int
     dead_lettered: int
+    pending_count: int
+    oldest_pending_age_seconds: float
 
 
 class OutboxDispatcher:
@@ -45,6 +48,7 @@ class OutboxDispatcher:
         self._base_retry_seconds = base_retry_seconds
         self._clock = clock
 
+    @observed_operation(component="outbox", operation="dispatch")
     def dispatch_once(self) -> DispatchResult:
         """按租约领取一批 Outbox 事件，确认发布后完成，失败则有限重试或死信。"""
 
@@ -94,4 +98,6 @@ class OutboxDispatcher:
             published=published,
             retried=retried,
             dead_lettered=dead_lettered,
+            pending_count=batch.pending_count,
+            oldest_pending_age_seconds=batch.oldest_pending_age_seconds,
         )

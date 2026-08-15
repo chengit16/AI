@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from time import monotonic
 from uuid import UUID, uuid4
 
+from ai_platform_backend.observability import observed_operation
+
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import FieldPolicyRegistry
 from ai_platform_api.modules.authorization.domain.policy import PolicyDecisionPoint
@@ -74,6 +76,7 @@ class RetrievalEvidenceService:
         self._reranker = reranker
         self._budget = budget or EvidenceProcessingBudget()
 
+    @observed_operation(component="retrieval", operation="prepare_evidence")
     def prepare(self, context: RequestContext, run_id: UUID) -> EvidenceSetSnapshot:
         """重新授权并精读候选；重复调用只返回首次提交的证据事实。"""
 

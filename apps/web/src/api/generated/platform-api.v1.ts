@@ -3028,14 +3028,42 @@ export type components = {
       readonly total_timeout_ms: number;
     };
     /**
+     * HealthCheckDetail
+     * @description 描述单项检查的状态、时延和稳定降级原因，不包含连接地址或异常文本。
+     */
+    readonly HealthCheckDetail: {
+      /**
+       * Checked At
+       * Format: date-time
+       */
+      readonly checked_at: string;
+      /** Critical */
+      readonly critical: boolean;
+      /** Latency Ms */
+      readonly latency_ms: number;
+      /** Reason Code */
+      readonly reason_code?: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "ok" | "degraded";
+    };
+    /**
      * HealthResponse
      * @description 定义健康状态操作的稳定响应结构。
      */
     readonly HealthResponse: {
+      /** Checked At */
+      readonly checked_at?: string | null;
       /** Checks */
       readonly checks: {
         readonly [key: string]: "ok" | "degraded";
       };
+      /** Details */
+      readonly details?: {
+        readonly [key: string]: components["schemas"]["HealthCheckDetail"];
+      } | null;
       /** Environment */
       readonly environment: string;
       /** Service */

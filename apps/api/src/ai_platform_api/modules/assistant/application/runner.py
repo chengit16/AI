@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from ai_platform_backend.observability import observed_operation
+
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
@@ -73,6 +75,7 @@ class AssistantRunExecutor:
         self._streams = streams
         self._delta_batch_characters = delta_batch_characters
 
+    @observed_operation(component="assistant", operation="execute")
     def execute(
         self,
         context: RequestContext,

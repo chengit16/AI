@@ -11,6 +11,8 @@ from time import monotonic
 from typing import Protocol, cast
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
+from ai_platform_backend.observability import observed_operation
+
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import (
@@ -250,6 +252,7 @@ class WorkflowRunExecutor:
         self._approvals = approvals
         self._budget = budget
 
+    @observed_operation(component="workflow", operation="execute")
     def execute(
         self,
         context: RequestContext,

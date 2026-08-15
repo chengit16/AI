@@ -7,7 +7,7 @@ from types import TracebackType
 from typing import Any, Literal, cast
 from uuid import UUID
 
-from sqlalchemy import CursorResult, and_, or_, select, update
+from sqlalchemy import CursorResult, and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session, sessionmaker
@@ -159,7 +159,23 @@ class SqlAlchemyOutboxLeaseStore:
                         claim_until=claim_until,
                     )
                 )
-        return OutboxClaimBatch(tuple(claimed), dead_lettered=expired_result.rowcount)
+            # 3. 在同一快照记录待处理与持租约事件的积压，不读取 Payload 或按空间分组。
+            pending_count, oldest_pending_at = session.execute(
+                select(func.count(), func.min(outbox_events.c.occurred_at)).where(
+                    outbox_events.c.status.in_(("pending", "publishing"))
+                )
+            ).one()
+            oldest_age = (
+                0.0
+                if oldest_pending_at is None
+                else max(0.0, (now - oldest_pending_at).total_seconds())
+            )
+        return OutboxClaimBatch(
+            tuple(claimed),
+            dead_lettered=expired_result.rowcount,
+            pending_count=int(pending_count),
+            oldest_pending_age_seconds=oldest_age,
+        )
 
     def mark_published(
         self,

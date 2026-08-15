@@ -1,0 +1,60 @@
+groups:
+  - name: ai-platform-runtime
+    interval: 30s
+    rules:
+      - alert: AiPlatformDependencyUnavailable
+        expr: min by (service, environment, dependency) (ai_platform_dependency_health) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "平台关键依赖持续不可用"
+      - alert: AiPlatformHttpErrorRatioHigh
+        expr: >-
+          sum by (service, environment) (rate(ai_platform_http_requests_total{http_status_code=~"4..|5.."}[5m]))
+          /
+          clamp_min(sum by (service, environment) (rate(ai_platform_http_requests_total[5m])), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "平台 HTTP 错误比例超过 5%"
+      - alert: AiPlatformHttpP95LatencyHigh
+        expr: >-
+          histogram_quantile(0.95,
+            sum by (service, environment, le) (rate(ai_platform_http_request_duration_seconds_bucket[5m])))
+          > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "平台 HTTP P95 延迟超过 2 秒"
+      - alert: AiPlatformWorkerTaskFailure
+        expr: increase(ai_platform_tasks_total{outcome="error"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker 任务出现失败"
+      - alert: AiPlatformOutboxBacklogOldest
+        expr: ai_platform_outbox_oldest_pending_age_seconds > 300
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Outbox 最老积压超过 300 秒"
+      - alert: AiPlatformOutboxDeadLetter
+        expr: increase(ai_platform_outbox_dispatch_total{outcome="dead_lettered"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Outbox 出现死信"
+      - alert: AiPlatformSseNotificationFailure
+        expr: increase(ai_platform_sse_notifications_total{outcome="failed"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSE 跨实例通知出现失败并进入轮询兜底"

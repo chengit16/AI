@@ -58,10 +58,12 @@ class ClaimedOutboxEvent:
 
 @dataclass(frozen=True)
 class OutboxClaimBatch:
-    """汇总本轮成功领取的事件及领取前已转死信数量。"""
+    """汇总本轮认领和认领开始时的积压事实，不包含事件载荷或资源标识。"""
 
     events: tuple[ClaimedOutboxEvent, ...]
     dead_lettered: int
+    pending_count: int = 0
+    oldest_pending_age_seconds: float = 0
 
 
 class OutboxWriter(Protocol):

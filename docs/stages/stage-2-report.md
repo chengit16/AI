@@ -7,7 +7,7 @@
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P2-06` 可观测性基线进行中 |
+| 当前节点 | `P2-07` 审计、用量、配额与 Outbox 运营进行中 |
 | 阶段可靠性 | `not_run` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
@@ -81,6 +81,16 @@
 - 故障与时限：真实 PostgreSQL/Valkey 专项 `4/4`，覆盖跨实例唤醒与替代实例恢复、全部通知丢失后的数据库轮询、20 个跨实例恢复样本和 Valkey 不可达。20 个样本按 `P2-01` nearest-rank 口径均在 `p99 <= 5s` 门禁内；500 条 SSE 条件容量认证仍为 `not_run`，实际双 API 进程停止与联合故障演练继续由 `P2-11` 执行。
 - 自动验收：P2-05 单元 `6/6`，相关 SSE/应用回归 `27/27`；统一 `./scripts/verify` 通过 React `37/37`、Python `490/490`、Ruff format/lint `441` 个文件、mypy strict `441` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。`./platform start` 重建真实 API 装配后，`./platform doctor` 的 13 项诊断全部通过，数据库 Revision 保持 `20260815_0038`。
 
+### P2-06 结构化日志、Trace、指标与健康告警基线
+
+- 状态：已完成，提交待回填。
+- 字段安全：新增版本化可观测字段注册表，对日志、Span、Prometheus 标签和告警事实执行“未登记即拒绝”。凭据、Cookie、Session、正文、查询、Prompt、模型输入输出、事件 Payload、字段级 ABAC 受限值及用户/空间/资源等高基数标识不得进入普通可观测通道；第三方自由文本日志统一收敛为不复制原始消息的安全 JSON 事件。
+- Trace 传播：FastAPI 在 HTTP 边缘校验 W3C `traceparent` 并建立请求 Span，应用层通过标准 OTel Context 关联检索、模型、Assistant、工作流、审批和 Outbox。五个 Worker Lane 均记录任务 Span、结果与耗时，集成事件只有在 HMAC 信封验签成功后才能恢复父 Trace，未验证 Header、Broker 属性和任务载荷不能成为可信父链。
+- 指标与聚合：新增 HTTP、应用操作、Worker 任务、依赖健康、Outbox 积压/重试/死信和 SSE 发布/订阅/轮询/回查指标；HTTP 只使用路由模板，不使用真实资源路径。API 与 Worker 通过 `.ai-platform/runtime/prometheus` 共享多进程指标文件，启动前清理旧运行数据，子进程退出时清理 live Gauge；`/api/v1/metrics` 实际同时采集到 API 请求和五个 Worker Lane 的成功任务样本。
+- 健康与告警：Readiness 保留既有 `checks` 兼容字段并增加检查时间、延迟、关键性和稳定原因码，Web 运行状态页同步展示这些事实。Prometheus 规则覆盖关键依赖不可用、HTTP 错误比例/P95 延迟、Worker 失败、Outbox 最老积压/死信和 SSE 通知失败；本地未部署 Prometheus、Alertmanager 或 Trace 后端，规则和 OTLP 接口已就绪但不冒充外部监控链已投产。
+- 安全与覆盖验收：20 条合成关键 Trace 均覆盖 HTTP、任务、检索、模型、工作流、审批和 Outbox，覆盖率 `1.0`，达到 `>= 0.99` 门禁。专项 `9/9` 覆盖字段 Schema、生产环境 HTTPS OTLP、日志/Span/指标/告警四通道敏感数据拒绝、安全第三方 Formatter、多进程 Worker 聚合和告警规则解析。
+- 自动验收：统一 `./scripts/verify` 通过 React `37/37`、Python `500/500`、Ruff format/lint `447` 个文件、mypy strict `447` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建；P2-06、真实 PostgreSQL/Valkey SSE 及 Outbox 专项 `18/18`。`./platform start` 完成 API/Worker 镜像重建，数据库 Revision 保持 `20260815_0038`，`./platform doctor` 的 13 项诊断全部通过。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -90,4 +100,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P2-01`～`P2-05` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检、安全重建和跨实例 SSE 恢复，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-06`。
+`not_run`。`P2-01`～`P2-06` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检、安全重建、跨实例 SSE 恢复和安全可观测基线，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-07`。

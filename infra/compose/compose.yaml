@@ -4,6 +4,11 @@ x-python-environment: &python-environment
   AI_PLATFORM_ENVIRONMENT: local
   AI_PLATFORM_VERSION: 0.0.0
   AI_PLATFORM_DEPENDENCY_CHECKS_ENABLED: "true"
+  # 未配置 Collector 时保持空值，应用仍输出结构化日志和 Prometheus 指标。
+  AI_PLATFORM_OBSERVABILITY_OTLP_ENDPOINT: ${OBSERVABILITY_OTLP_ENDPOINT:-}
+  AI_PLATFORM_OBSERVABILITY_OTLP_TIMEOUT_SECONDS: ${OBSERVABILITY_OTLP_TIMEOUT_SECONDS:-2}
+  AI_PLATFORM_OBSERVABILITY_SAFE_LIBRARY_LOGGING: "true"
+  PROMETHEUS_MULTIPROC_DIR: /var/run/ai-platform-prometheus
   AI_PLATFORM_DATABASE_URL: postgresql+psycopg://ai_platform:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/ai_platform
   # Valkey 使用 RESP 协议，连接 URI 保留标准 redis:// Scheme 以兼容现有客户端生态。
   AI_PLATFORM_VALKEY_URL: redis://valkey:6379/0
@@ -46,6 +51,7 @@ x-worker-common: &worker-common
     dockerfile: infra/docker/worker.Dockerfile
   volumes:
     - ${AI_PLATFORM_ROOT:-../../.ai-platform}/secrets/task-signing.key:/run/secrets/ai-platform-task-signing.key:ro
+    - ${AI_PLATFORM_ROOT:-../../.ai-platform}/runtime/prometheus:/var/run/ai-platform-prometheus
   depends_on:
     migrate:
       condition: service_completed_successfully
@@ -136,6 +142,7 @@ services:
       - "127.0.0.1:${AI_PLATFORM_API_PORT:-8000}:8000"
     volumes:
       - ${AI_PLATFORM_ROOT:-../../.ai-platform}/secrets/master.key:/run/secrets/ai-platform-master.key:ro
+      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/runtime/prometheus:/var/run/ai-platform-prometheus
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -166,7 +173,14 @@ services:
       context: ../..
       dockerfile: infra/docker/api.Dockerfile
     environment: *python-environment
-    command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    volumes:
+      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/runtime/prometheus:/var/run/ai-platform-prometheus
+    command:
+      [
+        "sh",
+        "-c",
+        "find /var/run/ai-platform-prometheus -type f -name '*.db' -delete && uv run --no-sync alembic upgrade head",
+      ]
     depends_on:
       postgres:
         condition: service_healthy

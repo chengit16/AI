@@ -16,6 +16,7 @@ COPY alembic.ini ./alembic.ini
 COPY infra/migrations ./infra/migrations
 COPY contracts/errors ./contracts/errors
 COPY contracts/authorization ./contracts/authorization
+COPY contracts/observability ./contracts/observability
 COPY contracts/fixtures/release-manifest.v1.valid.json ./contracts/fixtures/release-manifest.v1.valid.json
 COPY contracts/release ./contracts/release
 

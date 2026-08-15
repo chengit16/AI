@@ -12,5 +12,6 @@ RUN pip install --no-cache-dir uv==0.10.7 \
 
 COPY apps/worker/src ./apps/worker/src
 COPY packages/backend/src ./packages/backend/src
+COPY contracts/observability ./contracts/observability
 
 CMD ["uv", "run", "--no-sync", "celery", "-A", "ai_platform_worker.app.celery_app:celery_app", "worker", "--loglevel=INFO"]

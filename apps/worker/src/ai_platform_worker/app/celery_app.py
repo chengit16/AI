@@ -1,8 +1,11 @@
 """创建 Celery 应用并只注册受治理的集成事件与后台扫描任务。"""
 
+from ai_platform_backend.observability import configure_safe_standard_logging
 from celery import Celery
+from celery.signals import setup_logging, worker_process_shutdown
 
 from ai_platform_worker.config import get_worker_settings
+from ai_platform_worker.observability import shutdown_worker_observability
 
 settings = get_worker_settings()
 
@@ -61,3 +64,23 @@ celery_app.conf.update(
         },
     },
 )
+
+
+@worker_process_shutdown.connect  # type: ignore[misc]
+def close_observability_runtime(**_: object) -> None:
+    """刷新子进程 Span 并移除 live Gauge，防止退出进程继续贡献活动数。"""
+
+    shutdown_worker_observability()
+
+
+@setup_logging.connect  # type: ignore[misc]
+def configure_worker_logging(**_: object) -> None:
+    """接管 Celery 默认 Formatter，避免任务参数和原始异常文本进入容器日志。"""
+
+    current_settings = get_worker_settings()
+    if current_settings.observability_safe_library_logging:
+        configure_safe_standard_logging(
+            service_name=current_settings.app_name,
+            environment=current_settings.environment,
+            replace_handlers=True,
+        )

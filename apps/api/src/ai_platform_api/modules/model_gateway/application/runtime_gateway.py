@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
 
+from ai_platform_backend.observability import observed_operation
 from ai_platform_backend.safety import RagSafetyGate
 
 from ai_platform_api.common.errors import PlatformError
@@ -71,6 +72,7 @@ class _GovernedProvider:
     factory: RuntimeProviderFactory
     credential_versions: dict[str, int]
 
+    @observed_operation(component="model", operation="provider_invoke")
     def invoke(
         self,
         request: ModelRequest,
@@ -117,6 +119,7 @@ class RuntimeModelGatewayService:
         # 首期本地单 API 进程共享熔断状态；多实例共享状态在容量阶段按实测再引入。
         self._circuit_states: dict[str, CircuitState] = {}
 
+    @observed_operation(component="model", operation="invoke")
     def invoke(
         self,
         request: ModelRequest,

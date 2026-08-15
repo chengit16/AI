@@ -73,6 +73,7 @@ ensure_environment() {
     "$root_path/data/objects" \
     "$root_path/logs" \
     "$root_path/runtime" \
+    "$root_path/runtime/prometheus" \
     "$root_path/secrets" \
     "$backup_root"
 }

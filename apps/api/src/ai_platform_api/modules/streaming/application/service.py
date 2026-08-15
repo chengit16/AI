@@ -1,9 +1,10 @@
 """编排流式 Run 创建、事件追加、结束和工作空间隔离回放。"""
 
-from contextlib import suppress
 from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
+
+from ai_platform_backend.observability import current_observability_runtime
 
 from ai_platform_api.modules.streaming.domain.errors import StreamRunNotFoundError
 from ai_platform_api.modules.streaming.domain.models import (
@@ -205,12 +206,16 @@ class TransactionalStreamService:
         """订阅瞬时唤醒；不可用时返回空值，由调用方继续按 PostgreSQL 轮询恢复。"""
 
         if self._notifier is None:
+            self._record_notification("disabled")
             return None
         try:
-            return self._notifier.subscribe(run_id)
+            subscription = self._notifier.subscribe(run_id)
         except Exception:
             # 通知层不是事实库，连接失败不能阻断已授权客户端从 PostgreSQL 恢复。
+            self._record_notification("failed")
             return None
+        self._record_notification("subscribed" if subscription is not None else "fallback")
+        return subscription
 
     def close(self) -> None:
         """释放进程级通知连接；数据库资源仍由应用容器单独管理。"""
@@ -222,7 +227,34 @@ class TransactionalStreamService:
         """在数据库提交后尽力唤醒其他实例，失败时保留轮询兜底语义。"""
 
         if self._notifier is None:
+            self._record_notification("disabled")
             return
         # 事实已经提交，通知失败不得把成功写入伪装成业务失败或触发重复生成。
-        with suppress(Exception):
+        try:
             self._notifier.publish(run_id)
+        except Exception:
+            self._record_notification("failed")
+            return
+        self._record_notification("published")
+
+    @staticmethod
+    def _record_notification(outcome: str) -> None:
+        """记录固定结果标签；Run、频道与正文都不能成为指标维度。"""
+
+        runtime = current_observability_runtime()
+        if runtime is None:
+            return
+        labels = {
+            **runtime.common_labels,
+            "notification_mode": "pubsub",
+            "outcome": outcome,
+        }
+        runtime.fields.validate("metric", labels)
+        runtime.sse_notifications.labels(**labels).inc()
+        runtime.log(
+            "sse_notification_result",
+            component="streaming",
+            operation="notify",
+            notification_mode="pubsub",
+            outcome=outcome,
+        )

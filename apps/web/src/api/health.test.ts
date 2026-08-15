@@ -15,6 +15,16 @@ describe("平台健康探针", () => {
           version: "0.0.0",
           environment: "local",
           checks: { api: "ok", postgres: "degraded" },
+          checked_at: "2026-08-15T06:00:00Z",
+          details: {
+            postgres: {
+              status: "degraded",
+              critical: true,
+              latency_ms: 1500,
+              checked_at: "2026-08-15T06:00:00Z",
+              reason_code: "dependency_unavailable",
+            },
+          },
         }),
         { status: 503, headers: { "Content-Type": "application/json" } },
       ),
@@ -23,6 +33,7 @@ describe("平台健康探针", () => {
     await expect(getPlatformHealth()).resolves.toMatchObject({
       status: "degraded",
       checks: { postgres: "degraded" },
+      details: { postgres: { latency_ms: 1500, reason_code: "dependency_unavailable" } },
     });
   });
 

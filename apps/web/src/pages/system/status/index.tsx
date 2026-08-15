@@ -1,7 +1,7 @@
 /** @description 本地运行状态页，轮询平台健康接口并区分正常、降级与不可达状态。 */
 import { useQuery } from "@tanstack/react-query";
 import { Button, Skeleton, Tag, Tooltip } from "antd";
-import { CheckCircle2, CircleAlert, Database, RefreshCw, Server } from "lucide-react";
+import { CheckCircle2, CircleAlert, Clock3, Database, RefreshCw, Server } from "lucide-react";
 
 import { getPlatformHealth } from "@/api/health";
 import { PageHeader } from "@/components/PageHeader/PageHeader";
@@ -15,6 +15,27 @@ const serviceLabels: Record<string, string> = {
   object_storage: "对象存储",
   document_parser: "文档解析服务",
 };
+
+const reasonLabels: Record<string, string> = {
+  dependency_unavailable: "依赖不可用",
+};
+
+function formatLatency(value: number | undefined): string {
+  if (value === undefined) return "未采集延迟";
+  return value < 1 ? "< 1 ms" : `${Math.round(value)} ms`;
+}
+
+function formatCheckedAt(value: string | undefined): string {
+  if (!value) return "尚无检查时间";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "检查时间无效";
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
 
 /** 展示本地运行健康快照；30 秒轮询只用于观测，不替代部署层 Readiness。 */
 export default function StatusPage() {
@@ -89,16 +110,28 @@ export default function StatusPage() {
                   className="flex items-center justify-between gap-4 border-b border-b-solid border-border-soft px-6 py-5"
                   key={name}
                 >
-                  <span className="flex items-center gap-3">
+                  <span className="flex min-w-0 items-center gap-3">
                     {name === "api" ? <Server size={18} /> : <Database size={18} />}
-                    <span>
+                    <span className="min-w-0">
                       <strong className="block">{serviceLabels[name] ?? name}</strong>
-                      <small className="mt-[3px] block text-text-muted">{name}</small>
+                      <small className="mt-[3px] flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
+                        <span>{name}</span>
+                        <span>{formatLatency(health.data?.details?.[name]?.latency_ms)}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock3 size={12} />
+                          {formatCheckedAt(health.data?.details?.[name]?.checked_at)}
+                        </span>
+                      </small>
                     </span>
                   </span>
-                  <Tag color={status === "ok" ? "success" : "warning"}>
-                    {status === "ok" ? "正常" : "降级"}
-                  </Tag>
+                  <span className="flex flex-none items-center gap-2">
+                    {health.data?.details?.[name]?.critical && <Tag>关键</Tag>}
+                    <Tag color={status === "ok" ? "success" : "warning"}>
+                      {status === "ok"
+                        ? "正常"
+                        : (reasonLabels[health.data?.details?.[name]?.reason_code ?? ""] ?? "降级")}
+                    </Tag>
+                  </span>
                 </div>
               ))}
             </div>

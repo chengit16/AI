@@ -3,6 +3,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from ai_platform_backend.observability import ObservabilityRuntime
 from fastapi import FastAPI
 
 from ai_platform_api.app.dependencies import (
@@ -33,6 +34,7 @@ from ai_platform_api.modules.model_gateway.api.routes import (
     runtime_router as ai_runtime_router,
 )
 from ai_platform_api.modules.system.api.health import router as health_router
+from ai_platform_api.modules.system.api.observability import router as observability_router
 from ai_platform_api.modules.workflow.api.approval_routes import router as approval_policy_router
 from ai_platform_api.modules.workflow.api.approval_runtime_routes import (
     router as approval_instance_router,
@@ -52,12 +54,23 @@ def create_app(
     if dependencies.settings != resolved_settings:
         raise ValueError("应用配置与依赖容器配置不一致")
 
+    observability = ObservabilityRuntime(
+        service_name=resolved_settings.app_name,
+        environment=resolved_settings.environment,
+        field_registry_path=resolved_settings.observability_field_registry_path,
+        otlp_endpoint=resolved_settings.observability_otlp_endpoint,
+        otlp_timeout_seconds=resolved_settings.observability_otlp_timeout_seconds,
+        metrics_process_prefix="api",
+        configure_library_logging=resolved_settings.observability_safe_library_logging,
+    )
+
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         try:
             yield
         finally:
             dependencies.close()
+            observability.shutdown()
 
     # 2. 应用生命周期统一接管容器关闭，并把领域能力显式暴露给依赖解析函数。
     application = FastAPI(
@@ -72,6 +85,7 @@ def create_app(
         responses={500: {"model": ErrorResponse, "description": "平台内部错误"}},
     )
     application.state.container = dependencies
+    application.state.observability = observability
     application.state.authentication_service = dependencies.authentication
     application.state.registration_service = dependencies.registration
     application.state.enterprise_workspace_service = dependencies.enterprise_workspaces
@@ -104,9 +118,10 @@ def create_app(
     application.state.approval_instance_service = dependencies.approval_instances
     # 3. 中间件、错误映射和 Router 在状态装配后注册，所有业务入口共享同一安全边界。
     application.dependency_overrides[get_settings] = lambda: resolved_settings
-    application.add_middleware(TraceContextMiddleware)
+    application.add_middleware(TraceContextMiddleware, observability=observability)
     register_error_handlers(application, dependencies.errors)
     application.include_router(health_router, prefix="/api/v1")
+    application.include_router(observability_router, prefix="/api/v1")
     application.include_router(identity_router, prefix="/api/v1")
     application.include_router(workspace_router, prefix="/api/v1")
     application.include_router(entitlement_router, prefix="/api/v1")

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from ai_platform_backend.observability import current_observability_runtime
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, status
 from fastapi.responses import StreamingResponse
 
@@ -570,6 +571,10 @@ def _stream_frames(
     cursor = last_event_id
     next_heartbeat = time.monotonic() + heartbeat_seconds
     subscription = streams.subscribe(run.run_id)
+    observability = current_observability_runtime()
+    wakeup_started: float | None = None
+    if observability is not None and subscription is not None:
+        observability.sse_active_subscriptions.labels(**observability.common_labels).inc()
     try:
         while True:
             # 1. 每轮只在实际查询期间持有 Session；Run 未启动时复核助手终态后继续等待。
@@ -581,6 +586,12 @@ def _stream_frames(
                         cursor,
                         now=datetime.now(UTC),
                     )
+                    if observability is not None and wakeup_started is not None:
+                        observability.sse_wakeup_duration.labels(
+                            **observability.common_labels,
+                            notification_mode="pubsub",
+                        ).observe(max(0, time.monotonic() - wakeup_started))
+                        wakeup_started = None
                 except StreamRunNotFoundError:
                     current = conversations.get_run_for_stream(
                         context,
@@ -609,11 +620,28 @@ def _stream_frames(
             wait_seconds = poll_interval_ms / 1_000
             if subscription is None:
                 time.sleep(wait_seconds)
+                if observability is not None:
+                    observability.sse_fallback_queries.labels(**observability.common_labels).inc()
             else:
-                subscription.wait(wait_seconds)
+                notified = subscription.wait(wait_seconds)
+                if observability is not None:
+                    outcome = "received" if notified else "timeout"
+                    observability.sse_notifications.labels(
+                        **observability.common_labels,
+                        notification_mode="pubsub",
+                        outcome=outcome,
+                    ).inc()
+                    if notified:
+                        wakeup_started = time.monotonic()
+                    else:
+                        observability.sse_fallback_queries.labels(
+                            **observability.common_labels
+                        ).inc()
     finally:
         if subscription is not None:
             subscription.close()
+            if observability is not None:
+                observability.sse_active_subscriptions.labels(**observability.common_labels).dec()
 
 
 def _snapshot_frame(run: AssistantRun, replay: StreamReplay) -> str:

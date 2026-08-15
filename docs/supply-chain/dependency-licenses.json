@@ -493,6 +493,12 @@
     },
     {
       "direct": false,
+      "license": "Apache 2.0",
+      "name": "googleapis-common-protos",
+      "version": "1.75.1"
+    },
+    {
+      "direct": false,
       "license": "MIT",
       "name": "h11",
       "version": "0.16.0"
@@ -508,6 +514,12 @@
       "license": "BSD-3-Clause",
       "name": "idna",
       "version": "3.18"
+    },
+    {
+      "direct": false,
+      "license": "Apache-2.0",
+      "name": "importlib_metadata",
+      "version": "8.7.1"
     },
     {
       "direct": false,
@@ -528,7 +540,7 @@
       "version": "3.0.3"
     },
     {
-      "direct": false,
+      "direct": true,
       "license": "Apache-2.0",
       "name": "minio",
       "version": "7.2.15"
@@ -540,10 +552,52 @@
       "version": "2.5.2"
     },
     {
+      "direct": true,
+      "license": "Apache-2.0",
+      "name": "opentelemetry-api",
+      "version": "1.38.0"
+    },
+    {
+      "direct": false,
+      "license": "Apache-2.0",
+      "name": "opentelemetry-exporter-otlp-proto-common",
+      "version": "1.38.0"
+    },
+    {
+      "direct": true,
+      "license": "Apache-2.0",
+      "name": "opentelemetry-exporter-otlp-proto-http",
+      "version": "1.38.0"
+    },
+    {
+      "direct": false,
+      "license": "Apache-2.0",
+      "name": "opentelemetry-proto",
+      "version": "1.38.0"
+    },
+    {
+      "direct": true,
+      "license": "Apache-2.0",
+      "name": "opentelemetry-sdk",
+      "version": "1.38.0"
+    },
+    {
+      "direct": false,
+      "license": "Apache-2.0",
+      "name": "opentelemetry-semantic-conventions",
+      "version": "0.59b0"
+    },
+    {
       "direct": false,
       "license": "Apache-2.0 OR BSD-2-Clause",
       "name": "packaging",
       "version": "26.3"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "pdfminer.six",
+      "version": "20260107"
     },
     {
       "direct": true,
@@ -562,6 +616,24 @@
       "license": "MIT-CMU",
       "name": "pillow",
       "version": "12.3.0"
+    },
+    {
+      "direct": true,
+      "license": "Apache-2.0 AND BSD-2-Clause",
+      "name": "prometheus_client",
+      "version": "0.23.1"
+    },
+    {
+      "direct": false,
+      "license": "BSD",
+      "name": "prompt_toolkit",
+      "version": "3.0.53"
+    },
+    {
+      "direct": false,
+      "license": "3-Clause BSD",
+      "name": "protobuf",
+      "version": "6.33.6"
     },
     {
       "direct": true,
@@ -601,6 +673,12 @@
     },
     {
       "direct": false,
+      "license": "MIT",
+      "name": "pydantic_core",
+      "version": "2.46.4"
+    },
+    {
+      "direct": false,
       "license": "BSD-3-Clause, Apache-2.0, dependency licenses",
       "name": "pypdfium2",
       "version": "5.13.0"
@@ -618,7 +696,7 @@
       "version": "1.2.2"
     },
     {
-      "direct": false,
+      "direct": true,
       "license": "Apache-2.0",
       "name": "python-multipart",
       "version": "0.0.20"
@@ -630,10 +708,16 @@
       "version": "6.0.3"
     },
     {
-      "direct": false,
+      "direct": true,
       "license": "MIT",
       "name": "redis",
       "version": "6.4.0"
+    },
+    {
+      "direct": false,
+      "license": "Apache-2.0",
+      "name": "requests",
+      "version": "2.34.2"
     },
     {
       "direct": false,
@@ -658,6 +742,12 @@
       "license": "MIT",
       "name": "typing-inspection",
       "version": "0.4.4"
+    },
+    {
+      "direct": false,
+      "license": "PSF-2.0",
+      "name": "typing_extensions",
+      "version": "4.16.0"
     },
     {
       "direct": false,
@@ -706,6 +796,12 @@
       "license": "BSD-3-Clause",
       "name": "websockets",
       "version": "17.0.1"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "zipp",
+      "version": "4.1.0"
     }
   ],
   "sources": {
@@ -714,7 +810,7 @@
   },
   "summary": {
     "node_packages": 76,
-    "python_packages": 54,
+    "python_packages": 70,
     "unknown_python_licenses": []
   }
 }

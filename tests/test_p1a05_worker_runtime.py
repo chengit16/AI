@@ -28,7 +28,9 @@ def test_compose_runs_migration_before_api_and_worker() -> None:
         "scheduler",
     )
 
-    assert migrate["command"] == ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    assert migrate["command"][:2] == ["sh", "-c"]
+    assert "find /var/run/ai-platform-prometheus" in migrate["command"][2]
+    assert "uv run --no-sync alembic upgrade head" in migrate["command"][2]
     assert migrate["depends_on"]["postgres"]["condition"] == "service_healthy"
     assert migrate["restart"] == "no"
     assert services["api"]["depends_on"]["migrate"]["condition"] == (
@@ -49,12 +51,20 @@ def test_compose_exposes_each_secret_only_to_its_owner() -> None:
     assert "AI_PLATFORM_TASK_SIGNING_KEY_PATH" not in api["environment"]
     assert all("AI_PLATFORM_TASK_SIGNING_KEY_PATH" in worker["environment"] for worker in workers)
     assert all("AI_PLATFORM_MASTER_KEY_PATH" not in worker["environment"] for worker in workers)
-    assert len(api["volumes"]) == 1
-    assert "/secrets/master.key:/run/secrets/ai-platform-master.key:ro" in api["volumes"][0]
+    api_secrets = [volume for volume in api["volumes"] if "/secrets/" in volume]
+    assert len(api_secrets) == 1
+    assert "/secrets/master.key:/run/secrets/ai-platform-master.key:ro" in api_secrets[0]
     assert all(
-        len(worker["volumes"]) == 1
-        and "/secrets/task-signing.key:/run/secrets/ai-platform-task-signing.key:ro"
-        in worker["volumes"][0]
+        len([volume for volume in worker["volumes"] if "/secrets/" in volume]) == 1
+        and any(
+            "/secrets/task-signing.key:/run/secrets/ai-platform-task-signing.key:ro" in volume
+            for volume in worker["volumes"]
+        )
+        for worker in workers
+    )
+    assert "/runtime/prometheus:/var/run/ai-platform-prometheus" in "\n".join(api["volumes"])
+    assert all(
+        "/runtime/prometheus:/var/run/ai-platform-prometheus" in "\n".join(worker["volumes"])
         for worker in workers
     )
     assert all(

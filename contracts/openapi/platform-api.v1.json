@@ -18194,6 +18194,53 @@
         "title": "GatewayPolicySchema",
         "description": "定义网关策略结构的协议字段和序列化边界。"
       },
+      "HealthCheckDetail": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "critical": {
+            "type": "boolean",
+            "title": "Critical"
+          },
+          "latency_ms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Latency Ms"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "critical",
+          "latency_ms",
+          "checked_at"
+        ],
+        "title": "HealthCheckDetail",
+        "description": "描述单项检查的状态、时延和稳定降级原因，不包含连接地址或异常文本。"
+      },
       "HealthResponse": {
         "properties": {
           "service": {
@@ -18226,6 +18273,32 @@
             },
             "type": "object",
             "title": "Checks"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/HealthCheckDetail"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
           }
         },
         "additionalProperties": false,

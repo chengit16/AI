@@ -515,8 +515,18 @@ class GatewayPolicySchema(typing.TypedDict):
     total_timeout_ms: int
 
 
+class HealthCheckDetail(typing.TypedDict):
+    checked_at: str
+    critical: bool
+    latency_ms: float
+    reason_code: typing.NotRequired[str | None]
+    status: typing.Literal["ok", "degraded"]
+
+
 class HealthResponse(typing.TypedDict):
+    checked_at: typing.NotRequired[str | None]
     checks: dict[str, typing.Literal["ok", "degraded"]]
+    details: typing.NotRequired[dict[str, HealthCheckDetail] | None]
     environment: str
     service: str
     status: typing.Literal["ok", "degraded"]

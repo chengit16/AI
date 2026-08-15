@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "registry_version": 1,
+  "description": "P2-06 可观测字段白名单。所有日志、Span、指标标签和告警字段在导出前均须通过本注册表。",
+  "channels": {
+    "log": {
+      "allowed_fields": [
+        "attempt",
+        "checked_at",
+        "component",
+        "count",
+        "degraded_reason",
+        "dependency",
+        "duration_ms",
+        "environment",
+        "error_code",
+        "event_name",
+        "http_status_code",
+        "level",
+        "method",
+        "notification_mode",
+        "operation",
+        "outcome",
+        "queue",
+        "request_id",
+        "result_count",
+        "route",
+        "service",
+        "span_id",
+        "task_id",
+        "task_name",
+        "timestamp",
+        "trace_id"
+      ]
+    },
+    "span": {
+      "allowed_fields": [
+        "attempt",
+        "component",
+        "degraded_reason",
+        "dependency",
+        "error_code",
+        "http_status_code",
+        "method",
+        "notification_mode",
+        "operation",
+        "outcome",
+        "queue",
+        "request_id",
+        "result_count",
+        "route",
+        "task_id",
+        "task_name"
+      ]
+    },
+    "metric": {
+      "allowed_fields": [
+        "component",
+        "degraded_reason",
+        "dependency",
+        "environment",
+        "http_status_code",
+        "method",
+        "notification_mode",
+        "operation",
+        "outcome",
+        "queue",
+        "route",
+        "service",
+        "task_name"
+      ]
+    },
+    "alert": {
+      "allowed_fields": [
+        "alert_name",
+        "component",
+        "environment",
+        "observed_value",
+        "reason_code",
+        "service",
+        "severity",
+        "status",
+        "threshold"
+      ]
+    }
+  },
+  "forbidden_field_fragments": [
+    "authorization",
+    "body",
+    "content",
+    "cookie",
+    "credential",
+    "document_id",
+    "email",
+    "field_value",
+    "message",
+    "password",
+    "payload",
+    "prompt",
+    "query",
+    "secret",
+    "session",
+    "text",
+    "token",
+    "user_id",
+    "workspace_id"
+  ],
+  "forbidden_value_markers": [
+    "SYNTHETIC_SENSITIVE_MARKER",
+    "BEGIN PRIVATE KEY"
+  ],
+  "maximum_string_length": 160
+}

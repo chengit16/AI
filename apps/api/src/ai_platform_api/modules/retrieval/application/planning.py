@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from time import monotonic
 from uuid import UUID, uuid4
 
+from ai_platform_backend.observability import observed_operation
 from ai_platform_backend.safety import RagSafetyGate
 
 from ai_platform_api.common.request_context import RequestContext
@@ -131,6 +132,7 @@ class BoundedRetrievalPlanningService:
         self._query_rewriter = query_rewriter or DeterministicQueryRewriter()
         self._safety_gate = safety_gate or RagSafetyGate()
 
+    @observed_operation(component="retrieval", operation="plan")
     def retrieve(self, context: RequestContext, run_id: UUID) -> RetrievalPlanSnapshot:
         """在冻结 Run 与当前授权同时有效时执行检索；重复调用返回同一快照。"""
 

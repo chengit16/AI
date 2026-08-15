@@ -2,7 +2,7 @@
 
 ## 1. 适用范围
 
-本文档适用于 AI 智能平台阶段 1 本地 MVP，覆盖个人空间和企业空间的一键启动、日常诊断、日志查看、平台管理员管理、模型供应商接入、备份恢复、导入导出、主密钥轮换、升级回退和常见故障处理。
+本文档适用于 AI 智能平台本地 MVP 与阶段 2 可靠性增强，覆盖个人空间和企业空间的一键启动、日常诊断、日志与指标查看、平台管理员管理、模型供应商接入、备份恢复、导入导出、主密钥轮换、升级回退和常见故障处理。
 
 当前完成态是浏览器访问的 Web 系统，不是原生桌面应用。默认只绑定 `127.0.0.1`，不应通过修改端口绑定直接暴露到局域网或公网。macOS + Docker Desktop 已完成实际验收；Linux 是目标运行平台，但宿主机验收仍为 `not_run`；Windows 尚未进入首期支持范围。
 
@@ -140,7 +140,13 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 - 索引巡检默认每 300 秒进入 `platform.indexing` 队列，间隔可通过 `INDEX_INSPECTION_INTERVAL_SECONDS` 在 `60～86400` 秒内调整；异常时先检查 Scheduler、Indexing Worker 和维护运行事实。
 - 不把 Cookie、`Authorization`、模型 Key、字段级 ABAC 受限内容或完整文档正文粘贴到工单和文档。
 
-### 7.1 索引巡检与重建
+### 7.1 可观测性
+
+运行状态页展示每项依赖的延迟、最近检查时间、关键性和稳定降级原因。Prometheus 抓取入口为 `http://127.0.0.1:8000/api/v1/metrics`，聚合 API 与五个 Worker 的多进程指标；共享指标文件位于 `.ai-platform/runtime/prometheus`，属于可删除运行数据，不进入业务备份。
+
+容器日志使用固定字段单行 JSON。平台事件可以按 Trace ID、Request ID 和 Task ID 关联；Uvicorn、Celery 和第三方库的原始消息会被安全 Formatter 丢弃，避免 URL 参数、任务载荷或异常正文旁路字段注册表。可选 OTLP Trace、指标明细、告警规则和排障顺序见 [可观测性与告警运维手册](./observability.md)。
+
+### 7.2 索引巡检与重建
 
 索引巡检只读取 PostgreSQL 中的文档发布、成功入库、索引版本、发布指针和 Chunk 引用，不把正文或向量复制到巡检证据。`index_maintenance_runs` 保存扫描、差异、修复、排队和清理计数，`index_inspection_findings` 保存稳定差异码及处理状态。
 

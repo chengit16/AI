@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from ai_platform_backend.integration.domain import AuditRecord
+from ai_platform_backend.observability import observed_operation
 
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
@@ -98,6 +99,7 @@ class ApprovalInstanceService:
         self._unit_of_work = unit_of_work
         self._policies = policies
 
+    @observed_operation(component="approval", operation="start")
     def start(
         self,
         context: RequestContext,
@@ -203,6 +205,7 @@ class ApprovalInstanceService:
             raise ApprovalInstanceDenied
         return state
 
+    @observed_operation(component="approval", operation="act")
     def act(
         self,
         context: RequestContext,
@@ -270,6 +273,7 @@ class ApprovalInstanceService:
         except ApprovalRuntimeWriteConflictError as error:
             raise ApprovalInstanceConflict from error
 
+    @observed_operation(component="approval", operation="process_due")
     def process_due(
         self,
         context: RequestContext,

@@ -1,8 +1,9 @@
 """加载 API 进程配置并在启动前关闭不安全的生产默认值。"""
 
 from functools import lru_cache
+from urllib.parse import urlparse
 
-from pydantic import SecretStr, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,10 @@ class Settings(BaseSettings):
     compatibility_matrix_path: str = "contracts/release/compatibility-matrix.v1.json"
     resource_registry_path: str = "contracts/authorization/resource-registry.v1.json"
     field_policy_registry_path: str = "contracts/authorization/field-policy-registry.v1.json"
+    observability_field_registry_path: str = "contracts/observability/field-registry.v1.json"
+    observability_otlp_endpoint: str | None = None
+    observability_otlp_timeout_seconds: float = 2.0
+    observability_safe_library_logging: bool = False
     master_key_path: str = ".ai-platform/secrets/master.key"
     master_key_version: int = 1
     database_url: str = "postgresql+psycopg://ai_platform@127.0.0.1:5432/ai_platform"
@@ -47,6 +52,13 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = 43_200
     session_cookie_secure: bool = False
     local_mock_bootstrap_enabled: bool = False
+
+    @field_validator("observability_otlp_endpoint", mode="before")
+    @classmethod
+    def normalize_optional_otlp_endpoint(cls, value: object) -> object:
+        """把 Compose 空变量恢复为空配置，避免误向无效地址导出 Trace。"""
+
+        return None if value == "" else value
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
@@ -80,6 +92,14 @@ class Settings(BaseSettings):
             raise ValueError("SSE 通知连接超时必须位于 0.05 到 5 秒之间")
         if not 64 <= self.stream_delta_batch_characters <= 4_096:
             raise ValueError("SSE 增量批次字符数必须位于 64 到 4096 之间")
+        if not 0.1 <= self.observability_otlp_timeout_seconds <= 10:
+            raise ValueError("OTLP 导出超时必须位于 0.1 到 10 秒之间")
+        if self.observability_otlp_endpoint is not None:
+            endpoint = urlparse(self.observability_otlp_endpoint)
+            if endpoint.scheme not in {"http", "https"} or endpoint.hostname is None:
+                raise ValueError("OTLP 导出地址必须是有效 HTTP(S) URL")
+            if self.environment not in {"local", "test"} and endpoint.scheme != "https":
+                raise ValueError("非本地环境的 OTLP 导出地址必须使用 HTTPS")
         # 3. 供应商白名单只保存规范域名，URL、端口与路径统一由地址策略单独校验。
         normalized_hosts = tuple(
             host.strip().casefold().rstrip(".") for host in self.model_provider_allowed_hosts

@@ -2,8 +2,9 @@
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlparse
 
-from pydantic import SecretStr, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 WorkerProcessLane = Literal["control", "parsing", "ocr", "embedding", "indexing", "scheduler"]
@@ -18,8 +19,13 @@ class WorkerSettings(BaseSettings):
         extra="ignore",
     )
 
+    app_name: str = "ai-platform-worker"
     environment: str = "local"
     version: str = "0.0.0"
+    observability_field_registry_path: str = "contracts/observability/field-registry.v1.json"
+    observability_otlp_endpoint: str | None = None
+    observability_otlp_timeout_seconds: float = 2.0
+    observability_safe_library_logging: bool = False
     database_url: str = "postgresql+psycopg://ai_platform@127.0.0.1:5432/ai_platform"
     valkey_url: str = "redis://127.0.0.1:6379/0"
     task_signing_key_path: str = ".ai-platform/secrets/task-signing.key"
@@ -54,6 +60,13 @@ class WorkerSettings(BaseSettings):
     indexing_max_chunk_chars: int = 1_500
     indexing_chunk_overlap_chars: int = 150
     indexing_chunker_version: str = "structural-char-v1"
+
+    @field_validator("observability_otlp_endpoint", mode="before")
+    @classmethod
+    def normalize_optional_otlp_endpoint(cls, value: object) -> object:
+        """把 Compose 空变量恢复为空配置，未配置 Collector 时只保留本地指标与日志。"""
+
+        return None if value == "" else value
 
     @property
     def worker_concurrency(self) -> int:
@@ -121,6 +134,14 @@ class WorkerSettings(BaseSettings):
         )
         if any(value < 1 or value > 8 for value in concurrency_values):
             raise ValueError("Worker Lane 并发必须位于 1 到 8 之间")
+        if not 0.1 <= self.observability_otlp_timeout_seconds <= 10:
+            raise ValueError("OTLP 导出超时必须位于 0.1 到 10 秒之间")
+        if self.observability_otlp_endpoint is not None:
+            endpoint = urlparse(self.observability_otlp_endpoint)
+            if endpoint.scheme not in {"http", "https"} or endpoint.hostname is None:
+                raise ValueError("OTLP 导出地址必须是有效 HTTP(S) URL")
+            if self.environment not in {"local", "test"} and endpoint.scheme != "https":
+                raise ValueError("非本地环境的 OTLP 导出地址必须使用 HTTPS")
         return self
 
 

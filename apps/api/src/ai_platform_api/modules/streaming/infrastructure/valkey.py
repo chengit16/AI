@@ -63,11 +63,8 @@ class ValkeyStreamNotifier(StreamNotifier):
     def publish(self, run_id: UUID) -> None:
         """发布固定载荷；消费者必须回查 PostgreSQL 才能取得事件和严格序号。"""
 
-        try:
-            self._client.publish(self.channel(run_id), "1")
-        except RedisError:
-            # 最佳努力通知不得改变已经提交的 PostgreSQL 事实。
-            return
+        # 上层在事实提交后统一收敛异常并记录降级；此处不能吞掉失败后伪报发布成功。
+        self._client.publish(self.channel(run_id), "1")
 
     def subscribe(self, run_id: UUID) -> StreamWakeupSubscription | None:
         """为单个 Run 建立隔离频道；订阅失败时显式返回空值启用轮询兜底。"""

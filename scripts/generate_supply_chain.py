@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from packaging.utils import canonicalize_name
+
 ROOT = Path(__file__).parents[1]
 OUTPUT_DIR = ROOT / "docs" / "supply-chain"
 PYTHON_SBOM = OUTPUT_DIR / "python-production.cdx.json"
@@ -23,10 +25,17 @@ PYTHON_DIRECT = {
     "celery",
     "cryptography",
     "fastapi",
+    "minio",
+    "opentelemetry-api",
+    "opentelemetry-exporter-otlp-proto-http",
+    "opentelemetry-sdk",
     "pdfplumber",
     "pgvector",
+    "prometheus-client",
     "psycopg",
     "pydantic-settings",
+    "python-multipart",
+    "redis",
     "sqlalchemy",
     "uvicorn",
 }
@@ -219,21 +228,22 @@ def python_license(distribution: Distribution) -> str:
 
 def python_licenses(python_sbom: dict[str, Any]) -> list[dict[str, Any]]:
     allowed = {
-        (str(component["name"]).lower(), str(component["version"]))
+        (canonicalize_name(str(component["name"])), str(component["version"]))
         for component in python_sbom["components"]
     }
     records: list[dict[str, Any]] = []
     for distribution in distributions():
         name = str(distribution.metadata.get("Name") or "")
         version = distribution.version
-        if (name.lower(), version) not in allowed:
+        normalized_name = canonicalize_name(name)
+        if (normalized_name, version) not in allowed:
             continue
         records.append(
             {
                 "name": name,
                 "version": version,
                 "license": python_license(distribution),
-                "direct": name.lower() in PYTHON_DIRECT,
+                "direct": normalized_name in PYTHON_DIRECT,
             }
         )
     return sorted(records, key=lambda record: (record["name"].lower(), record["version"]))
