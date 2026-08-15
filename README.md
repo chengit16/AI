@@ -12,6 +12,8 @@
 - [阶段 0 技术验证报告](./docs/stages/stage-0-report.md)：阶段 0 的实际环境、验证事实、限制和结论。
 - [阶段 1 实施计划](./docs/stages/stage-1-plan.md)：个人版与企业版 MVP 的节点依赖、交付物和门禁。
 - [阶段 1 验证报告](./docs/stages/stage-1-report.md)：阶段 1 的持续验证事实和状态口径。
+- [阶段 1 本地 MVP 发布报告](./docs/releases/stage-1-local-mvp/README.md)：本地交付范围、ReleaseManifest、验收状态和正式发布边界。
+- [本地 MVP 运维与故障处理手册](./docs/operations/local-mvp-operations.md)：启动、诊断、备份恢复、密钥轮换、升级回退和常见故障。
 - [供应链与许可证基线](./docs/supply-chain/README.md)：生产依赖 SBOM、漏洞审计和商业发布边界。
 - [前端 UI/UX 设计基线](./docs/design/ui-ux-baseline.md)：布局、动态菜单、响应式、可访问性和阶段 1 优化清单。
 - [Web 前端代码规范](./docs/governance/frontend-code-standards.md)：React、目录、状态、接口、样式、测试和质量门禁。

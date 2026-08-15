@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1G-05` 运维手册、MVP 报告、ReleaseManifest、阶段关闭提交与标签待开始 |
+| 当前节点 | `P1G-05` 运维手册、MVP 报告和 ReleaseManifest 已通过，等待阶段关闭提交与标签 |
 | `core_functional` | `passed` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -648,6 +648,17 @@
 - 自动验收：统一 `./scripts/verify` 全部通过，包括 React `36/36`、Python `437/437`、Ruff、mypy strict（427 个源文件）、Prettier、ESLint、TypeScript、UnoCSS、注释、架构、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链和 Vite 生产构建。沙箱首次执行因本地 PostgreSQL、MinIO 和 Tika 访问被拒绝，使用允许访问相同本地依赖的环境原样重跑后全部通过，不记为产品缺陷。
 - 容器与边界：`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260815_0035`、Valkey 和 Worker 八项诊断全部通过，浏览器控制台无错误。运行状态页的服务延迟、最近检查时间和详情入口作为后续可观测性增强，不阻断本地 MVP；真实供应商、Linux、容量、镜像扫描和 AI 质量状态保持不变。
 - 提交：`04d1908`。
+
+### P1G-05 本地 MVP 发布准备与阶段关闭
+
+- 状态：交付物与门禁通过，等待阶段关闭提交和 `stage-1-complete` 标签。
+- 运维交付：新增 [`本地 MVP 运维与故障处理手册`](../operations/local-mvp-operations.md)，覆盖 macOS/Linux 状态边界、目录与密钥职责、一键启动、健康与日志定位、平台管理员、真实模型接入、加密备份恢复、导入导出、主密钥轮换、升级回退和常见故障。恢复包与独立恢复密钥的分离保管、破坏性恢复确认和失败关闭规则保持与 `ADR-004` 一致。
+- MVP 报告：新增 [`阶段 1 本地 MVP 发布报告`](../releases/stage-1-local-mvp/README.md)，汇总交付范围和验收索引；`core_functional=passed`，真实供应商与 AI 质量保持 `not_configured`，容量和 Linux 保持 `not_run`，不会把本地 Mock 或 macOS 结果描述为生产结论。
+- ReleaseManifest：生成 `0.1.0` 本地 MVP 清单，冻结 Web、API、Worker、契约源码摘要、数据库 Revision `20260815_0035`、Node `24.19.0`、Python `3.12.12` 和 7 个 `linux/arm64` 验收镜像内容摘要；清单自摘要为 `sha256:e8983e87cf681491b0173a0c2b1e8740e3e436316d45ad57b1eff568e7b62943`，生成漂移和 `p1a-02-v1` 兼容矩阵检查通过。
+- 自动与联合门禁：最终工作树执行 `./scripts/verify` 全部通过，包括 React `36/36`、Python `437/437`、Ruff、mypy strict（427 个源文件）、Prettier、ESLint、TypeScript、UnoCSS、注释、架构、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、供应链和 Vite 生产构建。重新执行 `scripts/run_p1g02_acceptance.py`，个人/企业联合越权、安全、SSE、审批、恢复、模型故障和配额清单 `33/33` 通过。
+- 容器门禁：`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker 八项全部通过。开发级供应链门禁为 `passed`；正式发布级门禁按设计返回 `blocked`，原因仍是镜像漏洞扫描 `not_configured` 和 Linux 宿主机验收 `not_run`，因此不创建正式发布供应链归档。
+- 当前边界：本节点关闭本地 MVP 阶段，不改变既定后置范围，不提前实现阶段 2 可靠性、阶段 3 Agent 控制面或 SaaS/Go/真实多源连接器/LLM Grading/多模态/Channel Gateway/Durable Run。阶段关闭提交必须回填本节点 SHA、给出阶段通过结论并创建 `stage-1-complete` 标签。
+- 提交：待阶段关闭提交回填。
 
 ## 4. 当前限制
 

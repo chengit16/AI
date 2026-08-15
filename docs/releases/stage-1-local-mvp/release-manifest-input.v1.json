@@ -1,0 +1,78 @@
+{
+  "release_version": "0.1.0",
+  "compatibility_matrix_version": "p1a-02-v1",
+  "components": [
+    {
+      "name": "web",
+      "version": "0.1.0",
+      "source_digest": "sha256:7653c02d7d6f06bc441d57ad41a5a669167e3a4732361e40655be870d43c49e7"
+    },
+    {
+      "name": "api",
+      "version": "0.1.0",
+      "source_digest": "sha256:e5acca4d59dc2d89351c9e771f2e88fcf20467d01fd72fbb7093b0af96673ec8"
+    },
+    {
+      "name": "worker",
+      "version": "0.1.0",
+      "source_digest": "sha256:87a6a4ee16073321a6279184ab54d02c5e68a7003a6f1834d23c9dfc3ded346e"
+    },
+    {
+      "name": "contracts",
+      "version": "1.0.0",
+      "source_digest": "sha256:d8d324a23210a2bc59ca69f6bfc757b6715ee9fca4ad16c115621fbbf9a2f88a"
+    }
+  ],
+  "database": {
+    "schema_revision": "20260815_0035"
+  },
+  "runtimes": {
+    "node": "24.19.0",
+    "python": "3.12.12"
+  },
+  "images": [
+    {
+      "name": "api",
+      "reference": "ai-intelligent-platform-api:latest",
+      "digest": "sha256:420636515920685441572df43ecac6ffe1dd76ae1e4dafb3887ce3e0d37b0c65",
+      "platforms": ["linux/arm64"]
+    },
+    {
+      "name": "minio",
+      "reference": "minio/minio:RELEASE.2025-07-23T15-54-02Z",
+      "digest": "sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0",
+      "platforms": ["linux/arm64"]
+    },
+    {
+      "name": "postgres",
+      "reference": "pgvector/pgvector:pg16",
+      "digest": "sha256:a36250871de0833b8757561c72f2477ef1ddd1101afa4e617fb552e0de514c6b",
+      "platforms": ["linux/arm64"]
+    },
+    {
+      "name": "tika",
+      "reference": "ai-platform-tika:3.2.3-chi-sim",
+      "digest": "sha256:6be5e49d6e75465d7b53256651a758dfcc38e25c3dfd826158561e85a91b8575",
+      "platforms": ["linux/arm64"]
+    },
+    {
+      "name": "valkey",
+      "reference": "valkey/valkey:8.1.5-alpine@sha256:918228e4ff7da6b3a4213cb18067f6e09d9f0503d0a08868699ba227cff71861",
+      "digest": "sha256:918228e4ff7da6b3a4213cb18067f6e09d9f0503d0a08868699ba227cff71861",
+      "platforms": ["linux/arm64"]
+    },
+    {
+      "name": "web",
+      "reference": "ai-intelligent-platform-web:latest",
+      "digest": "sha256:2328d9512aef7c2258cb28703d59a9fcc5c81e091fbd8bee6bb215067ee3f860",
+      "platforms": ["linux/arm64"]
+    },
+    {
+      "name": "worker",
+      "reference": "ai-intelligent-platform-worker:latest",
+      "digest": "sha256:a8b29acc2898c541a2a528dccf4d7d829a1390fbca6f0435c56df9d12e7997bd",
+      "platforms": ["linux/arm64"]
+    }
+  ]
+}
+
