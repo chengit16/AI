@@ -7,11 +7,11 @@
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-04` 测试集与自动评估 |
+| 当前节点 | `P3-05` 发布审批门禁 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期与严格配置校验已通过 |
+| Agent 控制面 | `in_progress`，生命周期、严格配置校验与自动评估门禁已通过 |
 | 服务发布与回滚 | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -26,7 +26,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0043` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0044` |
 | 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实供应商或 AI 质量 |
 
@@ -71,14 +71,26 @@
 - 当前边界：本节点只建立可冻结、可复算的配置事实和发布前引用门禁，不提前实现 P3-04 测试评估、P3-05 审批、P3-06 Release 生成、外部写工具或后置能力。
 - 提交：`773d2b9`。
 
+### P3-04 测试集与自动评估
+
+- 状态：已完成，提交 `4dbc736`。
+- 固定测试事实：新增工作空间隔离、内容寻址且不可变的测试集版本和用例事实；测试集必须完整覆盖 `functional`、`authorization`、`prompt_injection`、`citation` 和 `output_contract` 五类检查，同一版本只能重放相同内容，不能原地替换。
+- 确定性评估：固定离线规则策略、用例阈值和内部可信 `AgentEvaluationExecutor` 端口；失败、超时和缺失观测统一计为失败，`authorization`、`prompt_injection`、`citation` 与 `output_contract` 为不可被普通功能分抵消的硬门禁。在线 LLM Grading 和多模态图片问答保持关闭，不把 Mock 结果描述为真实 AI 质量。
+- 结果与候选门禁：评估运行、检查汇总和用例结果不可变，只保存分数、时延、状态和无敏感正文的摘要；相同候选、测试集和策略已有结果时直接重放，不重复调用执行器。完整通过后候选进入 `ready_for_approval`，失败进入 `test_failed`；应用层和数据库 Trigger 均拒绝缺少匹配通过证据的绕过晋级。
+- 专项验收：P3-04 单元 `5/5`，P3-02～P3-04 联合单元 `19/19`，真实 PostgreSQL、Migration 和相邻 Agent 节点联合 `17/17`，空库升级、降级、再升级与公共表兼容 `4/4`；覆盖内容漂移、结果幂等、硬门禁、超时、跳过、跨空间访问、结果篡改和直接更新候选状态。
+- 统一门禁：`./scripts/verify` 通过 React `42/42`、Python `590/590`、Ruff format/lint `528` 个文件、mypy strict `528` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器验收：重新构建并升级本地平台后，`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision `20260816_0044`、Valkey、五个 Worker Lane 和 Scheduler 共 13 项通过；公共数据库已真实升级。本节点未增加 HTTP 路由或页面，因此不执行浏览器验收。
+- 当前边界：本节点证明固定规则和核心功能评估链路，不代表真实模型供应商、AI 质量或容量认证；只为 `P3-05` 预留通过证据读取门禁，不提前实现审批、Release 生成、服务路由或后置能力。
+- 提交：`4dbc736`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布供应链门禁继续阻断。
-- 阶段 3 尚未完成测试评估、审批、服务路由、灰度和回滚，不能把生命周期与配置事实描述为完整 Agent 控制面。
+- 阶段 3 尚未完成审批、Release 生成、服务路由、灰度和回滚，不能把当前控制面事实描述为完整 Agent 发布平台。
 - LLM Grading、多模态图片问答、真实多源连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 均保持后置。
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实和 `P3-03` 草稿配置校验已通过，当前进入 `P3-04` 测试集与自动评估；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验和 `P3-04` 测试集与自动评估已通过，当前进入 `P3-05` 发布审批门禁；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
