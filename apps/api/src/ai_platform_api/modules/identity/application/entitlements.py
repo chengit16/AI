@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID
@@ -11,6 +12,7 @@ from ai_platform_api.modules.identity.application.entitlement_errors import (
     EntitlementConflictError,
     EntitlementFeatureDeniedError,
     EntitlementGovernanceDeniedError,
+    EntitlementValidationError,
 )
 from ai_platform_api.modules.identity.application.entitlement_support import (
     browser_account,
@@ -25,11 +27,23 @@ from ai_platform_api.modules.identity.domain.entitlements import (
     EntitlementSnapshot,
     EntitlementUnitOfWork,
     EntitlementWriteConflictError,
+    UsageCursorError,
     UsageMetric,
+    UsageReconciliation,
     UsageRecord,
+    UsageRecordPage,
 )
 
-__all__ = ["EntitlementService", "EntitlementSnapshot"]
+__all__ = [
+    "EntitlementService",
+    "EntitlementSnapshot",
+    "UsageMetric",
+    "UsageReconciliation",
+    "UsageRecord",
+    "UsageRecordPage",
+]
+
+USAGE_PERIOD_PATTERN = re.compile(r"^(?:lifetime|[0-9]{4}-[0-9]{2})$")
 
 
 class EntitlementService:
@@ -147,6 +161,49 @@ class EntitlementService:
         except EntitlementWriteConflictError as error:
             raise EntitlementConflictError from error
 
+    def list_usage_records(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        limit: int,
+        cursor: UUID | None = None,
+        metric: UsageMetric | None = None,
+        period_key: str | None = None,
+    ) -> UsageRecordPage:
+        """返回可按计量项和周期核对的幂等用量明细。"""
+
+        _require_operations_read(context, workspace_id)
+        if (
+            limit < 1
+            or limit > 200
+            or (period_key is not None and USAGE_PERIOD_PATTERN.fullmatch(period_key) is None)
+        ):
+            raise EntitlementValidationError
+        try:
+            with self._unit_of_work as unit_of_work:
+                return unit_of_work.entitlements.list_usage_records(
+                    workspace_id,
+                    limit=limit,
+                    cursor=cursor,
+                    metric=metric,
+                    period_key=period_key,
+                )
+        except UsageCursorError as error:
+            raise EntitlementValidationError from error
+
+    def reconcile_usage(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+    ) -> tuple[UsageReconciliation, ...]:
+        """对比用量计数器和不可变明细，任何差异都保持可见而不自动改账。"""
+
+        _require_operations_read(context, workspace_id)
+        with self._unit_of_work as unit_of_work:
+            return unit_of_work.entitlements.list_usage_reconciliation(workspace_id)
+
     def consume(
         self,
         *,
@@ -179,3 +236,14 @@ class EntitlementService:
                 return mutation.record
         except EntitlementWriteConflictError as error:
             raise EntitlementConflictError from error
+
+
+def _require_operations_read(context: RequestContext, workspace_id: UUID) -> None:
+    """运营用量只允许通过已登记权限读取，不能复用普通套餐查看权限扩大范围。"""
+
+    if (
+        context.workspace_id != workspace_id
+        or context.authorized_permission_code != "operations.records.read"
+        or not context.authorized_workspace
+    ):
+        raise EntitlementGovernanceDeniedError

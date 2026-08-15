@@ -159,6 +159,30 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 
 当前周期巡检由 Scheduler 自动执行。全量重建和失败产物清理已经具备幂等应用层，但人工操作入口将在 `P2-10` 受控运营工作台统一接入权限、确认和审计；在此之前不得直接修改索引表或伪造维护运行记录。出现持续 `unresolved` 时保留运行 ID、差异码、工作空间和文档 ID，检查成功入库 Artifact 是否仍存在，再按后续受控入口处理，禁止记录文档正文。
 
+### 7.3 审计、用量与 Outbox 运营
+
+P2-07 提供工作空间级运营 API，当前不提前建设 `P2-10` 的可视化工作台。个人空间和企业空间使用同一安全边界：只有默认 `workspace_owner` 获得 `operations.records.read` 和 `operations.outbox.replay`，自定义菜单或页面可见性不能替代服务端权限。全部读取必须绑定可信工作空间，其他空间的游标也会被拒绝。
+
+| 能力 | API | 运营边界 |
+| --- | --- | --- |
+| 审计查询 | `GET /api/v1/workspaces/{workspace_id}/operations/audit-records` | 可按主体、动作、资源类型、结果和时间筛选；返回权限码、策略决策 ID、策略版本与 Trace，不返回自由属性 |
+| 用量明细 | `GET /api/v1/workspaces/{workspace_id}/operations/usage-records` | 可按计量项和周期筛选不可变账本，游标分页上限为 200 条 |
+| 用量对账 | `GET /api/v1/workspaces/{workspace_id}/operations/usage-reconciliation` | 对比当前计数器、明细累计和最后结果；发现差异只报告，不自动改账 |
+| Outbox 查询 | `GET /api/v1/workspaces/{workspace_id}/operations/outbox-events` | 可按状态、事件类型和时间筛选；响应刻意不包含事件 Payload |
+| 集成巡检 | `GET /api/v1/workspaces/{workspace_id}/operations/integration-inspection` | 汇总状态、最老积压、过期租约、不兼容 Schema、重放请求、重复投递和幂等异常 |
+| Outbox 重放 | `POST /api/v1/workspaces/{workspace_id}/operations/outbox-events/{event_id}/replay` | 只接受浏览器主体、客户端幂等键和结构化原因码，只能重放 `published` 或 `dead_letter` 事件 |
+
+日常巡检先看 `oldest_pending_age_seconds`、`expired_claim_count`、`incompatible_schema_count` 和 `idempotency_issue_count`。最老积压超过 300 秒、存在不兼容 Schema 或幂等异常时，应保留工作空间、事件 ID、稳定错误码、Request ID 和 Trace ID，检查 Outbox 发布器与对应消费者；禁止把 Payload、用户正文或凭据复制到排障记录。
+
+人工重放必须满足以下规则：
+
+1. 先确认来源事件已是 `published` 或 `dead_letter`，并已排除消费者实现、Schema 或依赖仍然故障的情况。
+2. 使用 8～128 字符的稳定 `idempotency_key`，同一次运营动作重试必须复用原值；`reason_code` 使用 3～64 字符的大写结构化原因码。
+3. 重放保留原 `event_id`，重放请求事实、事件重新排队和审计记录在同一事务提交。重复请求返回同一不可变重放记录，不能生成第二次运营动作。
+4. 消费者收到相同事件时只更新 `delivery_count` 和 `last_received_at`，不得再次执行已完成的业务投影。重放后应再次检查集成巡检、事件状态和消费回执。
+
+用量对账的 `consistent=false` 代表计数器、账本累计或最后结果存在差异。当前接口不会自动修复，也不得直接修改 `usage_counters` 或用量明细；应保存计量项、周期、计数器版本和差异值，等待后续受控修复能力。审计、用量明细、消费回执和重放请求均属于追溯事实，不通过普通运营接口删除或覆盖。
+
 ## 8. 备份、导出、恢复与导入
 
 ### 8.1 创建恢复包

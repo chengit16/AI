@@ -73,6 +73,8 @@ OWNER_PERMISSION_CODES = (
     "organization.position.read",
     "organization.position.status",
     "organization.structure.access",
+    "operations.outbox.replay",
+    "operations.records.read",
     "system.runtime.access",
     "workspace.context.switch",
     "workspace.entitlement.read",

@@ -74,6 +74,12 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityUnitOfWork,
     SqlAlchemyRegistrationUnitOfWork,
 )
+from ai_platform_api.modules.integration.application.operations import (
+    IntegrationOperationsService,
+)
+from ai_platform_api.modules.integration.infrastructure.operations_sqlalchemy import (
+    SqlAlchemyIntegrationOperationsUnitOfWork,
+)
 from ai_platform_api.modules.knowledge.application.facts import KnowledgeFactService
 from ai_platform_api.modules.knowledge.application.management import KnowledgeManagementService
 from ai_platform_api.modules.knowledge.application.uploads import KnowledgeUploadService
@@ -179,6 +185,7 @@ class ApplicationContainer:
     sessions: ValkeySessionStore
     menu_configuration: MenuConfigurationService | None = None
     menu_releases: MenuReleaseService | None = None
+    integration_operations: IntegrationOperationsService | None = None
     knowledge_facts: KnowledgeFactService | None = None
     knowledge_uploads: KnowledgeUploadService | None = None
     knowledge_management: KnowledgeManagementService | None = None
@@ -428,6 +435,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             entitlements=EntitlementService(
                 unit_of_work=SqlAlchemyEntitlementUnitOfWork(database.sessions),
+            ),
+            integration_operations=IntegrationOperationsService(
+                SqlAlchemyIntegrationOperationsUnitOfWork(database.sessions)
             ),
             organization=OrganizationService(
                 unit_of_work=SqlAlchemyOrganizationUnitOfWork(database.sessions),

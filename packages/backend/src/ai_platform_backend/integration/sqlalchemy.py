@@ -64,6 +64,7 @@ class SqlAlchemyAuditWriter:
         self._session = session
 
     def add(self, record: AuditRecord) -> None:
+        authorization = record.authorization
         self._session.execute(
             insert(audit_records).values(
                 audit_id=record.audit_id,
@@ -78,6 +79,15 @@ class SqlAlchemyAuditWriter:
                 request_id=record.request_id,
                 trace_id=record.trace_id,
                 traceparent=record.traceparent,
+                permission_code=(
+                    authorization.permission_code if authorization is not None else None
+                ),
+                policy_decision_id=(
+                    authorization.policy_decision_id if authorization is not None else None
+                ),
+                policy_version=(
+                    authorization.policy_version if authorization is not None else None
+                ),
                 attributes=record.attributes,
             )
         )
@@ -291,11 +301,28 @@ class SqlAlchemyConsumerUnitOfWork:
                 processed_at=processed_at,
                 trace_id=trace_id,
                 traceparent=traceparent,
+                delivery_count=1,
+                last_received_at=processed_at,
             )
             .on_conflict_do_nothing()
             .returning(consumer_receipts.c.event_id)
         )
-        return self.session.execute(statement).scalar_one_or_none() is not None
+        inserted = self.session.execute(statement).scalar_one_or_none()
+        if inserted is not None:
+            return True
+        # 重复投递只增加接收次数，消费位置和业务投影仍保持同一份原子事实。
+        self.session.execute(
+            update(consumer_receipts)
+            .where(
+                consumer_receipts.c.consumer_name == consumer_name,
+                consumer_receipts.c.event_id == event.event_id,
+            )
+            .values(
+                delivery_count=consumer_receipts.c.delivery_count + 1,
+                last_received_at=processed_at,
+            )
+        )
+        return False
 
     def apply_projection(self, event: IntegrationEvent, *, traceparent: str) -> None:
         statement = insert(resource_projections).values(

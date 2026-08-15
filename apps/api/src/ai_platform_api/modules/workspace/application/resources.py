@@ -115,6 +115,7 @@ class CreateWorkspaceResource:
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
             # 审计属性只保留版本等非敏感结构，不复制资源标题或受保护字段正文。
             attributes={"resource_version": resource.version},
         )

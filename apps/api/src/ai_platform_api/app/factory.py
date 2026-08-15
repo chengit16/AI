@@ -26,6 +26,7 @@ from ai_platform_api.modules.identity.api.entitlement_routes import router as en
 from ai_platform_api.modules.identity.api.organization_routes import router as organization_router
 from ai_platform_api.modules.identity.api.role_routes import router as role_router
 from ai_platform_api.modules.identity.api.routes import router as identity_router
+from ai_platform_api.modules.integration.api.routes import router as integration_operations_router
 from ai_platform_api.modules.knowledge.api.routes import router as knowledge_router
 from ai_platform_api.modules.model_gateway.api.routes import (
     router as model_provider_router,
@@ -90,6 +91,7 @@ def create_app(
     application.state.registration_service = dependencies.registration
     application.state.enterprise_workspace_service = dependencies.enterprise_workspaces
     application.state.entitlement_service = dependencies.entitlements
+    application.state.integration_operations_service = dependencies.integration_operations
     application.state.organization_service = dependencies.organization
     application.state.role_service = dependencies.roles
     application.state.resource_registry = dependencies.resource_registry
@@ -125,6 +127,7 @@ def create_app(
     application.include_router(identity_router, prefix="/api/v1")
     application.include_router(workspace_router, prefix="/api/v1")
     application.include_router(entitlement_router, prefix="/api/v1")
+    application.include_router(integration_operations_router, prefix="/api/v1")
     application.include_router(organization_router, prefix="/api/v1")
     application.include_router(role_router, prefix="/api/v1")
     application.include_router(authorization_router, prefix="/api/v1")

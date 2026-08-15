@@ -68,6 +68,8 @@ class IdempotentProjectionConsumer:
                 traceparent=traceparent,
                 processed_at=processed_at,
             ):
+                # 重复接收次数也是运营事实，必须提交，但不能再次执行投影副作用。
+                unit_of_work.commit()
                 return False
             # 2. 投影和消费位置共享一次提交，进程失败后可安全重投而不重复副作用。
             unit_of_work.apply_projection(event, traceparent=traceparent)

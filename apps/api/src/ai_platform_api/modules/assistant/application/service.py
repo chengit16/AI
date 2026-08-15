@@ -822,6 +822,7 @@ def _record_conversation_event(
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
             attributes={"status": conversation.status, "version": conversation.version},
         )
     )
@@ -867,6 +868,7 @@ def _record_run_queued(
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
             attributes={
                 "conversation_id": str(run.conversation_id),
                 "message_id": str(run.user_message_id),
@@ -929,6 +931,7 @@ def _record_run_finished(
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
             attributes=attributes,
         )
     )
@@ -980,6 +983,7 @@ def _record_feedback_event(
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
             attributes=attributes,
         )
     )

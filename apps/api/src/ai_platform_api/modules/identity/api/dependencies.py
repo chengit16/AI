@@ -206,6 +206,8 @@ def _authorize_registered_operation(request: Request, context: RequestContext) -
     return replace(
         context,
         authorized_permission_code=decision.permission_code,
+        authorized_policy_decision_id=decision.decision_id,
+        authorized_policy_version=decision.policy_version,
         authorized_workspace=decision.resource_scope.workspace,
         authorized_department_ids=decision.resource_scope.department_ids,
         authorized_account_ids=decision.resource_scope.account_ids,
@@ -241,6 +243,7 @@ def _resource_reference(
                 "approval_instance_id",
                 "workflow_run_id",
                 "workflow_id",
+                "event_id",
             )
             if (value := values.get(key)) is not None
         ),
@@ -263,6 +266,7 @@ def _resource_reference(
             "approval_instance_id",
             "workflow_run_id",
             "workflow_id",
+            "event_id",
         )
         if (value := values.get(key)) is not None
     }

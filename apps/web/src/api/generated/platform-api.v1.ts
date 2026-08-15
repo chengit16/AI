@@ -1228,6 +1228,126 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/audit-records": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Audit Records
+     * @description 按工作空间和可选筛选返回审计记录。
+     */
+    readonly get: operations["listOperationsAuditRecords"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/integration-inspection": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Integration Inspection
+     * @description 汇总 Outbox 积压、Schema 兼容和消费者幂等状态。
+     */
+    readonly get: operations["getOperationsIntegrationInspection"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/outbox-events": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Outbox Events
+     * @description 分页返回 Outbox 追踪元数据，响应结构不包含 Payload。
+     */
+    readonly get: operations["listOperationsOutboxEvents"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/outbox-events/{event_id}/replay": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Replay Outbox Event
+     * @description 保留原事件 ID 重排已发布或死信事件，并记录不可变人工请求。
+     */
+    readonly post: operations["replayOperationsOutboxEvent"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/usage-reconciliation": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Usage Reconciliation
+     * @description 对账当前计数器、明细累计和最后结果，不自动改写账本。
+     */
+    readonly get: operations["getOperationsUsageReconciliation"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/usage-records": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Usage Records
+     * @description 按计量项和周期分页读取不可变用量明细。
+     */
+    readonly get: operations["listOperationsUsageRecords"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/organization/departments": {
     readonly parameters: {
       readonly query?: never;
@@ -2307,6 +2427,71 @@ export type components = {
       };
     };
     /**
+     * AuditRecordPageResponse
+     * @description 返回一页审计事实及下一页稳定游标。
+     */
+    readonly AuditRecordPageResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["AuditRecordResponse"][];
+      /** Next Cursor */
+      readonly next_cursor: string | null;
+    };
+    /**
+     * AuditRecordResponse
+     * @description 返回可关联主体、资源、授权策略和 Trace 的审计事实。
+     */
+    readonly AuditRecordResponse: {
+      /** Action */
+      readonly action: string;
+      /**
+       * Actor Id
+       * Format: uuid
+       */
+      readonly actor_id: string;
+      /**
+       * Audit Id
+       * Format: uuid
+       */
+      readonly audit_id: string;
+      /**
+       * Occurred At
+       * Format: date-time
+       */
+      readonly occurred_at: string;
+      /**
+       * Outcome
+       * @enum {string}
+       */
+      readonly outcome: "succeeded" | "denied" | "failed";
+      /** Permission Code */
+      readonly permission_code: string | null;
+      /** Policy Decision Id */
+      readonly policy_decision_id: string | null;
+      /** Policy Version */
+      readonly policy_version: number | null;
+      /**
+       * Request Id
+       * Format: uuid
+       */
+      readonly request_id: string;
+      /**
+       * Resource Id
+       * Format: uuid
+       */
+      readonly resource_id: string;
+      /** Resource Type */
+      readonly resource_type: string;
+      /** Trace Id */
+      readonly trace_id: string;
+      /** User Id */
+      readonly user_id: string | null;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
      * AuthenticationContextResponse
      * @description 定义认证上下文操作的稳定响应结构。
      */
@@ -3178,6 +3363,33 @@ export type components = {
       readonly updated_at: string;
     };
     /**
+     * IntegrationInspectionResponse
+     * @description 返回 Outbox 积压、Schema 与消费者幂等巡检摘要。
+     */
+    readonly IntegrationInspectionResponse: {
+      /**
+       * Checked At
+       * Format: date-time
+       */
+      readonly checked_at: string;
+      /** Consumer Receipt Count */
+      readonly consumer_receipt_count: number;
+      /** Duplicate Delivery Count */
+      readonly duplicate_delivery_count: number;
+      /** Expired Claim Count */
+      readonly expired_claim_count: number;
+      /** Idempotency Issue Count */
+      readonly idempotency_issue_count: number;
+      /** Incompatible Schema Count */
+      readonly incompatible_schema_count: number;
+      /** Oldest Pending Age Seconds */
+      readonly oldest_pending_age_seconds: number;
+      /** Replay Request Count */
+      readonly replay_request_count: number;
+      /** Status Counts */
+      readonly status_counts: readonly components["schemas"]["OutboxStatusCountResponse"][];
+    };
+    /**
      * InviteWorkspaceMemberRequest
      * @description 定义邀请工作空间成员操作的请求字段与协议校验边界。
      */
@@ -3831,6 +4043,154 @@ export type components = {
       readonly active: boolean;
     };
     /**
+     * OutboxEventPageResponse
+     * @description 返回一页不含 Payload 的 Outbox 元数据。
+     */
+    readonly OutboxEventPageResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["OutboxEventResponse"][];
+      /** Next Cursor */
+      readonly next_cursor: string | null;
+    };
+    /**
+     * OutboxEventResponse
+     * @description 返回 Outbox 运营元数据；协议结构刻意不定义 Payload。
+     */
+    readonly OutboxEventResponse: {
+      /** Actor Id */
+      readonly actor_id: string | null;
+      /**
+       * Aggregate Id
+       * Format: uuid
+       */
+      readonly aggregate_id: string;
+      /** Aggregate Version */
+      readonly aggregate_version: number;
+      /** Attempt Count */
+      readonly attempt_count: number;
+      /**
+       * Available At
+       * Format: date-time
+       */
+      readonly available_at: string;
+      /** Claim Until */
+      readonly claim_until: string | null;
+      /**
+       * Event Id
+       * Format: uuid
+       */
+      readonly event_id: string;
+      /** Event Type */
+      readonly event_type: string;
+      /** Last Error Code */
+      readonly last_error_code: string | null;
+      /**
+       * Occurred At
+       * Format: date-time
+       */
+      readonly occurred_at: string;
+      /** Published At */
+      readonly published_at: string | null;
+      /** Replay Count */
+      readonly replay_count: number;
+      /** Request Id */
+      readonly request_id: string | null;
+      /** Schema Version */
+      readonly schema_version: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "pending" | "publishing" | "published" | "dead_letter";
+      /** Trace Id */
+      readonly trace_id: string;
+      /** User Id */
+      readonly user_id: string | null;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * OutboxReplayBody
+     * @description 接收人工重放所需的客户端幂等键和结构化原因码。
+     */
+    readonly OutboxReplayBody: {
+      /** Idempotency Key */
+      readonly idempotency_key: string;
+      /** Reason Code */
+      readonly reason_code: string;
+    };
+    /**
+     * OutboxReplayResponse
+     * @description 返回首次重放请求的不可变事实，重复幂等调用复用同一记录。
+     */
+    readonly OutboxReplayResponse: {
+      /**
+       * Event Id
+       * Format: uuid
+       */
+      readonly event_id: string;
+      /** Idempotency Key */
+      readonly idempotency_key: string;
+      /** Reason Code */
+      readonly reason_code: string;
+      /**
+       * Replay Request Id
+       * Format: uuid
+       */
+      readonly replay_request_id: string;
+      /**
+       * Request Id
+       * Format: uuid
+       */
+      readonly request_id: string;
+      /**
+       * Requested At
+       * Format: date-time
+       */
+      readonly requested_at: string;
+      /**
+       * Requested By Actor Id
+       * Format: uuid
+       */
+      readonly requested_by_actor_id: string;
+      /** Requested By User Id */
+      readonly requested_by_user_id: string | null;
+      /** Source Attempt Count */
+      readonly source_attempt_count: number;
+      /** Source Error Code */
+      readonly source_error_code: string | null;
+      /** Source Published At */
+      readonly source_published_at: string | null;
+      /**
+       * Source Status
+       * @enum {string}
+       */
+      readonly source_status: "published" | "dead_letter";
+      /** Trace Id */
+      readonly trace_id: string;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * OutboxStatusCountResponse
+     * @description 返回一种 Outbox 状态的事件数量。
+     */
+    readonly OutboxStatusCountResponse: {
+      /** Count */
+      readonly count: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "pending" | "publishing" | "published" | "dead_letter";
+    };
+    /**
      * PositionListResponse
      * @description 定义职位列表操作的稳定响应结构。
      */
@@ -4355,6 +4715,85 @@ export type components = {
       readonly scan_status: "clean";
       /** Size Bytes */
       readonly size_bytes: number;
+    };
+    /**
+     * UsageReconciliationListResponse
+     * @description 返回工作空间全部计量项和周期的对账摘要。
+     */
+    readonly UsageReconciliationListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["UsageReconciliationResponse"][];
+    };
+    /**
+     * UsageReconciliationResponse
+     * @description 返回计数器、明细累计和最后结果的逐项对账状态。
+     */
+    readonly UsageReconciliationResponse: {
+      /** Consistent */
+      readonly consistent: boolean;
+      /** Counter Value */
+      readonly counter_value: number | null;
+      /** Counter Version */
+      readonly counter_version: number | null;
+      /** Latest Resulting Value */
+      readonly latest_resulting_value: number | null;
+      /**
+       * Metric
+       * @enum {string}
+       */
+      readonly metric:
+        "storage_bytes" | "knowledge_bases" | "published_agents" | "questions_monthly";
+      /** Period Key */
+      readonly period_key: string;
+      /** Record Count */
+      readonly record_count: number;
+      /** Record Delta Total */
+      readonly record_delta_total: number;
+    };
+    /**
+     * UsageRecordPageResponse
+     * @description 返回一页用量明细及下一页稳定游标。
+     */
+    readonly UsageRecordPageResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["UsageRecordResponse"][];
+      /** Next Cursor */
+      readonly next_cursor: string | null;
+    };
+    /**
+     * UsageRecordResponse
+     * @description 返回单条不可变用量增量与计数结果。
+     */
+    readonly UsageRecordResponse: {
+      /** Delta Value */
+      readonly delta_value: number;
+      /** Idempotency Key */
+      readonly idempotency_key: string;
+      /**
+       * Metric
+       * @enum {string}
+       */
+      readonly metric:
+        "storage_bytes" | "knowledge_bases" | "published_agents" | "questions_monthly";
+      /**
+       * Occurred At
+       * Format: date-time
+       */
+      readonly occurred_at: string;
+      /** Period Key */
+      readonly period_key: string;
+      /** Resulting Value */
+      readonly resulting_value: number;
+      /**
+       * Usage Record Id
+       * Format: uuid
+       */
+      readonly usage_record_id: string;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
     };
     /**
      * UserMessageCreatedResponse
@@ -10669,6 +11108,477 @@ export interface operations {
       };
       /** @description 资源状态冲突 */
       readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listOperationsAuditRecords: {
+    readonly parameters: {
+      readonly query?: {
+        readonly action?: string | null;
+        readonly actor_id?: string | null;
+        readonly cursor?: string | null;
+        readonly limit?: number;
+        readonly occurred_from?: string | null;
+        readonly occurred_to?: string | null;
+        readonly outcome?: ("succeeded" | "denied" | "failed") | null;
+        readonly resource_type?: string | null;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AuditRecordPageResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getOperationsIntegrationInspection: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["IntegrationInspectionResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listOperationsOutboxEvents: {
+    readonly parameters: {
+      readonly query?: {
+        readonly cursor?: string | null;
+        readonly event_type?: string | null;
+        readonly limit?: number;
+        readonly occurred_from?: string | null;
+        readonly occurred_to?: string | null;
+        readonly status?: ("pending" | "publishing" | "published" | "dead_letter") | null;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["OutboxEventPageResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly replayOperationsOutboxEvent: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly event_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["OutboxReplayBody"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["OutboxReplayResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getOperationsUsageReconciliation: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["UsageReconciliationListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listOperationsUsageRecords: {
+    readonly parameters: {
+      readonly query?: {
+        readonly cursor?: string | null;
+        readonly limit?: number;
+        readonly metric?:
+          ("storage_bytes" | "knowledge_bases" | "published_agents" | "questions_monthly") | null;
+        readonly period_key?: string | null;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["UsageRecordPageResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
         headers: {
           readonly [name: string]: unknown;
         };

@@ -5,6 +5,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
+    ForeignKeyConstraint,
     Index,
     Integer,
     MetaData,
@@ -34,8 +35,17 @@ audit_records = Table(
     Column("request_id", UUID(as_uuid=True), nullable=False),
     Column("trace_id", String(32), nullable=False),
     Column("traceparent", String(55), nullable=False),
+    Column("permission_code", String(160), nullable=True),
+    Column("policy_decision_id", UUID(as_uuid=True), nullable=True),
+    Column("policy_version", Integer, nullable=True),
     Column("attributes", JSONB, nullable=False),
     CheckConstraint("outcome IN ('succeeded', 'denied', 'failed')", name="ck_audit_outcome"),
+    CheckConstraint(
+        "(permission_code IS NULL AND policy_decision_id IS NULL AND policy_version IS NULL) "
+        "OR (permission_code IS NOT NULL AND policy_decision_id IS NOT NULL "
+        "AND policy_version >= 1)",
+        name="ck_audit_authorization",
+    ),
 )
 Index(
     "ix_audit_records_workspace_occurred",
@@ -73,6 +83,11 @@ outbox_events = Table(
     Column("claim_until", DateTime(timezone=True), nullable=True),
     Column("last_error_code", String(128), nullable=True),
     Column("published_at", DateTime(timezone=True), nullable=True),
+    UniqueConstraint(
+        "event_id",
+        "workspace_id",
+        name="uq_outbox_events_event_workspace",
+    ),
     CheckConstraint("schema_version >= 1", name="ck_outbox_events_schema_version"),
     CheckConstraint("aggregate_version >= 1", name="ck_outbox_events_aggregate_version"),
     CheckConstraint("attempt_count >= 0", name="ck_outbox_events_attempt_count"),
@@ -98,7 +113,69 @@ consumer_receipts = Table(
     Column("processed_at", DateTime(timezone=True), nullable=False),
     Column("trace_id", String(32), nullable=False),
     Column("traceparent", String(55), nullable=False),
+    Column("delivery_count", Integer, nullable=False),
+    Column("last_received_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint("consumer_name", "event_id", name="uq_consumer_receipts_consumer_event"),
+    CheckConstraint("delivery_count >= 1", name="ck_consumer_receipts_delivery_count"),
+)
+
+Index(
+    "ix_consumer_receipts_event_received",
+    consumer_receipts.c.event_id,
+    consumer_receipts.c.last_received_at,
+)
+
+outbox_replay_requests = Table(
+    "outbox_replay_requests",
+    metadata,
+    Column("replay_request_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("event_id", UUID(as_uuid=True), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("reason_code", String(64), nullable=False),
+    Column("source_status", String(32), nullable=False),
+    Column("source_attempt_count", Integer, nullable=False),
+    Column("source_published_at", DateTime(timezone=True), nullable=True),
+    Column("source_error_code", String(128), nullable=True),
+    Column("requested_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_user_id", UUID(as_uuid=True), nullable=True),
+    Column("request_id", UUID(as_uuid=True), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("requested_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_outbox_replay_requests_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["event_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.outbox_events.event_id",
+            f"{SCHEMA_TOKEN}.outbox_events.workspace_id",
+        ],
+        name="fk_outbox_replay_requests_event_workspace",
+        ondelete="RESTRICT",
+    ),
+    CheckConstraint(
+        "reason_code ~ '^[A-Z][A-Z0-9_]{2,63}$'",
+        name="ck_outbox_replay_requests_reason",
+    ),
+    CheckConstraint(
+        "source_status IN ('published', 'dead_letter')",
+        name="ck_outbox_replay_requests_source_status",
+    ),
+    CheckConstraint(
+        "source_attempt_count >= 0",
+        name="ck_outbox_replay_requests_attempt_count",
+    ),
+)
+
+Index(
+    "ix_outbox_replay_requests_event_time",
+    outbox_replay_requests.c.workspace_id,
+    outbox_replay_requests.c.event_id,
+    outbox_replay_requests.c.requested_at,
 )
 
 resource_projections = Table(

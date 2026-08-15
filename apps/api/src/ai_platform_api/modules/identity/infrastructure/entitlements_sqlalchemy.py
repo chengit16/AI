@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextvars import ContextVar
+from datetime import datetime
 from types import TracebackType
 from typing import Any, cast
 from uuid import UUID
@@ -12,7 +13,7 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
 )
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import func, insert, select, tuple_, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -26,8 +27,11 @@ from ai_platform_api.modules.identity.domain.entitlements import (
     EntitlementWriteConflictError,
     OpenApiEntitlement,
     UsageCounter,
+    UsageCursorError,
     UsageMetric,
+    UsageReconciliation,
     UsageRecord,
+    UsageRecordPage,
     WorkspaceEntitlement,
     WorkspaceFeatureSettings,
 )
@@ -199,6 +203,120 @@ class SqlAlchemyEntitlementRepository:
         )
         return tuple(self._counter(row) for row in rows)
 
+    def list_usage_records(
+        self,
+        workspace_id: UUID,
+        *,
+        limit: int,
+        cursor: UUID | None,
+        metric: UsageMetric | None,
+        period_key: str | None,
+    ) -> UsageRecordPage:
+        """使用稳定复合游标返回工作空间内的用量明细。"""
+
+        statement = select(workspace_usage_records).where(
+            workspace_usage_records.c.workspace_id == workspace_id
+        )
+        if cursor is not None:
+            cursor_position = self._usage_cursor(workspace_id, cursor)
+            statement = statement.where(
+                tuple_(
+                    workspace_usage_records.c.occurred_at,
+                    workspace_usage_records.c.usage_record_id,
+                )
+                < cursor_position
+            )
+        if metric is not None:
+            statement = statement.where(workspace_usage_records.c.metric == metric)
+        if period_key is not None:
+            statement = statement.where(workspace_usage_records.c.period_key == period_key)
+        rows = self._session.execute(
+            statement.order_by(
+                workspace_usage_records.c.occurred_at.desc(),
+                workspace_usage_records.c.usage_record_id.desc(),
+            ).limit(limit + 1)
+        )
+        items = tuple(self._usage_record(row) for row in rows)
+        return UsageRecordPage(
+            items=items[:limit],
+            next_cursor=(items[limit - 1].usage_record_id if len(items) > limit else None),
+        )
+
+    def list_usage_reconciliation(
+        self,
+        workspace_id: UUID,
+    ) -> tuple[UsageReconciliation, ...]:
+        """在数据库内聚合明细，并与当前计数器和最后结果逐项核对。"""
+
+        # 1. 聚合只返回每个计量项和周期的摘要，避免运营查询把整本用量明细载入内存。
+        summaries = self._session.execute(
+            select(
+                workspace_usage_records.c.metric,
+                workspace_usage_records.c.period_key,
+                func.count().label("record_count"),
+                func.sum(workspace_usage_records.c.delta_value).label("record_delta_total"),
+            )
+            .where(workspace_usage_records.c.workspace_id == workspace_id)
+            .group_by(
+                workspace_usage_records.c.metric,
+                workspace_usage_records.c.period_key,
+            )
+        ).all()
+        summary_by_key = {
+            (cast("UsageMetric", row.metric), row.period_key): (
+                int(row.record_count),
+                int(row.record_delta_total),
+            )
+            for row in summaries
+        }
+
+        # 2. 窗口排名选出每项最后结果；相同时间再按 UUID 排序，保证结果可重复。
+        rank = (
+            func.row_number()
+            .over(
+                partition_by=(
+                    workspace_usage_records.c.metric,
+                    workspace_usage_records.c.period_key,
+                ),
+                order_by=(
+                    workspace_usage_records.c.occurred_at.desc(),
+                    workspace_usage_records.c.usage_record_id.desc(),
+                ),
+            )
+            .label("record_rank")
+        )
+        ranked_records = (
+            select(
+                workspace_usage_records.c.metric,
+                workspace_usage_records.c.period_key,
+                workspace_usage_records.c.resulting_value,
+                rank,
+            )
+            .where(workspace_usage_records.c.workspace_id == workspace_id)
+            .subquery()
+        )
+        latest_by_key = {
+            (cast("UsageMetric", row.metric), row.period_key): int(row.resulting_value)
+            for row in self._session.execute(
+                select(ranked_records).where(ranked_records.c.record_rank == 1)
+            )
+        }
+        counters = {
+            (counter.metric, counter.period_key): counter
+            for counter in self.list_usage_counters(workspace_id)
+        }
+        keys = sorted(counters.keys() | summary_by_key.keys())
+        return tuple(
+            self._reconciliation(
+                metric=metric_key,
+                period_key=period_key,
+                counter=counters.get((metric_key, period_key)),
+                summary=summary_by_key.get((metric_key, period_key)),
+                latest_resulting_value=latest_by_key.get((metric_key, period_key)),
+            )
+            for metric_key, period_key in keys
+        )
+
     def get_usage_counter(
         self,
         workspace_id: UUID,
@@ -226,16 +344,7 @@ class SqlAlchemyEntitlementRepository:
         ).one_or_none()
         if row is None:
             return None
-        return UsageRecord(
-            row.usage_record_id,
-            row.workspace_id,
-            cast("UsageMetric", row.metric),
-            row.period_key,
-            row.idempotency_key,
-            row.delta_value,
-            row.resulting_value,
-            row.occurred_at,
-        )
+        return self._usage_record(row)
 
     def set_open_api_enabled(
         self,
@@ -334,6 +443,65 @@ class SqlAlchemyEntitlementRepository:
             row.used_value,
             row.updated_at,
             row.version,
+        )
+
+    @staticmethod
+    def _usage_record(row: Any) -> UsageRecord:
+        return UsageRecord(
+            row.usage_record_id,
+            row.workspace_id,
+            cast("UsageMetric", row.metric),
+            row.period_key,
+            row.idempotency_key,
+            row.delta_value,
+            row.resulting_value,
+            row.occurred_at,
+        )
+
+    def _usage_cursor(
+        self,
+        workspace_id: UUID,
+        usage_record_id: UUID,
+    ) -> tuple[datetime, UUID]:
+        row = self._session.execute(
+            select(
+                workspace_usage_records.c.occurred_at,
+                workspace_usage_records.c.usage_record_id,
+            ).where(
+                workspace_usage_records.c.workspace_id == workspace_id,
+                workspace_usage_records.c.usage_record_id == usage_record_id,
+            )
+        ).one_or_none()
+        if row is None:
+            raise UsageCursorError
+        return row.occurred_at, row.usage_record_id
+
+    @staticmethod
+    def _reconciliation(
+        *,
+        metric: UsageMetric,
+        period_key: str,
+        counter: UsageCounter | None,
+        summary: tuple[int, int] | None,
+        latest_resulting_value: int | None,
+    ) -> UsageReconciliation:
+        record_count, record_delta_total = summary or (0, 0)
+        counter_value = counter.used_value if counter is not None else None
+        # 明细累计值和最后结果都必须等于计数器；缺任一侧即保留为不一致供运营排查。
+        consistent = (
+            counter_value is not None
+            and latest_resulting_value is not None
+            and counter_value == latest_resulting_value == record_delta_total
+        )
+        return UsageReconciliation(
+            metric=metric,
+            period_key=period_key,
+            counter_value=counter_value,
+            counter_version=counter.version if counter is not None else None,
+            record_count=record_count,
+            record_delta_total=record_delta_total,
+            latest_resulting_value=latest_resulting_value,
+            consistent=consistent,
         )
 
 

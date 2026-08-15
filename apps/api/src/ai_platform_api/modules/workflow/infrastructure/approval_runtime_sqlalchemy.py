@@ -500,6 +500,7 @@ def record_embedded_approval_created(
             request_id=context.request_id,
             trace_id=instance.trace_id,
             traceparent=instance.traceparent,
+            authorization=context.audit_authorization,
             attributes=attributes,
         )
     )

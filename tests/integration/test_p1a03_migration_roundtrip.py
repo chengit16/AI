@@ -96,7 +96,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260815_0038"
+    assert current_revision(connection, schema) == "20260815_0039"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -137,6 +137,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "message_feedbacks",
         "open_api_keys",
         "outbox_events",
+        "outbox_replay_requests",
         "positions",
         "platform_administrators",
         "platform_audit_records",
@@ -186,7 +187,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260815_0038"
+    assert current_revision(connection, schema) == "20260815_0039"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -524,7 +525,7 @@ def test_existing_menu_release_is_copied_and_restored_without_mutation(
     connection.commit()
 
     # 2. 升级必须复制新事实并切换指针，原快照、原摘要和来源发布保持不变。
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260815_0035")
     connection.commit()
     releases = (
         connection.execute(

@@ -218,6 +218,28 @@ class AssistantSourceResponse(typing.TypedDict):
     source_position: dict[str, object]
 
 
+class AuditRecordPageResponse(typing.TypedDict):
+    items: list[AuditRecordResponse]
+    next_cursor: str | None
+
+
+class AuditRecordResponse(typing.TypedDict):
+    action: str
+    actor_id: str
+    audit_id: str
+    occurred_at: str
+    outcome: typing.Literal["succeeded", "denied", "failed"]
+    permission_code: str | None
+    policy_decision_id: str | None
+    policy_version: int | None
+    request_id: str
+    resource_id: str
+    resource_type: str
+    trace_id: str
+    user_id: str | None
+    workspace_id: str
+
+
 class AuthenticationContextResponse(typing.TypedDict):
     actor_id: str
     authentication_method: str
@@ -570,6 +592,18 @@ class IngestionJobResponse(typing.TypedDict):
     updated_at: str
 
 
+class IntegrationInspectionResponse(typing.TypedDict):
+    checked_at: str
+    consumer_receipt_count: int
+    duplicate_delivery_count: int
+    expired_claim_count: int
+    idempotency_issue_count: int
+    incompatible_schema_count: int
+    oldest_pending_age_seconds: float
+    replay_request_count: int
+    status_counts: list[OutboxStatusCountResponse]
+
+
 class InviteWorkspaceMemberRequest(typing.TypedDict):
     login_name: str
 
@@ -804,6 +838,59 @@ class OrganizationStatusRequest(typing.TypedDict):
     active: bool
 
 
+class OutboxEventPageResponse(typing.TypedDict):
+    items: list[OutboxEventResponse]
+    next_cursor: str | None
+
+
+class OutboxEventResponse(typing.TypedDict):
+    actor_id: str | None
+    aggregate_id: str
+    aggregate_version: int
+    attempt_count: int
+    available_at: str
+    claim_until: str | None
+    event_id: str
+    event_type: str
+    last_error_code: str | None
+    occurred_at: str
+    published_at: str | None
+    replay_count: int
+    request_id: str | None
+    schema_version: int
+    status: typing.Literal["pending", "publishing", "published", "dead_letter"]
+    trace_id: str
+    user_id: str | None
+    workspace_id: str
+
+
+class OutboxReplayBody(typing.TypedDict):
+    idempotency_key: str
+    reason_code: str
+
+
+class OutboxReplayResponse(typing.TypedDict):
+    event_id: str
+    idempotency_key: str
+    reason_code: str
+    replay_request_id: str
+    request_id: str
+    requested_at: str
+    requested_by_actor_id: str
+    requested_by_user_id: str | None
+    source_attempt_count: int
+    source_error_code: str | None
+    source_published_at: str | None
+    source_status: typing.Literal["published", "dead_letter"]
+    trace_id: str
+    workspace_id: str
+
+
+class OutboxStatusCountResponse(typing.TypedDict):
+    count: int
+    status: typing.Literal["pending", "publishing", "published", "dead_letter"]
+
+
 class PositionListResponse(typing.TypedDict):
     items: list[PositionResponse]
 
@@ -1016,6 +1103,41 @@ class UploadMetadataResponse(typing.TypedDict):
     media_type: str
     scan_status: typing.NotRequired[str]
     size_bytes: int
+
+
+class UsageReconciliationListResponse(typing.TypedDict):
+    items: list[UsageReconciliationResponse]
+
+
+class UsageReconciliationResponse(typing.TypedDict):
+    consistent: bool
+    counter_value: int | None
+    counter_version: int | None
+    latest_resulting_value: int | None
+    metric: typing.Literal[
+        "storage_bytes", "knowledge_bases", "published_agents", "questions_monthly"
+    ]
+    period_key: str
+    record_count: int
+    record_delta_total: int
+
+
+class UsageRecordPageResponse(typing.TypedDict):
+    items: list[UsageRecordResponse]
+    next_cursor: str | None
+
+
+class UsageRecordResponse(typing.TypedDict):
+    delta_value: int
+    idempotency_key: str
+    metric: typing.Literal[
+        "storage_bytes", "knowledge_bases", "published_agents", "questions_monthly"
+    ]
+    occurred_at: str
+    period_key: str
+    resulting_value: int
+    usage_record_id: str
+    workspace_id: str
 
 
 class UserMessageCreatedResponse(typing.TypedDict):

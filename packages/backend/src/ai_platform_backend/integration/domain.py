@@ -28,6 +28,15 @@ class IntegrationEvent:
 
 
 @dataclass(frozen=True)
+class AuditAuthorization:
+    """记录产生审计事实时实际通过的策略决策，不从业务属性反向推断。"""
+
+    permission_code: str
+    policy_decision_id: UUID
+    policy_version: int
+
+
+@dataclass(frozen=True)
 class AuditRecord:
     """记录工作空间内操作者、资源、结果和请求追踪信息。"""
 
@@ -44,6 +53,7 @@ class AuditRecord:
     trace_id: str
     traceparent: str
     attributes: dict[str, object]
+    authorization: AuditAuthorization | None = None
 
 
 @dataclass(frozen=True)

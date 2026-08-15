@@ -7,7 +7,7 @@
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P2-07` 审计、用量、配额与 Outbox 运营进行中 |
+| 当前节点 | `P2-08` 工作空间数据生命周期进行中 |
 | 阶段可靠性 | `not_run` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
@@ -23,7 +23,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0038`；阶段 1 发布仍冻结在 `20260815_0035` |
+| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0039`；阶段 1 发布仍冻结在 `20260815_0035` |
 | 阶段 1 发布 | 本地 MVP `0.1.0`，ReleaseManifest 摘要 `e8983e87…b62943` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实 AI 质量 |
 
@@ -91,6 +91,17 @@
 - 安全与覆盖验收：20 条合成关键 Trace 均覆盖 HTTP、任务、检索、模型、工作流、审批和 Outbox，覆盖率 `1.0`，达到 `>= 0.99` 门禁。专项 `9/9` 覆盖字段 Schema、生产环境 HTTPS OTLP、日志/Span/指标/告警四通道敏感数据拒绝、安全第三方 Formatter、多进程 Worker 聚合和告警规则解析。
 - 自动验收：统一 `./scripts/verify` 通过 React `37/37`、Python `500/500`、Ruff format/lint `447` 个文件、mypy strict `447` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建；P2-06、真实 PostgreSQL/Valkey SSE 及 Outbox 专项 `18/18`。`./platform start` 完成 API/Worker 镜像重建，数据库 Revision 保持 `20260815_0038`，`./platform doctor` 的 13 项诊断全部通过。
 
+### P2-07 审计、用量、配额与 Outbox 运营
+
+- 状态：已完成，实现提交待回填。
+- 审计追溯：审计事实补齐实际授权权限码、策略决策 ID 和策略版本，使主体、工作空间、资源、操作、授权依据、结果、Request 与 Trace 能形成稳定关联。运营响应返回固定追溯字段，不复制自由属性或业务内容。
+- 用量账本：既有原子计数器增加不可变用量明细分页与逐计量项/周期对账；每条记录保存幂等键、变更量、变更后值和发生时间。对账同时比较计数器、明细累计和最后结果，任何差异保持 `consistent=false`，不自动改写或掩盖账本。
+- Outbox 运营：提供工作空间隔离的事件状态查询，响应不包含 Payload；巡检汇总四类状态、最老积压、过期租约、不兼容事件 Schema、重放请求、消费回执、重复接收和幂等异常。消费回执增加 `delivery_count` 与 `last_received_at`，相同事件重复送达只更新回执，不再次执行投影。
+- 安全重放：只允许具有 `operations.outbox.replay` 的浏览器主体重放 `published/dead_letter` 事件，API Key 与无用户主体失败关闭。客户端幂等键在工作空间内唯一；重放保留原 `event_id`，不可变请求事实、事件重新排队和带结构化原因的审计记录同事务提交，重复调用返回同一请求。
+- 权限与契约：资源注册表升至 16，包含 78 个权限、107 个 API、95 个菜单和 100 个菜单接口绑定；`operations.records.read` 与 `operations.outbox.replay` 仅默认授予个人/企业 `workspace_owner`，并为既有空间升级当前菜单快照。OpenAPI、React/Python 生成类型、错误目录和兼容矩阵同步，阶段 1 发布清单仍冻结在 Revision `0035`。
+- Migration 与回归：Revision `20260815_0039` 增加审计追溯列、消费回执接收计数、不可变 `outbox_replay_requests`、工作空间复合外键和运营查询索引，完成既有 Owner 权限回填及菜单快照升级。空库与非空库往返 `4/4`、P2-07 HTTP `2/2`、真实 PostgreSQL `5/5`、Outbox/权益/P2-07 联合回归 `20/20` 通过。
+- 自动验收：统一 `./scripts/verify` 通过 React `37/37`、Python `508/508`、Ruff format/lint `456` 个文件、mypy strict `456` 个源文件、Migration、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。`./platform start` 完成镜像重建和现有数据升级，数据库 Revision 为 `20260815_0039`，`./platform doctor` 的 13 项诊断全部通过。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -100,4 +111,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P2-01`～`P2-06` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检、安全重建、跨实例 SSE 恢复和安全可观测基线，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-07`。
+`not_run`。`P2-01`～`P2-07` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检、安全重建、跨实例 SSE 恢复、安全可观测基线及审计/用量/Outbox 运营，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-08`。

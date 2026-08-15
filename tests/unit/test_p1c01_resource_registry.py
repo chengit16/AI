@@ -8,6 +8,10 @@ from uuid import UUID
 
 import pytest
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
+from ai_platform_api.modules.authorization.domain.grants import (
+    MEMBER_PERMISSION_CODES,
+    OWNER_PERMISSION_CODES,
+)
 from ai_platform_api.modules.authorization.domain.resources import (
     Menu,
     MenuApiBinding,
@@ -29,13 +33,21 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 15
-    assert len(resource_registry.permissions) == 76
+    assert resource_registry.registry_version == 16
+    assert len(resource_registry.permissions) == 78
     assert len(resource_registry.page_resources) == 9
-    assert len(resource_registry.api_resources) == 101
-    assert len(resource_registry.menus) == 93
-    assert len(resource_registry.menu_api_bindings) == 94
+    assert len(resource_registry.api_resources) == 107
+    assert len(resource_registry.menus) == 95
+    assert len(resource_registry.menu_api_bindings) == 100
     assert registry_openapi_violations() == ()
+
+
+def test_new_workspace_owner_gets_operations_permissions_but_member_does_not() -> None:
+    """新建个人和企业空间必须与 0039 对历史 Owner 的回填结果一致。"""
+
+    assert {"operations.records.read", "operations.outbox.replay"}.issubset(OWNER_PERMISSION_CODES)
+    assert "operations.records.read" not in MEMBER_PERMISSION_CODES
+    assert "operations.outbox.replay" not in MEMBER_PERMISSION_CODES
 
 
 def test_registry_rejects_duplicate_dangling_and_unbound_resources() -> None:

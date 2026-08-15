@@ -359,6 +359,7 @@ def _record_change(
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
             attributes={**attributes, "menu_version": menu_version},
         )
     )

@@ -83,6 +83,28 @@ class UsageRecord:
 
 
 @dataclass(frozen=True)
+class UsageRecordPage:
+    """返回按发生时间倒序排列的一页用量账本。"""
+
+    items: tuple[UsageRecord, ...]
+    next_cursor: UUID | None
+
+
+@dataclass(frozen=True)
+class UsageReconciliation:
+    """对比计数器、明细增量和最后结果，提供可验证的配额对账事实。"""
+
+    metric: UsageMetric
+    period_key: str
+    counter_value: int | None
+    counter_version: int | None
+    record_count: int
+    record_delta_total: int
+    latest_resulting_value: int | None
+    consistent: bool
+
+
+@dataclass(frozen=True)
 class QuotaSnapshot:
     """提供某项额度当前用量、上限和剩余量的只读快照。"""
 
@@ -138,6 +160,10 @@ class EntitlementWriteConflictError(Exception):
     """权益、功能开关或用量幂等记录发生并发冲突。"""
 
 
+class UsageCursorError(Exception):
+    """用量分页游标不存在或不属于当前工作空间。"""
+
+
 class UsageRepository(Protocol):
     """供业务模块在自身事务内原子维护套餐用量的最小公开接口。"""
 
@@ -187,6 +213,21 @@ class EntitlementRepository(UsageRepository, Protocol):
     def active_member_count(self, workspace_id: UUID) -> int: ...
 
     def list_usage_counters(self, workspace_id: UUID) -> tuple[UsageCounter, ...]: ...
+
+    def list_usage_records(
+        self,
+        workspace_id: UUID,
+        *,
+        limit: int,
+        cursor: UUID | None,
+        metric: UsageMetric | None,
+        period_key: str | None,
+    ) -> UsageRecordPage: ...
+
+    def list_usage_reconciliation(
+        self,
+        workspace_id: UUID,
+    ) -> tuple[UsageReconciliation, ...]: ...
 
     def set_open_api_enabled(
         self,

@@ -849,6 +849,7 @@ def _record(
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
             # 审计只保存状态与版本标识，不复制标题、来源地址或对象键。
             attributes={"aggregate_version": aggregate_version},
         )

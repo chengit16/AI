@@ -503,6 +503,7 @@ def _record(
             request_id=context.request_id,
             trace_id=context.trace.trace_id,
             traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
             attributes=attributes,
         )
     )
@@ -556,6 +557,7 @@ def _record_workflow_outcome(
             request_id=context.request_id,
             trace_id=instance.trace_id,
             traceparent=instance.traceparent,
+            authorization=context.audit_authorization,
             attributes=attributes,
         )
     )
