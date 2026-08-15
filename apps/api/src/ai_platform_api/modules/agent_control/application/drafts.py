@@ -5,6 +5,10 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.agent_control.application.configuration import (
+    parse_agent_configuration,
+    validate_configuration_references,
+)
 from ai_platform_api.modules.agent_control.application.errors import (
     AgentLifecycleConflictError,
     AgentValidationError,
@@ -12,7 +16,6 @@ from ai_platform_api.modules.agent_control.application.errors import (
 from ai_platform_api.modules.agent_control.application.support import (
     UPDATE_DRAFT_OPERATION,
     browser_account,
-    configuration_digest,
     control_request,
     raise_write_conflict,
     record_change,
@@ -49,7 +52,7 @@ def update_draft(
     require_resource_scope(context, agent_id)
     if expected_revision < 1:
         raise AgentValidationError
-    config_hash = configuration_digest(configuration)
+    parsed, normalized_configuration, config_hash = parse_agent_configuration(configuration)
     require_idempotency_key(idempotency_key)
     request_hash = request_digest(
         {
@@ -73,6 +76,8 @@ def update_draft(
                 require_request_hash(request, request_hash)
                 return replay_draft(unit_of_work, context.workspace_id, request)
 
+            validate_configuration_references(unit_of_work.configuration, context, parsed)
+
             agent = require_custom_agent(
                 unit_of_work,
                 context.workspace_id,
@@ -91,7 +96,7 @@ def update_draft(
                 current,
                 revision=current.revision + 1,
                 status="editing",
-                configuration=configuration,
+                configuration=normalized_configuration,
                 config_hash=config_hash,
                 updated_by_account_id=account_id,
                 updated_at=now,

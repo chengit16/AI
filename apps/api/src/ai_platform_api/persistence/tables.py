@@ -2359,6 +2359,206 @@ index_maintenance_requests = indexing_tables.index_maintenance_requests.to_metad
 index_inspection_findings = indexing_tables.index_inspection_findings.to_metadata(metadata)
 retrieval_chunks = indexing_tables.retrieval_chunks.to_metadata(metadata)
 
+agent_prompt_versions = Table(
+    "agent_prompt_versions",
+    metadata,
+    Column("prompt_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("template", Text, nullable=False),
+    Column("prompt_hash", String(64), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "prompt_version_id",
+        "workspace_id",
+        name="uq_agent_prompt_versions_id_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_agent_prompt_versions_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_prompt_versions_creator",
+    ),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_agent_prompt_versions_name",
+    ),
+    CheckConstraint(
+        "char_length(btrim(template)) BETWEEN 1 AND 32000",
+        name="ck_agent_prompt_versions_template",
+    ),
+    CheckConstraint(
+        "prompt_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_prompt_versions_hash",
+    ),
+)
+
+agent_knowledge_scope_versions = Table(
+    "agent_knowledge_scope_versions",
+    metadata,
+    Column("knowledge_scope_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("scope_hash", String(64), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "knowledge_scope_version_id",
+        "workspace_id",
+        name="uq_agent_knowledge_scopes_id_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_agent_knowledge_scopes_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_knowledge_scopes_creator",
+    ),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_agent_knowledge_scopes_name",
+    ),
+    CheckConstraint(
+        "scope_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_knowledge_scopes_hash",
+    ),
+)
+
+agent_knowledge_scope_items = Table(
+    "agent_knowledge_scope_items",
+    metadata,
+    Column("knowledge_scope_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("knowledge_base_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    UniqueConstraint(
+        "knowledge_scope_version_id",
+        "position",
+        name="uq_agent_knowledge_scope_items_position",
+    ),
+    ForeignKeyConstraint(
+        ["knowledge_scope_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_knowledge_scope_versions.knowledge_scope_version_id",
+            f"{SCHEMA_TOKEN}.agent_knowledge_scope_versions.workspace_id",
+        ],
+        name="fk_agent_knowledge_scope_items_scope",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["knowledge_base_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.knowledge_bases.knowledge_base_id",
+            f"{SCHEMA_TOKEN}.knowledge_bases.workspace_id",
+        ],
+        name="fk_agent_knowledge_scope_items_base",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "position BETWEEN 1 AND 50",
+        name="ck_agent_knowledge_scope_items_position",
+    ),
+)
+
+agent_output_schema_versions = Table(
+    "agent_output_schema_versions",
+    metadata,
+    Column("output_schema_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("schema_document", JSONB, nullable=False),
+    Column("schema_hash", String(64), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "output_schema_version_id",
+        "workspace_id",
+        name="uq_agent_output_schemas_id_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_agent_output_schemas_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_output_schemas_creator",
+    ),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_agent_output_schemas_name",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(schema_document) = 'object'",
+        name="ck_agent_output_schemas_document",
+    ),
+    CheckConstraint(
+        "schema_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_output_schemas_hash",
+    ),
+)
+
+agent_safety_policy_versions = Table(
+    "agent_safety_policy_versions",
+    metadata,
+    Column("safety_policy_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("policy_key", String(64), nullable=False),
+    Column("version_number", Integer, nullable=False),
+    Column("implementation_version", String(64), nullable=False),
+    Column("policy_hash", String(64), nullable=False),
+    Column("status", String(16), nullable=False),
+    UniqueConstraint(
+        "policy_key",
+        "version_number",
+        name="uq_agent_safety_policies_key_version",
+    ),
+    CheckConstraint("version_number >= 1", name="ck_agent_safety_policies_version"),
+    CheckConstraint(
+        "policy_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_safety_policies_hash",
+    ),
+    CheckConstraint(
+        "status IN ('active', 'retired')",
+        name="ck_agent_safety_policies_status",
+    ),
+)
+
+agent_tool_definitions = Table(
+    "agent_tool_definitions",
+    metadata,
+    Column("tool_id", UUID(as_uuid=True), primary_key=True),
+    Column("tool_version", Integer, primary_key=True),
+    Column("tool_key", String(120), nullable=False),
+    Column("access_mode", String(16), nullable=False),
+    Column("permission_code", String(160), nullable=False),
+    UniqueConstraint(
+        "tool_key",
+        "tool_version",
+        name="uq_agent_tool_definitions_key_version",
+    ),
+    CheckConstraint("tool_version >= 1", name="ck_agent_tool_definitions_version"),
+    CheckConstraint(
+        "access_mode IN ('read', 'write')",
+        name="ck_agent_tool_definitions_access_mode",
+    ),
+    CheckConstraint(
+        "permission_code ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$'",
+        name="ck_agent_tool_definitions_permission",
+    ),
+)
+
 agents = Table(
     "agents",
     metadata,

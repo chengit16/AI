@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -32,6 +33,7 @@ from ai_platform_api.persistence.tables import (
     agent_draft_revisions,
     agent_release_candidates,
     agent_releases,
+    ai_runtime_config_publication,
     ai_runtime_config_versions,
     audit_records,
     outbox_events,
@@ -129,12 +131,48 @@ def context(account: RegisteredAccount) -> RequestContext:
     )
 
 
-def configuration(version: str) -> dict[str, object]:
+def configuration(
+    harness: AgentHarness,
+    owner_context: RequestContext,
+    version: str,
+) -> dict[str, object]:
+    """创建真实不可变资源版本，并返回通过 P3-03 校验的合成配置。"""
+
+    runtime_config_id = _ensure_runtime_config(harness.sessions, owner_context.actor_id)
+    prompt = harness.agents.create_prompt_version(
+        owner_context,
+        name=f"合成 Prompt {version}",
+        template=f"仅使用授权的合成资料回答, 版本 {version}。",
+    )
+    scope = harness.agents.create_knowledge_scope_version(
+        owner_context,
+        name="合成空知识范围",
+        knowledge_base_ids=(),
+    )
+    output_schema = harness.agents.create_output_schema_version(
+        owner_context,
+        name="合成回答输出",
+        schema_document={
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"answer": {"type": "string"}},
+        },
+    )
     return {
-        "schema_version": 1,
-        "prompt_version": version,
-        "runtime_config_version_id": "a4000000-0000-4000-8000-000000000302",
+        "prompt_version_id": str(prompt.prompt_version_id),
+        "runtime_config_version_id": str(runtime_config_id),
+        "knowledge_scope_version_ids": [str(scope.knowledge_scope_version_id)],
+        "workflow_release_id": None,
         "read_only_tools": [],
+        "output_schema_version_id": str(output_schema.output_schema_version_id),
+        "safety_policy_version_id": "a9000000-0000-4000-8000-000000000001",
+        "limits": {
+            "max_input_tokens": 8192,
+            "max_output_tokens": 2048,
+            "max_execution_seconds": 60,
+            "max_cost_microunits": 500_000,
+        },
     }
 
 
@@ -143,32 +181,34 @@ def test_lifecycle_history_idempotency_and_transactional_evidence(
 ) -> None:
     owner = register(agent_database, "owner")
     owner_context = context(owner)
+    first_configuration = configuration(agent_database, owner_context, "v1")
+    second_configuration = configuration(agent_database, owner_context, "v2")
     agent, draft = agent_database.agents.create_agent(
         owner_context,
         name="合成 PostgreSQL Agent",
         description="只使用合成数据",
-        configuration=configuration("v1"),
+        configuration=first_configuration,
         idempotency_key="synthetic-postgres-agent-create-0302",
     )
     repeated_agent, repeated_draft = agent_database.agents.create_agent(
         owner_context,
         name="合成 PostgreSQL Agent",
         description="只使用合成数据",
-        configuration=configuration("v1"),
+        configuration=first_configuration,
         idempotency_key="synthetic-postgres-agent-create-0302",
     )
     updated = agent_database.agents.update_draft(
         owner_context,
         agent_id=agent.agent_id,
         expected_revision=draft.revision,
-        configuration=configuration("v2"),
+        configuration=second_configuration,
         idempotency_key="synthetic-postgres-agent-update-0302",
     )
     repeated_updated = agent_database.agents.update_draft(
         owner_context,
         agent_id=agent.agent_id,
         expected_revision=draft.revision,
-        configuration=configuration("v2"),
+        configuration=second_configuration,
         idempotency_key="synthetic-postgres-agent-update-0302",
     )
     candidate = agent_database.agents.request_release_candidate(
@@ -210,11 +250,12 @@ def test_lifecycle_history_idempotency_and_transactional_evidence(
 def test_cross_workspace_reads_fail_closed(agent_database: AgentHarness) -> None:
     owner = register(agent_database, "isolation-owner")
     outsider = register(agent_database, "isolation-outsider")
+    owner_context = context(owner)
     agent, _ = agent_database.agents.create_agent(
-        context(owner),
+        owner_context,
         name="合成隔离 Agent",
         description=None,
-        configuration=configuration("v1"),
+        configuration=configuration(agent_database, owner_context, "isolation-v1"),
         idempotency_key="synthetic-postgres-agent-isolation-0302",
     )
 
@@ -225,13 +266,14 @@ def test_cross_workspace_reads_fail_closed(agent_database: AgentHarness) -> None
 def test_concurrent_create_replays_one_committed_fact(agent_database: AgentHarness) -> None:
     owner = register(agent_database, "concurrent-owner")
     owner_context = context(owner)
+    agent_configuration = configuration(agent_database, owner_context, "concurrent-v1")
 
     def create() -> tuple[object, object]:
         return agent_database.agents.create_agent(
             owner_context,
             name="合成并发 Agent",
             description=None,
-            configuration=configuration("v1"),
+            configuration=agent_configuration,
             idempotency_key="synthetic-postgres-agent-concurrent-0302",
         )
 
@@ -259,11 +301,12 @@ def test_release_and_history_mutation_are_rejected_by_database(
 ) -> None:
     owner = register(agent_database, "immutable-owner")
     owner_context = context(owner)
+    agent_configuration = configuration(agent_database, owner_context, "immutable-v1")
     agent, draft = agent_database.agents.create_agent(
         owner_context,
         name="合成不可变 Agent",
         description=None,
-        configuration=configuration("v1"),
+        configuration=agent_configuration,
         idempotency_key="synthetic-postgres-agent-immutable-0302",
     )
     candidate = agent_database.agents.request_release_candidate(
@@ -272,7 +315,7 @@ def test_release_and_history_mutation_are_rejected_by_database(
         expected_revision=draft.revision,
         idempotency_key="synthetic-postgres-agent-immutable-candidate-0302",
     )
-    runtime_config_id = _create_runtime_config(agent_database.sessions, owner.account_id)
+    runtime_config_id = _ensure_runtime_config(agent_database.sessions, owner.account_id)
     release_id = uuid4()
     snapshot = {
         "snapshot_schema_version": 1,
@@ -325,10 +368,18 @@ def test_release_and_history_mutation_are_rejected_by_database(
         )
 
 
-def _create_runtime_config(sessions: sessionmaker[Session], account_id: UUID) -> UUID:
-    """创建只供不可变 Release 外键测试使用的合成运行配置。"""
+def _ensure_runtime_config(sessions: sessionmaker[Session], account_id: UUID) -> UUID:
+    """创建并发布模块级唯一合成运行配置，重复调用返回当前版本。"""
 
-    runtime_config_version_id = uuid4()
+    with sessions() as session:
+        current = session.scalar(
+            select(ai_runtime_config_publication.c.runtime_config_version_id).where(
+                ai_runtime_config_publication.c.publication_key == "current"
+            )
+        )
+        if current is not None:
+            return cast(UUID, current)
+    runtime_config_version_id = UUID("a4000000-0000-4000-8000-000000000302")
     now = datetime.now(UTC)
     with sessions.begin() as session:
         session.execute(
@@ -341,10 +392,10 @@ def _create_runtime_config(sessions: sessionmaker[Session], account_id: UUID) ->
                 system_prompt_hash="b" * 64,
                 component_versions={"retrieval": "synthetic-v1"},
                 attempt_timeout_ms=500,
-                total_timeout_ms=2_000,
+                total_timeout_ms=120_000,
                 max_attempts_per_route=1,
                 max_prompt_characters=4_000,
-                max_output_tokens=256,
+                max_output_tokens=4096,
                 max_response_characters=8_000,
                 circuit_failure_threshold=3,
                 circuit_recovery_ms=30_000,
@@ -352,6 +403,15 @@ def _create_runtime_config(sessions: sessionmaker[Session], account_id: UUID) ->
                 max_estimated_cost_microunits=5_000_000,
                 created_by_account_id=account_id,
                 created_at=now,
+            )
+        )
+        session.execute(
+            insert(ai_runtime_config_publication).values(
+                publication_key="current",
+                runtime_config_version_id=runtime_config_version_id,
+                generation=1,
+                published_by_account_id=account_id,
+                published_at=now,
             )
         )
     return runtime_config_version_id

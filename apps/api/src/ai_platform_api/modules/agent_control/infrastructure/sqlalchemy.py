@@ -34,6 +34,9 @@ from ai_platform_api.modules.agent_control.domain.models import (
     AgentStatus,
     AgentWriteConflictError,
 )
+from ai_platform_api.modules.agent_control.infrastructure.configuration_sqlalchemy import (
+    SqlAlchemyAgentConfigurationRepository,
+)
 from ai_platform_api.persistence.tables import (
     agent_control_requests,
     agent_draft_revisions,
@@ -324,6 +327,7 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
             tuple[
                 Session,
                 SqlAlchemyAgentRepository,
+                SqlAlchemyAgentConfigurationRepository,
                 SqlAlchemyAuditWriter,
                 SqlAlchemyOutboxWriter,
             ]
@@ -340,6 +344,7 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
             (
                 session,
                 SqlAlchemyAgentRepository(session),
+                SqlAlchemyAgentConfigurationRepository(session),
                 SqlAlchemyAuditWriter(session),
                 SqlAlchemyOutboxWriter(session),
             )
@@ -368,11 +373,15 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
 
     @property
     def audit(self) -> SqlAlchemyAuditWriter:
+        return self._require_state()[3]
+
+    @property
+    def configuration(self) -> SqlAlchemyAgentConfigurationRepository:
         return self._require_state()[2]
 
     @property
     def outbox(self) -> SqlAlchemyOutboxWriter:
-        return self._require_state()[3]
+        return self._require_state()[4]
 
     def commit(self) -> None:
         """提交 Agent 业务事实、幂等、审计和 Outbox 的同一事务。"""
@@ -384,6 +393,7 @@ class SqlAlchemyAgentControlUnitOfWork(AgentControlUnitOfWork):
     ) -> tuple[
         Session,
         SqlAlchemyAgentRepository,
+        SqlAlchemyAgentConfigurationRepository,
         SqlAlchemyAuditWriter,
         SqlAlchemyOutboxWriter,
     ]:

@@ -4,11 +4,14 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.agent_control.application.configuration import (
+    parse_agent_configuration,
+    validate_configuration_references,
+)
 from ai_platform_api.modules.agent_control.application.errors import AgentDeniedError
 from ai_platform_api.modules.agent_control.application.support import (
     CREATE_OPERATION,
     browser_account,
-    configuration_digest,
     control_request,
     normalize_description,
     normalize_name,
@@ -45,7 +48,7 @@ def create_agent(
         raise AgentDeniedError
     normalized_name = normalize_name(name)
     normalized_description = normalize_description(description)
-    config_hash = configuration_digest(configuration)
+    parsed, normalized_configuration, config_hash = parse_agent_configuration(configuration)
     require_idempotency_key(idempotency_key)
     request_hash = request_digest(
         {
@@ -69,6 +72,8 @@ def create_agent(
                 require_request_hash(request, request_hash)
                 return replay_created_agent(unit_of_work, context.workspace_id, request)
 
+            validate_configuration_references(unit_of_work.configuration, context, parsed)
+
             agent_id = uuid4()
             draft_id = uuid4()
             agent = Agent(
@@ -90,7 +95,7 @@ def create_agent(
                 workspace_id=context.workspace_id,
                 revision=1,
                 status="editing",
-                configuration=configuration,
+                configuration=normalized_configuration,
                 config_hash=config_hash,
                 updated_by_account_id=account_id,
                 updated_at=now,

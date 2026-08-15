@@ -4,6 +4,10 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.agent_control.application.configuration import (
+    parse_agent_configuration,
+    validate_configuration_references,
+)
 from ai_platform_api.modules.agent_control.application.errors import (
     AgentLifecycleConflictError,
     AgentValidationError,
@@ -39,6 +43,7 @@ def request_release_candidate(
 ) -> AgentReleaseCandidate:
     """冻结候选来源；本节点不伪造测试、审批或已发布结论。"""
 
+    # 长函数保留原因: 幂等检查、行锁、配置复核、候选与审计提交必须共享一个事务视图。
     # 1. 候选请求绑定 revision；真正配置语义校验、测试和审批由后续节点推进。
     account_id = browser_account(context)
     require_resource_scope(context, agent_id)
@@ -79,6 +84,13 @@ def request_release_candidate(
                 for_update=True,
             )
             if agent.status != "active" or draft.revision != expected_revision:
+                raise AgentLifecycleConflictError
+            parsed, normalized_configuration, config_hash = parse_agent_configuration(
+                draft.configuration
+            )
+            validate_configuration_references(unit_of_work.configuration, context, parsed)
+            # 历史正文、规范化结果和摘要必须一致，避免绕过应用层写入的脏数据进入候选。
+            if normalized_configuration != draft.configuration or config_hash != draft.config_hash:
                 raise AgentLifecycleConflictError
             candidate_id = uuid4()
             candidate_hash = request_digest(

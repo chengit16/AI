@@ -8,12 +8,18 @@ from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.agent_control.application.candidates import (
     request_release_candidate,
 )
+from ai_platform_api.modules.agent_control.application.configuration_resources import (
+    create_knowledge_scope_version,
+    create_output_schema_version,
+    create_prompt_version,
+)
 from ai_platform_api.modules.agent_control.application.creation import create_agent
 from ai_platform_api.modules.agent_control.application.drafts import (
     list_draft_revisions,
     update_draft,
 )
 from ai_platform_api.modules.agent_control.application.errors import (
+    AgentConfigurationInvalidError,
     AgentDeniedError,
     AgentIdempotencyConflictError,
     AgentLifecycleConflictError,
@@ -23,6 +29,11 @@ from ai_platform_api.modules.agent_control.application.errors import (
 from ai_platform_api.modules.agent_control.application.lifecycle import archive_agent
 from ai_platform_api.modules.agent_control.application.queries import get_agent, get_release
 from ai_platform_api.modules.agent_control.application.support import configuration_digest
+from ai_platform_api.modules.agent_control.domain.configuration import (
+    AgentKnowledgeScopeVersion,
+    AgentOutputSchemaVersion,
+    AgentPromptVersion,
+)
 from ai_platform_api.modules.agent_control.domain.models import (
     Agent,
     AgentControlUnitOfWork,
@@ -33,6 +44,7 @@ from ai_platform_api.modules.agent_control.domain.models import (
 )
 
 __all__ = [
+    "AgentConfigurationInvalidError",
     "AgentControlService",
     "AgentDeniedError",
     "AgentIdempotencyConflictError",
@@ -48,6 +60,54 @@ class AgentControlService:
 
     def __init__(self, unit_of_work: AgentControlUnitOfWork) -> None:
         self._unit_of_work = unit_of_work
+
+    def create_prompt_version(
+        self,
+        context: RequestContext,
+        *,
+        name: str,
+        template: str,
+    ) -> AgentPromptVersion:
+        """创建内容寻址的不可变 Prompt 版本，明文凭证不会进入事实库。"""
+
+        return create_prompt_version(
+            self._unit_of_work,
+            context,
+            name=name,
+            template=template,
+        )
+
+    def create_knowledge_scope_version(
+        self,
+        context: RequestContext,
+        *,
+        name: str,
+        knowledge_base_ids: tuple[UUID, ...],
+    ) -> AgentKnowledgeScopeVersion:
+        """冻结当前主体可访问的知识库集合，后续仍会复核状态与权限。"""
+
+        return create_knowledge_scope_version(
+            self._unit_of_work,
+            context,
+            name=name,
+            knowledge_base_ids=knowledge_base_ids,
+        )
+
+    def create_output_schema_version(
+        self,
+        context: RequestContext,
+        *,
+        name: str,
+        schema_document: dict[str, object],
+    ) -> AgentOutputSchemaVersion:
+        """校验并冻结结构化输出 Schema，供草稿只按版本引用。"""
+
+        return create_output_schema_version(
+            self._unit_of_work,
+            context,
+            name=name,
+            schema_document=schema_document,
+        )
 
     def create_agent(
         self,

@@ -10,6 +10,9 @@ from uuid import UUID
 
 from ai_platform_backend.integration.domain import AuditWriter
 
+from ai_platform_api.modules.agent_control.domain.configuration import (
+    AgentConfigurationRepository,
+)
 from ai_platform_api.modules.integration.domain.events import OutboxWriter
 
 AgentKind = Literal["system", "custom"]
@@ -223,6 +226,9 @@ class AgentControlUnitOfWork(Protocol):
 
     @property
     def agents(self) -> AgentRepository: ...
+
+    @property
+    def configuration(self) -> AgentConfigurationRepository: ...
 
     @property
     def audit(self) -> AuditWriter: ...

@@ -21,6 +21,12 @@ class AgentValidationError(PlatformError):
     error_code = "VALIDATION_ERROR"
 
 
+class AgentConfigurationInvalidError(PlatformError):
+    """表示 Agent 配置结构、资源引用、安全边界或预算校验失败。"""
+
+    error_code = "AGENT_CONFIGURATION_INVALID"
+
+
 class AgentLifecycleConflictError(PlatformError):
     """表示 Agent 状态、草稿 revision 或候选来源已经发生竞争变化。"""
 
