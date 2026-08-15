@@ -166,7 +166,7 @@ def test_active_http_stream_emits_heartbeat_without_persisting_an_event(
 
     frames = assistant_routes._stream_frames(
         cast(AssistantConversationService, object()),
-        cast(TransactionalStreamService, object()),
+        cast(TransactionalStreamService, SimpleNamespace(subscribe=lambda _: None)),
         context,
         run,
         None,

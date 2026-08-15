@@ -2,7 +2,7 @@
 
 import json
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Annotated
@@ -563,48 +563,57 @@ def _stream_frames(
     *,
     heartbeat_seconds: int,
     poll_interval_ms: int,
-) -> Iterator[str]:
-    """轮询短事务回放并产生 SSE 帧，等待期间不占用数据库连接。"""
+) -> Generator[str, None, None]:
+    """结合跨实例唤醒和短事务轮询产生 SSE 帧，等待期间不占数据库连接。"""
 
     replay = initial_replay
     cursor = last_event_id
     next_heartbeat = time.monotonic() + heartbeat_seconds
-    while True:
-        # 1. 每轮只在实际查询期间持有 Session；Run 未启动时复核助手终态后继续等待。
-        if replay is None:
-            try:
-                replay = streams.replay(
-                    context.workspace_id,
-                    run.run_id,
-                    cursor,
-                    now=datetime.now(UTC),
-                )
-            except StreamRunNotFoundError:
-                current = conversations.get_run_for_stream(
-                    context,
-                    conversation_id=run.conversation_id,
-                    run_id=run.run_id,
-                )
-                if current.status not in {"queued", "running"}:
+    subscription = streams.subscribe(run.run_id)
+    try:
+        while True:
+            # 1. 每轮只在实际查询期间持有 Session；Run 未启动时复核助手终态后继续等待。
+            if replay is None:
+                try:
+                    replay = streams.replay(
+                        context.workspace_id,
+                        run.run_id,
+                        cursor,
+                        now=datetime.now(UTC),
+                    )
+                except StreamRunNotFoundError:
+                    current = conversations.get_run_for_stream(
+                        context,
+                        conversation_id=run.conversation_id,
+                        run_id=run.run_id,
+                    )
+                    if current.status not in {"queued", "running"}:
+                        return
+
+            # 2. 按数据库序号输出完整协议事件；只在持久化事件后推进回放游标。
+            if replay is not None:
+                for event in replay.events:
+                    yield _event_frame(event)
+                    cursor = event.event_id
+                if replay.final_run.status != "active":
+                    if replay.snapshot_required:
+                        yield _snapshot_frame(run, replay)
                     return
+                replay = None
 
-        # 2. 按数据库序号输出完整协议事件；只在持久化事件后推进回放游标。
-        if replay is not None:
-            for event in replay.events:
-                yield _event_frame(event)
-                cursor = event.event_id
-            if replay.final_run.status != "active":
-                if replay.snapshot_required:
-                    yield _snapshot_frame(run, replay)
-                return
-            replay = None
-
-        # 3. 心跳只使用 SSE 注释帧，不写库、不占序号，也不改变 Last-Event-ID。
-        now = time.monotonic()
-        if now >= next_heartbeat:
-            yield ": heartbeat\n\n"
-            next_heartbeat = now + heartbeat_seconds
-        time.sleep(poll_interval_ms / 1_000)
+            # 3. 心跳不写库、不改游标；Valkey 仅提前结束等待，超时仍轮询 PostgreSQL。
+            now = time.monotonic()
+            if now >= next_heartbeat:
+                yield ": heartbeat\n\n"
+                next_heartbeat = now + heartbeat_seconds
+            wait_seconds = poll_interval_ms / 1_000
+            if subscription is None:
+                time.sleep(wait_seconds)
+            else:
+                subscription.wait(wait_seconds)
+    finally:
+        if subscription is not None:
+            subscription.close()
 
 
 def _snapshot_frame(run: AssistantRun, replay: StreamReplay) -> str:

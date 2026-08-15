@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     stream_replay_limit_bytes: int = 10 * 1024 * 1024
     stream_heartbeat_seconds: int = 15
     stream_poll_interval_ms: int = 250
+    stream_notification_connect_timeout_seconds: float = 0.5
     stream_delta_batch_characters: int = 512
     session_ttl_seconds: int = 43_200
     session_cookie_secure: bool = False
@@ -75,6 +76,8 @@ class Settings(BaseSettings):
             raise ValueError("SSE 心跳间隔必须位于 1 到 60 秒之间")
         if not 50 <= self.stream_poll_interval_ms <= 5_000:
             raise ValueError("SSE 数据库轮询间隔必须位于 50 到 5000 毫秒之间")
+        if not 0.05 <= self.stream_notification_connect_timeout_seconds <= 5:
+            raise ValueError("SSE 通知连接超时必须位于 0.05 到 5 秒之间")
         if not 64 <= self.stream_delta_batch_characters <= 4_096:
             raise ValueError("SSE 增量批次字符数必须位于 64 到 4096 之间")
         # 3. 供应商白名单只保存规范域名，URL、端口与路径统一由地址策略单独校验。

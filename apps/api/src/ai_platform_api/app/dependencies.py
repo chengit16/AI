@@ -133,6 +133,7 @@ from ai_platform_api.modules.streaming.domain.models import StreamPolicy
 from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
     SqlAlchemyStreamUnitOfWork,
 )
+from ai_platform_api.modules.streaming.infrastructure.valkey import ValkeyStreamNotifier
 from ai_platform_api.modules.workflow.application.approval_runtime import ApprovalInstanceService
 from ai_platform_api.modules.workflow.application.approvals import ApprovalPolicyService
 from ai_platform_api.modules.workflow.application.executor import (
@@ -205,9 +206,13 @@ class ApplicationContainer:
     def close(self) -> None:
         try:
             try:
-                self.role_cache.close()
+                if self.streaming is not None:
+                    self.streaming.close()
             finally:
-                self.sessions.close()
+                try:
+                    self.role_cache.close()
+                finally:
+                    self.sessions.close()
         finally:
             self.database.close()
 
@@ -331,6 +336,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             replay_limit_events=settings.stream_replay_limit_events,
             replay_limit_bytes=settings.stream_replay_limit_bytes,
         ),
+        ValkeyStreamNotifier(
+            settings.valkey_url,
+            connect_timeout_seconds=settings.stream_notification_connect_timeout_seconds,
+        ),
     )
     model_context = AuthorizedModelContextBuilder(field_projection, rag_safety)
     assistant_run_executor = AssistantRunExecutor(
@@ -432,7 +441,12 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             sessions=sessions,
         )
     except Exception:
-        role_cache.close()
-        sessions.close()
-        database.close()
+        try:
+            streaming.close()
+        finally:
+            try:
+                role_cache.close()
+            finally:
+                sessions.close()
+                database.close()
         raise

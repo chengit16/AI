@@ -1,5 +1,6 @@
 """编排流式 Run 创建、事件追加、结束和工作空间隔离回放。"""
 
+from contextlib import suppress
 from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
@@ -8,11 +9,13 @@ from ai_platform_api.modules.streaming.domain.errors import StreamRunNotFoundErr
 from ai_platform_api.modules.streaming.domain.models import (
     SseEventType,
     StreamEvent,
+    StreamNotifier,
     StreamPolicy,
     StreamReplay,
     StreamRun,
     StreamStore,
     StreamUnitOfWork,
+    StreamWakeupSubscription,
 )
 
 __all__ = [
@@ -102,9 +105,15 @@ class StreamService:
 class TransactionalStreamService:
     """以独立短事务持久化或回放事件，供正式 HTTP SSE 与运行编排复用。"""
 
-    def __init__(self, unit_of_work: StreamUnitOfWork, policy: StreamPolicy) -> None:
+    def __init__(
+        self,
+        unit_of_work: StreamUnitOfWork,
+        policy: StreamPolicy,
+        notifier: StreamNotifier | None = None,
+    ) -> None:
         self._unit_of_work = unit_of_work
         self._policy = policy
+        self._notifier = notifier
 
     def start_run(
         self,
@@ -127,7 +136,8 @@ class TransactionalStreamService:
                 self._policy,
             )
             unit_of_work.commit()
-            return run
+        self._notify(run_id)
+        return run
 
     def append(
         self,
@@ -153,7 +163,8 @@ class TransactionalStreamService:
                 now,
             )
             unit_of_work.commit()
-            return event
+        self._notify(run_id)
+        return event
 
     def finish(
         self,
@@ -168,7 +179,8 @@ class TransactionalStreamService:
         with self._unit_of_work as unit_of_work:
             run = unit_of_work.streams.finish_run(run_id, status, final_payload, now)
             unit_of_work.commit()
-            return run
+        self._notify(run_id)
+        return run
 
     def replay(
         self,
@@ -188,3 +200,29 @@ class TransactionalStreamService:
                 now,
                 self._policy,
             )
+
+    def subscribe(self, run_id: UUID) -> StreamWakeupSubscription | None:
+        """订阅瞬时唤醒；不可用时返回空值，由调用方继续按 PostgreSQL 轮询恢复。"""
+
+        if self._notifier is None:
+            return None
+        try:
+            return self._notifier.subscribe(run_id)
+        except Exception:
+            # 通知层不是事实库，连接失败不能阻断已授权客户端从 PostgreSQL 恢复。
+            return None
+
+    def close(self) -> None:
+        """释放进程级通知连接；数据库资源仍由应用容器单独管理。"""
+
+        if self._notifier is not None:
+            self._notifier.close()
+
+    def _notify(self, run_id: UUID) -> None:
+        """在数据库提交后尽力唤醒其他实例，失败时保留轮询兜底语义。"""
+
+        if self._notifier is None:
+            return
+        # 事实已经提交，通知失败不得把成功写入伪装成业务失败或触发重复生成。
+        with suppress(Exception):
+            self._notifier.publish(run_id)
