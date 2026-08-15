@@ -3577,6 +3577,13 @@ service_routes = Table(
         "workspace_id",
         name="uq_service_routes_identity",
     ),
+    UniqueConstraint(
+        "route_id",
+        "service_id",
+        "workspace_id",
+        "route_version",
+        name="uq_service_routes_run_binding",
+    ),
     ForeignKeyConstraint(
         ["service_id", "workspace_id"],
         [f"{SCHEMA_TOKEN}.services.service_id", f"{SCHEMA_TOKEN}.services.workspace_id"],
@@ -3851,6 +3858,9 @@ assistant_runs = Table(
     Column("conversation_id", UUID(as_uuid=True), nullable=False),
     Column("user_message_id", UUID(as_uuid=True), nullable=False),
     Column("assistant_message_id", UUID(as_uuid=True), nullable=True),
+    Column("service_id", UUID(as_uuid=True), nullable=True),
+    Column("service_route_id", UUID(as_uuid=True), nullable=True),
+    Column("service_route_version", Integer, nullable=True),
     Column("agent_release_id", UUID(as_uuid=True), nullable=False),
     Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
     Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
@@ -3889,6 +3899,21 @@ assistant_runs = Table(
         name="fk_assistant_runs_assistant_message",
     ),
     ForeignKeyConstraint(
+        ["service_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.services.service_id", f"{SCHEMA_TOKEN}.services.workspace_id"],
+        name="fk_assistant_runs_service",
+    ),
+    ForeignKeyConstraint(
+        ["service_route_id", "service_id", "workspace_id", "service_route_version"],
+        [
+            f"{SCHEMA_TOKEN}.service_routes.route_id",
+            f"{SCHEMA_TOKEN}.service_routes.service_id",
+            f"{SCHEMA_TOKEN}.service_routes.workspace_id",
+            f"{SCHEMA_TOKEN}.service_routes.route_version",
+        ],
+        name="fk_assistant_runs_service_route",
+    ),
+    ForeignKeyConstraint(
         ["agent_release_id", "workspace_id"],
         [
             f"{SCHEMA_TOKEN}.agent_releases.release_id",
@@ -3905,6 +3930,12 @@ assistant_runs = Table(
         ["requested_by_account_id"],
         [f"{SCHEMA_TOKEN}.accounts.account_id"],
         name="fk_assistant_runs_requester",
+    ),
+    CheckConstraint(
+        "(service_id IS NULL AND service_route_id IS NULL AND service_route_version IS NULL) OR "
+        "(service_id IS NOT NULL AND service_route_id IS NOT NULL "
+        "AND service_route_version >= 1)",
+        name="ck_assistant_runs_service_binding",
     ),
     CheckConstraint(
         "status IN ('queued', 'running', 'completed', 'failed', 'cancelled')",
@@ -3924,6 +3955,13 @@ assistant_runs = Table(
 Index(
     "ix_assistant_runs_workspace_time",
     assistant_runs.c.workspace_id,
+    assistant_runs.c.created_at,
+)
+Index(
+    "ix_assistant_runs_service_release_time",
+    assistant_runs.c.workspace_id,
+    assistant_runs.c.service_id,
+    assistant_runs.c.agent_release_id,
     assistant_runs.c.created_at,
 )
 Index(

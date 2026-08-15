@@ -106,6 +106,9 @@ class AssistantRun:
     conversation_id: UUID
     user_message_id: UUID
     assistant_message_id: UUID | None
+    service_id: UUID | None
+    service_route_id: UUID | None
+    service_route_version: int | None
     agent_release_id: UUID
     runtime_config_version_id: UUID
     requested_by_account_id: UUID

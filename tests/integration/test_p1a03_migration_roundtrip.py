@@ -10,6 +10,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Connection, create_engine, text
+from sqlalchemy.exc import DBAPIError
 
 ROOT = Path(__file__).parents[2]
 DEFAULT_DATABASE_URL = (
@@ -199,6 +200,83 @@ def seed_existing_system_agent_publication(connection: Connection, schema: str) 
     connection.commit()
 
 
+def seed_runtime_isolation_runs(connection: Connection, schema: str) -> None:
+    """在 0047 结构中写入一条可证明 Route 和一条无 Route 证据的历史 Run。"""
+
+    # 两条已完成 Run 不触发活动会话唯一约束；Release 分别对应已接管和未接管的系统 Agent。
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".conversations (
+              conversation_id, workspace_id, created_by_account_id, title, status,
+              created_at, updated_at, version
+            ) VALUES
+            (
+              '60000000-0000-4000-8000-000000000308',
+              '20000000-0000-4000-8000-000000000307',
+              '10000000-0000-4000-8000-000000000307', '合成可证明历史会话', 'active',
+              '2026-08-16T00:02:00Z', '2026-08-16T00:03:00Z', 1
+            ),
+            (
+              '61000000-0000-4000-8000-000000000308',
+              '20000000-0000-4000-8000-000000000307',
+              '10000000-0000-4000-8000-000000000307', '合成无路由历史会话', 'active',
+              '2026-08-16T00:02:00Z', '2026-08-16T00:03:00Z', 1
+            );
+            INSERT INTO "{schema}".messages (
+              message_id, workspace_id, conversation_id, role, status,
+              created_by_account_id, created_at, updated_at, version
+            ) VALUES
+            (
+              '70000000-0000-4000-8000-000000000308',
+              '20000000-0000-4000-8000-000000000307',
+              '60000000-0000-4000-8000-000000000308', 'user', 'completed',
+              '10000000-0000-4000-8000-000000000307',
+              '2026-08-16T00:02:00Z', '2026-08-16T00:02:00Z', 1
+            ),
+            (
+              '71000000-0000-4000-8000-000000000308',
+              '20000000-0000-4000-8000-000000000307',
+              '61000000-0000-4000-8000-000000000308', 'user', 'completed',
+              '10000000-0000-4000-8000-000000000307',
+              '2026-08-16T00:02:00Z', '2026-08-16T00:02:00Z', 1
+            );
+            INSERT INTO "{schema}".assistant_runs (
+              run_id, workspace_id, conversation_id, user_message_id,
+              assistant_message_id, agent_release_id, runtime_config_version_id,
+              requested_by_account_id, status, idempotency_key, request_hash,
+              trace_id, traceparent, created_at, updated_at, completed_at, error_code
+            ) VALUES
+            (
+              '80000000-0000-4000-8000-000000000308',
+              '20000000-0000-4000-8000-000000000307',
+              '60000000-0000-4000-8000-000000000308',
+              '70000000-0000-4000-8000-000000000308', NULL,
+              '50000000-0000-4000-8000-000000000307',
+              '30000000-0000-4000-8000-000000000307',
+              '10000000-0000-4000-8000-000000000307', 'completed',
+              'synthetic-runtime-backfill-unique', '{"e" * 64}', '{"f" * 32}',
+              '00-{"f" * 32}-{"a" * 16}-01', '2026-08-16T00:02:00Z',
+              '2026-08-16T00:03:00Z', '2026-08-16T00:03:00Z', NULL
+            ),
+            (
+              '81000000-0000-4000-8000-000000000308',
+              '20000000-0000-4000-8000-000000000307',
+              '61000000-0000-4000-8000-000000000308',
+              '71000000-0000-4000-8000-000000000308', NULL,
+              '51000000-0000-4000-8000-000000000307',
+              '30000000-0000-4000-8000-000000000307',
+              '10000000-0000-4000-8000-000000000307', 'completed',
+              'synthetic-runtime-backfill-unproven', '{"d" * 64}', '{"c" * 32}',
+              '00-{"c" * 32}-{"b" * 16}-01', '2026-08-16T00:02:00Z',
+              '2026-08-16T00:03:00Z', '2026-08-16T00:03:00Z', NULL
+            );
+            """
+        )
+    )
+    connection.commit()
+
+
 def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     migration_database: tuple[Config, Connection, str],
 ) -> None:
@@ -208,7 +286,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260816_0047"
+    assert current_revision(connection, schema) == "20260816_0048"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -326,8 +404,106 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260816_0047"
+    assert current_revision(connection, schema) == "20260816_0048"
     assert schema_snapshot(connection, schema) == first_head
+
+
+def test_runtime_binding_upgrade_backfills_only_proven_history_and_blocks_downgrade(
+    migration_database: tuple[Config, Connection, str],
+) -> None:
+    """0048 不猜测历史 Route，并在产生追溯证据后拒绝破坏性降级。"""
+
+    config, connection, schema = migration_database
+    command.upgrade(config, "20260816_0046")
+    connection.commit()
+    seed_existing_system_agent_publication(connection, schema)
+    command.upgrade(config, "20260816_0047")
+    connection.commit()
+    seed_runtime_isolation_runs(connection, schema)
+
+    # 1. 唯一匹配当前系统 Route 的历史 Run 被回填，无 Route 的历史 Run 保持完整空绑定。
+    command.upgrade(config, "20260816_0048")
+    connection.commit()
+    rows = (
+        connection.execute(
+            text(
+                f"""
+            SELECT run.run_id, run.service_id, run.service_route_id,
+                   run.service_route_version, run.agent_release_id
+              FROM "{schema}".assistant_runs run
+             ORDER BY run.run_id
+            """
+            )
+        )
+        .mappings()
+        .all()
+    )
+    route = (
+        connection.execute(
+            text(
+                f"""
+            SELECT service.service_id, route.route_id, route.route_version
+              FROM "{schema}".services service
+              JOIN "{schema}".service_route_publications publication
+                ON publication.service_id = service.service_id
+              JOIN "{schema}".service_routes route
+                ON route.route_id = publication.route_id
+            """
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert rows[0] == {
+        "run_id": UUID("80000000-0000-4000-8000-000000000308"),
+        "service_id": route["service_id"],
+        "service_route_id": route["route_id"],
+        "service_route_version": route["route_version"],
+        "agent_release_id": UUID("50000000-0000-4000-8000-000000000307"),
+    }
+    assert rows[1] == {
+        "run_id": UUID("81000000-0000-4000-8000-000000000308"),
+        "service_id": None,
+        "service_route_id": None,
+        "service_route_version": None,
+        "agent_release_id": UUID("51000000-0000-4000-8000-000000000307"),
+    }
+    connection.commit()
+
+    # 2. 兼容空值只属于升级前历史，新 INSERT 即使其他引用有效也必须完整绑定。
+    with pytest.raises(DBAPIError):
+        connection.execute(
+            text(
+                f"""
+                INSERT INTO "{schema}".assistant_runs (
+                  run_id, workspace_id, conversation_id, user_message_id,
+                  assistant_message_id, service_id, service_route_id,
+                  service_route_version, agent_release_id, runtime_config_version_id,
+                  requested_by_account_id, status, idempotency_key, request_hash,
+                  trace_id, traceparent, created_at, updated_at, completed_at, error_code
+                ) VALUES (
+                  '82000000-0000-4000-8000-000000000308',
+                  '20000000-0000-4000-8000-000000000307',
+                  '61000000-0000-4000-8000-000000000308',
+                  '71000000-0000-4000-8000-000000000308', NULL,
+                  NULL, NULL, NULL,
+                  '51000000-0000-4000-8000-000000000307',
+                  '30000000-0000-4000-8000-000000000307',
+                  '10000000-0000-4000-8000-000000000307', 'completed',
+                  'synthetic-runtime-new-unbound', '{"1" * 64}', '{"2" * 32}',
+                  '00-{"2" * 32}-{"3" * 16}-01', '2026-08-16T00:04:00Z',
+                  '2026-08-16T00:04:00Z', '2026-08-16T00:04:00Z', NULL
+                )
+                """
+            )
+        )
+    connection.rollback()
+
+    # 3. 已回填完整绑定时降级会丢失追溯证据，Migration 必须显式拒绝。
+    with pytest.raises(RuntimeError, match="拒绝降级"):
+        command.downgrade(config, "20260816_0047")
+    connection.rollback()
+    assert current_revision(connection, schema) == "20260816_0048"
 
 
 def test_existing_system_publication_is_backfilled_as_current_service_route(

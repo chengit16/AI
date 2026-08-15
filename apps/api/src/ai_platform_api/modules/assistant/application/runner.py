@@ -32,6 +32,11 @@ from ai_platform_api.modules.retrieval.application.planning import (
 )
 from ai_platform_api.modules.retrieval.domain.evidence import EvidenceSetSnapshot
 from ai_platform_api.modules.retrieval.domain.planning import RetrievalPlanSnapshot
+from ai_platform_api.modules.service_runtime.application import RuntimeReleaseLoader
+from ai_platform_api.modules.service_runtime.application.errors import (
+    AgentRuntimeReleaseRequiredError,
+)
+from ai_platform_api.modules.service_runtime.domain.models import RuntimeReleaseSnapshot
 from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
 
 _DEGRADATION_MESSAGES = {
@@ -59,6 +64,7 @@ class AssistantRunExecutor:
         conversations: AssistantConversationService,
         retrieval_planning: BoundedRetrievalPlanningService,
         retrieval_evidence: RetrievalEvidenceService,
+        runtime_releases: RuntimeReleaseLoader,
         runtime_configurations: RuntimeConfigurationReader,
         model_runtime: RuntimeModelGatewayService,
         model_context: AuthorizedModelContextBuilder,
@@ -69,6 +75,7 @@ class AssistantRunExecutor:
         self._conversations = conversations
         self._retrieval_planning = retrieval_planning
         self._retrieval_evidence = retrieval_evidence
+        self._runtime_releases = runtime_releases
         self._runtime_configurations = runtime_configurations
         self._model_runtime = model_runtime
         self._model_context = model_context
@@ -91,7 +98,8 @@ class AssistantRunExecutor:
 
         stream_started = False
         try:
-            # 1. 先创建恢复事实，再逐阶段写入不含知识正文的进度事件。
+            # 1. 先复核 Run 冻结的 Route 与 Release；任何草稿旁路或改绑都在检索前失败关闭。
+            release = self._runtime_release(run)
             self._streams.start_run(
                 run.workspace_id,
                 run.conversation_id,
@@ -113,8 +121,8 @@ class AssistantRunExecutor:
                 evidence_count=len(evidence.items),
             )
 
-            # 2. 证据不足时使用固定降级文案；证据充分时只调用 Run 冻结的模型配置。
-            text = self._answer(run, plan, evidence)
+            # 2. 证据不足时使用固定降级文案；证据充分时只调用 Release 冻结的模型配置。
+            text = self._answer(run, release, plan, evidence)
             self._append_answer_events(run.run_id, run.trace_id, run.traceparent, text, evidence)
 
             # 3. 先固化消息正文，再关闭流恢复事实；正常路径不会把模型正文写入审计或日志。
@@ -140,13 +148,14 @@ class AssistantRunExecutor:
     def _answer(
         self,
         run: AssistantRun,
+        release: RuntimeReleaseSnapshot,
         plan: RetrievalPlanSnapshot,
         evidence: EvidenceSetSnapshot,
     ) -> str:
         if evidence.status == "uncertain":
             reason = evidence.degradation_reason or "no_current_evidence"
             return _DEGRADATION_MESSAGES[reason]
-        runtime_config_version_id = run.runtime_config_version_id
+        runtime_config_version_id = release.runtime_config_version_id
         configuration = self._runtime_configurations.get(runtime_config_version_id)
         if configuration is None:
             raise AiRuntimeConfigNotActiveError
@@ -167,6 +176,26 @@ class AssistantRunExecutor:
             runtime_config_version_id=runtime_config_version_id,
         )
         return result.content.strip()
+
+    def _runtime_release(self, run: AssistantRun) -> RuntimeReleaseSnapshot:
+        """装载新 Run 的完整发布绑定；升级前无 Route 证据的遗留 Run 不允许重新执行。"""
+
+        if (
+            run.service_id is None
+            or run.service_route_id is None
+            or run.service_route_version is None
+        ):
+            raise AgentRuntimeReleaseRequiredError
+        snapshot = self._runtime_releases.resolve_bound(
+            run.workspace_id,
+            run.service_id,
+            run.service_route_id,
+            run.service_route_version,
+            run.agent_release_id,
+        )
+        if snapshot.runtime_config_version_id != run.runtime_config_version_id:
+            raise AgentRuntimeReleaseRequiredError
+        return snapshot
 
     def _append_status(
         self,

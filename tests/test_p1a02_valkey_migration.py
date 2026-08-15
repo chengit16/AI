@@ -68,3 +68,13 @@ def test_compose_pins_valkey_and_removes_redis_service() -> None:
             "scheduler",
         )
     )
+    environment = compose["x-python-environment"]
+    assert environment["AI_PLATFORM_RUNTIME_CURRENT_CACHE_TTL_SECONDS"] == (
+        "${RUNTIME_CURRENT_CACHE_TTL_SECONDS:-300}"
+    )
+    assert environment["AI_PLATFORM_RUNTIME_BOUND_CACHE_TTL_SECONDS"] == (
+        "${RUNTIME_BOUND_CACHE_TTL_SECONDS:-86400}"
+    )
+    assert environment["AI_PLATFORM_RUNTIME_CACHE_TIMEOUT_SECONDS"] == (
+        "${RUNTIME_CACHE_TIMEOUT_SECONDS:-0.5}"
+    )

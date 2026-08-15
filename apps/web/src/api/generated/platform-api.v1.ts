@@ -2593,6 +2593,12 @@ export type components = {
        * Format: uuid
        */
       readonly runtime_config_version_id: string;
+      /** Service Id */
+      readonly service_id?: string | null;
+      /** Service Route Id */
+      readonly service_route_id?: string | null;
+      /** Service Route Version */
+      readonly service_route_version?: number | null;
       /**
        * Status
        * @enum {string}

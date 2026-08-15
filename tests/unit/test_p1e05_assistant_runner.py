@@ -35,12 +35,16 @@ from ai_platform_api.modules.retrieval.application.planning import (
 )
 from ai_platform_api.modules.retrieval.domain.evidence import EvidenceSetSnapshot
 from ai_platform_api.modules.retrieval.domain.planning import RetrievalPlanSnapshot
+from ai_platform_api.modules.service_runtime.application import RuntimeReleaseLoader
+from ai_platform_api.modules.service_runtime.domain.models import RuntimeReleaseSnapshot
 from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
 
 WORKSPACE_ID = UUID("10000000-0000-4000-8000-000000000505")
 ACCOUNT_ID = UUID("20000000-0000-4000-8000-000000000505")
 RUN_ID = UUID("30000000-0000-4000-8000-000000000505")
 CONFIG_ID = UUID("40000000-0000-4000-8000-000000000505")
+SERVICE_ID = UUID("50000000-0000-4000-8000-000000000505")
+ROUTE_ID = UUID("60000000-0000-4000-8000-000000000505")
 NOW = datetime(2026, 8, 15, tzinfo=UTC)
 
 
@@ -114,6 +118,29 @@ class FakeConfigurations:
     def get(self, runtime_config_version_id: UUID) -> AiRuntimeConfigVersion | None:
         self.requested_ids.append(runtime_config_version_id)
         return self.configuration if runtime_config_version_id == CONFIG_ID else None
+
+
+class FakeRuntimeReleases:
+    """证明执行器按 Run 冻结的服务 Route 装载唯一 Release。"""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[UUID, UUID, UUID, int, UUID]] = []
+
+    def resolve_bound(
+        self,
+        workspace_id: UUID,
+        service_id: UUID,
+        route_id: UUID,
+        service_route_version: int,
+        agent_release_id: UUID,
+    ) -> RuntimeReleaseSnapshot:
+        self.calls.append(
+            (workspace_id, service_id, route_id, service_route_version, agent_release_id)
+        )
+        return cast(
+            RuntimeReleaseSnapshot,
+            SimpleNamespace(runtime_config_version_id=CONFIG_ID),
+        )
 
 
 class FakeModelRuntime:
@@ -211,23 +238,26 @@ def test_executor_uses_frozen_configuration_and_duplicate_schedule_does_not_gene
     # 长函数保留原因: 该回归需要在一个场景中同时证明认领、冻结配置和 SSE 终态关系。
     # 1. 构造固定 Run、检索计划和通过安全边界的单条合成证据。
     run = AssistantRun(
-        RUN_ID,
-        WORKSPACE_ID,
-        uuid4(),
-        uuid4(),
-        uuid4(),
-        uuid4(),
-        CONFIG_ID,
-        ACCOUNT_ID,
-        "queued",
-        "synthetic-idempotency",
-        "a" * 64,
-        "b" * 32,
-        "00-" + "b" * 32 + "-" + "c" * 16 + "-01",
-        NOW,
-        NOW,
-        None,
-        None,
+        run_id=RUN_ID,
+        workspace_id=WORKSPACE_ID,
+        conversation_id=uuid4(),
+        user_message_id=uuid4(),
+        assistant_message_id=uuid4(),
+        service_id=SERVICE_ID,
+        service_route_id=ROUTE_ID,
+        service_route_version=1,
+        agent_release_id=uuid4(),
+        runtime_config_version_id=CONFIG_ID,
+        requested_by_account_id=ACCOUNT_ID,
+        status="queued",
+        idempotency_key="synthetic-idempotency",
+        request_hash="a" * 64,
+        trace_id="b" * 32,
+        traceparent="00-" + "b" * 32 + "-" + "c" * 16 + "-01",
+        created_at=NOW,
+        updated_at=NOW,
+        completed_at=None,
+        error_code=None,
     )
     plan = cast(
         RetrievalPlanSnapshot,
@@ -264,12 +294,14 @@ def test_executor_uses_frozen_configuration_and_duplicate_schedule_does_not_gene
     # 2. 装配全部内存端口；调用次数由 Fake 记录，避免测试依赖真实供应商。
     conversations = FakeConversations(run)
     configurations = FakeConfigurations(configuration)
+    runtime_releases = FakeRuntimeReleases()
     model_runtime = FakeModelRuntime()
     streams = FakeStreams()
     executor = AssistantRunExecutor(
         cast(AssistantConversationService, conversations),
         cast(BoundedRetrievalPlanningService, FakePlanning(plan)),
         cast(RetrievalEvidenceService, FakeEvidence(evidence)),
+        cast(RuntimeReleaseLoader, runtime_releases),
         cast(RuntimeConfigurationReader, configurations),
         cast(RuntimeModelGatewayService, model_runtime),
         cast(AuthorizedModelContextBuilder, FakeModelContext()),
@@ -291,6 +323,9 @@ def test_executor_uses_frozen_configuration_and_duplicate_schedule_does_not_gene
     assert first.claimed is True and first.status == "completed"
     assert repeated.claimed is False
     assert configurations.requested_ids == [CONFIG_ID]
+    assert runtime_releases.calls == [
+        (WORKSPACE_ID, SERVICE_ID, ROUTE_ID, 1, conversations.run.agent_release_id)
+    ]
     assert model_runtime.configuration_ids == [CONFIG_ID]
     assert conversations.answer == "合成模型回答"
     assert streams.started == 1

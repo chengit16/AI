@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     stream_poll_interval_ms: int = 250
     stream_notification_connect_timeout_seconds: float = 0.5
     stream_delta_batch_characters: int = 512
+    runtime_current_cache_ttl_seconds: int = 300
+    runtime_bound_cache_ttl_seconds: int = 24 * 60 * 60
+    runtime_cache_timeout_seconds: float = 0.5
     session_ttl_seconds: int = 43_200
     session_cookie_secure: bool = False
     local_mock_bootstrap_enabled: bool = False
@@ -93,6 +96,12 @@ class Settings(BaseSettings):
             raise ValueError("SSE 通知连接超时必须位于 0.05 到 5 秒之间")
         if not 64 <= self.stream_delta_batch_characters <= 4_096:
             raise ValueError("SSE 增量批次字符数必须位于 64 到 4096 之间")
+        if not 60 <= self.runtime_current_cache_ttl_seconds <= 15 * 60:
+            raise ValueError("Runtime 当前 Route 缓存租期必须位于 1 到 15 分钟之间")
+        if not 60 * 60 <= self.runtime_bound_cache_ttl_seconds <= 7 * 24 * 60 * 60:
+            raise ValueError("Runtime 精确绑定缓存租期必须位于 1 小时到 7 天之间")
+        if not 0.05 <= self.runtime_cache_timeout_seconds <= 5:
+            raise ValueError("Runtime 缓存超时必须位于 0.05 到 5 秒之间")
         if not 0.1 <= self.observability_otlp_timeout_seconds <= 10:
             raise ValueError("OTLP 导出超时必须位于 0.1 到 10 秒之间")
         if self.observability_otlp_endpoint is not None:

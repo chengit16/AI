@@ -155,6 +155,11 @@ from ai_platform_api.modules.retrieval.infrastructure.sqlalchemy import SqlAlche
 from ai_platform_api.modules.service_governance.infrastructure.sqlalchemy import (
     SqlAlchemyServiceRepository,
 )
+from ai_platform_api.modules.service_runtime.application import RuntimeReleaseLoader
+from ai_platform_api.modules.service_runtime.infrastructure import (
+    SqlAlchemyRuntimeSnapshotSource,
+    ValkeyRuntimeSnapshotCache,
+)
 from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
 from ai_platform_api.modules.streaming.domain.models import StreamPolicy
 from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
@@ -219,6 +224,7 @@ class ApplicationContainer:
     model_runtime: RuntimeModelGatewayService | None = None
     assistant_conversations: AssistantConversationService | None = None
     assistant_run_executor: AssistantRunExecutor | None = None
+    runtime_releases: RuntimeReleaseLoader | None = None
     assistant_sources: AssistantSourceService | None = None
     streaming: TransactionalStreamService | None = None
     retrieval_planning: BoundedRetrievalPlanningService | None = None
@@ -238,21 +244,25 @@ class ApplicationContainer:
     def close(self) -> None:
         try:
             try:
-                if self.streaming is not None:
-                    self.streaming.close()
+                if self.runtime_releases is not None:
+                    self.runtime_releases.close()
             finally:
                 try:
-                    if self.policy_version_gate is not None:
-                        self.policy_version_gate.close()
+                    if self.streaming is not None:
+                        self.streaming.close()
                 finally:
                     try:
-                        if self.lifecycle_cache is not None:
-                            self.lifecycle_cache.close()
+                        if self.policy_version_gate is not None:
+                            self.policy_version_gate.close()
                     finally:
                         try:
-                            self.role_cache.close()
+                            if self.lifecycle_cache is not None:
+                                self.lifecycle_cache.close()
                         finally:
-                            self.sessions.close()
+                            try:
+                                self.role_cache.close()
+                            finally:
+                                self.sessions.close()
         finally:
             self.database.close()
 
@@ -373,6 +383,15 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         DeterministicLexicalReranker(),
     )
     runtime_reader = SqlAlchemyRuntimeConfigurationReader(database.sessions)
+    runtime_releases = RuntimeReleaseLoader(
+        SqlAlchemyRuntimeSnapshotSource(database.sessions),
+        ValkeyRuntimeSnapshotCache(
+            settings.valkey_url,
+            current_ttl_seconds=settings.runtime_current_cache_ttl_seconds,
+            bound_ttl_seconds=settings.runtime_bound_cache_ttl_seconds,
+            timeout_seconds=settings.runtime_cache_timeout_seconds,
+        ),
+    )
     http_runtime_provider_factory = OpenAiCompatibleRuntimeProviderFactory(provider_url_policy)
     runtime_provider_factory = (
         LocalMockRuntimeProviderFactory(
@@ -407,6 +426,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         assistant_conversations,
         retrieval_planning,
         retrieval_evidence,
+        runtime_releases,
         runtime_reader,
         model_runtime,
         model_context,
@@ -443,6 +463,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             model_runtime=model_runtime,
             assistant_conversations=assistant_conversations,
             assistant_run_executor=assistant_run_executor,
+            runtime_releases=runtime_releases,
             assistant_sources=AssistantSourceService(
                 assistant_conversations,
                 retrieval_evidence,
@@ -512,14 +533,17 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         )
     except Exception:
         try:
-            streaming.close()
+            runtime_releases.close()
         finally:
             try:
-                policy_version_gate.close()
+                streaming.close()
             finally:
                 try:
-                    role_cache.close()
+                    policy_version_gate.close()
                 finally:
-                    sessions.close()
-                    database.close()
+                    try:
+                        role_cache.close()
+                    finally:
+                        sessions.close()
+                        database.close()
         raise

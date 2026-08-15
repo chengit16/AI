@@ -88,10 +88,13 @@ def ensure_system_service_route(
     )
     if service.agent_id != agent_id or service.service_type != "system_assistant":
         raise ServiceRouteUnavailableError
+    # 暂停或归档由服务管理员显式控制，新请求不能等到 Run INSERT 时才依赖数据库兜底拒绝。
+    if service.status != "active":
+        raise ServiceRouteUnavailableError
     if current.route.primary_release_id == release_id:
         return current
 
-    # 3. 系统配置变化只追加 active Route；服务若被显式 suspended，状态保持不变。
+    # 3. 系统配置变化只追加 active Route；历史 Run 仍保留原 Route 和 Release 绑定。
     route = ServiceRoute(
         route_id=uuid4(),
         service_id=service.service_id,

@@ -193,6 +193,9 @@ class AssistantRunResponse(typing.TypedDict):
     error_code: str | None
     run_id: str
     runtime_config_version_id: str
+    service_id: typing.NotRequired[str | None]
+    service_route_id: typing.NotRequired[str | None]
+    service_route_version: typing.NotRequired[int | None]
     status: typing.Literal["queued", "running", "completed", "failed", "cancelled"]
     trace_id: str
     updated_at: str

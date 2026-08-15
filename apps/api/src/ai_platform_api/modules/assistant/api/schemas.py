@@ -101,6 +101,9 @@ class AssistantRunResponse(BaseModel):
     conversation_id: UUID
     user_message_id: UUID
     assistant_message_id: UUID | None
+    service_id: UUID | None = None
+    service_route_id: UUID | None = None
+    service_route_version: int | None = Field(default=None, ge=1)
     agent_release_id: UUID
     runtime_config_version_id: UUID
     status: Literal["queued", "running", "completed", "failed", "cancelled"]

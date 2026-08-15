@@ -263,7 +263,7 @@ class AssistantConversationService:
                     runtime_config=runtime_config,
                     released_at=now,
                 )
-                ensure_system_service_route(
+                deployment = ensure_system_service_route(
                     unit_of_work,
                     context,
                     agent_id=release.agent_id,
@@ -280,6 +280,9 @@ class AssistantConversationService:
                     idempotency_key=idempotency_key,
                     request_hash=request_hash,
                     release=release,
+                    service_id=deployment.service.service_id,
+                    service_route_id=deployment.route.route_id,
+                    service_route_version=deployment.route.route_version,
                     now=now,
                 )
                 unit_of_work.assistant.add_submission(submission)
@@ -716,6 +719,9 @@ def _new_submission(
     idempotency_key: str,
     request_hash: str,
     release: AgentRelease,
+    service_id: UUID,
+    service_route_id: UUID,
+    service_route_version: int,
     now: datetime,
 ) -> MessageSubmission:
     message_id = uuid4()
@@ -741,6 +747,9 @@ def _new_submission(
         conversation_id=conversation_id,
         user_message_id=message_id,
         assistant_message_id=assistant_message_id,
+        service_id=service_id,
+        service_route_id=service_route_id,
+        service_route_version=service_route_version,
         agent_release_id=release.release_id,
         runtime_config_version_id=release.runtime_config_version_id,
         requested_by_account_id=account_id,
@@ -891,6 +900,9 @@ def _record_run_queued(
             attributes={
                 "conversation_id": str(run.conversation_id),
                 "message_id": str(run.user_message_id),
+                "service_id": str(run.service_id),
+                "service_route_id": str(run.service_route_id),
+                "service_route_version": run.service_route_version,
                 "agent_release_id": str(run.agent_release_id),
                 "runtime_config_version_id": str(run.runtime_config_version_id),
             },
@@ -913,6 +925,9 @@ def _record_run_queued(
                 "run_id": str(run.run_id),
                 "conversation_id": str(run.conversation_id),
                 "user_message_id": str(run.user_message_id),
+                "service_id": str(run.service_id),
+                "service_route_id": str(run.service_route_id),
+                "service_route_version": run.service_route_version,
                 "agent_release_id": str(run.agent_release_id),
                 "runtime_config_version_id": str(run.runtime_config_version_id),
             },
