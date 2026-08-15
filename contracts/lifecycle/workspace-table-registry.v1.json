@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 1,
+  "registry_version": 2,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -40,6 +40,10 @@
     { "table": "retrieval_evidence_sets", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "model_invocations", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "agents", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "agent_drafts", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "agent_draft_revisions", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "agent_release_candidates", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "agent_control_requests", "classification": "business", "export": true, "purge": true, "excluded_columns": ["request_hash"] },
     { "table": "agent_releases", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "agent_publications", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "conversations", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

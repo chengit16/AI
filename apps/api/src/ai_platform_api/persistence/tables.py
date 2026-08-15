@@ -2365,7 +2365,9 @@ agents = Table(
     Column("agent_id", UUID(as_uuid=True), primary_key=True),
     Column("workspace_id", UUID(as_uuid=True), nullable=False),
     Column("agent_key", String(64), nullable=False),
+    Column("agent_kind", String(16), nullable=False, server_default="system"),
     Column("name", String(120), nullable=False),
+    Column("description", String(1000), nullable=True),
     Column("status", String(32), nullable=False),
     Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
@@ -2384,8 +2386,239 @@ agents = Table(
         [f"{SCHEMA_TOKEN}.accounts.account_id"],
         name="fk_agents_creator",
     ),
-    CheckConstraint("status IN ('active', 'disabled')", name="ck_agents_status"),
+    CheckConstraint(
+        "(agent_kind = 'system' AND status IN ('active', 'disabled')) OR "
+        "(agent_kind = 'custom' AND status IN ('active', 'archived'))",
+        name="ck_agents_kind_status",
+    ),
+    CheckConstraint("agent_kind IN ('system', 'custom')", name="ck_agents_kind"),
     CheckConstraint("version >= 1", name="ck_agents_version"),
+)
+
+agent_drafts = Table(
+    "agent_drafts",
+    metadata,
+    Column("draft_id", UUID(as_uuid=True), primary_key=True),
+    Column("agent_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("revision", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("configuration", JSONB, nullable=False),
+    Column("config_hash", String(64), nullable=False),
+    Column("updated_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("draft_id", "workspace_id", name="uq_agent_drafts_id_workspace"),
+    UniqueConstraint("agent_id", "workspace_id", name="uq_agent_drafts_agent_workspace"),
+    ForeignKeyConstraint(
+        ["agent_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.agents.agent_id", f"{SCHEMA_TOKEN}.agents.workspace_id"],
+        name="fk_agent_drafts_agent",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["updated_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_drafts_updater",
+    ),
+    CheckConstraint("revision >= 1", name="ck_agent_drafts_revision"),
+    CheckConstraint(
+        "status IN ('editing', 'testing', 'test_failed', 'ready_for_approval', "
+        "'approval_pending', 'approved', 'rejected', 'superseded')",
+        name="ck_agent_drafts_status",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(configuration) = 'object'",
+        name="ck_agent_drafts_configuration",
+    ),
+    CheckConstraint(
+        "config_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_drafts_config_hash",
+    ),
+)
+
+agent_draft_revisions = Table(
+    "agent_draft_revisions",
+    metadata,
+    Column("draft_id", UUID(as_uuid=True), primary_key=True),
+    Column("revision", Integer, primary_key=True),
+    Column("agent_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("configuration", JSONB, nullable=False),
+    Column("config_hash", String(64), nullable=False),
+    Column("updated_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "draft_id",
+        "revision",
+        "agent_id",
+        "workspace_id",
+        name="uq_agent_draft_revisions_source",
+    ),
+    ForeignKeyConstraint(
+        ["draft_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.agent_drafts.draft_id", f"{SCHEMA_TOKEN}.agent_drafts.workspace_id"],
+        name="fk_agent_draft_revisions_draft",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["agent_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.agents.agent_id", f"{SCHEMA_TOKEN}.agents.workspace_id"],
+        name="fk_agent_draft_revisions_agent",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["updated_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_draft_revisions_updater",
+    ),
+    CheckConstraint("revision >= 1", name="ck_agent_draft_revisions_revision"),
+    CheckConstraint(
+        "status IN ('editing', 'testing', 'test_failed', 'ready_for_approval', "
+        "'approval_pending', 'approved', 'rejected', 'superseded')",
+        name="ck_agent_draft_revisions_status",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(configuration) = 'object'",
+        name="ck_agent_draft_revisions_configuration",
+    ),
+    CheckConstraint(
+        "config_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_draft_revisions_config_hash",
+    ),
+)
+Index(
+    "ix_agent_draft_revisions_agent_revision",
+    agent_draft_revisions.c.workspace_id,
+    agent_draft_revisions.c.agent_id,
+    agent_draft_revisions.c.revision,
+)
+
+agent_release_candidates = Table(
+    "agent_release_candidates",
+    metadata,
+    Column("candidate_id", UUID(as_uuid=True), primary_key=True),
+    Column("agent_id", UUID(as_uuid=True), nullable=False),
+    Column("draft_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("draft_revision", Integer, nullable=False),
+    Column("candidate_hash", String(64), nullable=False),
+    Column("config_hash", String(64), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "candidate_id",
+        "workspace_id",
+        name="uq_agent_release_candidates_id_workspace",
+    ),
+    UniqueConstraint(
+        "draft_id",
+        "draft_revision",
+        name="uq_agent_release_candidates_draft_revision",
+    ),
+    ForeignKeyConstraint(
+        ["draft_id", "draft_revision", "agent_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_draft_revisions.draft_id",
+            f"{SCHEMA_TOKEN}.agent_draft_revisions.revision",
+            f"{SCHEMA_TOKEN}.agent_draft_revisions.agent_id",
+            f"{SCHEMA_TOKEN}.agent_draft_revisions.workspace_id",
+        ],
+        name="fk_agent_release_candidates_revision",
+    ),
+    ForeignKeyConstraint(
+        ["agent_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.agents.agent_id", f"{SCHEMA_TOKEN}.agents.workspace_id"],
+        name="fk_agent_release_candidates_agent",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_release_candidates_creator",
+    ),
+    CheckConstraint("draft_revision >= 1", name="ck_agent_release_candidates_revision"),
+    CheckConstraint(
+        "candidate_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_release_candidates_candidate_hash",
+    ),
+    CheckConstraint(
+        "config_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_release_candidates_config_hash",
+    ),
+    CheckConstraint(
+        "status IN ('created', 'testing', 'test_failed', 'ready_for_approval', "
+        "'approval_pending', 'approved', 'rejected', 'released', 'superseded')",
+        name="ck_agent_release_candidates_status",
+    ),
+    CheckConstraint("version >= 1", name="ck_agent_release_candidates_version"),
+)
+Index(
+    "ix_agent_release_candidates_workspace_time",
+    agent_release_candidates.c.workspace_id,
+    agent_release_candidates.c.created_at,
+)
+
+agent_control_requests = Table(
+    "agent_control_requests",
+    metadata,
+    Column("request_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("operation", String(64), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("result_type", String(32), nullable=False),
+    Column("result_id", UUID(as_uuid=True), nullable=False),
+    Column("result_revision", Integer, nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "actor_id",
+        "operation",
+        "idempotency_key",
+        name="uq_agent_control_requests_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_agent_control_requests_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["actor_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_control_requests_actor",
+    ),
+    CheckConstraint(
+        "operation IN ('agent.create', 'agent.draft.update', 'agent.release.request', "
+        "'agent.archive')",
+        name="ck_agent_control_requests_operation",
+    ),
+    CheckConstraint(
+        "idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'",
+        name="ck_agent_control_requests_idempotency",
+    ),
+    CheckConstraint(
+        "request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_control_requests_hash",
+    ),
+    CheckConstraint(
+        "result_type IN ('agent', 'draft', 'candidate')",
+        name="ck_agent_control_requests_result_type",
+    ),
+    CheckConstraint(
+        "result_revision IS NULL OR result_revision >= 1",
+        name="ck_agent_control_requests_result_revision",
+    ),
+)
+Index(
+    "ix_agent_control_requests_workspace_time",
+    agent_control_requests.c.workspace_id,
+    agent_control_requests.c.created_at,
 )
 
 agent_releases = Table(
@@ -2394,19 +2627,33 @@ agent_releases = Table(
     Column("release_id", UUID(as_uuid=True), primary_key=True),
     Column("agent_id", UUID(as_uuid=True), nullable=False),
     Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("release_kind", String(16), nullable=False, server_default="system"),
     Column("version", Integer, nullable=False),
     Column("status", String(32), nullable=False),
     Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
     Column("config_hash", String(64), nullable=False),
+    Column("candidate_id", UUID(as_uuid=True), nullable=True),
+    Column("candidate_hash", String(64), nullable=True),
+    Column("snapshot", JSONB, nullable=True),
+    Column("snapshot_hash", String(64), nullable=True),
     Column("released_by_account_id", UUID(as_uuid=True), nullable=False),
     Column("released_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint("agent_id", "version", name="uq_agent_releases_version"),
+    UniqueConstraint("candidate_id", name="uq_agent_releases_candidate"),
     UniqueConstraint("release_id", "workspace_id", name="uq_agent_releases_id_workspace"),
     ForeignKeyConstraint(
         ["agent_id", "workspace_id"],
         [f"{SCHEMA_TOKEN}.agents.agent_id", f"{SCHEMA_TOKEN}.agents.workspace_id"],
         name="fk_agent_releases_agent",
         ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["candidate_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_release_candidates.candidate_id",
+            f"{SCHEMA_TOKEN}.agent_release_candidates.workspace_id",
+        ],
+        name="fk_agent_releases_candidate",
     ),
     ForeignKeyConstraint(
         ["runtime_config_version_id"],
@@ -2420,9 +2667,25 @@ agent_releases = Table(
     ),
     CheckConstraint("version >= 1", name="ck_agent_releases_version"),
     CheckConstraint("status = 'released'", name="ck_agent_releases_status"),
+    CheckConstraint("release_kind IN ('system', 'custom')", name="ck_agent_releases_kind"),
     CheckConstraint(
         "config_hash ~ '^[0-9a-f]{64}$'",
         name="ck_agent_releases_config_hash",
+    ),
+    CheckConstraint(
+        "candidate_hash IS NULL OR candidate_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_releases_candidate_hash",
+    ),
+    CheckConstraint(
+        "snapshot_hash IS NULL OR snapshot_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_releases_snapshot_hash",
+    ),
+    CheckConstraint(
+        "(release_kind = 'system' AND candidate_id IS NULL AND candidate_hash IS NULL "
+        "AND snapshot IS NULL AND snapshot_hash IS NULL) OR "
+        "(release_kind = 'custom' AND candidate_id IS NOT NULL AND candidate_hash IS NOT NULL "
+        "AND jsonb_typeof(snapshot) = 'object' AND snapshot_hash IS NOT NULL)",
+        name="ck_agent_releases_kind_payload",
     ),
 )
 Index(

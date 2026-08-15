@@ -96,7 +96,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260815_0041"
+    assert current_revision(connection, schema) == "20260816_0042"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -105,7 +105,11 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "approval_instance_levels",
         "approval_assignments",
         "approval_actions",
+        "agent_control_requests",
+        "agent_draft_revisions",
+        "agent_drafts",
         "agent_publications",
+        "agent_release_candidates",
         "agent_releases",
         "agents",
         "ai_runtime_config_publication",
@@ -192,7 +196,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260815_0041"
+    assert current_revision(connection, schema) == "20260816_0042"
     assert schema_snapshot(connection, schema) == first_head
 
 
