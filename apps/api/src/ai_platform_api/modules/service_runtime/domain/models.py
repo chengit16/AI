@@ -57,6 +57,7 @@ class RuntimeSnapshotSource(Protocol):
         self,
         workspace_id: UUID,
         service_id: UUID,
+        assignment_bucket: int,
     ) -> RuntimeReleaseSnapshot | None: ...
 
     def get_bound(
@@ -76,6 +77,7 @@ class RuntimeSnapshotCache(Protocol):
         self,
         workspace_id: UUID,
         service_id: UUID,
+        assignment_bucket: int,
     ) -> RuntimeReleaseSnapshot | None: ...
 
     def get_bound(
@@ -87,7 +89,7 @@ class RuntimeSnapshotCache(Protocol):
         agent_release_id: UUID,
     ) -> RuntimeReleaseSnapshot | None: ...
 
-    def put_current(self, snapshot: RuntimeReleaseSnapshot) -> None: ...
+    def put_current(self, snapshot: RuntimeReleaseSnapshot, assignment_bucket: int) -> None: ...
 
     def put_bound(self, snapshot: RuntimeReleaseSnapshot) -> None: ...
 
@@ -121,6 +123,32 @@ def document_digest(document: object) -> str:
     """计算 Runtime 发布文档的 SHA-256 内容身份。"""
 
     return hashlib.sha256(canonical_json(document)).hexdigest()
+
+
+def route_assignment_bucket(service_id: UUID, assignment_key: str) -> int:
+    """把稳定非敏感分配键映射到固定百分位，不保存或返回原始主体值。"""
+
+    normalized = assignment_key.strip()
+    if not 1 <= len(normalized) <= 256 or any(
+        ord(character) < 32 or ord(character) == 127 for character in normalized
+    ):
+        raise ValueError("Runtime 灰度分配键不满足长度或字符约束")
+    digest = hashlib.sha256(service_id.bytes + b"\x00" + normalized.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big", signed=False) % 100
+
+
+def selected_route_release(snapshot: RuntimeReleaseSnapshot, assignment_bucket: int) -> UUID:
+    """按 Route 模式和固定百分位选择唯一 Release。"""
+
+    if not 0 <= assignment_bucket <= 99:
+        raise ValueError("Runtime 灰度分桶超出百分位范围")
+    if (
+        snapshot.route_mode == "canary"
+        and snapshot.canary_release_id is not None
+        and assignment_bucket < snapshot.canary_percent
+    ):
+        return snapshot.canary_release_id
+    return snapshot.primary_release_id
 
 
 def runtime_snapshot_document(snapshot: RuntimeReleaseSnapshot) -> dict[str, object]:

@@ -18,8 +18,14 @@ from ai_platform_api.modules.service_governance.application.queries import (
     get_service,
     list_services,
 )
+from ai_platform_api.modules.service_governance.application.routing import (
+    promote_route,
+    rollback_route,
+    start_canary,
+)
 from ai_platform_api.modules.service_governance.application.updates import update_service
 from ai_platform_api.modules.service_governance.domain.models import (
+    CurrentRouteInvalidator,
     ServiceDeployment,
     ServiceGovernanceUnitOfWork,
     ServiceStatus,
@@ -39,8 +45,13 @@ __all__ = [
 class ServiceGovernanceService:
     """管理自定义服务定义、当前访问策略和启停状态。"""
 
-    def __init__(self, unit_of_work: ServiceGovernanceUnitOfWork) -> None:
+    def __init__(
+        self,
+        unit_of_work: ServiceGovernanceUnitOfWork,
+        current_route_invalidator: CurrentRouteInvalidator | None = None,
+    ) -> None:
         self._unit_of_work = unit_of_work
+        self._current_route_invalidator = current_route_invalidator
 
     def create_service(
         self,
@@ -103,6 +114,7 @@ class ServiceGovernanceService:
 
         return update_service(
             self._unit_of_work,
+            self._current_route_invalidator,
             context,
             service_id=service_id,
             expected_version=expected_version,
@@ -111,5 +123,68 @@ class ServiceGovernanceService:
             visibility=visibility,
             allowed_department_ids=allowed_department_ids,
             allowed_account_ids=allowed_account_ids,
+            idempotency_key=idempotency_key,
+        )
+
+    def start_canary(
+        self,
+        context: RequestContext,
+        *,
+        service_id: UUID,
+        release_id: UUID,
+        canary_percent: int,
+        expected_generation: int,
+        idempotency_key: str,
+    ) -> ServiceDeployment:
+        """为服务追加或扩大稳定灰度 Route。"""
+
+        return start_canary(
+            self._unit_of_work,
+            self._current_route_invalidator,
+            context,
+            service_id=service_id,
+            release_id=release_id,
+            canary_percent=canary_percent,
+            expected_generation=expected_generation,
+            idempotency_key=idempotency_key,
+        )
+
+    def promote_route(
+        self,
+        context: RequestContext,
+        *,
+        service_id: UUID,
+        release_id: UUID,
+        expected_generation: int,
+        idempotency_key: str,
+    ) -> ServiceDeployment:
+        """把指定有效 Release 切换为服务唯一正式版本。"""
+
+        return promote_route(
+            self._unit_of_work,
+            self._current_route_invalidator,
+            context,
+            service_id=service_id,
+            release_id=release_id,
+            expected_generation=expected_generation,
+            idempotency_key=idempotency_key,
+        )
+
+    def rollback_route(
+        self,
+        context: RequestContext,
+        *,
+        service_id: UUID,
+        expected_generation: int,
+        idempotency_key: str,
+    ) -> ServiceDeployment:
+        """追加 rollback Route 并恢复最近稳定 Release。"""
+
+        return rollback_route(
+            self._unit_of_work,
+            self._current_route_invalidator,
+            context,
+            service_id=service_id,
+            expected_generation=expected_generation,
             idempotency_key=idempotency_key,
         )

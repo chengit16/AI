@@ -30,6 +30,7 @@ RELEASE_ID = UUID("50000000-0000-4000-8000-000000000308")
 CONFIG_ID = UUID("60000000-0000-4000-8000-000000000308")
 POLICY_ID = UUID("70000000-0000-4000-8000-000000000308")
 NOW = datetime(2026, 8, 16, tzinfo=UTC)
+ASSIGNMENT_KEY = "synthetic-runtime-account"
 
 
 class FakeCacheClient:
@@ -70,8 +71,10 @@ class FakeSource:
         self,
         workspace_id: UUID,
         service_id: UUID,
+        assignment_bucket: int,
     ) -> RuntimeReleaseSnapshot | None:
         assert workspace_id == WORKSPACE_ID and service_id == SERVICE_ID
+        assert 0 <= assignment_bucket <= 99
         self.current_calls += 1
         if not self.available:
             raise RuntimeSourceUnavailableError
@@ -142,9 +145,9 @@ def loader() -> tuple[RuntimeReleaseLoader, FakeSource, FakeCacheClient]:
 def test_current_route_refreshes_cache_and_survives_control_plane_query_failure() -> None:
     runtime, source, client = loader()
 
-    first = runtime.resolve_current(WORKSPACE_ID, SERVICE_ID)
+    first = runtime.resolve_current(WORKSPACE_ID, SERVICE_ID, ASSIGNMENT_KEY)
     source.available = False
-    during_outage = runtime.resolve_current(WORKSPACE_ID, SERVICE_ID)
+    during_outage = runtime.resolve_current(WORKSPACE_ID, SERVICE_ID, ASSIGNMENT_KEY)
 
     assert first == during_outage == snapshot()
     assert source.current_calls == 2
@@ -153,7 +156,7 @@ def test_current_route_refreshes_cache_and_survives_control_plane_query_failure(
 
 def test_bound_release_uses_immutable_cache_without_querying_control_plane() -> None:
     runtime, source, _ = loader()
-    runtime.resolve_current(WORKSPACE_ID, SERVICE_ID)
+    runtime.resolve_current(WORKSPACE_ID, SERVICE_ID, ASSIGNMENT_KEY)
     source.available = False
 
     bound = runtime.resolve_bound(WORKSPACE_ID, SERVICE_ID, ROUTE_ID, 1, RELEASE_ID)
@@ -176,10 +179,10 @@ def test_historical_bound_write_does_not_replace_current_route() -> None:
     )
     historical = replace(historical, route_hash=route_digest(historical))
 
-    cache.put_current(current)
+    cache.put_current(current, 42)
     cache.put_bound(historical)
 
-    assert cache.get_current(WORKSPACE_ID, SERVICE_ID) == current
+    assert cache.get_current(WORKSPACE_ID, SERVICE_ID, 42) == current
     assert (
         cache.get_bound(
             WORKSPACE_ID,
@@ -194,7 +197,7 @@ def test_historical_bound_write_does_not_replace_current_route() -> None:
 
 def test_corrupt_bound_cache_is_deleted_and_rebuilt_only_from_release_facts() -> None:
     runtime, source, client = loader()
-    runtime.resolve_current(WORKSPACE_ID, SERVICE_ID)
+    runtime.resolve_current(WORKSPACE_ID, SERVICE_ID, ASSIGNMENT_KEY)
     key = ValkeyRuntimeSnapshotCache.bound_key(WORKSPACE_ID, SERVICE_ID, ROUTE_ID, 1, RELEASE_ID)
     client.values[key] = "{}"
 
@@ -207,7 +210,7 @@ def test_corrupt_bound_cache_is_deleted_and_rebuilt_only_from_release_facts() ->
 
 def test_misbound_valid_cache_envelope_is_deleted_and_rebuilt_from_source() -> None:
     runtime, source, client = loader()
-    runtime.resolve_current(WORKSPACE_ID, SERVICE_ID)
+    runtime.resolve_current(WORKSPACE_ID, SERVICE_ID, ASSIGNMENT_KEY)
     expected_key = ValkeyRuntimeSnapshotCache.bound_key(
         WORKSPACE_ID,
         SERVICE_ID,
@@ -241,13 +244,13 @@ def test_invalid_or_unavailable_release_fails_closed_without_draft_fallback() ->
     runtime, source, client = loader()
     source.snapshot = replace(snapshot(), service_status="suspended")
     with pytest.raises(AgentRuntimeReleaseRequiredError):
-        runtime.resolve_current(WORKSPACE_ID, SERVICE_ID)
+        runtime.resolve_current(WORKSPACE_ID, SERVICE_ID, ASSIGNMENT_KEY)
 
     source.snapshot = snapshot()
     source.available = False
     client.values.clear()
     with pytest.raises(RuntimeServiceRouteUnavailableError):
-        runtime.resolve_current(WORKSPACE_ID, SERVICE_ID)
+        runtime.resolve_current(WORKSPACE_ID, SERVICE_ID, ASSIGNMENT_KEY)
 
 
 @pytest.mark.parametrize(

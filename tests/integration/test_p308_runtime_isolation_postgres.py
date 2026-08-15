@@ -57,8 +57,7 @@ DEFAULT_DATABASE_URL = (
 )
 
 
-@pytest.fixture(scope="module")
-def runtime_database() -> Iterator[AssistantHarness]:
+def runtime_harness() -> Iterator[AssistantHarness]:
     """创建只属于 P3-08 的临时 Schema，避免复用其他节点的运行事实。"""
 
     database_url = os.environ.get("AI_PLATFORM_TEST_DATABASE_URL", DEFAULT_DATABASE_URL)
@@ -99,6 +98,13 @@ def runtime_database() -> Iterator[AssistantHarness]:
         admin_engine.dispose()
 
 
+@pytest.fixture(scope="module")
+def runtime_database() -> Iterator[AssistantHarness]:
+    """为 P3-08 用例装配独立 Runtime 临时数据库。"""
+
+    yield from runtime_harness()
+
+
 def test_runtime_source_and_database_preserve_exact_run_binding(
     runtime_database: AssistantHarness,
 ) -> None:
@@ -125,7 +131,7 @@ def test_runtime_source_and_database_preserve_exact_run_binding(
     assert first.run.runtime_config_version_id == first_config_id
 
     source = SqlAlchemyRuntimeSnapshotSource(runtime_database.sessions)
-    current = source.get_current(owner.workspace_id, first.run.service_id)
+    current = source.get_current(owner.workspace_id, first.run.service_id, 0)
     bound = source.get_bound(
         owner.workspace_id,
         first.run.service_id,
@@ -196,7 +202,7 @@ def test_runtime_source_and_database_preserve_exact_run_binding(
         first.run.service_route_version,
         first.run.agent_release_id,
     )
-    latest = source.get_current(owner.workspace_id, first.run.service_id)
+    latest = source.get_current(owner.workspace_id, first.run.service_id, 0)
     assert historical is not None and latest is not None
     assert historical.agent_release_id == first.run.agent_release_id
     assert latest.agent_release_id == second.run.agent_release_id

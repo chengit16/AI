@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, and_, case, or_, select
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -37,9 +37,20 @@ class SqlAlchemyRuntimeSnapshotSource:
         self,
         workspace_id: UUID,
         service_id: UUID,
+        assignment_bucket: int,
     ) -> RuntimeReleaseSnapshot | None:
-        """读取当前指针选择的主 Release；P3-09 前不执行灰度分配。"""
+        """在单条发布事实查询中按固定百分位选择主版本或灰度 Release。"""
 
+        selected_release_id = case(
+            (
+                and_(
+                    service_routes.c.route_mode == "canary",
+                    assignment_bucket < service_routes.c.canary_percent,
+                ),
+                service_routes.c.canary_release_id,
+            ),
+            else_=service_routes.c.primary_release_id,
+        )
         statement = (
             _snapshot_select()
             .join(
@@ -54,7 +65,7 @@ class SqlAlchemyRuntimeSnapshotSource:
             )
             .join(
                 agent_releases,
-                (agent_releases.c.release_id == service_routes.c.primary_release_id)
+                (agent_releases.c.release_id == selected_release_id)
                 & (agent_releases.c.workspace_id == services.c.workspace_id),
             )
             .join(

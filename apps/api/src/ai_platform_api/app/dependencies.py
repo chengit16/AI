@@ -350,9 +350,19 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         if settings.local_mock_bootstrap_enabled
         else None
     )
+    runtime_releases = RuntimeReleaseLoader(
+        SqlAlchemyRuntimeSnapshotSource(database.sessions),
+        ValkeyRuntimeSnapshotCache(
+            settings.valkey_url,
+            current_ttl_seconds=settings.runtime_current_cache_ttl_seconds,
+            bound_ttl_seconds=settings.runtime_bound_cache_ttl_seconds,
+            timeout_seconds=settings.runtime_cache_timeout_seconds,
+        ),
+    )
     assistant_conversations = AssistantConversationService(
         SqlAlchemyAssistantUnitOfWork(database.sessions, SqlAlchemyServiceRepository),
         runtime_bootstrap=runtime_bootstrap,
+        current_route_invalidator=runtime_releases,
     )
     workflows = WorkflowDefinitionService(SqlAlchemyWorkflowUnitOfWork(database.sessions))
     approval_policies = ApprovalPolicyService(SqlAlchemyApprovalPolicyUnitOfWork(database.sessions))
@@ -383,15 +393,6 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         DeterministicLexicalReranker(),
     )
     runtime_reader = SqlAlchemyRuntimeConfigurationReader(database.sessions)
-    runtime_releases = RuntimeReleaseLoader(
-        SqlAlchemyRuntimeSnapshotSource(database.sessions),
-        ValkeyRuntimeSnapshotCache(
-            settings.valkey_url,
-            current_ttl_seconds=settings.runtime_current_cache_ttl_seconds,
-            bound_ttl_seconds=settings.runtime_bound_cache_ttl_seconds,
-            timeout_seconds=settings.runtime_cache_timeout_seconds,
-        ),
-    )
     http_runtime_provider_factory = OpenAiCompatibleRuntimeProviderFactory(provider_url_policy)
     runtime_provider_factory = (
         LocalMockRuntimeProviderFactory(

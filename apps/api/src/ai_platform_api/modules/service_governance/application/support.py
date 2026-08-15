@@ -42,6 +42,9 @@ from ai_platform_api.modules.service_governance.domain.models import (
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 CREATE_SERVICE_OPERATION: ServiceControlOperation = "service.create"
 UPDATE_SERVICE_OPERATION: ServiceControlOperation = "service.update"
+CANARY_SERVICE_ROUTE_OPERATION: ServiceControlOperation = "service.route.canary"
+PROMOTE_SERVICE_ROUTE_OPERATION: ServiceControlOperation = "service.route.promote"
+ROLLBACK_SERVICE_ROUTE_OPERATION: ServiceControlOperation = "service.route.rollback"
 
 
 def canonical_json(document: object) -> bytes:
@@ -353,6 +356,7 @@ def record_service_change(
     occurred_at: datetime,
     attributes: dict[str, object],
     aggregate_version: int | None = None,
+    event_type: str = "service.state.changed",
 ) -> None:
     """同步记录服务治理审计和 Outbox，不传播访问主体清单。"""
 
@@ -388,7 +392,7 @@ def record_service_change(
     unit_of_work.outbox.add(
         IntegrationEvent(
             event_id=uuid4(),
-            event_type="service.state.changed",
+            event_type=event_type,
             workspace_id=context.workspace_id,
             aggregate_id=service.service_id,
             aggregate_version=aggregate_version or service.version,

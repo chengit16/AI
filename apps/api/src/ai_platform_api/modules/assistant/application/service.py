@@ -41,8 +41,10 @@ from ai_platform_api.modules.model_gateway.domain.runtime_errors import (
     AiRuntimeConfigNotActiveError,
 )
 from ai_platform_api.modules.service_governance.application.system_assistant import (
+    SystemServiceRouteSync,
     ensure_system_service_route,
 )
+from ai_platform_api.modules.service_governance.domain.models import CurrentRouteInvalidator
 
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 FEEDBACK_RATINGS = frozenset({"helpful", "unhelpful"})
@@ -66,9 +68,11 @@ class AssistantConversationService:
         self,
         unit_of_work: AssistantUnitOfWork,
         runtime_bootstrap: RuntimeConfigurationBootstrap | None = None,
+        current_route_invalidator: CurrentRouteInvalidator | None = None,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._runtime_bootstrap = runtime_bootstrap
+        self._current_route_invalidator = current_route_invalidator
 
     def create_conversation(
         self,
@@ -95,7 +99,7 @@ class AssistantConversationService:
                 runtime_config=runtime_config,
                 released_at=now,
             )
-            ensure_system_service_route(
+            route_sync = ensure_system_service_route(
                 unit_of_work,
                 context,
                 agent_id=release.agent_id,
@@ -116,7 +120,8 @@ class AssistantConversationService:
             unit_of_work.assistant.add_conversation(conversation)
             _record_conversation_event(unit_of_work, context, conversation, "created", now)
             unit_of_work.commit()
-            return conversation
+        self._invalidate_synced_route(context, route_sync)
+        return conversation
 
     def list_conversations(
         self,
@@ -263,7 +268,7 @@ class AssistantConversationService:
                     runtime_config=runtime_config,
                     released_at=now,
                 )
-                deployment = ensure_system_service_route(
+                route_sync = ensure_system_service_route(
                     unit_of_work,
                     context,
                     agent_id=release.agent_id,
@@ -280,19 +285,33 @@ class AssistantConversationService:
                     idempotency_key=idempotency_key,
                     request_hash=request_hash,
                     release=release,
-                    service_id=deployment.service.service_id,
-                    service_route_id=deployment.route.route_id,
-                    service_route_version=deployment.route.route_version,
+                    service_id=route_sync.deployment.service.service_id,
+                    service_route_id=route_sync.deployment.route.route_id,
+                    service_route_version=route_sync.deployment.route.route_version,
                     now=now,
                 )
                 unit_of_work.assistant.add_submission(submission)
                 _record_run_queued(unit_of_work, context, submission, now)
                 unit_of_work.commit()
-                return submission
+            self._invalidate_synced_route(context, route_sync)
+            return submission
         except AssistantWriteConflictError as error:
             if error.reason == "conversation_busy":
                 raise AssistantConversationBusyError from error
             raise AssistantIdempotencyConflictError from error
+
+    def _invalidate_synced_route(
+        self,
+        context: RequestContext,
+        route_sync: SystemServiceRouteSync,
+    ) -> None:
+        """仅在系统 Route 已提交变化后清除派生缓存，避免无变化请求重复删除。"""
+
+        if route_sync.changed and self._current_route_invalidator is not None:
+            self._current_route_invalidator.invalidate_current(
+                context.workspace_id,
+                route_sync.deployment.service.service_id,
+            )
 
     def get_run_for_stream(
         self,

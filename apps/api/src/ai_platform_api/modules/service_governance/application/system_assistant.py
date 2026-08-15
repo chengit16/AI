@@ -1,6 +1,6 @@
 """把阶段 1 系统知识助手发布指针兼容同步到服务治理事实。"""
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -28,6 +28,14 @@ SYSTEM_SERVICE_KEY = "system-knowledge"
 SYSTEM_SERVICE_NAME = "系统知识助手"
 
 
+@dataclass(frozen=True)
+class SystemServiceRouteSync:
+    """返回系统服务当前部署，以及本事务是否创建了新的 Route。"""
+
+    deployment: ServiceDeployment
+    changed: bool
+
+
 def ensure_system_service_route(
     unit_of_work: ServiceGovernanceUnitOfWork,
     context: RequestContext,
@@ -35,7 +43,7 @@ def ensure_system_service_route(
     agent_id: UUID,
     release_id: UUID,
     occurred_at: datetime,
-) -> ServiceDeployment:
+) -> SystemServiceRouteSync:
     """在助手原事务内创建或追加系统服务 Route，不改变原发布和历史 Run。"""
 
     # 1. 先锁定并校验原系统 Release，兼容同步不能接受自定义或失效快照。
@@ -78,7 +86,7 @@ def ensure_system_service_route(
             occurred_at=occurred_at,
             attributes={"previous_status": "draft"},
         )
-        return deployment
+        return SystemServiceRouteSync(deployment, changed=True)
 
     current = require_deployment(
         unit_of_work.services,
@@ -92,7 +100,7 @@ def ensure_system_service_route(
     if service.status != "active":
         raise ServiceRouteUnavailableError
     if current.route.primary_release_id == release_id:
-        return current
+        return SystemServiceRouteSync(current, changed=False)
 
     # 3. 系统配置变化只追加 active Route；历史 Run 仍保留原 Route 和 Release 绑定。
     route = ServiceRoute(
@@ -150,7 +158,7 @@ def ensure_system_service_route(
         occurred_at=occurred_at,
         attributes={"previous_route_id": str(current.route.route_id)},
     )
-    return deployment
+    return SystemServiceRouteSync(deployment, changed=True)
 
 
 def _new_system_deployment(

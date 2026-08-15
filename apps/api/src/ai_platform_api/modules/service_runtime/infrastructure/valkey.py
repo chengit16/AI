@@ -62,8 +62,9 @@ class ValkeyRuntimeSnapshotCache:
         self,
         workspace_id: UUID,
         service_id: UUID,
+        assignment_bucket: int,
     ) -> RuntimeReleaseSnapshot | None:
-        return self._get(self.current_key(workspace_id, service_id))
+        return self._get(self.current_key(workspace_id, service_id, assignment_bucket))
 
     def get_bound(
         self,
@@ -83,13 +84,17 @@ class ValkeyRuntimeSnapshotCache:
             )
         )
 
-    def put_current(self, snapshot: RuntimeReleaseSnapshot) -> None:
+    def put_current(self, snapshot: RuntimeReleaseSnapshot, assignment_bucket: int) -> None:
         """刷新服务当前 Route，并同步预热该版本的精确绑定。"""
 
         payload = _snapshot_payload(snapshot)
         try:
             self._client.set(
-                self.current_key(snapshot.workspace_id, snapshot.service_id),
+                self.current_key(
+                    snapshot.workspace_id,
+                    snapshot.service_id,
+                    assignment_bucket,
+                ),
                 payload,
                 ex=self._current_ttl_seconds,
             )
@@ -127,7 +132,11 @@ class ValkeyRuntimeSnapshotCache:
 
     def delete_current(self, workspace_id: UUID, service_id: UUID) -> None:
         try:
-            self._client.delete(self.current_key(workspace_id, service_id))
+            # 百分位键集合固定有界，可确定性删除而不使用生产环境危险的 KEYS/SCAN。
+            self._client.delete(
+                self.legacy_current_key(workspace_id, service_id),
+                *(self.current_key(workspace_id, service_id, bucket) for bucket in range(100)),
+            )
         except RedisError as error:
             raise RuntimeCacheUnavailableError from error
 
@@ -183,7 +192,15 @@ class ValkeyRuntimeSnapshotCache:
             return None
 
     @staticmethod
-    def current_key(workspace_id: UUID, service_id: UUID) -> str:
+    def current_key(workspace_id: UUID, service_id: UUID, assignment_bucket: int) -> str:
+        if not 0 <= assignment_bucket <= 99:
+            raise ValueError("Runtime 灰度分桶超出百分位范围")
+        return f"runtime-current:v2:{workspace_id}:{service_id}:{assignment_bucket}"
+
+    @staticmethod
+    def legacy_current_key(workspace_id: UUID, service_id: UUID) -> str:
+        """保留旧单键身份，主动失效时一并清理 P3-08 派生缓存。"""
+
         return f"runtime-current:v1:{workspace_id}:{service_id}"
 
     @staticmethod

@@ -286,7 +286,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260816_0048"
+    assert current_revision(connection, schema) == "20260816_0049"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -404,7 +404,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260816_0048"
+    assert current_revision(connection, schema) == "20260816_0049"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -422,7 +422,7 @@ def test_runtime_binding_upgrade_backfills_only_proven_history_and_blocks_downgr
     seed_runtime_isolation_runs(connection, schema)
 
     # 1. 唯一匹配当前系统 Route 的历史 Run 被回填，无 Route 的历史 Run 保持完整空绑定。
-    command.upgrade(config, "20260816_0048")
+    command.upgrade(config, "20260816_0049")
     connection.commit()
     rows = (
         connection.execute(
@@ -503,7 +503,7 @@ def test_runtime_binding_upgrade_backfills_only_proven_history_and_blocks_downgr
     with pytest.raises(RuntimeError, match="拒绝降级"):
         command.downgrade(config, "20260816_0047")
     connection.rollback()
-    assert current_revision(connection, schema) == "20260816_0048"
+    assert current_revision(connection, schema) == "20260816_0049"
 
 
 def test_existing_system_publication_is_backfilled_as_current_service_route(

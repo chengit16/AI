@@ -3713,7 +3713,8 @@ service_control_requests = Table(
         name="fk_service_control_requests_service",
     ),
     CheckConstraint(
-        "operation IN ('service.create', 'service.update')",
+        "operation IN ('service.create', 'service.update', 'service.route.canary', "
+        "'service.route.promote', 'service.route.rollback')",
         name="ck_service_control_requests_operation",
     ),
     CheckConstraint(

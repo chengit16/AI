@@ -21,7 +21,19 @@ ServiceType = Literal[
 ServiceStatus = Literal["draft", "active", "suspended", "archived"]
 ServiceAccessVisibility = Literal["workspace", "restricted"]
 ServiceRouteMode = Literal["active", "canary", "rollback"]
-ServiceControlOperation = Literal["service.create", "service.update"]
+ServiceControlOperation = Literal[
+    "service.create",
+    "service.update",
+    "service.route.canary",
+    "service.route.promote",
+    "service.route.rollback",
+]
+
+
+class CurrentRouteInvalidator(Protocol):
+    """在服务事实提交后清除 Runtime current 派生缓存。"""
+
+    def invalidate_current(self, workspace_id: UUID, service_id: UUID) -> None: ...
 
 
 @dataclass(frozen=True)

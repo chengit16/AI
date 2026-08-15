@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import suppress
 from uuid import UUID
 
@@ -16,8 +17,12 @@ from ai_platform_api.modules.service_runtime.domain.models import (
     RuntimeSnapshotSource,
     RuntimeSourceUnavailableError,
     document_digest,
+    route_assignment_bucket,
     route_digest,
+    selected_route_release,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RuntimeReleaseLoader:
@@ -27,22 +32,28 @@ class RuntimeReleaseLoader:
         self._source = source
         self._cache = cache
 
-    def resolve_current(self, workspace_id: UUID, service_id: UUID) -> RuntimeReleaseSnapshot:
+    def resolve_current(
+        self,
+        workspace_id: UUID,
+        service_id: UUID,
+        assignment_key: str,
+    ) -> RuntimeReleaseSnapshot:
         """优先观察 PostgreSQL 当前 Route，只有 Source 故障时才使用短租期缓存。"""
 
+        assignment_bucket = _assignment_bucket(service_id, assignment_key)
         try:
-            snapshot = self._source.get_current(workspace_id, service_id)
+            snapshot = self._source.get_current(workspace_id, service_id, assignment_bucket)
         except RuntimeSourceUnavailableError:
-            return self._current_from_cache(workspace_id, service_id)
+            return self._current_from_cache(workspace_id, service_id, assignment_bucket)
         if snapshot is None:
             self._delete_current_best_effort(workspace_id, service_id)
             raise RuntimeServiceRouteUnavailableError
         verified = _require_current_identity(
-            _require_valid_snapshot(snapshot),
+            _require_current_selection(_require_valid_snapshot(snapshot), assignment_bucket),
             workspace_id,
             service_id,
         )
-        self._put_current_best_effort(verified)
+        self._put_current_best_effort(verified, assignment_bucket)
         return verified
 
     def resolve_bound(
@@ -92,20 +103,36 @@ class RuntimeReleaseLoader:
 
         self._cache.close()
 
+    def invalidate_current(self, workspace_id: UUID, service_id: UUID) -> None:
+        """提交后清除全部 current 分桶；失败只告警，不伪装数据库发布失败。"""
+
+        try:
+            self._cache.delete_current(workspace_id, service_id)
+        except RuntimeCacheUnavailableError:
+            logger.warning(
+                "Runtime current 缓存主动失效失败",
+                extra={"workspace_id": str(workspace_id), "service_id": str(service_id)},
+                exc_info=True,
+            )
+
     def _current_from_cache(
         self,
         workspace_id: UUID,
         service_id: UUID,
+        assignment_bucket: int,
     ) -> RuntimeReleaseSnapshot:
         try:
-            snapshot = self._cache.get_current(workspace_id, service_id)
+            snapshot = self._cache.get_current(workspace_id, service_id, assignment_bucket)
         except RuntimeCacheUnavailableError as error:
             raise RuntimeServiceRouteUnavailableError from error
         if snapshot is None:
             raise RuntimeServiceRouteUnavailableError
         try:
             return _require_current_identity(
-                _require_valid_snapshot(snapshot),
+                _require_current_selection(
+                    _require_valid_snapshot(snapshot),
+                    assignment_bucket,
+                ),
                 workspace_id,
                 service_id,
             )
@@ -153,10 +180,14 @@ class RuntimeReleaseLoader:
             )
             return None
 
-    def _put_current_best_effort(self, snapshot: RuntimeReleaseSnapshot) -> None:
+    def _put_current_best_effort(
+        self,
+        snapshot: RuntimeReleaseSnapshot,
+        assignment_bucket: int,
+    ) -> None:
         # PostgreSQL 发布事实已通过验证；缓存故障只失去降级能力，不能伪造主链路失败。
         with suppress(RuntimeCacheUnavailableError):
-            self._cache.put_current(snapshot)
+            self._cache.put_current(snapshot, assignment_bucket)
 
     def _put_bound_best_effort(self, snapshot: RuntimeReleaseSnapshot) -> None:
         # 历史绑定只补齐自己的不可变键，不能把旧 Route 反向写成服务当前版本。
@@ -186,7 +217,7 @@ class RuntimeReleaseLoader:
 
 
 def _require_valid_snapshot(snapshot: RuntimeReleaseSnapshot) -> RuntimeReleaseSnapshot:
-    """拒绝草稿旁路、失效状态、摘要损坏和 P3-09 前的灰度 Route。"""
+    """拒绝草稿旁路、失效状态、摘要损坏和非法灰度或回滚结构。"""
 
     release_snapshot = snapshot.release_snapshot
     configuration = release_snapshot.get("configuration") if release_snapshot is not None else None
@@ -204,14 +235,24 @@ def _require_valid_snapshot(snapshot: RuntimeReleaseSnapshot) -> RuntimeReleaseS
         and release_snapshot is None
         and snapshot.release_snapshot_hash is None
     )
+    valid_single_release_route = (
+        snapshot.route_mode in {"active", "rollback"}
+        and snapshot.agent_release_id == snapshot.primary_release_id
+        and snapshot.canary_release_id is None
+        and snapshot.canary_percent == 0
+    )
+    valid_canary_route = (
+        snapshot.route_mode == "canary"
+        and snapshot.canary_release_id is not None
+        and snapshot.canary_release_id != snapshot.primary_release_id
+        and 1 <= snapshot.canary_percent <= 99
+        and snapshot.agent_release_id in {snapshot.primary_release_id, snapshot.canary_release_id}
+    )
     if (
         snapshot.service_status != "active"
         or snapshot.agent_status != "active"
         or snapshot.release_status != "released"
-        or snapshot.route_mode != "active"
-        or snapshot.agent_release_id != snapshot.primary_release_id
-        or snapshot.canary_release_id is not None
-        or snapshot.canary_percent != 0
+        or not (valid_single_release_route or valid_canary_route)
         or snapshot.service_route_version < 1
         or snapshot.release_version < 1
         or not _is_sha256(snapshot.config_hash)
@@ -219,6 +260,24 @@ def _require_valid_snapshot(snapshot: RuntimeReleaseSnapshot) -> RuntimeReleaseS
         or route_digest(snapshot) != snapshot.route_hash
         or not (valid_system or valid_custom)
     ):
+        raise AgentRuntimeReleaseRequiredError
+    return snapshot
+
+
+def _assignment_bucket(service_id: UUID, assignment_key: str) -> int:
+    try:
+        return route_assignment_bucket(service_id, assignment_key)
+    except ValueError as error:
+        raise AgentRuntimeReleaseRequiredError from error
+
+
+def _require_current_selection(
+    snapshot: RuntimeReleaseSnapshot,
+    assignment_bucket: int,
+) -> RuntimeReleaseSnapshot:
+    """复核 Source 或 current 缓存没有返回其他百分位对应的 Release。"""
+
+    if selected_route_release(snapshot, assignment_bucket) != snapshot.agent_release_id:
         raise AgentRuntimeReleaseRequiredError
     return snapshot
 

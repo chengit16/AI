@@ -28,6 +28,7 @@ from ai_platform_api.modules.service_governance.application.support import (
     service_request,
 )
 from ai_platform_api.modules.service_governance.domain.models import (
+    CurrentRouteInvalidator,
     ServiceAccessPolicyVersion,
     ServiceAccessVisibility,
     ServiceDeployment,
@@ -39,6 +40,7 @@ from ai_platform_api.modules.service_governance.domain.models import (
 
 def update_service(
     unit_of_work_factory: ServiceGovernanceUnitOfWork,
+    invalidator: CurrentRouteInvalidator | None,
     context: RequestContext,
     *,
     service_id: UUID,
@@ -88,7 +90,10 @@ def update_service(
             )
             if request is not None:
                 require_request_hash(request, request_hash)
-                return deployment_from_request(request)
+                deployment = deployment_from_request(request)
+                if invalidator is not None:
+                    invalidator.invalidate_current(context.workspace_id, service_id)
+                return deployment
 
             current = require_deployment(
                 unit_of_work.services,
@@ -172,6 +177,8 @@ def update_service(
                 attributes={"previous_status": current.service.status},
             )
             unit_of_work.commit()
+            if invalidator is not None:
+                invalidator.invalidate_current(context.workspace_id, service_id)
             return deployment
     except ServiceWriteConflictError as error:
         replayed = _recover_update(
@@ -181,6 +188,8 @@ def update_service(
             request_hash=request_hash,
         )
         if replayed is not None:
+            if invalidator is not None:
+                invalidator.invalidate_current(context.workspace_id, service_id)
             return replayed
         raise_write_conflict(error)
 
