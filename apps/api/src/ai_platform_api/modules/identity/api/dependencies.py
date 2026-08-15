@@ -14,6 +14,7 @@ from ai_platform_api.modules.authorization.application.menu_releases import Menu
 from ai_platform_api.modules.authorization.application.menus import MenuConfigurationService
 from ai_platform_api.modules.authorization.application.policy import (
     ApiResource,
+    AuthorizationPolicyUnavailableError,
     PolicyDecisionPoint,
     PolicyRequest,
     ResourceReference,
@@ -199,9 +200,18 @@ def _authorize_registered_operation(request: Request, context: RequestContext) -
             context=context,
             permission_code=api_resource.permission_code,
             resource=_resource_reference(request, context, api_resource, permission.resource_type),
+            surface=(
+                "menu"
+                if operation_id in {"getCurrentWorkspaceMenuRelease", "getEffectiveWorkspaceRoles"}
+                else "field_projection"
+                if permission.resource_type == "field_projection"
+                else "api"
+            ),
         )
     )
     if not decision.allowed:
+        if decision.reason == "policy_unavailable":
+            raise AuthorizationPolicyUnavailableError
         raise AuthorizationDeniedError
     return replace(
         context,

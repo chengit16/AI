@@ -254,14 +254,39 @@ def test_prometheus_rules_cover_latency_error_backlog_degradation_and_sse() -> N
         "AiPlatformOutboxBacklogOldest",
         "AiPlatformOutboxDeadLetter",
         "AiPlatformSseNotificationFailure",
+        "AiPlatformAuthorizationPolicyUnavailable",
+        "AiPlatformAuthorizationProbeSpike",
+        "AiPlatformAuthorizationCacheRejected",
     }
     assert "ai_platform_outbox_oldest_pending_age_seconds > 300" in expressions
     assert "ai_platform_dependency_health" in expressions
     assert "ai_platform_sse_notifications_total" in expressions
+    assert "ai_platform_authorization_decisions_total" in expressions
+    assert "ai_platform_authorization_policy_cache_total" in expressions
     assert all(
         forbidden not in expressions
         for forbidden in ("workspace_id", "user_id", "document_id", "trace_id")
     )
+
+
+def test_authorization_metrics_keep_only_fixed_surface_and_reason_labels() -> None:
+    runtime = _runtime()
+    try:
+        runtime.record_authorization_cache("stale_rejected")
+        runtime.record_authorization_decision(
+            surface="retrieval",
+            outcome="denied",
+            reason_code="policy_unavailable",
+        )
+        payload = runtime.metrics_payload().decode("utf-8")
+
+        assert 'cache_status="stale_rejected"' in payload
+        assert 'surface="retrieval"' in payload
+        assert 'reason_code="policy_unavailable"' in payload
+        assert "workspace_id" not in payload
+        assert "user_id" not in payload
+    finally:
+        runtime.shutdown()
 
 
 def test_prometheus_multiprocess_payload_contains_worker_metrics(tmp_path: Path) -> None:

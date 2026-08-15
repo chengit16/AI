@@ -362,6 +362,23 @@ class DenyPolicy:
         )
 
 
+class UnavailablePolicy:
+    """模拟版本见证异常，协议边缘必须返回可重试策略错误。"""
+
+    def decide(self, request: PolicyRequest) -> PolicyDecision:
+        return PolicyDecision(
+            uuid4(),
+            "deny",
+            request.permission_code,
+            WORKSPACE_ID,
+            ResourceScope(),
+            frozenset(),
+            9,
+            0,
+            "policy_unavailable",
+        )
+
+
 def authorization_client(policy: PolicyDecisionPoint) -> TestClient:
     settings = Settings(environment="test")
     closing = ClosingDependency()
@@ -402,6 +419,19 @@ def test_direct_api_access_is_denied_before_service_execution() -> None:
 
     assert response.status_code == 403
     assert response.json()["code"] == "POLICY_DENIED"
+
+
+def test_stale_policy_cache_returns_retryable_service_unavailable() -> None:
+    client = authorization_client(cast("PolicyDecisionPoint", UnavailablePolicy()))
+    with client:
+        response = client.get(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/roles/{ROLE_ID}/permissions",
+            headers={"X-Workspace-ID": str(WORKSPACE_ID)},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "POLICY_UNAVAILABLE"
+    assert response.json()["retryable"] is True
 
 
 def test_role_permission_routes_share_registered_permission_codes() -> None:

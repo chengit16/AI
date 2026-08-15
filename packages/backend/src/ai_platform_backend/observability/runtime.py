@@ -297,6 +297,19 @@ class ObservabilityRuntime:
             registry=self.registry,
             multiprocess_mode="livemostrecent",
         )
+        # 4. 授权指标只使用固定表面、结论和原因码，禁止主体、空间或资源标识成为标签。
+        self.authorization_decisions = Counter(
+            "ai_platform_authorization_decisions_total",
+            "授权表面的允许、拒绝与稳定原因数量。",
+            (*common, "surface", "outcome", "reason_code"),
+            registry=self.registry,
+        )
+        self.authorization_policy_cache = Counter(
+            "ai_platform_authorization_policy_cache_total",
+            "策略版本见证的新建、命中与失败关闭数量。",
+            (*common, "cache_status"),
+            registry=self.registry,
+        )
 
     @property
     def common_labels(self) -> dict[str, str]:
@@ -488,6 +501,47 @@ class ObservabilityRuntime:
 
         base = {"service": self.service_name, "environment": self.environment, **attributes}
         return AlertFact(self.fields.validate("alert", base))
+
+    def record_authorization_decision(
+        self,
+        *,
+        surface: str,
+        outcome: str,
+        reason_code: str,
+    ) -> None:
+        """记录低基数授权结果；权限码和目标资源只保留在受控业务事实中。"""
+
+        labels = {
+            **self.common_labels,
+            "surface": surface,
+            "outcome": outcome,
+            "reason_code": reason_code,
+        }
+        self.fields.validate("metric", labels)
+        self.authorization_decisions.labels(**labels).inc()
+        self.log(
+            "authorization_decision_completed",
+            component="authorization",
+            operation="decide",
+            surface=surface,
+            outcome=outcome,
+            reason_code=reason_code,
+        )
+
+    def record_authorization_cache(self, cache_status: str) -> None:
+        """记录策略版本见证状态；异常状态由 Prometheus 规则触发受控告警。"""
+
+        labels = {**self.common_labels, "cache_status": cache_status}
+        self.fields.validate("metric", labels)
+        self.authorization_policy_cache.labels(**labels).inc()
+        if cache_status not in {"fresh", "bootstrapped"}:
+            self.log(
+                "authorization_policy_cache_rejected",
+                component="authorization",
+                operation="verify_policy_version",
+                cache_status=cache_status,
+                outcome="denied",
+            )
 
     def metrics_payload(self) -> bytes:
         """生成当前进程 Prometheus 文本，不暴露 Trace 或业务资源标识。"""

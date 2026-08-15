@@ -6,6 +6,7 @@
     "log": {
       "allowed_fields": [
         "attempt",
+        "cache_status",
         "checked_at",
         "component",
         "count",
@@ -22,11 +23,13 @@
         "operation",
         "outcome",
         "queue",
+        "reason_code",
         "request_id",
         "result_count",
         "route",
         "service",
         "span_id",
+        "surface",
         "task_id",
         "task_name",
         "timestamp",
@@ -46,15 +49,18 @@
         "operation",
         "outcome",
         "queue",
+        "reason_code",
         "request_id",
         "result_count",
         "route",
+        "surface",
         "task_id",
         "task_name"
       ]
     },
     "metric": {
       "allowed_fields": [
+        "cache_status",
         "component",
         "degraded_reason",
         "dependency",
@@ -65,8 +71,10 @@
         "operation",
         "outcome",
         "queue",
+        "reason_code",
         "route",
         "service",
+        "surface",
         "task_name"
       ]
     },

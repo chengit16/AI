@@ -34,10 +34,12 @@ def error_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
         413: "上传内容超过限制",
         415: "上传内容类型不受支持",
     }
+    # 策略缓存、数据库或其他安全依赖异常时，任一受保护接口都可能失败关闭为 503。
+    documented_statuses = dict.fromkeys((*statuses, 503))
     return {
         status: {
             "model": ErrorResponse,
             "description": descriptions[status],
         }
-        for status in statuses
+        for status in documented_statuses
     }

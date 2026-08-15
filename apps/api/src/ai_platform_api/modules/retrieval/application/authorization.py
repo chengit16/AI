@@ -27,6 +27,7 @@ def retrieval_policy_request(context: RequestContext) -> PolicyRequest:
             workspace_id=context.workspace_id,
             attributes={"risk_level": "high"},
         ),
+        surface="retrieval",
     )
 
 

@@ -138,6 +138,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -193,6 +203,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -322,6 +342,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -437,6 +467,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -586,6 +626,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -701,6 +751,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -870,6 +930,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1022,6 +1092,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1147,6 +1227,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -1299,6 +1389,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -1468,6 +1568,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1593,6 +1703,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -1735,6 +1855,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -1897,6 +2027,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -2173,6 +2313,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2373,6 +2523,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2498,6 +2658,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -2740,6 +2910,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2865,6 +3045,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -3037,6 +3227,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -3715,6 +3915,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -3848,6 +4058,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -4027,6 +4247,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4199,6 +4429,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4361,6 +4601,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -4494,6 +4744,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -4673,6 +4933,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4845,6 +5115,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -4998,6 +5278,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -5167,6 +5457,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -5290,6 +5590,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -5469,6 +5779,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -5624,6 +5944,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -5793,6 +6123,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -5945,6 +6285,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -6090,6 +6440,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -6267,6 +6627,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -6412,6 +6782,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -6579,6 +6959,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -6734,6 +7124,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -6911,6 +7311,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -7063,6 +7473,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -7206,6 +7626,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -7368,6 +7798,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -7547,6 +7987,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -7702,6 +8152,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -7871,6 +8331,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -8023,6 +8493,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -8160,6 +8640,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -8310,6 +8800,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -8474,6 +8974,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -8651,6 +9161,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -8808,6 +9328,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -8977,6 +9507,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -9132,6 +9672,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -9513,6 +10063,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -9688,6 +10248,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -10099,6 +10669,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10281,6 +10861,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10354,6 +10944,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -10452,6 +11052,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -10579,6 +11189,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10692,6 +11312,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -10929,6 +11559,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -11039,6 +11679,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -11112,6 +11762,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -11217,6 +11877,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -11290,6 +11960,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -11400,6 +12080,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -11559,6 +12249,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -11694,6 +12394,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -11858,6 +12568,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -12046,6 +12766,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -12203,6 +12933,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -12409,6 +13149,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -12574,6 +13324,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -12753,6 +13513,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -12908,6 +13678,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -13095,6 +13875,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -13257,6 +14047,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -13409,6 +14209,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -13544,6 +14354,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -13696,6 +14516,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -13875,6 +14705,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -14020,6 +14860,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -14192,6 +15042,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -14382,6 +15242,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -14537,6 +15407,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -14706,6 +15586,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -14858,6 +15748,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -14993,6 +15893,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -15162,6 +16072,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -15307,6 +16227,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -15486,6 +16416,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -15648,6 +16588,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -15783,6 +16733,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -15944,6 +16904,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -16089,6 +17059,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -16268,6 +17248,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -16433,6 +17423,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -16612,6 +17612,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -16777,6 +17787,16 @@
           },
           "422": {
             "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
             "content": {
               "application/json": {
                 "schema": {

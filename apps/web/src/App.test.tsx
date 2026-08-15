@@ -211,6 +211,64 @@ describe("平台路由与运行状态", () => {
     await waitFor(() => expect(screen.getByRole("main")).toHaveFocus());
   });
 
+  it("菜单策略不可用时立即清空旧导航并失败关闭", async () => {
+    useSessionStore
+      .getState()
+      .setAuthenticated("account-id", "workspace-id", "synthetic-csrf-token");
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const url = String(input);
+      if (url.endsWith("/menu-releases/current")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              code: "POLICY_UNAVAILABLE",
+              message: "权限策略暂时不可用，操作已默认拒绝",
+              retryable: true,
+              request_id: "10000000-0000-4000-8000-000000000209",
+              trace_id: "9123456789abcdef0123456789abcdef",
+            }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      if (url.endsWith("/api/v1/workspaces")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              items: [
+                {
+                  workspace_id: "workspace-id",
+                  workspace_type: "personal",
+                  name: "合成个人空间",
+                  status: "active",
+                  membership_type: "owner",
+                  membership_status: "active",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    renderApp(pageRoutes.WorkspaceOverviewPage);
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "菜单暂时无法加载" }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("link", { name: "空间总览" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "运行状态" })).not.toBeInTheDocument();
+    });
+  });
+
   it("展示后端返回的健康状态", async () => {
     useSessionStore
       .getState()

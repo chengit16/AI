@@ -472,6 +472,7 @@ class SqlAlchemyWorkflowKnowledgeRetriever(WorkflowKnowledgeRetriever):
                 context,
                 "knowledge.document.read",
                 ResourceReference("document", context.workspace_id, context.workspace_id),
+                surface="retrieval",
             )
         )
         if not decision.allowed or "content" in decision.field_mask:

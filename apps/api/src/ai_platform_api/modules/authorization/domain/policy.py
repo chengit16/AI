@@ -9,6 +9,17 @@ from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 
 Decision = Literal["allow", "deny", "approval_required"]
 DataScopeType = Literal["workspace", "department_tree", "self", "resource"]
+AuthorizationSurface = Literal["menu", "api", "retrieval", "field_projection"]
+PolicyVersionCacheStatus = Literal["fresh", "bootstrapped"]
+
+
+class PolicyVersionUnavailableError(Exception):
+    """表示策略版本见证不可用或与 PostgreSQL 事实不一致。"""
+
+    def __init__(self, reason_code: str, source_version: int) -> None:
+        super().__init__(reason_code)
+        self.reason_code = reason_code
+        self.source_version = source_version
 
 
 @dataclass(frozen=True)
@@ -28,6 +39,7 @@ class PolicyRequest:
     context: RequestContext
     permission_code: str
     resource: ResourceReference
+    surface: AuthorizationSurface = "api"
 
 
 @dataclass(frozen=True)
@@ -76,3 +88,11 @@ class PolicyDecisionPoint(Protocol):
     """对可信主体、动作和资源执行统一策略决策，未知情况默认拒绝。"""
 
     def decide(self, request: PolicyRequest) -> PolicyDecision: ...
+
+
+class PolicyVersionGate(Protocol):
+    """用 PostgreSQL 版本校验可重建缓存，缓存异常时必须失败关闭。"""
+
+    def verify(self, workspace_id: UUID, source_version: int) -> PolicyVersionCacheStatus: ...
+
+    def close(self) -> None: ...

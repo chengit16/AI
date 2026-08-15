@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+from ai_platform_backend.observability import current_observability_runtime
+
+from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.modules.authorization.domain.fields import (
     SECURITY_LEVEL_RANK,
     FieldPolicyRegistry,
@@ -17,6 +20,8 @@ from ai_platform_api.modules.authorization.domain.policy import (
     PolicyDecision,
     PolicyDecisionPoint,
     PolicyRequest,
+    PolicyVersionGate,
+    PolicyVersionUnavailableError,
     ResourceReference,
     ResourceScope,
 )
@@ -32,6 +37,12 @@ __all__ = [
 ]
 
 
+class AuthorizationPolicyUnavailableError(PlatformError):
+    """表示策略版本或依赖不可用，调用方只能稍后重试而不能降级放行。"""
+
+    error_code = "POLICY_UNAVAILABLE"
+
+
 class RbacPolicyDecisionPoint:
     """以注册表、可信主体、角色授权和数据范围形成唯一策略决策。"""
 
@@ -40,17 +51,28 @@ class RbacPolicyDecisionPoint:
         registry: ResourceRegistry,
         grants: PolicyGrantReader,
         field_registry: FieldPolicyRegistry | None = None,
+        version_gate: PolicyVersionGate | None = None,
     ) -> None:
         self._registry = registry
         self._grants = grants
         self._field_registry = field_registry or FieldPolicyRegistry(1, 1, ())
+        self._version_gate = version_gate
 
     def decide(self, request: PolicyRequest) -> PolicyDecision:
         try:
-            return self._decide(request)
+            decision = self._decide(request)
+        except PolicyVersionUnavailableError as error:
+            self._observe_cache(error.reason_code)
+            decision = self._denied(
+                request,
+                "policy_unavailable",
+                policy_version=max(1, error.source_version),
+            )
         except Exception:
             # 策略存储、组织树或角色事实异常时不能降级为放行。
-            return self._denied(request, "policy_unavailable")
+            decision = self._denied(request, "policy_unavailable")
+        self._observe_decision(request, decision)
+        return decision
 
     def _decide(self, request: PolicyRequest) -> PolicyDecision:
         # 1. 先验证工作空间、注册 Permission 和凭证 Scope，任何来源都只能缩小权限。
@@ -76,6 +98,12 @@ class RbacPolicyDecisionPoint:
         subject = self._grants.resolve_subject(request.context)
         if subject is None or not subject.role_ids:
             return self._denied(request, "subject_not_active")
+        if self._version_gate is not None:
+            cache_status = self._version_gate.verify(
+                request.context.workspace_id,
+                subject.role_version,
+            )
+            self._observe_cache(cache_status)
         matching = tuple(
             grant
             for grant in self._grants.list_role_grants(
@@ -219,6 +247,26 @@ class RbacPolicyDecisionPoint:
             reason=reason,
             maximum_security_level="PUBLIC",
         )
+
+    @staticmethod
+    def _observe_cache(status: str) -> None:
+        """记录固定缓存状态；工作空间和主体标识不得成为日志或指标标签。"""
+
+        runtime = current_observability_runtime()
+        if runtime is not None:
+            runtime.record_authorization_cache(status)
+
+    @staticmethod
+    def _observe_decision(request: PolicyRequest, decision: PolicyDecision) -> None:
+        """只输出表面、结论和稳定原因，不复制权限目标或资源内容。"""
+
+        runtime = current_observability_runtime()
+        if runtime is not None:
+            runtime.record_authorization_decision(
+                surface=request.surface,
+                outcome="allowed" if decision.allowed else "denied",
+                reason_code=decision.reason,
+            )
 
 
 def _resource_matches_scope(request: PolicyRequest, scope: ResourceScope) -> bool:

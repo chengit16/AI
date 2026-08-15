@@ -5568,6 +5568,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly loginWithPassword: {
@@ -5612,6 +5621,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -5688,6 +5706,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly registerPersonalAccount: {
@@ -5732,6 +5759,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -5864,6 +5900,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly createPlatformAiRuntimeConfig: {
@@ -5928,6 +5973,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -6013,6 +6067,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getCurrentPlatformAiRuntimeConfig: {
@@ -6071,6 +6134,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listPlatformModelProviders: {
@@ -6122,6 +6194,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -6200,6 +6281,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly activatePlatformModelProvider: {
@@ -6271,6 +6361,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -6360,6 +6459,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly reviewPlatformModelProviderDataPolicy: {
@@ -6442,6 +6550,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly disablePlatformModelProvider: {
@@ -6513,6 +6630,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -6676,6 +6802,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listApprovalInstances: {
@@ -6742,6 +6877,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -6842,6 +6986,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getApprovalInstance: {
@@ -6916,6 +7069,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -7017,6 +7179,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly rejectApprovalInstance: {
@@ -7104,6 +7275,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -7205,6 +7385,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly withdrawApprovalInstance: {
@@ -7299,6 +7488,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly processDueApprovalInstances: {
@@ -7381,6 +7579,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listApprovalPolicies: {
@@ -7447,6 +7654,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -7538,6 +7754,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getApprovalPolicy: {
@@ -7612,6 +7837,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -7713,6 +7947,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly previewApprovalChain: {
@@ -7806,6 +8049,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listAssistantConversations: {
@@ -7872,6 +8124,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -7956,6 +8217,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -8053,6 +8323,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listAssistantMessages: {
@@ -8129,6 +8408,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -8231,6 +8519,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getAssistantMessageFeedback: {
@@ -8306,6 +8603,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -8408,6 +8714,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listAssistantMessageSources: {
@@ -8499,6 +8814,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listAssistantRuns: {
@@ -8575,6 +8899,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -8666,6 +8999,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -8774,6 +9116,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getWorkspaceEntitlement: {
@@ -8847,6 +9198,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -8947,6 +9307,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly retryKnowledgeIngestionJob: {
@@ -9030,6 +9399,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -9130,6 +9508,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listKnowledgeBases: {
@@ -9196,6 +9583,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -9280,6 +9676,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -9377,6 +9782,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listKnowledgeDocuments: {
@@ -9453,6 +9867,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -9554,6 +9977,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly deleteKnowledgeDocument: {
@@ -9638,6 +10070,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -9740,6 +10181,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly publishKnowledgeDocumentVersion: {
@@ -9825,6 +10275,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -9921,6 +10380,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -10254,6 +10722,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly leaveEnterpriseWorkspace: {
@@ -10336,6 +10813,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -10697,6 +11183,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly disableEnterpriseWorkspaceMember: {
@@ -10780,6 +11275,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -10876,6 +11380,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly createWorkspaceMenuRelease: {
@@ -10958,6 +11471,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -11059,6 +11581,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly publishWorkspaceMenuRelease: {
@@ -11142,6 +11673,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -11239,6 +11779,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly validateWorkspaceMenuRelease: {
@@ -11322,6 +11871,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -11418,6 +11976,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getWorkspaceMenuConfiguration: {
@@ -11500,6 +12067,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -11600,6 +12176,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listOperationsAuditRecords: {
@@ -11680,6 +12265,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getOperationsIntegrationInspection: {
@@ -11744,6 +12338,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -11822,6 +12425,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -11923,6 +12535,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getOperationsUsageReconciliation: {
@@ -11987,6 +12608,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -12071,6 +12701,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listEnterpriseDepartments: {
@@ -12144,6 +12783,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -12237,6 +12885,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -12338,6 +12995,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly setEnterpriseDepartmentStatus: {
@@ -12432,6 +13098,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getEnterpriseMemberOrganization: {
@@ -12515,6 +13190,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -12616,6 +13300,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listEnterprisePositions: {
@@ -12689,6 +13382,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -12782,6 +13484,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -12883,6 +13594,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listEnterpriseRoles: {
@@ -12947,6 +13667,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -13047,6 +13776,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getRoleMenuVisibility: {
@@ -13130,6 +13868,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -13231,6 +13978,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listEnterpriseRolePermissions: {
@@ -13305,6 +14061,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -13406,6 +14171,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly setEnterpriseRoleStatus: {
@@ -13493,6 +14267,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -13593,6 +14376,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly revokeEnterpriseRoleBinding: {
@@ -13683,6 +14475,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getEffectiveEnterpriseRoles: {
@@ -13764,6 +14565,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly switchWorkspaceContext: {
@@ -13828,6 +14638,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -13901,6 +14720,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -13992,6 +14820,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getWorkflowDefinition: {
@@ -14066,6 +14903,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -14167,6 +15013,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly validateWorkflowDraft: {
@@ -14241,6 +15096,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -14342,6 +15206,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly listWorkflowRuns: {
@@ -14418,6 +15291,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -14520,6 +15402,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly getWorkflowRun: {
@@ -14595,6 +15486,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -14684,6 +15584,15 @@ export interface operations {
           readonly "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   readonly acceptEnterpriseWorkspaceInvitation: {
@@ -14766,6 +15675,15 @@ export interface operations {
       };
       /** @description 平台内部错误 */
       readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
         headers: {
           readonly [name: string]: unknown;
         };

@@ -58,3 +58,28 @@ groups:
           severity: warning
         annotations:
           summary: "SSE 跨实例通知出现失败并进入轮询兜底"
+      - alert: AiPlatformAuthorizationPolicyUnavailable
+        expr: >-
+          increase(ai_platform_authorization_decisions_total{reason_code="policy_unavailable"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "授权策略版本或安全依赖不可用，访问已失败关闭"
+      - alert: AiPlatformAuthorizationProbeSpike
+        expr: >-
+          sum by (service, environment, surface)
+          (increase(ai_platform_authorization_decisions_total{outcome="denied",reason_code=~"workspace_mismatch|credential_scope_denied|resource_out_of_scope"}[5m])) > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "授权表面出现集中越权探测"
+      - alert: AiPlatformAuthorizationCacheRejected
+        expr: >-
+          increase(ai_platform_authorization_policy_cache_total{cache_status=~"stale_rejected|future_rejected|corrupt|cache_unavailable|cache_protocol_invalid|invalid_source_version"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "策略版本见证异常，访问已失败关闭并等待重新校验"

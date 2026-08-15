@@ -25,11 +25,14 @@ export function useWorkspaceMenuNavigation() {
   const workspaceId = useSessionStore((state) => state.workspaceId);
   const accountId = useSessionStore((state) => state.accountId);
   const workspace = useCurrentWorkspace();
+  // 1. 独立轮询菜单发布和企业有效角色，使任一权限事实变化都能在传播时限内触发重算。
   const release = useQuery({
     queryKey: ["workspace-menu-release", workspaceId],
     queryFn: ({ signal }) => getCurrentWorkspaceMenuRelease(workspaceId!, signal),
     enabled: Boolean(workspaceId),
     staleTime: 0,
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
   });
   const roles = useQuery({
     queryKey: ["workspace-effective-roles", workspaceId, accountId],
@@ -38,17 +41,23 @@ export function useWorkspaceMenuNavigation() {
       workspaceId && accountId && workspace.currentWorkspace?.workspace_type === "enterprise",
     ),
     staleTime: 0,
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
   });
-  // 发布快照只携带数据，组件与图标始终从本地白名单解析，防止服务端配置执行任意代码。
-  const navigation = useMemo(
-    () =>
-      release.data?.snapshot
-        ? buildDynamicNavigation(release.data, iconByKey, roles.data ?? null)
-        : staticWorkspaceNavigation,
-    [release.data, roles.data],
+  const authorizationUnavailable = Boolean(
+    release.error || roles.error || workspace.workspaces.error,
   );
-  // 权限码集合只裁剪按钮和页面入口，后端 PDP 仍对每次请求独立授权。
+  // 2. 发布快照只携带数据，组件与图标始终从本地白名单解析；任一事实异常时清空旧入口。
+  const navigation = useMemo(() => {
+    // 策略查询失败时清空所有历史入口，避免静态回退或旧快照继续暴露已撤销页面。
+    if (authorizationUnavailable) return [];
+    return release.data?.snapshot
+      ? buildDynamicNavigation(release.data, iconByKey, roles.data ?? null)
+      : staticWorkspaceNavigation;
+  }, [authorizationUnavailable, release.data, roles.data]);
+  // 3. 权限码集合只裁剪按钮和页面入口，后端 PDP 仍对每次请求独立授权。
   const visiblePermissionCodes = useMemo(() => {
+    if (authorizationUnavailable) return new Set<string>();
     if (!release.data?.snapshot) {
       return new Set(
         resourceRegistry.menus
@@ -73,7 +82,7 @@ export function useWorkspaceMenuNavigation() {
         )
         .map((menu) => menu.permission_code!),
     );
-  }, [release.data, roles.data]);
+  }, [authorizationUnavailable, release.data, roles.data]);
   return {
     release,
     roles,

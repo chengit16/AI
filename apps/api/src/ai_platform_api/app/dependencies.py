@@ -34,6 +34,9 @@ from ai_platform_api.modules.authorization.domain.resources import ResourceRegis
 from ai_platform_api.modules.authorization.infrastructure.menu_sqlalchemy import (
     SqlAlchemyMenuConfigurationUnitOfWork,
 )
+from ai_platform_api.modules.authorization.infrastructure.policy_version import (
+    ValkeyPolicyVersionGate,
+)
 from ai_platform_api.modules.authorization.infrastructure.sqlalchemy import (
     SqlAlchemyPolicyGrantRepository,
     SqlAlchemyRolePermissionUnitOfWork,
@@ -191,6 +194,7 @@ class ApplicationContainer:
     role_cache: ValkeyRoleResolutionCache
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
+    policy_version_gate: ValkeyPolicyVersionGate | None = None
     menu_configuration: MenuConfigurationService | None = None
     menu_releases: MenuReleaseService | None = None
     integration_operations: IntegrationOperationsService | None = None
@@ -227,13 +231,17 @@ class ApplicationContainer:
                     self.streaming.close()
             finally:
                 try:
-                    if self.lifecycle_cache is not None:
-                        self.lifecycle_cache.close()
+                    if self.policy_version_gate is not None:
+                        self.policy_version_gate.close()
                 finally:
                     try:
-                        self.role_cache.close()
+                        if self.lifecycle_cache is not None:
+                            self.lifecycle_cache.close()
                     finally:
-                        self.sessions.close()
+                        try:
+                            self.role_cache.close()
+                        finally:
+                            self.sessions.close()
         finally:
             self.database.close()
 
@@ -250,6 +258,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     database = PlatformDatabase.create(settings.database_url)
     sessions = ValkeySessionStore(settings.valkey_url)
     role_cache = ValkeyRoleResolutionCache(settings.valkey_url)
+    policy_version_gate = ValkeyPolicyVersionGate(settings.valkey_url)
     reader = SqlAlchemyIdentityReader(database.sessions)
     entitlement_access = SqlAlchemyEntitlementAccessReader(database.sessions)
     digester = Sha256SecretDigester()
@@ -330,7 +339,12 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         SqlAlchemyApprovalRuntimeUnitOfWork(database.sessions),
         approval_policies,
     )
-    policy = RbacPolicyDecisionPoint(resource_registry, policy_reader, field_registry)
+    policy = RbacPolicyDecisionPoint(
+        resource_registry,
+        policy_reader,
+        field_registry,
+        policy_version_gate,
+    )
     retrieval_planning = BoundedRetrievalPlanningService(
         SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
         policy,
@@ -475,6 +489,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 cache=role_cache,
             ),
             role_cache=role_cache,
+            policy_version_gate=policy_version_gate,
             secret_cipher=secret_cipher,
             sessions=sessions,
         )
@@ -483,8 +498,11 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             streaming.close()
         finally:
             try:
-                role_cache.close()
+                policy_version_gate.close()
             finally:
-                sessions.close()
-                database.close()
+                try:
+                    role_cache.close()
+                finally:
+                    sessions.close()
+                    database.close()
         raise
