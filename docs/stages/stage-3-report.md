@@ -7,11 +7,11 @@
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-06` 不可变发布快照 |
+| 当前节点 | `P3-07` 服务与路由治理 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期、严格配置校验、自动评估与发布审批门禁已通过 |
+| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、发布审批与不可变 Release 已通过 |
 | 服务发布与回滚 | `not_run` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -95,14 +95,27 @@
 - 当前边界：审批通过只将当前有效候选推进至 `approved`，不提前生成 `AgentRelease`、服务路由或 Runtime 绑定；这些能力从 `P3-06` 开始按顺序建设。
 - 提交：`89575ae`。
 
+### P3-06 不可变发布快照
+
+- 状态：已完成，提交 `1d3bec3`。
+- 发布快照：自定义 `AgentRelease` 只从候选绑定的不可变草稿 revision 构造，不回读当前草稿。快照按 `agent-control.v1` 固定完整配置、测试集版本、评估运行与策略、五类必需检查、审批实例与策略版本；Prompt、测试输入/回答和审批条件正文不会复制到审计或 Outbox。
+- 原子性与幂等：发布事务遵循 Agent 行锁到候选行锁的固定顺序，候选唯一约束和每 Agent 单调版本保证同一候选只生成一个 Release。Release、四类来源身份、候选 `released` 终态、幂等请求、审计和 `agent.release.published` Outbox 事件同事务提交；相同键和不同键重放都返回同一 Release，不重复事件。
+- 可验证与防绕过：应用写入和读取均复算规范 JSON SHA-256。Revision `20260816_0046` 为共享 Release 增加草稿 revision、评估运行和审批绑定复合外键；插入 Trigger 逐字段核对候选、配置、评估、审批、字段数量和时间语义，候选终态 Trigger 要求同事务内先存在匹配 Release，既有不可变 Trigger 继续拒绝更新和删除。系统助手 Release 保持兼容，缺少新来源字段的系统事实无需回填。
+- 边界修正：全量门禁首次命中 Python 与 PostgreSQL 对时间微秒尾零的序列化差异；数据库校验改为把快照时间解析为 `timestamptz` 后做语义比较，同时保留对象字段数量和所有业务字段校验，避免把等价时间误判为篡改。
+- 专项验收：真实 PostgreSQL `3/3`，P3-06 与 Migration 往返 `7/7`，P3-02～P3-06 单元、集成及 Migration 联合 `43/43`；覆盖合法发布、摘要复算、同键/不同键重放、跨空间、缺审批、直接 SQL 伪造、直接终态推进、更新和删除拒绝，以及空库升级、降级、再升级。
+- 统一门禁：`./scripts/verify` 通过 React `42/42`、Python `597/597`、Ruff format/lint `536` 个文件、mypy strict `536` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器验收：重新构建 API、Migration、Web 和 Worker 镜像并升级公共数据库后，`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision `20260816_0046`、Valkey、五个 Worker Lane 和 Scheduler 共 13 项通过。本节点未增加 HTTP 路由或页面，因此不执行浏览器验收。
+- 当前边界：本节点只生成可被后续路由引用的 Release，不提前创建 `Service`、当前路由、灰度、回滚或 Runtime 装载；`P3-07` 起按顺序建设服务治理。
+- 提交：`1d3bec3`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布供应链门禁继续阻断。
-- 阶段 3 尚未完成 Release 生成、服务路由、灰度和回滚，不能把当前控制面事实描述为完整 Agent 发布平台。
+- 阶段 3 尚未完成服务路由、灰度和回滚，不能把当前控制面事实描述为完整 Agent 发布平台。
 - LLM Grading、多模态图片问答、真实多源连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 均保持后置。
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估和 `P3-05` 发布审批门禁已通过，当前进入 `P3-06` 不可变发布快照；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁和 `P3-06` 不可变发布快照已通过，当前进入 `P3-07` 服务与路由治理；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
