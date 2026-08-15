@@ -53,6 +53,14 @@ def test_valid_manifest_matches_frozen_matrix() -> None:
     assert result.reasons == ()
 
 
+def test_current_stage_two_revision_is_release_compatible() -> None:
+    matrix = parse_matrix(load_json(MATRIX))
+
+    assert matrix.database_revisions[-1] == "20260815_0041"
+    assert len(matrix.database_revisions) == len(set(matrix.database_revisions))
+    assert tuple(sorted(matrix.database_revisions)) == matrix.database_revisions
+
+
 def test_manifest_tampering_is_rejected() -> None:
     service = ReleaseManifestService()
     manifest = service.build(inputs())
