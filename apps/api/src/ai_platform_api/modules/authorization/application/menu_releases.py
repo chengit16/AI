@@ -476,7 +476,11 @@ def _snapshot_violations(
             or item.page_resource_id != registered.page_resource_id
             or item.permission_code != registered.permission_code
             or item.source != registered.source
-            or item.status != registered.status
+            # 历史快照保留发布时状态；只有当前注册表版本才要求状态完全一致。
+            or (
+                snapshot.registry_version == registry.registry_version
+                and item.status != registered.status
+            )
         ):
             errors.append(f"snapshot.menus[{menu_id}] 修改了不可覆盖字段")
         parent = snapshot_by_id.get(item.parent_menu_id) if item.parent_menu_id else None
@@ -500,7 +504,13 @@ def _snapshot_violations(
             if item.menu_id in snapshot_by_id
         )
     )
-    if snapshot.menu_api_bindings != expected_bindings:
+    # 3. 注册表升级可以追加接口绑定；旧快照只需保持为当前绑定的合法子集，不能被原地补写。
+    bindings_valid = (
+        snapshot.menu_api_bindings == expected_bindings
+        if snapshot.registry_version == registry.registry_version
+        else set(snapshot.menu_api_bindings).issubset(expected_bindings)
+    )
+    if not bindings_valid:
         errors.append("snapshot.menu_api_bindings 与当前注册表不一致")
     role_keys = {(item.role_id, item.menu_id) for item in snapshot.role_menus}
     if len(role_keys) != len(snapshot.role_menus) or any(

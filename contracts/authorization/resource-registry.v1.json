@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 14,
+  "registry_version": 15,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -177,7 +177,7 @@
       "access_level": "authorized",
       "permission_code": "workflow.page.access",
       "resource_version": 1,
-      "status": "disabled"
+      "status": "active"
     }
   ],
   "api_resources": [
@@ -280,7 +280,8 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000097", "api_key": "approval.instance.approve", "operation_id": "approveApprovalInstance", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-instances/{approval_instance_id}/approve", "access_level": "authorized", "permission_code": "approval.instance.approve", "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000098", "api_key": "approval.instance.reject", "operation_id": "rejectApprovalInstance", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-instances/{approval_instance_id}/reject", "access_level": "authorized", "permission_code": "approval.instance.reject", "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000099", "api_key": "approval.instance.transfer", "operation_id": "transferApprovalInstance", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-instances/{approval_instance_id}/transfer", "access_level": "authorized", "permission_code": "approval.instance.transfer", "risk_level": "high", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000100", "api_key": "approval.instance.withdraw", "operation_id": "withdrawApprovalInstance", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-instances/{approval_instance_id}/withdraw", "access_level": "authorized", "permission_code": "approval.instance.withdraw", "risk_level": "high", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000100", "api_key": "approval.instance.withdraw", "operation_id": "withdrawApprovalInstance", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/approval-instances/{approval_instance_id}/withdraw", "access_level": "authorized", "permission_code": "approval.instance.withdraw", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000101", "api_key": "workflow.run.list", "operation_id": "listWorkflowRuns", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs", "access_level": "authorized", "permission_code": "workflow.run.read", "risk_level": "normal", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -347,7 +348,7 @@
     { "menu_id": "82000000-0000-4000-8000-000000000168", "menu_key": "navigation.workspace.assistant.run_cancel", "parent_menu_key": "navigation.workspace.assistant", "name": "取消知识问答运行", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.run.cancel", "icon_key": null, "sort_order": 250, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000169", "menu_key": "navigation.workspace.assistant.source_read", "parent_menu_key": "navigation.workspace.assistant", "name": "查看知识问答来源", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.source.read", "icon_key": null, "sort_order": 260, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000170", "menu_key": "navigation.workspace.assistant.feedback_manage", "parent_menu_key": "navigation.workspace.assistant", "name": "提交知识问答反馈", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.feedback.manage", "icon_key": null, "sort_order": 270, "source": "system", "status": "active" },
-    { "menu_id": "82000000-0000-4000-8000-000000000171", "menu_key": "navigation.workspace.workflow", "parent_menu_key": "navigation.workspace", "name": "工作流", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000009", "permission_code": "workflow.page.access", "icon_key": "workflow", "sort_order": 370, "source": "system", "status": "disabled" },
+    { "menu_id": "82000000-0000-4000-8000-000000000171", "menu_key": "navigation.workspace.workflow", "parent_menu_key": "navigation.workspace", "name": "工作流", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000009", "permission_code": "workflow.page.access", "icon_key": "network", "sort_order": 370, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000172", "menu_key": "navigation.workspace.workflow.definition_create", "parent_menu_key": "navigation.workspace.workflow", "name": "创建工作流", "menu_type": "action", "page_resource_id": null, "permission_code": "workflow.definition.create", "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000173", "menu_key": "navigation.workspace.workflow.definition_read", "parent_menu_key": "navigation.workspace.workflow", "name": "查看工作流", "menu_type": "action", "page_resource_id": null, "permission_code": "workflow.definition.read", "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000174", "menu_key": "navigation.workspace.workflow.definition_update", "parent_menu_key": "navigation.workspace.workflow", "name": "编辑工作流草稿", "menu_type": "action", "page_resource_id": null, "permission_code": "workflow.definition.update", "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
@@ -470,6 +471,7 @@
     { "menu_id": "82000000-0000-4000-8000-000000000184", "api_resource_id": "81000000-0000-4000-8000-000000000097", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000185", "api_resource_id": "81000000-0000-4000-8000-000000000098", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000186", "api_resource_id": "81000000-0000-4000-8000-000000000099", "action_type": "mutation" },
-    { "menu_id": "82000000-0000-4000-8000-000000000187", "api_resource_id": "81000000-0000-4000-8000-000000000100", "action_type": "mutation" }
+    { "menu_id": "82000000-0000-4000-8000-000000000187", "api_resource_id": "81000000-0000-4000-8000-000000000100", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000177", "api_resource_id": "81000000-0000-4000-8000-000000000101", "action_type": "query" }
   ]
 }

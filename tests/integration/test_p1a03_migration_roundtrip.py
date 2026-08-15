@@ -1,5 +1,6 @@
 """验证阶段 1 Migration 从空库升级、逐步降级和再次升级。"""
 
+import json
 import os
 from collections.abc import Iterator
 from pathlib import Path
@@ -95,7 +96,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260815_0034"
+    assert current_revision(connection, schema) == "20260815_0035"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -181,7 +182,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260815_0034"
+    assert current_revision(connection, schema) == "20260815_0035"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -363,4 +364,194 @@ def test_existing_clean_upload_is_backfilled_as_queued_ingestion_job(
         UUID("10000000-0000-4000-8000-000000000319"),
         32,
         55,
+    )
+
+
+def test_existing_menu_release_is_copied_and_restored_without_mutation(
+    migration_database: tuple[Config, Connection, str],
+) -> None:
+    config, connection, schema = migration_database
+    command.upgrade(config, "20260815_0034")
+    connection.commit()
+    workspace_id = UUID("20000000-0000-4000-8000-000000000505")
+    account_id = UUID("10000000-0000-4000-8000-000000000505")
+    role_id = UUID("70000000-0000-4000-8000-000000000505")
+    source_release_id = UUID("90000000-0000-4000-8000-000000000505")
+    source_digest = "a" * 64
+    source_snapshot = {
+        "schema_version": 1,
+        "registry_version": 3,
+        "workspace_id": str(workspace_id),
+        "menu_version": 1,
+        "menus": [
+            {
+                "menu_id": "82000000-0000-4000-8000-000000000171",
+                "menu_key": "navigation.workspace.workflow",
+                "parent_menu_id": "82000000-0000-4000-8000-000000000001",
+                "name": "工作流",
+                "menu_type": "page",
+                "page_resource_id": "80000000-0000-4000-8000-000000000009",
+                "permission_code": "workflow.page.access",
+                "icon_key": None,
+                "sort_order": 370,
+                "source": "system",
+                "status": "disabled",
+                "visible": False,
+            }
+        ],
+        "role_menus": [],
+        "menu_api_bindings": [],
+    }
+
+    # 1. 固定历史账号、空间、系统角色和发布指针，复现真实升级前的非空菜单数据。
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".accounts (
+              account_id, login_name, display_name, password_hash, status, auth_version,
+              created_at, created_by_actor_id, updated_at, updated_by_actor_id, version
+            ) VALUES (
+              :account_id, 'synthetic.p1f05.migration@example.com', '合成迁移用户',
+              'synthetic-password-hash', 'active', 1, '2026-08-15T00:00:00Z', :account_id,
+              '2026-08-15T00:00:00Z', :account_id, 1
+            )
+            """
+        ),
+        {"account_id": account_id},
+    )
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".workspaces (
+              workspace_id, workspace_type, name, owner_account_id, entitlement_version,
+              role_version, menu_version, status, created_at, created_by_actor_id,
+              updated_at, updated_by_actor_id, version
+            ) VALUES (
+              :workspace_id, 'enterprise', '合成历史菜单空间', NULL, 1, 1, 1,
+              'active', '2026-08-15T00:00:00Z', :account_id,
+              '2026-08-15T00:00:00Z', :account_id, 1
+            )
+            """
+        ),
+        {"workspace_id": workspace_id, "account_id": account_id},
+    )
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".roles (
+              role_id, workspace_id, role_key, name, status, system_managed,
+              created_at, updated_at, version
+            ) VALUES (
+              :role_id, :workspace_id, 'workspace_owner', '空间所有者', 'active', true,
+              '2026-08-15T00:00:00Z', '2026-08-15T00:00:00Z', 1
+            )
+            """
+        ),
+        {"role_id": role_id, "workspace_id": workspace_id},
+    )
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".menu_releases (
+              release_id, workspace_id, release_number, release_kind, source_release_id,
+              status, snapshot, snapshot_digest, validation_errors, rejection_reason,
+              created_by_account_id, decided_by_account_id, created_at, validated_at,
+              decided_at, published_at, version
+            ) VALUES (
+              :release_id, :workspace_id, 1, 'standard', NULL, 'published',
+              CAST(:snapshot AS jsonb), :digest, ARRAY[]::varchar[], NULL,
+              :account_id, :account_id, '2026-08-15T00:00:00Z', '2026-08-15T00:00:00Z',
+              '2026-08-15T00:00:00Z', '2026-08-15T00:00:00Z', 1
+            )
+            """
+        ),
+        {
+            "release_id": source_release_id,
+            "workspace_id": workspace_id,
+            "snapshot": json.dumps(source_snapshot, ensure_ascii=False),
+            "digest": source_digest,
+            "account_id": account_id,
+        },
+    )
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".workspace_menu_publications (
+              workspace_id, current_release_id, published_at
+            ) VALUES (:workspace_id, :release_id, '2026-08-15T00:00:00Z')
+            """
+        ),
+        {"workspace_id": workspace_id, "release_id": source_release_id},
+    )
+    connection.commit()
+
+    # 2. 升级必须复制新事实并切换指针，原快照、原摘要和来源发布保持不变。
+    command.upgrade(config, "head")
+    connection.commit()
+    releases = (
+        connection.execute(
+            text(
+                f"""
+            SELECT release_id, release_number, source_release_id, snapshot, snapshot_digest
+            FROM "{schema}".menu_releases
+            WHERE workspace_id = :workspace_id
+            ORDER BY release_number
+            """
+            ),
+            {"workspace_id": workspace_id},
+        )
+        .mappings()
+        .all()
+    )
+    assert len(releases) == 2
+    assert releases[0]["snapshot"] == source_snapshot
+    assert releases[0]["snapshot_digest"] == source_digest
+    assert releases[1]["source_release_id"] == source_release_id
+    assert releases[1]["snapshot"]["registry_version"] == 15
+    assert releases[1]["snapshot"]["menus"][0]["status"] == "active"
+    assert releases[1]["snapshot"]["menus"][0]["icon_key"] == "network"
+    assert releases[1]["snapshot"]["menus"][0]["visible"] is True
+    assert releases[1]["snapshot"]["menu_api_bindings"] == [
+        {
+            "menu_id": "82000000-0000-4000-8000-000000000177",
+            "api_resource_id": "81000000-0000-4000-8000-000000000101",
+            "action_type": "query",
+        }
+    ]
+    assert (
+        connection.scalar(
+            text(
+                f"""
+            SELECT current_release_id FROM "{schema}".workspace_menu_publications
+            WHERE workspace_id = :workspace_id
+            """
+            ),
+            {"workspace_id": workspace_id},
+        )
+        == releases[1]["release_id"]
+    )
+
+    # 3. 降级只删除本 Revision 的复制版本，并把当前指针恢复到原发布事实。
+    command.downgrade(config, "20260815_0034")
+    connection.commit()
+    assert (
+        connection.scalar(
+            text(
+                f"""
+            SELECT current_release_id FROM "{schema}".workspace_menu_publications
+            WHERE workspace_id = :workspace_id
+            """
+            ),
+            {"workspace_id": workspace_id},
+        )
+        == source_release_id
+    )
+    assert (
+        connection.scalar(
+            text(
+                f'SELECT count(*) FROM "{schema}".menu_releases WHERE workspace_id = :workspace_id'
+            ),
+            {"workspace_id": workspace_id},
+        )
+        == 1
     )

@@ -1,7 +1,7 @@
 // 由 scripts/generate_resource_registry.py 自动生成, 请勿手工修改。
 export const resourceRegistry = {
   schema_version: 1,
-  registry_version: 14,
+  registry_version: 15,
   permissions: [
     {
       code: "workspace.overview.access",
@@ -634,7 +634,7 @@ export const resourceRegistry = {
       access_level: "authorized",
       permission_code: "workflow.page.access",
       resource_version: 1,
-      status: "disabled",
+      status: "active",
     },
   ],
   api_resources: [
@@ -1760,6 +1760,17 @@ export const resourceRegistry = {
       risk_level: "high",
       status: "active",
     },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000101",
+      api_key: "workflow.run.list",
+      operation_id: "listWorkflowRuns",
+      method: "GET",
+      path_pattern: "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs",
+      access_level: "authorized",
+      permission_code: "workflow.run.read",
+      risk_level: "normal",
+      status: "active",
+    },
   ],
   menus: [
     {
@@ -2602,10 +2613,10 @@ export const resourceRegistry = {
       menu_type: "page",
       page_resource_id: "80000000-0000-4000-8000-000000000009",
       permission_code: "workflow.page.access",
-      icon_key: "workflow",
+      icon_key: "network",
       sort_order: 370,
       source: "system",
-      status: "disabled",
+      status: "active",
     },
     {
       menu_id: "82000000-0000-4000-8000-000000000172",
@@ -3437,6 +3448,11 @@ export const resourceRegistry = {
       menu_id: "82000000-0000-4000-8000-000000000187",
       api_resource_id: "81000000-0000-4000-8000-000000000100",
       action_type: "mutation",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000177",
+      api_resource_id: "81000000-0000-4000-8000-000000000101",
+      action_type: "query",
     },
   ],
 } as const;

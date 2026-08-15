@@ -87,6 +87,7 @@ OWNER_PERMISSION_CODES = (
     "workflow.definition.publish",
     "workflow.definition.read",
     "workflow.definition.update",
+    "workflow.page.access",
     "workflow.run.create",
     "workflow.run.read",
 )
@@ -113,6 +114,7 @@ MEMBER_PERMISSION_CODES = (
     "assistant.source.read",
     "assistant.feedback.manage",
     "workflow.definition.read",
+    "workflow.page.access",
     "workflow.run.create",
     "workflow.run.read",
 )

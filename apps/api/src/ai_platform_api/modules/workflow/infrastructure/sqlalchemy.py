@@ -327,6 +327,26 @@ class SqlAlchemyWorkflowRepository(WorkflowRepository):
                 raise WorkflowWriteConflictError("idempotency") from error
             raise WorkflowWriteConflictError("write") from error
 
+    def list_runs(
+        self,
+        workspace_id: UUID,
+        workflow_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[WorkflowRun, ...]:
+        """按创建时间倒序读取一个工作流的运行事实，页面刷新后可恢复监控。"""
+
+        rows = self._session.execute(
+            select(workflow_runs)
+            .where(
+                workflow_runs.c.workspace_id == workspace_id,
+                workflow_runs.c.workflow_id == workflow_id,
+            )
+            .order_by(workflow_runs.c.created_at.desc(), workflow_runs.c.workflow_run_id)
+            .limit(limit)
+        )
+        return tuple(workflow_run_from_row(row) for row in rows)
+
     def get_run(
         self,
         workspace_id: UUID,

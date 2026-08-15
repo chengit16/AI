@@ -27,6 +27,7 @@ from ai_platform_api.modules.workflow.api.schemas import (
     WorkflowNodeDocument,
     WorkflowPublicationResponse,
     WorkflowPublishResponse,
+    WorkflowRunListResponse,
     WorkflowRunResponse,
     WorkflowVersionResponse,
 )
@@ -240,6 +241,35 @@ def create_workflow_run(
     # 重复幂等请求可能再次调度，但数据库 queued -> running 条件保证节点只执行一次。
     background_tasks.add_task(executor.execute, context, run.workflow_run_id)
     return _run(run)
+
+
+@router.get(
+    "/{workflow_id}/runs",
+    response_model=WorkflowRunListResponse,
+    operation_id="listWorkflowRuns",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def list_workflow_runs(
+    workspace_id: UUID,
+    workflow_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[WorkflowDefinitionService, Depends(workflow_service)],
+    projection: Annotated[FieldProjectionService, Depends(field_projection_service)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> WorkflowRunListResponse:
+    """列出最近运行；每条输入和输出在序列化前独立执行字段级投影。"""
+
+    _require_workspace_path(context, workspace_id)
+    return WorkflowRunListResponse(
+        items=[
+            _run(
+                item,
+                projection=projection,
+                field_mask=context.authorized_field_mask,
+            )
+            for item in service.list_runs(context, workflow_id=workflow_id, limit=limit)
+        ]
+    )
 
 
 @router.get(

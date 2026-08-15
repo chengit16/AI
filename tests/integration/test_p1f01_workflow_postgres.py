@@ -281,7 +281,15 @@ def test_cross_workspace_and_http_run_projection(workflow_database: WorkflowHarn
             f"/api/v1/workspaces/{owner.workspace_id}/workflows/{workflow.workflow_id}"
             f"/runs/{run.workflow_run_id}"
         )
+        list_response = client.get(
+            f"/api/v1/workspaces/{owner.workspace_id}/workflows/{workflow.workflow_id}/runs"
+        )
 
     assert response.status_code == 200
     assert response.json()["workflow_run_id"] == str(run.workflow_run_id)
     assert response.json()["input_payload"] is None
+    assert list_response.status_code == 200
+    assert [item["workflow_run_id"] for item in list_response.json()["items"]] == [
+        str(run.workflow_run_id)
+    ]
+    assert list_response.json()["items"][0]["input_payload"] is None

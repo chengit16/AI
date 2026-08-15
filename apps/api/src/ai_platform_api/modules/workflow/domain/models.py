@@ -244,6 +244,14 @@ class WorkflowRepository(Protocol):
 
     def add_run(self, run: WorkflowRun) -> None: ...
 
+    def list_runs(
+        self,
+        workspace_id: UUID,
+        workflow_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[WorkflowRun, ...]: ...
+
     def get_run(
         self,
         workspace_id: UUID,

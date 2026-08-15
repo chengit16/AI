@@ -422,6 +422,32 @@ class WorkflowDefinitionService:
                 raise WorkflowIdempotencyConflictError from error
             raise WorkflowConflictError from error
 
+    def list_runs(
+        self,
+        context: RequestContext,
+        *,
+        workflow_id: UUID,
+        limit: int,
+    ) -> tuple[WorkflowRun, ...]:
+        """列出一个工作流的最近运行，并按运行实例范围做二次裁剪。"""
+
+        _browser_account(context)
+        if not 1 <= limit <= 200:
+            raise WorkflowValidationError
+        with self._unit_of_work as unit_of_work:
+            # 父工作流只用于限定查询边界，资源级授权仍绑定每个 Run，不能借列表接口扩大范围。
+            _require_workflow(unit_of_work, context.workspace_id, workflow_id)
+            values = unit_of_work.workflows.list_runs(
+                context.workspace_id,
+                workflow_id,
+                limit=limit,
+            )
+        if context.authorized_workspace:
+            return values
+        return tuple(
+            value for value in values if value.workflow_run_id in context.authorized_resource_ids
+        )
+
     def get_run(
         self,
         context: RequestContext,

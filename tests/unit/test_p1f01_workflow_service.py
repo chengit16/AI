@@ -167,6 +167,20 @@ class MemoryWorkflowRepository:
     def add_run(self, run: WorkflowRun) -> None:
         self.runs[run.workflow_run_id] = run
 
+    def list_runs(
+        self,
+        workspace_id: UUID,
+        workflow_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[WorkflowRun, ...]:
+        values = (
+            run
+            for run in reversed(tuple(self.runs.values()))
+            if run.workspace_id == workspace_id and run.workflow_id == workflow_id
+        )
+        return tuple(values)[:limit]
+
     def get_run(
         self,
         workspace_id: UUID,
@@ -318,6 +332,15 @@ def test_revision_conflict_and_run_scope_use_distinct_resource_ids() -> None:
             workflow_run_id=run.workflow_run_id,
         )
         == run
+    )
+    assert service.list_runs(run_context, workflow_id=workflow.workflow_id, limit=50) == (run,)
+    assert (
+        service.list_runs(
+            replace(run_context, authorized_resource_ids=frozenset()),
+            workflow_id=workflow.workflow_id,
+            limit=50,
+        )
+        == ()
     )
     with pytest.raises(WorkflowDeniedError):
         service.get_run(

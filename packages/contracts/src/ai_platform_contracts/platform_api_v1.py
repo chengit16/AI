@@ -1087,6 +1087,10 @@ class WorkflowPublishResponse(typing.TypedDict):
     workflow: WorkflowDefinitionResponse
 
 
+class WorkflowRunListResponse(typing.TypedDict):
+    items: list[WorkflowRunResponse]
+
+
 class WorkflowRunResponse(typing.TypedDict):
     completed_at: str | None
     created_at: str

@@ -211,3 +211,9 @@ class WorkflowRunResponse(BaseModel):
     completed_at: datetime | None
     error_code: str | None
     version: int
+
+
+class WorkflowRunListResponse(BaseModel):
+    """返回当前授权范围内的最近工作流运行。"""
+
+    items: list[WorkflowRunResponse]
