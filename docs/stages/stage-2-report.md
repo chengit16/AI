@@ -7,7 +7,7 @@
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P2-03` Worker 隔离、死信与安全并发进行中 |
+| 当前节点 | `P2-04` 索引巡检与重建进行中 |
 | 阶段可靠性 | `not_run` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
@@ -23,7 +23,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0036`；阶段 1 发布仍冻结在 `20260815_0035` |
+| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0037`；阶段 1 发布仍冻结在 `20260815_0035` |
 | 阶段 1 发布 | 本地 MVP `0.1.0`，ReleaseManifest 摘要 `e8983e87…b62943` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实 AI 质量 |
 
@@ -51,6 +51,17 @@
 - 故障与 Migration：真实 PostgreSQL 覆盖自动重试独立 Attempt、旧租约迟到、租约耗尽、`timed_out -> manual_recovery -> cancelled`、不可变触发器、审计/Outbox 原子性及重复完成；Migration 覆盖空库 `base -> head -> base -> head`、非空升级、取消终态降回阶段 1 可理解失败态及结构一致性。
 - 自动验收：专项单元与既有入库回归 `13/13`，P2-02 PostgreSQL 和 Migration `6/6`；统一门禁 React `37/37`、Python `457/457`、Ruff、mypy strict `431` 个源文件、OpenAPI/契约兼容、模块依赖、注释、UnoCSS、Secret Scanner、SBOM、ReleaseManifest 和生产构建全部通过。`./platform doctor` Web、API、MinIO、Tika、PostgreSQL、Revision `20260815_0036`、Valkey 和 Worker 八项通过。
 
+### P2-03 Worker 隔离、索引死信与安全并发
+
+- 状态：已完成，提交 `0700701`。
+- 进程与队列：Celery Beat 从业务 Worker 中拆出独立 Scheduler；control、parsing、OCR、embedding 和 indexing 五个 Worker 进程分别只监听 `platform.control`、`platform.parsing`、`platform.ocr`、`platform.embedding` 和 `platform.indexing`。TXT、Markdown、DOCX 进入 parsing，PDF 与图片进入 OCR；PostgreSQL 认领条件再次复核 Lane，Broker 不能决定业务事实。
+- 索引阶段：原索引构建拆为 Embedding 和 Indexing 两个真实阶段。Embedding 在事务外复核 Artifact、生成 Chunk 与向量并写入 `active=false` 的不可见构建；Indexing 只提交已完整落库的构建，再原子切换索引版本与发布指针。任一阶段失败或并发重放都不能让半成品可见。
+- 死信与恢复：索引租约绑定不可复用 `active_attempt_id`，过期租约、同名 Worker 迟到结果和旧 Attempt 均失去提交权。自动尝试耗尽后进入稳定 `dead_letter`，人工恢复最多开启 3 个新 generation；终态 Attempt 由数据库触发器保持不可变，重复恢复不能重复发布或覆盖当前索引。
+- 并发与配置：五个 Lane 并发可分别配置，应用层统一限制为 `1～8`，本地默认 control/parsing/OCR/embedding/indexing 为 `2/2/1/1/2`。Compose 补齐批量、租约、退避、扫描周期、文件/页数和 Chunk 参数，PostgreSQL 继续作为唯一事实源，Valkey 只承担 Broker 与唤醒。
+- 故障隔离演练：停止 OCR Worker 后，Scheduler 继续向各队列投递，OCR 队列独立积压到 11 条，parsing、embedding 和 indexing 队列均保持为 0；control、parsing、embedding 和 indexing 日志持续记录任务成功，未出现跨 Lane 消费。通过统一入口恢复 OCR Worker 后积压归零，五个 Lane 继续成功执行。
+- 健康与密钥：演练将 32 字节任务签名密钥校验纳入五个 Worker 健康检查，避免 Celery 节点可响应但任务无法装配的假健康；Scheduler 不挂载文件型密钥并具有独立 Beat 健康检查。启动器按 12 个常驻服务等待就绪，`./platform doctor` 实际检查 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker 和 Scheduler 共 13 项。
+- 自动验收：Worker 路由与并发专项 `18/18`，P2-02/P2-03 PostgreSQL 与 Migration `9/9`，检索 PostgreSQL 回归 `1/1`；统一 `./scripts/verify` 通过 React `37/37`、Python `473/473`、Ruff format/lint `433` 个文件、mypy strict `433` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。最终 `./platform start` 正常返回，Revision `20260815_0037` 和 13 项容器诊断全部通过。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -60,4 +71,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P2-01`、`P2-02` 已完成可靠性契约和入库任务恢复事实，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-03`。
+`not_run`。`P2-01`～`P2-03` 已完成可靠性契约、任务恢复事实、Worker 隔离和索引死信恢复，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-04`。
