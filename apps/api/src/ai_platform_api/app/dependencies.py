@@ -130,6 +130,10 @@ from ai_platform_api.modules.model_gateway.infrastructure.runtime_sqlalchemy imp
     SqlAlchemyRuntimeConfigurationUnitOfWork,
     SqlAlchemyRuntimeInvocationStore,
 )
+from ai_platform_api.modules.operations.application.service import OperationsWorkbenchService
+from ai_platform_api.modules.operations.infrastructure.sqlalchemy import (
+    SqlAlchemyOperationsWorkbenchUnitOfWork,
+)
 from ai_platform_api.modules.release.application.startup import verify_release_compatibility
 from ai_platform_api.modules.retrieval.application.evidence import RetrievalEvidenceService
 from ai_platform_api.modules.retrieval.application.planning import (
@@ -198,6 +202,7 @@ class ApplicationContainer:
     menu_configuration: MenuConfigurationService | None = None
     menu_releases: MenuReleaseService | None = None
     integration_operations: IntegrationOperationsService | None = None
+    operations_workbench: OperationsWorkbenchService | None = None
     workspace_lifecycle: WorkspaceLifecycleService | None = None
     lifecycle_cache: ValkeyWorkspaceCacheCleaner | None = None
     knowledge_facts: KnowledgeFactService | None = None
@@ -478,6 +483,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             integration_operations=IntegrationOperationsService(
                 SqlAlchemyIntegrationOperationsUnitOfWork(database.sessions)
+            ),
+            operations_workbench=OperationsWorkbenchService(
+                SqlAlchemyOperationsWorkbenchUnitOfWork(database.sessions)
             ),
             workspace_lifecycle=lifecycle,
             lifecycle_cache=lifecycle_cache,

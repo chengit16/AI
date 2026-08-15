@@ -772,6 +772,26 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/ingestion-jobs/{ingestion_job_id}/cancel": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Cancel Ingestion Job
+     * @description 取消非终态入库任务；状态机、审计和 Worker 失租由应用服务保证。
+     */
+    readonly post: operations["cancelKnowledgeIngestionJob"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/ingestion-jobs/{ingestion_job_id}/retry": {
     readonly parameters: {
       readonly query?: never;
@@ -1400,6 +1420,166 @@ export type paths = {
      * @description 按计量项和周期分页读取不可变用量明细。
      */
     readonly get: operations["listOperationsUsageRecords"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/index-maintenance/cleanups": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Request Index Cleanup
+     * @description 登记一次只删除不可恢复且不可见 Chunk 的清理命令。
+     */
+    readonly post: operations["requestOperationsIndexCleanup"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/index-maintenance/inspections": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Request Index Inspection
+     * @description 登记一次会修复安全候选或排队重建的工作空间索引巡检。
+     */
+    readonly post: operations["requestOperationsIndexInspection"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/index-maintenance/rebuilds": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Request Index Rebuild
+     * @description 登记一次从当前发布事实创建新索引构建的命令。
+     */
+    readonly post: operations["requestOperationsIndexRebuild"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/index-maintenance/requests": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Index Requests
+     * @description 列出人工索引维护请求和 Worker 恢复状态。
+     */
+    readonly get: operations["listOperationsIndexMaintenanceRequests"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/index-maintenance/runs": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Index Runs
+     * @description 列出已完成的索引维护结果和可复算摘要。
+     */
+    readonly get: operations["listOperationsIndexMaintenanceRuns"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/ingestion-jobs": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Ingestion Jobs
+     * @description 跨知识库列出当前工作空间最近的入库任务。
+     */
+    readonly get: operations["listOperationsWorkbenchIngestionJobs"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/lifecycle-operations": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Lifecycle Operations
+     * @description 列出导出、清除和保留期运行的统一历史摘要。
+     */
+    readonly get: operations["listOperationsLifecycleHistory"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/overview": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Overview
+     * @description 返回任务、索引、Outbox 和生命周期的安全聚合指标。
+     */
+    readonly get: operations["getOperationsWorkbenchOverview"];
     readonly put?: never;
     readonly post?: never;
     readonly delete?: never;
@@ -3350,6 +3530,121 @@ export type components = {
       readonly version: string;
     };
     /**
+     * IndexMaintenanceCommandBody
+     * @description 接收索引维护命令的结构化原因和显式确认文本。
+     */
+    readonly IndexMaintenanceCommandBody: {
+      /** Confirmation */
+      readonly confirmation: string;
+      /** Reason Code */
+      readonly reason_code: string;
+    };
+    /**
+     * IndexMaintenanceRequestListResponse
+     * @description 返回当前工作空间最近的人工维护请求。
+     */
+    readonly IndexMaintenanceRequestListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["IndexMaintenanceRequestResponse"][];
+    };
+    /**
+     * IndexMaintenanceRequestResponse
+     * @description 返回人工维护请求状态，不暴露内部租约和请求摘要。
+     */
+    readonly IndexMaintenanceRequestResponse: {
+      /** Attempt Count */
+      readonly attempt_count: number;
+      /**
+       * Command
+       * @enum {string}
+       */
+      readonly command: "inspection" | "full_rebuild" | "cleanup";
+      /** Completed At */
+      readonly completed_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Last Error Code */
+      readonly last_error_code: string | null;
+      /**
+       * Maintenance Request Id
+       * Format: uuid
+       */
+      readonly maintenance_request_id: string;
+      /** Reason Code */
+      readonly reason_code: string;
+      /**
+       * Requested By Actor Id
+       * Format: uuid
+       */
+      readonly requested_by_actor_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "pending" | "running" | "retry_wait" | "completed" | "dead_letter";
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
+     * IndexMaintenanceRunListResponse
+     * @description 返回当前工作空间最近的索引维护运行。
+     */
+    readonly IndexMaintenanceRunListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["IndexMaintenanceRunResponse"][];
+    };
+    /**
+     * IndexMaintenanceRunResponse
+     * @description 返回一次索引维护完成证据和计数。
+     */
+    readonly IndexMaintenanceRunResponse: {
+      /** Cleaned Chunk Count */
+      readonly cleaned_chunk_count: number;
+      /**
+       * Completed At
+       * Format: date-time
+       */
+      readonly completed_at: string;
+      /** Inconsistency Count */
+      readonly inconsistency_count: number;
+      /**
+       * Maintenance Run Id
+       * Format: uuid
+       */
+      readonly maintenance_run_id: string;
+      /** Rebuild Queued Count */
+      readonly rebuild_queued_count: number;
+      /** Repaired Count */
+      readonly repaired_count: number;
+      /** Requested By Actor Id */
+      readonly requested_by_actor_id: string | null;
+      /** Result Digest */
+      readonly result_digest: string;
+      /**
+       * Run Kind
+       * @enum {string}
+       */
+      readonly run_kind: "inspection" | "full_rebuild" | "cleanup";
+      /** Scanned Document Count */
+      readonly scanned_document_count: number;
+      /**
+       * Started At
+       * Format: date-time
+       */
+      readonly started_at: string;
+    };
+    /**
      * IngestionJobListResponse
      * @description 定义入库任务列表操作的稳定响应结构。
      */
@@ -3663,6 +3958,43 @@ export type components = {
       readonly status: string;
       /** Table Count */
       readonly table_count: number | null;
+    };
+    /**
+     * LifecycleOperationListResponse
+     * @description 返回导出、清除和保留期执行的统一历史列表。
+     */
+    readonly LifecycleOperationListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["LifecycleOperationResponse"][];
+    };
+    /**
+     * LifecycleOperationResponse
+     * @description 返回一种生命周期操作的统一历史摘要。
+     */
+    readonly LifecycleOperationResponse: {
+      /** Completed At */
+      readonly completed_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Error Code */
+      readonly error_code: string | null;
+      /**
+       * Operation Id
+       * Format: uuid
+       */
+      readonly operation_id: string;
+      /**
+       * Operation Kind
+       * @enum {string}
+       */
+      readonly operation_kind: "export" | "purge" | "retention";
+      /** Result Count */
+      readonly result_count: number | null;
+      /** Status */
+      readonly status: string;
     };
     /**
      * LifecyclePurgeBody
@@ -4187,6 +4519,83 @@ export type components = {
     readonly OpenApiFeatureRequest: {
       /** Enabled */
       readonly enabled: boolean;
+    };
+    /**
+     * OperationsIngestionJobListResponse
+     * @description 返回当前工作空间最近的入库任务。
+     */
+    readonly OperationsIngestionJobListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["OperationsIngestionJobResponse"][];
+    };
+    /**
+     * OperationsIngestionJobResponse
+     * @description 返回入库任务的安全运营摘要。
+     */
+    readonly OperationsIngestionJobResponse: {
+      /** Attempt Count */
+      readonly attempt_count: number;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      readonly document_id: string;
+      /** Error Code */
+      readonly error_code: string | null;
+      /**
+       * Ingestion Job Id
+       * Format: uuid
+       */
+      readonly ingestion_job_id: string;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      readonly knowledge_base_id: string;
+      /** Manual Retry Count */
+      readonly manual_retry_count: number;
+      /** Max Attempts */
+      readonly max_attempts: number;
+      /**
+       * Processing Lane
+       * @enum {string}
+       */
+      readonly processing_lane: "parsing" | "ocr";
+      /** Source Name */
+      readonly source_name: string;
+      /** Status */
+      readonly status: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+    };
+    /**
+     * OperationsOverviewResponse
+     * @description 返回不含标识、正文和凭据的运营指标快照。
+     */
+    readonly OperationsOverviewResponse: {
+      /**
+       * Checked At
+       * Format: date-time
+       */
+      readonly checked_at: string;
+      /** Index Requests */
+      readonly index_requests: readonly components["schemas"]["StatusCountResponse"][];
+      /** Index Versions */
+      readonly index_versions: readonly components["schemas"]["StatusCountResponse"][];
+      /** Ingestion */
+      readonly ingestion: readonly components["schemas"]["StatusCountResponse"][];
+      /** Lifecycle Active Count */
+      readonly lifecycle_active_count: number;
+      /** Outbox */
+      readonly outbox: readonly components["schemas"]["StatusCountResponse"][];
     };
     /**
      * OrganizationStatusRequest
@@ -4840,6 +5249,16 @@ export type components = {
        * @enum {string}
        */
       readonly security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+    };
+    /**
+     * StatusCountResponse
+     * @description 返回一个固定状态和对应数量。
+     */
+    readonly StatusCountResponse: {
+      /** Count */
+      readonly count: number;
+      /** Status */
+      readonly status: string;
     };
     /**
      * SubmitMessageFeedbackRequest
@@ -9318,6 +9737,105 @@ export interface operations {
       };
     };
   };
+  readonly cancelKnowledgeIngestionJob: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly ingestion_job_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["IngestionJobResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   readonly retryKnowledgeIngestionJob: {
     readonly parameters: {
       readonly query?: never;
@@ -12654,6 +13172,696 @@ export interface operations {
         };
         content: {
           readonly "application/json": components["schemas"]["UsageRecordPageResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly requestOperationsIndexCleanup: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["IndexMaintenanceCommandBody"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["IndexMaintenanceRequestResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly requestOperationsIndexInspection: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["IndexMaintenanceCommandBody"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["IndexMaintenanceRequestResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly requestOperationsIndexRebuild: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["IndexMaintenanceCommandBody"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["IndexMaintenanceRequestResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listOperationsIndexMaintenanceRequests: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["IndexMaintenanceRequestListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listOperationsIndexMaintenanceRuns: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["IndexMaintenanceRunListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listOperationsWorkbenchIngestionJobs: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["OperationsIngestionJobListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listOperationsLifecycleHistory: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["LifecycleOperationListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getOperationsWorkbenchOverview: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["OperationsOverviewResponse"];
         };
       };
       /** @description 请求上下文无效 */

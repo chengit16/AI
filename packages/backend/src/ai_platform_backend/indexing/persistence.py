@@ -304,6 +304,87 @@ Index(
     index_maintenance_runs.c.completed_at,
 )
 
+index_maintenance_requests = Table(
+    "index_maintenance_requests",
+    metadata,
+    Column("maintenance_request_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("command", String(32), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("reason_code", String(64), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("attempt_count", Integer, nullable=False),
+    Column("claimed_by", String(255), nullable=True),
+    Column("claim_until", DateTime(timezone=True), nullable=True),
+    Column("last_error_code", String(128), nullable=True),
+    Column("requested_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_user_id", UUID(as_uuid=True), nullable=False),
+    Column("request_id", UUID(as_uuid=True), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_index_maintenance_requests_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_index_maintenance_requests_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_actor_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_index_maintenance_requests_actor",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_user_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_index_maintenance_requests_user",
+    ),
+    CheckConstraint(
+        "command IN ('inspection', 'full_rebuild', 'cleanup')",
+        name="ck_index_maintenance_requests_command",
+    ),
+    CheckConstraint(
+        "status IN ('pending', 'running', 'retry_wait', 'completed', 'dead_letter')",
+        name="ck_index_maintenance_requests_status",
+    ),
+    CheckConstraint(
+        "attempt_count BETWEEN 0 AND 3",
+        name="ck_index_maintenance_requests_attempts",
+    ),
+    CheckConstraint(
+        "request_hash ~ '^[0-9a-f]{64}$' AND reason_code ~ '^[A-Z][A-Z0-9_]{2,63}$'",
+        name="ck_index_maintenance_requests_contract",
+    ),
+    CheckConstraint(
+        "(status = 'running' AND claimed_by IS NOT NULL AND claim_until IS NOT NULL) OR "
+        "(status <> 'running' AND claimed_by IS NULL AND claim_until IS NULL)",
+        name="ck_index_maintenance_requests_claim",
+    ),
+    CheckConstraint(
+        "(status IN ('completed', 'dead_letter') AND completed_at IS NOT NULL) OR "
+        "(status NOT IN ('completed', 'dead_letter') AND completed_at IS NULL)",
+        name="ck_index_maintenance_requests_completion",
+    ),
+)
+Index(
+    "ix_index_maintenance_requests_claim",
+    index_maintenance_requests.c.status,
+    index_maintenance_requests.c.updated_at,
+)
+Index(
+    "ix_index_maintenance_requests_workspace_created",
+    index_maintenance_requests.c.workspace_id,
+    index_maintenance_requests.c.created_at,
+)
+
 index_inspection_findings = Table(
     "index_inspection_findings",
     metadata,

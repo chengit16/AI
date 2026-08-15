@@ -80,6 +80,8 @@ class IndexMaintenanceStore(Protocol):
         *,
         now: datetime,
         workspace_id: UUID | None = None,
+        maintenance_run_id: UUID | None = None,
+        requested_by_actor_id: UUID | None = None,
     ) -> IndexInspectionReport: ...
 
     def repair(

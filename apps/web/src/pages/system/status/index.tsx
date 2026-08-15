@@ -1,61 +1,35 @@
-/** @description 本地运行状态页，轮询平台健康接口并区分正常、降级与不可达状态。 */
+/** @description 本地运行健康与受控运营工作台页面。 */
 import { useQuery } from "@tanstack/react-query";
-import { Button, Skeleton, Tag, Tooltip } from "antd";
-import { CheckCircle2, CircleAlert, Clock3, Database, RefreshCw, Server } from "lucide-react";
+import { Button, Tooltip } from "antd";
+import { RefreshCw } from "lucide-react";
 
 import { getPlatformHealth } from "@/api/health";
 import { PageHeader } from "@/components/PageHeader/PageHeader";
-import { cn } from "@/utils/cn";
+import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
+import { useWorkspaceMenuNavigation } from "@/hooks/useWorkspaceMenuNavigation";
 
-const serviceLabels: Record<string, string> = {
-  api: "平台 API",
-  configuration: "配置中心",
-  postgres: "关系数据库",
-  valkey: "缓存与会话服务",
-  object_storage: "对象存储",
-  document_parser: "文档解析服务",
-};
+import { OperationsWorkbench } from "./components/OperationsWorkbench";
+import { RuntimeHealthPanel } from "./components/RuntimeHealthPanel";
 
-const reasonLabels: Record<string, string> = {
-  dependency_unavailable: "依赖不可用",
-};
-
-function formatLatency(value: number | undefined): string {
-  if (value === undefined) return "未采集延迟";
-  return value < 1 ? "< 1 ms" : `${Math.round(value)} ms`;
-}
-
-function formatCheckedAt(value: string | undefined): string {
-  if (!value) return "尚无检查时间";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "检查时间无效";
-  return new Intl.DateTimeFormat("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(date);
-}
-
-/** 展示本地运行健康快照；30 秒轮询只用于观测，不替代部署层 Readiness。 */
+/** 展示本地依赖状态，并按动态菜单权限装载当前工作空间运营控制面。 */
 export default function StatusPage() {
   const health = useQuery({
     queryKey: ["platform-health"],
     queryFn: getPlatformHealth,
     refetchInterval: 30_000,
   });
-  const isHealthy = health.data?.status === "ok";
-
+  const workspace = useCurrentWorkspace();
+  const menu = useWorkspaceMenuNavigation();
   return (
     <>
       <PageHeader
-        eyebrow="LOCAL RUNTIME"
+        eyebrow="LOCAL OPERATIONS"
         title="运行状态"
-        description="查看本地 API 与基础配置的就绪状态。"
+        description="查看本地依赖健康，管理当前工作空间的任务恢复、索引、事件投递和数据生命周期。"
         actions={
-          <Tooltip title="刷新状态">
+          <Tooltip title="刷新健康状态">
             <Button
-              aria-label="刷新状态"
+              aria-label="刷新健康状态"
               icon={<RefreshCw size={17} />}
               loading={health.isFetching}
               onClick={() => void health.refetch()}
@@ -63,81 +37,16 @@ export default function StatusPage() {
           </Tooltip>
         }
       />
-      {health.isLoading ? (
-        <Skeleton active paragraph={{ rows: 7 }} />
-      ) : (
-        <>
-          <section
-            className={cn(
-              "flex min-h-[150px] items-center gap-5 rounded-panel border-l-[5px] border-l-solid border-accent bg-status-banner p-8 text-status-foreground",
-              (health.isError || !isHealthy) && "border-warning bg-status-banner-pending",
-            )}
-            aria-live="polite"
-          >
-            <span className="grid h-12 w-12 flex-none place-items-center rounded-panel bg-accent text-nav-bg">
-              {health.isError || !isHealthy ? (
-                <CircleAlert size={24} />
-              ) : (
-                <CheckCircle2 size={24} />
-              )}
-            </span>
-            <div>
-              <p className="mb-2 mt-0 text-xs font-700 text-status-label">平台运行状态</p>
-              <h2 className="mb-2 mt-0 text-[21px]">
-                {health.isError
-                  ? "无法连接平台 API"
-                  : isHealthy
-                    ? "基础服务运行正常"
-                    : "依赖服务降级"}
-              </h2>
-              <span className="text-[13px] text-status-detail">
-                {health.data
-                  ? `环境 ${health.data.environment} · 版本 ${health.data.version}`
-                  : "请检查后端和容器进程"}
-              </span>
-            </div>
-          </section>
-          <section className="ui-surface-panel mt-6 overflow-hidden">
-            <div className="flex items-center justify-between gap-4 border-b border-b-solid border-border-soft px-6 py-5">
-              <h2 className="m-0 text-[17px]">服务检查</h2>
-              <span className="text-xs text-text-muted">
-                {health.data ? `${Object.keys(health.data.checks).length} 项` : "--"}
-              </span>
-            </div>
-            <div>
-              {Object.entries(health.data?.checks ?? {}).map(([name, status]) => (
-                <div
-                  className="flex items-center justify-between gap-4 border-b border-b-solid border-border-soft px-6 py-5"
-                  key={name}
-                >
-                  <span className="flex min-w-0 items-center gap-3">
-                    {name === "api" ? <Server size={18} /> : <Database size={18} />}
-                    <span className="min-w-0">
-                      <strong className="block">{serviceLabels[name] ?? name}</strong>
-                      <small className="mt-[3px] flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
-                        <span>{name}</span>
-                        <span>{formatLatency(health.data?.details?.[name]?.latency_ms)}</span>
-                        <span className="inline-flex items-center gap-1">
-                          <Clock3 size={12} />
-                          {formatCheckedAt(health.data?.details?.[name]?.checked_at)}
-                        </span>
-                      </small>
-                    </span>
-                  </span>
-                  <span className="flex flex-none items-center gap-2">
-                    {health.data?.details?.[name]?.critical && <Tag>关键</Tag>}
-                    <Tag color={status === "ok" ? "success" : "warning"}>
-                      {status === "ok"
-                        ? "正常"
-                        : (reasonLabels[health.data?.details?.[name]?.reason_code ?? ""] ?? "降级")}
-                    </Tag>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </>
-      )}
+      <RuntimeHealthPanel
+        health={health.data}
+        isLoading={health.isLoading}
+        isError={health.isError}
+      />
+      <OperationsWorkbench
+        workspaceId={workspace.workspaceId}
+        workspaceName={workspace.currentWorkspace?.name ?? ""}
+        permissions={menu.visiblePermissionCodes}
+      />
     </>
   );
 }

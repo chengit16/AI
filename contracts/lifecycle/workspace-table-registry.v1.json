@@ -33,6 +33,7 @@
     { "table": "index_versions", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_index_publications", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "index_maintenance_runs", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "index_maintenance_requests", "classification": "business", "export": true, "purge": true, "excluded_columns": ["request_hash"] },
     { "table": "index_inspection_findings", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "retrieval_chunks", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "retrieval_plans", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

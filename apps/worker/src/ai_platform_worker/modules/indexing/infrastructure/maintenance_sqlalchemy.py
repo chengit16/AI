@@ -13,6 +13,7 @@ from ai_platform_backend.indexing.facts import document_publications, documents
 from ai_platform_backend.indexing.maintenance import (
     IndexCleanupResult,
     IndexFindingCode,
+    IndexFindingResolution,
     IndexInspectionFinding,
     IndexInspectionReport,
     IndexRebuildBatchResult,
@@ -81,11 +82,17 @@ class SqlAlchemyIndexMaintenanceStore:
         *,
         now: datetime,
         workspace_id: UUID | None = None,
+        maintenance_run_id: UUID | None = None,
+        requested_by_actor_id: UUID | None = None,
     ) -> IndexInspectionReport:
         """在同一数据库快照中生成不含正文的索引一致性报告。"""
 
-        maintenance_run_id = uuid4()
+        resolved_run_id = maintenance_run_id or uuid4()
         with self._session_factory() as session, session.begin():
+            # 人工命令使用请求 ID 作为运行 ID；进程崩溃后的重放必须复用首次完整结果。
+            existing = _read_inspection_report(session, resolved_run_id)
+            if existing is not None:
+                return existing
             # 1. 业务发布事实决定必须存在的活动索引，派生指针不能反向决定发布状态。
             published = _load_published_indexes(session, workspace_id=workspace_id)
             chunk_stats = _load_chunk_stats(
@@ -102,10 +109,10 @@ class SqlAlchemyIndexMaintenanceStore:
             digest = _finding_digest(normalized)
             _persist_maintenance_run(
                 session,
-                maintenance_run_id=maintenance_run_id,
+                maintenance_run_id=resolved_run_id,
                 run_kind="inspection",
                 workspace_id=workspace_id,
-                requested_by_actor_id=None,
+                requested_by_actor_id=requested_by_actor_id,
                 now=now,
                 scanned_document_count=len(published),
                 inconsistency_count=len(normalized),
@@ -114,7 +121,7 @@ class SqlAlchemyIndexMaintenanceStore:
             finding_rows = [
                 {
                     "finding_id": finding.finding_id,
-                    "maintenance_run_id": maintenance_run_id,
+                    "maintenance_run_id": resolved_run_id,
                     "finding_code": finding.code,
                     "workspace_id": finding.workspace_id,
                     "document_id": finding.document_id,
@@ -129,7 +136,7 @@ class SqlAlchemyIndexMaintenanceStore:
             if finding_rows:
                 session.execute(insert(index_inspection_findings), finding_rows)
         return IndexInspectionReport(
-            maintenance_run_id=maintenance_run_id,
+            maintenance_run_id=resolved_run_id,
             started_at=now,
             completed_at=now,
             scanned_document_count=len(published),
@@ -898,6 +905,52 @@ def _read_rebuild_result(
         row.scanned_document_count,
         row.rebuild_queued_count,
         row.result_digest,
+    )
+
+
+def _read_inspection_report(
+    session: Session,
+    maintenance_run_id: UUID,
+) -> IndexInspectionReport | None:
+    # 1. 先限定运行类型，避免其他维护命令使用相同标识时被错误解释为巡检证据。
+    run = (
+        session.execute(
+            select(index_maintenance_runs).where(
+                index_maintenance_runs.c.maintenance_run_id == maintenance_run_id,
+                index_maintenance_runs.c.run_kind == "inspection",
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if run is None:
+        return None
+    # 2. 按稳定标识恢复全部差异项，使崩溃重试返回与首次执行相同的顺序。
+    findings = tuple(
+        IndexInspectionFinding(
+            finding_id=row["finding_id"],
+            code=cast(IndexFindingCode, row["finding_code"]),
+            workspace_id=row["workspace_id"],
+            document_id=row["document_id"],
+            document_version_id=row["document_version_id"],
+            index_version_id=row["index_version_id"],
+            resolution=cast(IndexFindingResolution, row["resolution"]),
+        )
+        for row in session.execute(
+            select(index_inspection_findings)
+            .where(index_inspection_findings.c.maintenance_run_id == maintenance_run_id)
+            .order_by(index_inspection_findings.c.finding_id)
+        ).mappings()
+    )
+    # 3. 从持久化计数和差异项重建不可变报告，不重新执行任何修复副作用。
+    return IndexInspectionReport(
+        maintenance_run_id=maintenance_run_id,
+        started_at=run["started_at"],
+        completed_at=run["completed_at"],
+        scanned_document_count=run["scanned_document_count"],
+        inconsistency_count=run["inconsistency_count"],
+        result_digest=run["result_digest"],
+        findings=findings,
     )
 
 

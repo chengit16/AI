@@ -565,6 +565,47 @@ class HealthResponse(typing.TypedDict):
     version: str
 
 
+class IndexMaintenanceCommandBody(typing.TypedDict):
+    confirmation: str
+    reason_code: str
+
+
+class IndexMaintenanceRequestListResponse(typing.TypedDict):
+    items: list[IndexMaintenanceRequestResponse]
+
+
+class IndexMaintenanceRequestResponse(typing.TypedDict):
+    attempt_count: int
+    command: typing.Literal["inspection", "full_rebuild", "cleanup"]
+    completed_at: str | None
+    created_at: str
+    last_error_code: str | None
+    maintenance_request_id: str
+    reason_code: str
+    requested_by_actor_id: str
+    status: typing.Literal["pending", "running", "retry_wait", "completed", "dead_letter"]
+    updated_at: str
+    workspace_id: str
+
+
+class IndexMaintenanceRunListResponse(typing.TypedDict):
+    items: list[IndexMaintenanceRunResponse]
+
+
+class IndexMaintenanceRunResponse(typing.TypedDict):
+    cleaned_chunk_count: int
+    completed_at: str
+    inconsistency_count: int
+    maintenance_run_id: str
+    rebuild_queued_count: int
+    repaired_count: int
+    requested_by_actor_id: str | None
+    result_digest: str
+    run_kind: typing.Literal["inspection", "full_rebuild", "cleanup"]
+    scanned_document_count: int
+    started_at: str
+
+
 class IngestionJobListResponse(typing.TypedDict):
     items: list[IngestionJobResponse]
 
@@ -676,6 +717,20 @@ class LifecycleExportResponse(typing.TypedDict):
     object_manifest_sha256: str | None
     status: str
     table_count: int | None
+
+
+class LifecycleOperationListResponse(typing.TypedDict):
+    items: list[LifecycleOperationResponse]
+
+
+class LifecycleOperationResponse(typing.TypedDict):
+    completed_at: str | None
+    created_at: str
+    error_code: str | None
+    operation_id: str
+    operation_kind: typing.Literal["export", "purge", "retention"]
+    result_count: int | None
+    status: str
 
 
 class LifecyclePurgeBody(typing.TypedDict):
@@ -871,6 +926,34 @@ class MoveDepartmentRequest(typing.TypedDict):
 
 class OpenApiFeatureRequest(typing.TypedDict):
     enabled: bool
+
+
+class OperationsIngestionJobListResponse(typing.TypedDict):
+    items: list[OperationsIngestionJobResponse]
+
+
+class OperationsIngestionJobResponse(typing.TypedDict):
+    attempt_count: int
+    created_at: str
+    document_id: str
+    error_code: str | None
+    ingestion_job_id: str
+    knowledge_base_id: str
+    manual_retry_count: int
+    max_attempts: int
+    processing_lane: typing.Literal["parsing", "ocr"]
+    source_name: str
+    status: str
+    updated_at: str
+
+
+class OperationsOverviewResponse(typing.TypedDict):
+    checked_at: str
+    index_requests: list[StatusCountResponse]
+    index_versions: list[StatusCountResponse]
+    ingestion: list[StatusCountResponse]
+    lifecycle_active_count: int
+    outbox: list[StatusCountResponse]
 
 
 class OrganizationStatusRequest(typing.TypedDict):
@@ -1126,6 +1209,11 @@ class StartApprovalInstanceRequest(typing.TypedDict):
     resource_type: str
     risk_level: typing.Literal["normal", "high", "critical"]
     security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+
+
+class StatusCountResponse(typing.TypedDict):
+    count: int
+    status: str
 
 
 class SubmitMessageFeedbackRequest(typing.TypedDict):

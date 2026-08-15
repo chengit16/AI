@@ -96,7 +96,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260815_0040"
+    assert current_revision(connection, schema) == "20260815_0041"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -123,6 +123,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "ingestion_job_attempts",
         "ingestion_job_stages",
         "ingestion_jobs",
+        "index_maintenance_requests",
         "index_versions",
         "index_maintenance_runs",
         "index_inspection_findings",
@@ -191,7 +192,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260815_0040"
+    assert current_revision(connection, schema) == "20260815_0041"
     assert schema_snapshot(connection, schema) == first_head
 
 

@@ -35,11 +35,18 @@ class IndexMaintenanceProcessor:
         *,
         now: datetime | None = None,
         workspace_id: UUID | None = None,
+        maintenance_run_id: UUID | None = None,
+        requested_by_actor_id: UUID | None = None,
     ) -> tuple[IndexInspectionReport, IndexRepairResult]:
         """先持久化完整差异证据，再基于最新发布事实执行安全修复。"""
 
         inspected_at = now or datetime.now(UTC)
-        report = self._store.inspect(now=inspected_at, workspace_id=workspace_id)
+        report = self._store.inspect(
+            now=inspected_at,
+            workspace_id=workspace_id,
+            maintenance_run_id=maintenance_run_id,
+            requested_by_actor_id=requested_by_actor_id,
+        )
         repair = self._store.repair(
             report,
             now=inspected_at,

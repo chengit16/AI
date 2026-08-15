@@ -2355,6 +2355,7 @@ Index(
 index_versions = indexing_tables.index_versions.to_metadata(metadata)
 document_index_publications = indexing_tables.document_index_publications.to_metadata(metadata)
 index_maintenance_runs = indexing_tables.index_maintenance_runs.to_metadata(metadata)
+index_maintenance_requests = indexing_tables.index_maintenance_requests.to_metadata(metadata)
 index_inspection_findings = indexing_tables.index_inspection_findings.to_metadata(metadata)
 retrieval_chunks = indexing_tables.retrieval_chunks.to_metadata(metadata)
 

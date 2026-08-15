@@ -35,6 +35,7 @@ from ai_platform_api.modules.model_gateway.api.routes import (
 from ai_platform_api.modules.model_gateway.api.routes import (
     runtime_router as ai_runtime_router,
 )
+from ai_platform_api.modules.operations.api.routes import router as operations_workbench_router
 from ai_platform_api.modules.system.api.health import router as health_router
 from ai_platform_api.modules.system.api.observability import router as observability_router
 from ai_platform_api.modules.workflow.api.approval_routes import router as approval_policy_router
@@ -93,6 +94,7 @@ def create_app(
     application.state.enterprise_workspace_service = dependencies.enterprise_workspaces
     application.state.entitlement_service = dependencies.entitlements
     application.state.integration_operations_service = dependencies.integration_operations
+    application.state.operations_workbench_service = dependencies.operations_workbench
     application.state.workspace_lifecycle_service = dependencies.workspace_lifecycle
     application.state.organization_service = dependencies.organization
     application.state.role_service = dependencies.roles
@@ -130,6 +132,7 @@ def create_app(
     application.include_router(workspace_router, prefix="/api/v1")
     application.include_router(entitlement_router, prefix="/api/v1")
     application.include_router(integration_operations_router, prefix="/api/v1")
+    application.include_router(operations_workbench_router, prefix="/api/v1")
     application.include_router(lifecycle_router, prefix="/api/v1")
     application.include_router(organization_router, prefix="/api/v1")
     application.include_router(role_router, prefix="/api/v1")

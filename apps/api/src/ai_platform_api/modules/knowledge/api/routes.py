@@ -173,6 +173,24 @@ def retry_ingestion_job(
 
 
 @router.post(
+    "/ingestion-jobs/{ingestion_job_id}/cancel",
+    response_model=IngestionJobResponse,
+    operation_id="cancelKnowledgeIngestionJob",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def cancel_ingestion_job(
+    workspace_id: UUID,
+    ingestion_job_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+) -> IngestionJobResponse:
+    """取消非终态入库任务；状态机、审计和 Worker 失租由应用服务保证。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _ingestion_job(service.cancel_ingestion_job(context, ingestion_job_id=ingestion_job_id))
+
+
+@router.post(
     "/knowledge-bases",
     response_model=KnowledgeBaseResponse,
     operation_id="createKnowledgeBase",

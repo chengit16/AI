@@ -163,6 +163,29 @@ def inspect_index_consistency() -> dict[str, int]:
             runtime.close()
 
 
+@shared_task(name="platform.indexing.maintenance_commands.v1", ignore_result=True)
+def process_index_maintenance_commands() -> dict[str, int]:
+    """处理受控工作台登记的索引巡检、全量重建和不可恢复 Chunk 清理请求。"""
+
+    settings = get_worker_settings()
+    observability = get_worker_observability()
+    task_name = "platform.indexing.maintenance_commands.v1"
+    with observability.task(task_name=task_name, queue=_queue_name()):
+        runtime = build_worker_runtime(settings)
+        try:
+            result = runtime.index_maintenance_commands.run_batch(
+                limit=settings.indexing_batch_size
+            )
+            return {
+                "claimed": result.claimed,
+                "completed": result.completed,
+                "retried": result.retried,
+                "dead_lettered": result.dead_lettered,
+            }
+        finally:
+            runtime.close()
+
+
 @shared_task(
     name="platform.integration.consume.v1",
     bind=True,
