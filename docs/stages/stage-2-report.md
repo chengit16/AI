@@ -7,7 +7,7 @@
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P2-02` 任务阶段、尝试历史与恢复机制进行中 |
+| 当前节点 | `P2-03` Worker 隔离、死信与安全并发进行中 |
 | 阶段可靠性 | `not_run` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
@@ -23,7 +23,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260815_0035` |
+| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0036`；阶段 1 发布仍冻结在 `20260815_0035` |
 | 阶段 1 发布 | 本地 MVP `0.1.0`，ReleaseManifest 摘要 `e8983e87…b62943` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实 AI 质量 |
 
@@ -42,8 +42,14 @@
 
 ### P2-02 任务阶段、尝试历史与恢复机制
 
-- 状态：进行中。
-- 当前任务：在不改变阶段 1 任务事实和写入权的前提下，设计并实现 `IngestionJob -> JobStage -> JobAttempt` 运营事实、稳定终态、有限重试、超时、取消和人工恢复审计，并把 `p2-01-v1` 对应任务故障场景接入真实测试。
+- 状态：已完成，提交 `08385b4`。
+- 事实模型：保留 `ingestion_jobs` 作为 PostgreSQL 唯一任务事实源，新增 `ingestion_job_stages` 保存当前阶段运营状态，新增 `ingestion_job_attempts` 只追加每次租约执行；没有创建第二套队列或引入新消息中间件。阶段 1 既有任务在升级时生成明确标记的 `legacy_backfill` 汇总 Attempt，不伪造缺失历史。
+- 状态与恢复：增加稳定 `cancelled`、`timed_out` 终态；自动尝试仍受 `max_attempts` 约束，人工恢复最多 3 次且每次开启新 generation、Attempt 序号从 1 重新计算。租约过期先冻结旧 Attempt，再进入有限恢复或稳定超时；终态 Attempt 的更新和删除均由 PostgreSQL 触发器拒绝。
+- 并发与幂等：活动租约同时绑定 `worker_id` 和不可复用 `active_attempt_id`，同名 Worker 的旧执行不能覆盖新租约；即使回收扫描尚未运行，超过 `claim_until` 的成功或失败回写也会立即失租。任务、阶段与 Attempt 在同一事务转换，重复完成不会新增历史或覆盖终态。
+- 取消与审计：排队、运行和等待重试任务可转换为取消终态；运行中取消必须恰好关闭一个活动 Attempt，任务、阶段、Attempt、审计记录及 Outbox 事件同事务提交。取消后的迟到 Worker 回写被拒绝，成功、失败、取消和超时终态不能再次取消。
+- 契约与兼容：OpenAPI V1 兼容性新增 `cancelled/timed_out` 状态以及可选 `can_cancel/cancelled_at` 字段，React 与 Python 生成类型同步；知识生产页能区分失败、超时和取消，不提前建设 `P2-10` 的运营取消界面。兼容矩阵同时允许阶段 1 的 `0035` 和当前开发 `0036`，阶段 1 ReleaseManifest 与恢复证据继续固定在 `0035`。
+- 故障与 Migration：真实 PostgreSQL 覆盖自动重试独立 Attempt、旧租约迟到、租约耗尽、`timed_out -> manual_recovery -> cancelled`、不可变触发器、审计/Outbox 原子性及重复完成；Migration 覆盖空库 `base -> head -> base -> head`、非空升级、取消终态降回阶段 1 可理解失败态及结构一致性。
+- 自动验收：专项单元与既有入库回归 `13/13`，P2-02 PostgreSQL 和 Migration `6/6`；统一门禁 React `37/37`、Python `457/457`、Ruff、mypy strict `431` 个源文件、OpenAPI/契约兼容、模块依赖、注释、UnoCSS、Secret Scanner、SBOM、ReleaseManifest 和生产构建全部通过。`./platform doctor` Web、API、MinIO、Tika、PostgreSQL、Revision `20260815_0036`、Valkey 和 Worker 八项通过。
 
 ## 4. 当前限制
 
@@ -54,4 +60,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P2-01` 已完成契约与故障数据冻结，但阶段可靠性必须等待后续真实故障执行和 `P2-11` 联合演练；当前进入 `P2-02`。
+`not_run`。`P2-01`、`P2-02` 已完成可靠性契约和入库任务恢复事实，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-03`。
