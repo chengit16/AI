@@ -2762,6 +2762,378 @@ Index(
     agent_release_candidates.c.created_at,
 )
 
+agent_evaluation_policy_versions = Table(
+    "agent_evaluation_policy_versions",
+    metadata,
+    Column("evaluation_policy_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("policy_key", String(80), nullable=False),
+    Column("version_number", Integer, nullable=False),
+    Column("required_check_codes", JSONB, nullable=False),
+    Column("hard_gate_check_codes", JSONB, nullable=False),
+    Column("minimum_check_scores", JSONB, nullable=False),
+    Column("failure_handling", String(32), nullable=False),
+    Column("timeout_handling", String(32), nullable=False),
+    Column("skipped_handling", String(32), nullable=False),
+    Column("evaluator_kind", String(32), nullable=False),
+    Column("online_llm_grading", Boolean, nullable=False),
+    Column("multimodal_image_qa", Boolean, nullable=False),
+    Column("policy_hash", String(64), nullable=False),
+    Column("status", String(16), nullable=False),
+    UniqueConstraint(
+        "policy_key",
+        "version_number",
+        name="uq_agent_evaluation_policies_key_version",
+    ),
+    CheckConstraint("version_number >= 1", name="ck_agent_evaluation_policies_version"),
+    CheckConstraint(
+        "jsonb_typeof(required_check_codes) = 'array' "
+        "AND jsonb_array_length(required_check_codes) = 5 "
+        "AND jsonb_typeof(hard_gate_check_codes) = 'array' "
+        "AND jsonb_array_length(hard_gate_check_codes) = 4 "
+        "AND jsonb_typeof(minimum_check_scores) = 'object'",
+        name="ck_agent_evaluation_policies_documents",
+    ),
+    CheckConstraint(
+        "failure_handling = 'block_release' "
+        "AND timeout_handling = 'count_as_failure' "
+        "AND skipped_handling = 'count_as_failure'",
+        name="ck_agent_evaluation_policies_failure_modes",
+    ),
+    CheckConstraint(
+        "evaluator_kind = 'deterministic_rules' "
+        "AND online_llm_grading = false AND multimodal_image_qa = false",
+        name="ck_agent_evaluation_policies_deferred_capabilities",
+    ),
+    CheckConstraint(
+        "policy_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_evaluation_policies_hash",
+    ),
+    CheckConstraint(
+        "status IN ('active', 'retired')",
+        name="ck_agent_evaluation_policies_status",
+    ),
+)
+
+agent_evaluation_dataset_versions = Table(
+    "agent_evaluation_dataset_versions",
+    metadata,
+    Column("dataset_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("dataset_version", String(80), nullable=False),
+    Column("dataset_hash", String(64), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "dataset_version_id",
+        "workspace_id",
+        name="uq_agent_evaluation_datasets_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "dataset_version",
+        name="uq_agent_evaluation_datasets_workspace_version",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_agent_evaluation_datasets_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_evaluation_datasets_creator",
+    ),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_agent_evaluation_datasets_name",
+    ),
+    CheckConstraint(
+        "dataset_version ~ '^p304-[a-z0-9][a-z0-9-]{1,60}-v[1-9][0-9]*$'",
+        name="ck_agent_evaluation_datasets_version",
+    ),
+    CheckConstraint(
+        "dataset_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_evaluation_datasets_hash",
+    ),
+)
+
+agent_evaluation_test_cases = Table(
+    "agent_evaluation_test_cases",
+    metadata,
+    Column("case_id", UUID(as_uuid=True), primary_key=True),
+    Column("dataset_version_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("case_key", String(80), nullable=False),
+    Column("check_code", String(32), nullable=False),
+    Column("input_fixture", JSONB, nullable=False),
+    Column("expected_fixture", JSONB, nullable=False),
+    Column("timeout_ms", Integer, nullable=False),
+    Column("minimum_score_bps", Integer, nullable=False),
+    Column("case_hash", String(64), nullable=False),
+    UniqueConstraint(
+        "case_id",
+        "dataset_version_id",
+        "workspace_id",
+        name="uq_agent_evaluation_cases_identity",
+    ),
+    UniqueConstraint(
+        "dataset_version_id",
+        "case_key",
+        name="uq_agent_evaluation_cases_key",
+    ),
+    UniqueConstraint(
+        "dataset_version_id",
+        "position",
+        name="uq_agent_evaluation_cases_position",
+    ),
+    ForeignKeyConstraint(
+        ["dataset_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_evaluation_dataset_versions.dataset_version_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_dataset_versions.workspace_id",
+        ],
+        name="fk_agent_evaluation_cases_dataset",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("position >= 1", name="ck_agent_evaluation_cases_position"),
+    CheckConstraint(
+        "case_key ~ '^[a-z][a-z0-9_.-]{2,79}$'",
+        name="ck_agent_evaluation_cases_key",
+    ),
+    CheckConstraint(
+        "check_code IN ('functional', 'authorization', 'prompt_injection', "
+        "'citation', 'output_contract')",
+        name="ck_agent_evaluation_cases_check",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(input_fixture) = 'object' AND jsonb_typeof(expected_fixture) = 'object'",
+        name="ck_agent_evaluation_cases_fixtures",
+    ),
+    CheckConstraint(
+        "timeout_ms BETWEEN 1 AND 120000",
+        name="ck_agent_evaluation_cases_timeout",
+    ),
+    CheckConstraint(
+        "minimum_score_bps BETWEEN 0 AND 10000",
+        name="ck_agent_evaluation_cases_score",
+    ),
+    CheckConstraint(
+        "case_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_evaluation_cases_hash",
+    ),
+)
+
+agent_evaluation_runs = Table(
+    "agent_evaluation_runs",
+    metadata,
+    Column("evaluation_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("candidate_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("dataset_version_id", UUID(as_uuid=True), nullable=False),
+    Column("evaluation_policy_version_id", UUID(as_uuid=True), nullable=False),
+    Column("candidate_hash", String(64), nullable=False),
+    Column("config_hash", String(64), nullable=False),
+    Column("evaluator_version", String(64), nullable=False),
+    Column("evidence_level", String(32), nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("total_cases", Integer, nullable=False),
+    Column("passed_cases", Integer, nullable=False),
+    Column("failed_cases", Integer, nullable=False),
+    Column("timeout_cases", Integer, nullable=False),
+    Column("skipped_cases", Integer, nullable=False),
+    Column("result_hash", String(64), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "evaluation_run_id",
+        "workspace_id",
+        name="uq_agent_evaluation_runs_id_workspace",
+    ),
+    UniqueConstraint(
+        "evaluation_run_id",
+        "dataset_version_id",
+        "workspace_id",
+        name="uq_agent_evaluation_runs_dataset_identity",
+    ),
+    UniqueConstraint(
+        "candidate_id",
+        "dataset_version_id",
+        "evaluation_policy_version_id",
+        name="uq_agent_evaluation_runs_identity",
+    ),
+    ForeignKeyConstraint(
+        ["candidate_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_release_candidates.candidate_id",
+            f"{SCHEMA_TOKEN}.agent_release_candidates.workspace_id",
+        ],
+        name="fk_agent_evaluation_runs_candidate",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["dataset_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_evaluation_dataset_versions.dataset_version_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_dataset_versions.workspace_id",
+        ],
+        name="fk_agent_evaluation_runs_dataset",
+    ),
+    ForeignKeyConstraint(
+        ["evaluation_policy_version_id"],
+        [f"{SCHEMA_TOKEN}.agent_evaluation_policy_versions.evaluation_policy_version_id"],
+        name="fk_agent_evaluation_runs_policy",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_agent_evaluation_runs_creator",
+    ),
+    CheckConstraint(
+        "candidate_hash ~ '^[0-9a-f]{64}$' AND config_hash ~ '^[0-9a-f]{64}$' "
+        "AND result_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_evaluation_runs_hashes",
+    ),
+    CheckConstraint(
+        "evaluator_version ~ '^[a-z][a-z0-9._-]{2,63}$'",
+        name="ck_agent_evaluation_runs_evaluator",
+    ),
+    CheckConstraint(
+        "evidence_level = 'core_functional'",
+        name="ck_agent_evaluation_runs_evidence_level",
+    ),
+    CheckConstraint(
+        "status IN ('passed', 'failed')",
+        name="ck_agent_evaluation_runs_status",
+    ),
+    CheckConstraint(
+        "total_cases >= 5 AND passed_cases >= 0 AND failed_cases >= 0 "
+        "AND timeout_cases >= 0 AND skipped_cases >= 0 "
+        "AND total_cases = passed_cases + failed_cases + timeout_cases + skipped_cases",
+        name="ck_agent_evaluation_runs_counts",
+    ),
+    CheckConstraint(
+        "status <> 'passed' OR passed_cases = total_cases",
+        name="ck_agent_evaluation_runs_passed",
+    ),
+)
+Index(
+    "ix_agent_evaluation_runs_candidate_time",
+    agent_evaluation_runs.c.workspace_id,
+    agent_evaluation_runs.c.candidate_id,
+    agent_evaluation_runs.c.completed_at,
+)
+
+agent_evaluation_check_results = Table(
+    "agent_evaluation_check_results",
+    metadata,
+    Column("evaluation_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("check_code", String(32), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("case_count", Integer, nullable=False),
+    Column("passed_count", Integer, nullable=False),
+    Column("score_bps", Integer, nullable=False),
+    Column("evidence_hash", String(64), nullable=False),
+    UniqueConstraint(
+        "evaluation_run_id",
+        "position",
+        name="uq_agent_evaluation_checks_position",
+    ),
+    ForeignKeyConstraint(
+        ["evaluation_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.evaluation_run_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.workspace_id",
+        ],
+        name="fk_agent_evaluation_checks_run",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "check_code IN ('functional', 'authorization', 'prompt_injection', "
+        "'citation', 'output_contract')",
+        name="ck_agent_evaluation_checks_code",
+    ),
+    CheckConstraint("position BETWEEN 1 AND 5", name="ck_agent_evaluation_checks_position"),
+    CheckConstraint(
+        "status IN ('passed', 'failed')",
+        name="ck_agent_evaluation_checks_status",
+    ),
+    CheckConstraint(
+        "case_count >= 1 AND passed_count BETWEEN 0 AND case_count",
+        name="ck_agent_evaluation_checks_counts",
+    ),
+    CheckConstraint(
+        "score_bps BETWEEN 0 AND 10000",
+        name="ck_agent_evaluation_checks_score",
+    ),
+    CheckConstraint(
+        "status <> 'passed' OR passed_count = case_count",
+        name="ck_agent_evaluation_checks_passed",
+    ),
+    CheckConstraint(
+        "evidence_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_evaluation_checks_hash",
+    ),
+)
+
+agent_evaluation_case_results = Table(
+    "agent_evaluation_case_results",
+    metadata,
+    Column("evaluation_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("case_id", UUID(as_uuid=True), primary_key=True),
+    Column("dataset_version_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("check_code", String(32), nullable=False),
+    Column("outcome", String(16), nullable=False),
+    Column("score_bps", Integer, nullable=False),
+    Column("duration_ms", Integer, nullable=False),
+    Column("evidence_hash", String(64), nullable=False),
+    ForeignKeyConstraint(
+        ["evaluation_run_id", "dataset_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.evaluation_run_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.dataset_version_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.workspace_id",
+        ],
+        name="fk_agent_evaluation_case_results_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["case_id", "dataset_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_evaluation_test_cases.case_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_test_cases.dataset_version_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_test_cases.workspace_id",
+        ],
+        name="fk_agent_evaluation_case_results_case",
+    ),
+    CheckConstraint(
+        "check_code IN ('functional', 'authorization', 'prompt_injection', "
+        "'citation', 'output_contract')",
+        name="ck_agent_evaluation_case_results_check",
+    ),
+    CheckConstraint(
+        "outcome IN ('passed', 'failed', 'timeout', 'skipped')",
+        name="ck_agent_evaluation_case_results_outcome",
+    ),
+    CheckConstraint(
+        "score_bps BETWEEN 0 AND 10000 AND duration_ms >= 0",
+        name="ck_agent_evaluation_case_results_metrics",
+    ),
+    CheckConstraint(
+        "outcome = 'passed' OR score_bps = 0",
+        name="ck_agent_evaluation_case_results_failed_score",
+    ),
+    CheckConstraint(
+        "evidence_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_evaluation_case_results_hash",
+    ),
+)
+
 agent_control_requests = Table(
     "agent_control_requests",
     metadata,

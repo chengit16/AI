@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import replace
 from datetime import UTC, datetime
 from types import TracebackType
+from typing import cast
 from uuid import UUID, uuid5
 
 import pytest
@@ -25,6 +26,9 @@ from ai_platform_api.modules.agent_control.domain.configuration import (
     KnowledgeBaseReference,
     RuntimeConfigurationReference,
     WorkflowReleaseReference,
+)
+from ai_platform_api.modules.agent_control.domain.evaluation import (
+    AgentEvaluationRepository,
 )
 from ai_platform_api.modules.agent_control.domain.models import (
     Agent,
@@ -364,6 +368,8 @@ class MemoryAgentUnitOfWork:
     def __init__(self) -> None:
         self.agents = MemoryAgentRepository()
         self.configuration = MemoryConfigurationRepository()
+        # P3-02 用例不调用评估端口，仅声明结构类型以保持统一 Unit of Work 契约。
+        self.evaluation = cast(AgentEvaluationRepository, object())
         self.audit = MemoryWriter()
         self.outbox = MemoryWriter()
         self.commit_count = 0

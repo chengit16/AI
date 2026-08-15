@@ -27,6 +27,12 @@ class AgentConfigurationInvalidError(PlatformError):
     error_code = "AGENT_CONFIGURATION_INVALID"
 
 
+class AgentTestGateFailedError(PlatformError):
+    """表示候选缺少完整通过且与当前摘要一致的确定性测试证据。"""
+
+    error_code = "AGENT_TEST_GATE_FAILED"
+
+
 class AgentLifecycleConflictError(PlatformError):
     """表示 Agent 状态、草稿 revision 或候选来源已经发生竞争变化。"""
 

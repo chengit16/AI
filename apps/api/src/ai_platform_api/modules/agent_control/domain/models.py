@@ -13,6 +13,9 @@ from ai_platform_backend.integration.domain import AuditWriter
 from ai_platform_api.modules.agent_control.domain.configuration import (
     AgentConfigurationRepository,
 )
+from ai_platform_api.modules.agent_control.domain.evaluation import (
+    AgentEvaluationRepository,
+)
 from ai_platform_api.modules.integration.domain.events import OutboxWriter
 
 AgentKind = Literal["system", "custom"]
@@ -229,6 +232,9 @@ class AgentControlUnitOfWork(Protocol):
 
     @property
     def configuration(self) -> AgentConfigurationRepository: ...
+
+    @property
+    def evaluation(self) -> AgentEvaluationRepository: ...
 
     @property
     def audit(self) -> AuditWriter: ...

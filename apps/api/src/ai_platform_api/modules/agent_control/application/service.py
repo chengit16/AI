@@ -24,7 +24,14 @@ from ai_platform_api.modules.agent_control.application.errors import (
     AgentIdempotencyConflictError,
     AgentLifecycleConflictError,
     AgentNotFoundError,
+    AgentTestGateFailedError,
     AgentValidationError,
+)
+from ai_platform_api.modules.agent_control.application.evaluation import (
+    create_evaluation_dataset,
+    get_evaluation_report,
+    require_passing_evaluation,
+    run_agent_evaluation,
 )
 from ai_platform_api.modules.agent_control.application.lifecycle import archive_agent
 from ai_platform_api.modules.agent_control.application.queries import get_agent, get_release
@@ -33,6 +40,11 @@ from ai_platform_api.modules.agent_control.domain.configuration import (
     AgentKnowledgeScopeVersion,
     AgentOutputSchemaVersion,
     AgentPromptVersion,
+)
+from ai_platform_api.modules.agent_control.domain.evaluation import (
+    AgentEvaluationDatasetVersion,
+    AgentEvaluationExecutor,
+    AgentEvaluationReport,
 )
 from ai_platform_api.modules.agent_control.domain.models import (
     Agent,
@@ -50,6 +62,7 @@ __all__ = [
     "AgentIdempotencyConflictError",
     "AgentLifecycleConflictError",
     "AgentNotFoundError",
+    "AgentTestGateFailedError",
     "AgentValidationError",
     "configuration_digest",
 ]
@@ -58,8 +71,13 @@ __all__ = [
 class AgentControlService:
     """管理自定义 Agent 生命周期，并阻止控制面写入系统助手事实。"""
 
-    def __init__(self, unit_of_work: AgentControlUnitOfWork) -> None:
+    def __init__(
+        self,
+        unit_of_work: AgentControlUnitOfWork,
+        evaluation_executor: AgentEvaluationExecutor | None = None,
+    ) -> None:
         self._unit_of_work = unit_of_work
+        self._evaluation_executor = evaluation_executor
 
     def create_prompt_version(
         self,
@@ -191,6 +209,73 @@ class AgentControlService:
             agent_id=agent_id,
             expected_revision=expected_revision,
             idempotency_key=idempotency_key,
+        )
+
+    def create_evaluation_dataset(
+        self,
+        context: RequestContext,
+        *,
+        name: str,
+        dataset_version: str,
+        cases: tuple[dict[str, object], ...],
+    ) -> AgentEvaluationDatasetVersion:
+        """冻结覆盖五类必需检查的合成测试集，相同版本不能替换内容。"""
+
+        return create_evaluation_dataset(
+            self._unit_of_work,
+            context,
+            name=name,
+            dataset_version=dataset_version,
+            cases=cases,
+        )
+
+    def run_evaluation(
+        self,
+        context: RequestContext,
+        *,
+        candidate_id: UUID,
+        dataset_version_id: UUID,
+    ) -> AgentEvaluationReport:
+        """通过内部执行器运行固定测试，并保存不可变评估结果。"""
+
+        if self._evaluation_executor is None:
+            raise AgentTestGateFailedError
+        return run_agent_evaluation(
+            self._unit_of_work,
+            self._evaluation_executor,
+            context,
+            candidate_id=candidate_id,
+            dataset_version_id=dataset_version_id,
+        )
+
+    def get_evaluation_report(
+        self,
+        context: RequestContext,
+        *,
+        candidate_id: UUID,
+        evaluation_run_id: UUID,
+    ) -> AgentEvaluationReport:
+        """读取候选的不可变评估报告，不返回测试输入、回答或异常正文。"""
+
+        return get_evaluation_report(
+            self._unit_of_work,
+            context,
+            candidate_id=candidate_id,
+            evaluation_run_id=evaluation_run_id,
+        )
+
+    def require_passing_evaluation(
+        self,
+        context: RequestContext,
+        *,
+        candidate_id: UUID,
+    ) -> AgentEvaluationReport:
+        """为后续审批门禁读取与候选摘要一致的完整通过证据。"""
+
+        return require_passing_evaluation(
+            self._unit_of_work,
+            context,
+            candidate_id=candidate_id,
         )
 
     def archive_agent(
