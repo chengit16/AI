@@ -47,8 +47,8 @@ class IndexBatchResult:
     lost_claims: int = 0
 
 
-class IndexBuildProcessor:
-    """构建期 Chunk 始终不可见，只有发布事务能切换当前索引。"""
+class IndexEmbeddingProcessor:
+    """生成并持久化不可见 Chunk，索引发布权保留给独立 Indexing Lane。"""
 
     def __init__(
         self,
@@ -88,7 +88,7 @@ class IndexBuildProcessor:
         )
         counts = {"claimed": 0, "succeeded": 0, "retried": 0, "failed": 0, "lost": 0}
         for _ in range(limit):
-            version = self._store.claim_next(
+            version = self._store.claim_embedding_next(
                 worker_id=self._worker_id,
                 now=current,
                 lease_seconds=self._lease_seconds,
@@ -138,11 +138,11 @@ class IndexBuildProcessor:
                     retryable=False,
                     stage="chunk",
                 )
-            # 2. Embedding 完成后由存储层校验租约并原子切换版本；丢失租约不得覆盖新 Worker。
+            # 2. Embedding 完成后只持久化不可见 Chunk；丢失租约不得覆盖新 Worker。
             built = self._embed(version, chunks)
             return (
                 "succeeded"
-                if self._store.mark_succeeded(version, built, completed_at=now)
+                if self._store.mark_embedding_succeeded(version, built, completed_at=now)
                 else "lost"
             )
         except IndexBuildError as error:
@@ -278,10 +278,74 @@ class IndexBuildProcessor:
         )
         outcomes: dict[str, IndexProcessOutcome] = {
             "retry_wait": "retried",
-            "failed": "failed",
+            "dead_letter": "failed",
             "lost_claim": "lost",
         }
         return outcomes[status]
+
+
+class IndexCommitProcessor:
+    """只提交已持久化的 Chunk 并切换索引指针，不执行解析或 Embedding。"""
+
+    def __init__(
+        self,
+        store: IndexVersionStore,
+        *,
+        worker_id: str,
+        lease_seconds: int,
+        retry_base_seconds: int,
+    ) -> None:
+        self._store = store
+        self._worker_id = worker_id
+        self._lease_seconds = lease_seconds
+        self._retry_base_seconds = retry_base_seconds
+
+    def run_batch(self, *, limit: int, now: datetime | None = None) -> IndexBatchResult:
+        current = now or datetime.now(UTC)
+        counts = {"claimed": 0, "succeeded": 0, "retried": 0, "failed": 0, "lost": 0}
+        for _ in range(limit):
+            version = self._store.claim_indexing_next(
+                worker_id=self._worker_id,
+                now=current,
+                lease_seconds=self._lease_seconds,
+            )
+            if version is None:
+                break
+            counts["claimed"] += 1
+            counts[self._commit(version, now=current)] += 1
+        return IndexBatchResult(
+            claimed=counts["claimed"],
+            succeeded=counts["succeeded"],
+            retried=counts["retried"],
+            failed=counts["failed"],
+            lost_claims=counts["lost"],
+        )
+
+    def _commit(self, version: ClaimedIndexVersion, *, now: datetime) -> IndexProcessOutcome:
+        try:
+            return (
+                "succeeded"
+                if self._store.mark_indexing_succeeded(version, completed_at=now)
+                else "lost"
+            )
+        except Exception:
+            # 底层事务异常只能形成稳定错误码；Broker 重投仍受租约身份和原子切换保护。
+            backoff = self._retry_base_seconds * 2 ** max(version.attempt_count - 1, 0)
+            status = self._store.mark_failed(
+                version,
+                stage="index",
+                error_code="INDEX_COMMIT_FAILED",
+                error_message="索引 Worker 提交索引时发生内部错误",
+                retryable=True,
+                failed_at=now,
+                next_attempt_at=now + timedelta(seconds=backoff),
+            )
+            outcomes: dict[str, IndexProcessOutcome] = {
+                "retry_wait": "retried",
+                "dead_letter": "failed",
+                "lost_claim": "lost",
+            }
+            return outcomes[status]
 
 
 def _decode_artifact(version: ClaimedIndexVersion, payload: bytes) -> ParsedDocument:

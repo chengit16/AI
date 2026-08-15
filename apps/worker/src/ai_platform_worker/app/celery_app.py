@@ -23,17 +23,35 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
+    task_default_queue="platform.control",
+    task_routes={
+        "platform.outbox.dispatch.v1": {"queue": "platform.control"},
+        "platform.integration.consume.v1": {"queue": "platform.control"},
+        "platform.ingestion.parse.v1": {"queue": "platform.parsing"},
+        "platform.ingestion.ocr.v1": {"queue": "platform.ocr"},
+        "platform.indexing.embed.v1": {"queue": "platform.embedding"},
+        "platform.indexing.commit.v1": {"queue": "platform.indexing"},
+    },
+    worker_concurrency=settings.worker_concurrency,
     beat_schedule={
         "dispatch-outbox": {
             "task": "platform.outbox.dispatch.v1",
             "schedule": settings.outbox_dispatch_interval_seconds,
         },
-        "process-ingestion-jobs": {
-            "task": "platform.ingestion.process.v1",
+        "process-parsing-jobs": {
+            "task": "platform.ingestion.parse.v1",
             "schedule": settings.ingestion_dispatch_interval_seconds,
         },
-        "process-index-versions": {
-            "task": "platform.indexing.process.v1",
+        "process-ocr-jobs": {
+            "task": "platform.ingestion.ocr.v1",
+            "schedule": settings.ingestion_dispatch_interval_seconds,
+        },
+        "process-index-embeddings": {
+            "task": "platform.indexing.embed.v1",
+            "schedule": settings.indexing_dispatch_interval_seconds,
+        },
+        "commit-index-versions": {
+            "task": "platform.indexing.commit.v1",
             "schedule": settings.indexing_dispatch_interval_seconds,
         },
     },

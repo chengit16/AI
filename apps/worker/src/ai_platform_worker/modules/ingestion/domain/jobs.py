@@ -10,6 +10,8 @@ from uuid import UUID
 from ai_platform_worker.modules.ingestion.domain.documents import ParsedDocument
 from ai_platform_worker.modules.ingestion.domain.errors import IngestionFailureStage
 
+IngestionWorkerLane = Literal["parsing", "ocr"]
+
 
 class IngestionStorageUnavailableError(Exception):
     """来源对象或解析产物存储当前不可用。"""
@@ -58,6 +60,7 @@ class IngestionJobStore(Protocol):
         worker_id: str,
         now: datetime,
         lease_seconds: int,
+        lane: IngestionWorkerLane = "parsing",
     ) -> ClaimedIngestionJob | None: ...
 
     def mark_succeeded(

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from ai_platform_worker.modules.ingestion.domain.errors import IngestionFailureStage
 from ai_platform_worker.modules.ingestion.domain.jobs import (
     ClaimedIngestionJob,
+    IngestionWorkerLane,
     ParsedArtifact,
 )
 
@@ -35,13 +36,14 @@ class SqlAlchemyIngestionJobStore:
         worker_id: str,
         now: datetime,
         lease_seconds: int,
+        lane: IngestionWorkerLane = "parsing",
     ) -> ClaimedIngestionJob | None:
         claim_until = now + timedelta(seconds=lease_seconds)
         with self._session_factory() as session, session.begin():
             # 1. 进程退出没有异常回调，先关闭过期 Attempt，再决定重试或稳定超时终态。
-            _expire_stale_leases(session, now)
+            _expire_stale_leases(session, now, lane=lane)
             # 2. 使用 SKIP LOCKED 选择最早可执行任务，多 Worker 不能同时认领同一行。
-            row = _select_claimable_job(session, now)
+            row = _select_claimable_job(session, now, lane=lane)
             if row is None:
                 return None
             # 3. 任务、阶段与新 Attempt 在同一事务推进，返回值冻结本次租约身份。
@@ -182,7 +184,12 @@ class SqlAlchemyIngestionJobStore:
         return status
 
 
-def _expire_stale_leases(session: Session, now: datetime) -> None:
+def _expire_stale_leases(
+    session: Session,
+    now: datetime,
+    *,
+    lane: IngestionWorkerLane,
+) -> None:
     """关闭最多一批过期租约，保留旧 Attempt 后再开放恢复认领。"""
 
     # 1. 有界锁定最早过期的任务，SKIP LOCKED 避免多个 Worker 互相阻塞回收扫描。
@@ -191,6 +198,7 @@ def _expire_stale_leases(session: Session, now: datetime) -> None:
         .where(
             ingestion_jobs.c.status == "running",
             ingestion_jobs.c.claim_until <= now,
+            ingestion_jobs.c.processing_lane == lane,
         )
         .order_by(ingestion_jobs.c.claim_until, ingestion_jobs.c.created_at)
         .limit(100)
@@ -251,7 +259,12 @@ def _expire_stale_leases(session: Session, now: datetime) -> None:
         )
 
 
-def _select_claimable_job(session: Session, now: datetime) -> Row[Any] | None:
+def _select_claimable_job(
+    session: Session,
+    now: datetime,
+    *,
+    lane: IngestionWorkerLane,
+) -> Row[Any] | None:
     return session.execute(
         select(ingestion_jobs)
         .where(
@@ -262,6 +275,7 @@ def _select_claimable_job(session: Session, now: datetime) -> Row[Any] | None:
                     & (ingestion_jobs.c.available_at <= now),
                 ),
                 ingestion_jobs.c.attempt_count < ingestion_jobs.c.max_attempts,
+                ingestion_jobs.c.processing_lane == lane,
             )
         )
         .order_by(ingestion_jobs.c.available_at, ingestion_jobs.c.created_at)

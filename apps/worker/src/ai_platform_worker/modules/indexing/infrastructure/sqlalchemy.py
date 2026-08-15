@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Literal, cast
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from ai_platform_backend.indexing.domain import (
@@ -13,6 +13,7 @@ from ai_platform_backend.indexing.domain import (
     IndexFailureStage,
     IndexSecurityLevel,
     IndexVisibility,
+    IndexWorkerLane,
 )
 from ai_platform_backend.indexing.facts import (
     document_publications,
@@ -25,7 +26,7 @@ from ai_platform_backend.indexing.sqlalchemy import (
     switch_active_document_index,
 )
 from ai_platform_backend.ingestion.persistence import ingestion_jobs
-from sqlalchemy import exists, func, insert, literal, or_, select, update
+from sqlalchemy import Row, exists, func, insert, literal, select, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -68,11 +69,15 @@ class SqlAlchemyIndexVersionStore:
             "security_level",
             "permission_labels",
             "status",
+            "processing_lane",
             "attempt_count",
+            "embedding_attempt_count",
+            "indexing_attempt_count",
             "max_attempts",
             "available_at",
             "created_at",
             "updated_at",
+            "manual_recovery_count",
         )
         # 2. 只选择成功入库且文档仍有效、尚未创建首个构建版本的来源事实。
         source = (
@@ -99,11 +104,15 @@ class SqlAlchemyIndexVersionStore:
                 documents.c.security_level,
                 documents.c.permission_labels,
                 literal("queued", type_=index_versions.c.status.type),
+                literal("embedding", type_=index_versions.c.processing_lane.type),
                 literal(0, type_=index_versions.c.attempt_count.type),
+                literal(0, type_=index_versions.c.embedding_attempt_count.type),
+                literal(0, type_=index_versions.c.indexing_attempt_count.type),
                 literal(max_attempts, type_=index_versions.c.max_attempts.type),
                 literal(now, type_=index_versions.c.available_at.type),
                 literal(now, type_=index_versions.c.created_at.type),
                 literal(now, type_=index_versions.c.updated_at.type),
+                literal(0, type_=index_versions.c.manual_recovery_count.type),
             )
             .select_from(
                 ingestion_jobs.join(
@@ -218,104 +227,77 @@ class SqlAlchemyIndexVersionStore:
                     security_level=source["security_level"],
                     permission_labels=source["permission_labels"],
                     status="queued",
+                    processing_lane="embedding",
                     attempt_count=0,
+                    embedding_attempt_count=0,
+                    indexing_attempt_count=0,
                     max_attempts=max_attempts,
                     available_at=now,
                     created_at=now,
                     updated_at=now,
+                    manual_recovery_count=0,
                 )
             )
         return index_version_id
 
-    def claim_next(
+    def claim_embedding_next(
         self,
         *,
         worker_id: str,
         now: datetime,
         lease_seconds: int,
     ) -> ClaimedIndexVersion | None:
+        """只领取 Artifact、Chunk 与 Embedding 阶段，索引写入由另一 Lane 完成。"""
+
+        return self._claim_next(
+            lane="embedding",
+            worker_id=worker_id,
+            now=now,
+            lease_seconds=lease_seconds,
+        )
+
+    def claim_indexing_next(
+        self,
+        *,
+        worker_id: str,
+        now: datetime,
+        lease_seconds: int,
+    ) -> ClaimedIndexVersion | None:
+        """只领取已有持久化 Chunk 的索引发布阶段，不执行 Embedding。"""
+
+        return self._claim_next(
+            lane="indexing",
+            worker_id=worker_id,
+            now=now,
+            lease_seconds=lease_seconds,
+        )
+
+    def _claim_next(
+        self,
+        *,
+        lane: IndexWorkerLane,
+        worker_id: str,
+        now: datetime,
+        lease_seconds: int,
+    ) -> ClaimedIndexVersion | None:
         claim_until = now + timedelta(seconds=lease_seconds)
         with self._session_factory() as session, session.begin():
-            # 1. 最后一次执行崩溃时没有异常回调，过期且耗尽次数的租约必须先收敛为失败。
-            session.execute(
-                update(index_versions)
-                .where(
-                    index_versions.c.status == "running",
-                    index_versions.c.claim_until <= now,
-                    index_versions.c.attempt_count >= index_versions.c.max_attempts,
-                )
-                .values(
-                    status="failed",
-                    claimed_by=None,
-                    claim_until=None,
-                    failure_stage="worker",
-                    error_code="INDEX_WORKER_LEASE_EXPIRED",
-                    error_message="索引 Worker 在最大尝试次数内未完成任务",
-                    completed_at=now,
-                    updated_at=now,
-                )
-            )
-            # 2. 使用 SKIP LOCKED 认领最早可执行版本，多 Worker 不会拿到同一任务。
-            row = session.execute(
-                select(index_versions)
-                .where(
-                    or_(
-                        (index_versions.c.status == "queued")
-                        & (index_versions.c.available_at <= now),
-                        (index_versions.c.status == "retry_wait")
-                        & (index_versions.c.available_at <= now),
-                        (index_versions.c.status == "running")
-                        & (index_versions.c.claim_until <= now),
-                    ),
-                    index_versions.c.attempt_count < index_versions.c.max_attempts,
-                )
-                .order_by(index_versions.c.available_at, index_versions.c.created_at)
-                .limit(1)
-                .with_for_update(skip_locked=True)
-            ).one_or_none()
+            # 1. 崩溃没有回调，先把本 Lane 的过期租约收敛到重试或死信。
+            _expire_stale_index_leases(session, lane=lane, now=now)
+            # 2. SKIP LOCKED 与持久化 Lane 共同保证不同资源池不会领取同一任务。
+            row = _select_claimable_index(session, lane=lane, now=now)
             if row is None:
                 return None
-            # 3. 在同一事务中推进尝试次数和租约，再返回冻结的任务与权限快照。
-            attempt_count = cast(int, row.attempt_count) + 1
-            session.execute(
-                update(index_versions)
-                .where(index_versions.c.index_version_id == row.index_version_id)
-                .values(
-                    status="running",
-                    attempt_count=attempt_count,
-                    claimed_by=worker_id,
-                    claim_until=claim_until,
-                    started_at=row.started_at or now,
-                    failure_stage=None,
-                    error_code=None,
-                    error_message=None,
-                    updated_at=now,
-                )
-            )
-            return ClaimedIndexVersion(
-                index_version_id=row.index_version_id,
-                workspace_id=row.workspace_id,
-                knowledge_base_id=row.knowledge_base_id,
-                document_id=row.document_id,
-                document_version_id=row.document_version_id,
-                ingestion_job_id=row.ingestion_job_id,
-                source_id=row.source_id,
-                artifact_object_key=row.artifact_object_key,
-                source_content_hash=row.source_content_hash,
-                parsed_content_hash=row.parsed_content_hash,
-                attempt_count=attempt_count,
-                max_attempts=row.max_attempts,
-                claimed_by=worker_id,
-                chunker_version=row.chunker_version,
-                embedding_model_version=row.embedding_model_version,
-                tokenizer_version=row.tokenizer_version,
-                department_ids=tuple(row.department_ids),
-                visibility=cast(IndexVisibility, row.visibility),
-                security_level=cast(IndexSecurityLevel, row.security_level),
-                permission_labels=tuple(row.permission_labels),
+            return _claim_index(
+                session,
+                row,
+                lane=lane,
+                worker_id=worker_id,
+                now=now,
+                claim_until=claim_until,
             )
 
-    def mark_succeeded(
+    def mark_embedding_succeeded(
         self,
         version: ClaimedIndexVersion,
         chunks: tuple[BuiltIndexChunk, ...],
@@ -323,7 +305,43 @@ class SqlAlchemyIndexVersionStore:
         completed_at: datetime,
     ) -> bool:
         with self._session_factory() as session, session.begin():
-            # 1. 与发布事务保持“发布指针 → 索引版本”的锁顺序，并复核当前 Worker 租约。
+            if not _owns_index_lease(
+                session,
+                version,
+                lane="embedding",
+                completed_at=completed_at,
+            ):
+                return False
+            # Chunk 先以不可见形式持久化，Embedding Worker 不拥有发布写入权。
+            _upsert_staged_chunks(session, chunks, created_at=completed_at)
+            session.execute(
+                update(index_versions)
+                .where(index_versions.c.index_version_id == version.index_version_id)
+                .values(
+                    status="index_queued",
+                    processing_lane="indexing",
+                    attempt_count=0,
+                    available_at=completed_at,
+                    claimed_by=None,
+                    claim_until=None,
+                    active_attempt_id=None,
+                    staged_chunk_count=len(chunks),
+                    failure_stage=None,
+                    error_code=None,
+                    error_message=None,
+                    updated_at=completed_at,
+                )
+            )
+        return True
+
+    def mark_indexing_succeeded(
+        self,
+        version: ClaimedIndexVersion,
+        *,
+        completed_at: datetime,
+    ) -> bool:
+        with self._session_factory() as session, session.begin():
+            # 1. 保持“发布指针 → 索引版本”锁顺序，避免并发发布和重放互相覆盖。
             session.execute(
                 select(document_publications.c.current_document_version_id)
                 .where(
@@ -332,72 +350,15 @@ class SqlAlchemyIndexVersionStore:
                 )
                 .with_for_update()
             ).one_or_none()
-            owned = session.execute(
-                select(index_versions.c.index_version_id)
-                .where(
-                    index_versions.c.index_version_id == version.index_version_id,
-                    index_versions.c.status == "running",
-                    index_versions.c.claimed_by == version.claimed_by,
-                )
-                .with_for_update()
-            ).scalar_one_or_none()
-            if owned is None:
+            row = _owned_index_row(
+                session,
+                version,
+                lane="indexing",
+                completed_at=completed_at,
+            )
+            if row is None or not row.staged_chunk_count:
                 return False
-            # 2. Chunk 先以 inactive 幂等写入，构建完成前任何检索都不能观察到半成品。
-            statement = postgresql_insert(retrieval_chunks).values(
-                [
-                    {
-                        "index_version_id": chunk.index_version_id,
-                        "chunk_id": chunk.chunk_id,
-                        "workspace_id": chunk.workspace_id,
-                        "knowledge_base_id": chunk.knowledge_base_id,
-                        "document_id": chunk.document_id,
-                        "document_version_id": chunk.document_version_id,
-                        "ingestion_job_id": chunk.ingestion_job_id,
-                        "source_id": chunk.source_id,
-                        "sequence_no": chunk.sequence_no,
-                        "content": chunk.content,
-                        "content_hash": chunk.content_hash,
-                        "embedding": list(chunk.embedding),
-                        "keyword_text": chunk.keyword_text,
-                        "department_ids": list(chunk.department_ids),
-                        "visibility": chunk.visibility,
-                        "security_level": chunk.security_level,
-                        "permission_labels": list(chunk.permission_labels),
-                        "source_position": chunk.source_position,
-                        "parsed_content_hash": chunk.parsed_content_hash,
-                        "parser_name": chunk.parser_name,
-                        "ocr_used": chunk.ocr_used,
-                        "created_at": completed_at,
-                        "active": False,
-                    }
-                    for chunk in chunks
-                ]
-            )
-            session.execute(
-                statement.on_conflict_do_update(
-                    index_elements=[
-                        retrieval_chunks.c.index_version_id,
-                        retrieval_chunks.c.chunk_id,
-                    ],
-                    set_={
-                        "content": statement.excluded.content,
-                        "content_hash": statement.excluded.content_hash,
-                        "embedding": statement.excluded.embedding,
-                        "keyword_text": statement.excluded.keyword_text,
-                        "department_ids": statement.excluded.department_ids,
-                        "visibility": statement.excluded.visibility,
-                        "security_level": statement.excluded.security_level,
-                        "permission_labels": statement.excluded.permission_labels,
-                        "source_position": statement.excluded.source_position,
-                        "parsed_content_hash": statement.excluded.parsed_content_hash,
-                        "parser_name": statement.excluded.parser_name,
-                        "ocr_used": statement.excluded.ocr_used,
-                        "active": False,
-                    },
-                )
-            )
-            # 3. 文档与索引版本就绪后，仅当该文档版本已发布时才原子切换活动索引。
+            # 2. 文档、版本与当前索引指针在一个事务中切换，重复投递不会重复发布。
             session.execute(
                 update(document_versions)
                 .where(
@@ -418,8 +379,9 @@ class SqlAlchemyIndexVersionStore:
                     status="ready",
                     claimed_by=None,
                     claim_until=None,
+                    active_attempt_id=None,
                     completed_at=completed_at,
-                    chunk_count=len(chunks),
+                    chunk_count=row.staged_chunk_count,
                     updated_at=completed_at,
                 )
             )
@@ -452,19 +414,18 @@ class SqlAlchemyIndexVersionStore:
         next_attempt_at: datetime,
     ) -> IndexFailureResult:
         with self._session_factory() as session, session.begin():
-            row = session.execute(
-                select(index_versions.c.attempt_count, index_versions.c.max_attempts)
-                .where(
-                    index_versions.c.index_version_id == version.index_version_id,
-                    index_versions.c.status == "running",
-                    index_versions.c.claimed_by == version.claimed_by,
-                )
-                .with_for_update()
-            ).one_or_none()
+            row = _owned_index_row(
+                session,
+                version,
+                lane=version.processing_lane,
+                completed_at=failed_at,
+            )
             if row is None:
                 return "lost_claim"
             terminal = not retryable or row.attempt_count >= row.max_attempts
-            status: Literal["retry_wait", "failed"] = "failed" if terminal else "retry_wait"
+            status = (
+                "dead_letter" if terminal else _lane_status(version.processing_lane, "retry_wait")
+            )
             session.execute(
                 update(index_versions)
                 .where(index_versions.c.index_version_id == version.index_version_id)
@@ -473,11 +434,295 @@ class SqlAlchemyIndexVersionStore:
                     available_at=next_attempt_at,
                     claimed_by=None,
                     claim_until=None,
+                    active_attempt_id=None,
                     failure_stage=stage,
                     error_code=error_code,
                     error_message=error_message,
                     completed_at=failed_at if terminal else None,
+                    dead_lettered_at=failed_at if terminal else None,
                     updated_at=failed_at,
                 )
             )
-        return status
+        return "dead_letter" if terminal else "retry_wait"
+
+    def recover_dead_letter(
+        self,
+        index_version_id: UUID,
+        *,
+        actor_id: UUID,
+        recovered_at: datetime,
+    ) -> bool:
+        """最多三次恢复死信，并从失败 Lane 的持久化边界重新开始。"""
+
+        # 1. 锁定稳定死信并复核恢复次数，重复或越界命令不会修改任务。
+        with self._session_factory() as session, session.begin():
+            row = session.execute(
+                select(index_versions)
+                .where(
+                    index_versions.c.index_version_id == index_version_id,
+                    index_versions.c.status == "dead_letter",
+                )
+                .with_for_update()
+            ).one_or_none()
+            if row is None or row.manual_recovery_count >= 3:
+                return False
+            # 2. 从失败 Lane 的持久化交接点恢复，只重置该 Lane 的有限尝试窗口。
+            lane = cast(IndexWorkerLane, row.processing_lane)
+            values: dict[str, object | None] = {
+                "status": "queued" if lane == "embedding" else "index_queued",
+                "attempt_count": 0,
+                "available_at": recovered_at,
+                "completed_at": None,
+                "failure_stage": None,
+                "error_code": None,
+                "error_message": None,
+                "dead_lettered_at": None,
+                "manual_recovery_count": row.manual_recovery_count + 1,
+                "last_recovered_by_actor_id": actor_id,
+                "last_recovered_at": recovered_at,
+                "updated_at": recovered_at,
+            }
+            if lane == "embedding":
+                values["embedding_attempt_count"] = 0
+            else:
+                values["indexing_attempt_count"] = 0
+            session.execute(
+                update(index_versions)
+                .where(index_versions.c.index_version_id == index_version_id)
+                .values(**values)
+            )
+        return True
+
+
+def _lane_status(lane: IndexWorkerLane, state: str) -> str:
+    """把稳定 Lane 和局部状态组合为数据库状态，避免跨 Lane 状态误写。"""
+
+    prefix = "index" if lane == "indexing" else lane
+    return f"{prefix}_{state}"
+
+
+def _expire_stale_index_leases(
+    session: Session,
+    *,
+    lane: IndexWorkerLane,
+    now: datetime,
+) -> None:
+    running_status = _lane_status(lane, "running")
+    message = f"{lane} Worker 在最大尝试次数内未完成任务"
+    common = (
+        index_versions.c.processing_lane == lane,
+        index_versions.c.status == running_status,
+        index_versions.c.claim_until <= now,
+    )
+    # 1. 耗尽的租约进入稳定死信，并保留索引阶段已持久化的不可见 Chunk。
+    session.execute(
+        update(index_versions)
+        .where(*common, index_versions.c.attempt_count >= index_versions.c.max_attempts)
+        .values(
+            status="dead_letter",
+            claimed_by=None,
+            claim_until=None,
+            active_attempt_id=None,
+            failure_stage="worker",
+            error_code="INDEX_WORKER_LEASE_EXPIRED",
+            error_message=message,
+            completed_at=now,
+            dead_lettered_at=now,
+            updated_at=now,
+        )
+    )
+    # 2. 尚有预算的租约回到本 Lane 等待态，其他 Lane 的任务不会被本次扫描触碰。
+    session.execute(
+        update(index_versions)
+        .where(*common, index_versions.c.attempt_count < index_versions.c.max_attempts)
+        .values(
+            status=_lane_status(lane, "retry_wait"),
+            available_at=now,
+            claimed_by=None,
+            claim_until=None,
+            active_attempt_id=None,
+            failure_stage="worker",
+            error_code="INDEX_WORKER_LEASE_EXPIRED",
+            error_message=message,
+            updated_at=now,
+        )
+    )
+
+
+def _select_claimable_index(
+    session: Session,
+    *,
+    lane: IndexWorkerLane,
+    now: datetime,
+) -> Row[Any] | None:
+    queued_status = "queued" if lane == "embedding" else "index_queued"
+    retry_status = _lane_status(lane, "retry_wait")
+    return session.execute(
+        select(index_versions)
+        .where(
+            index_versions.c.processing_lane == lane,
+            index_versions.c.status.in_((queued_status, retry_status)),
+            index_versions.c.available_at <= now,
+            index_versions.c.attempt_count < index_versions.c.max_attempts,
+        )
+        .order_by(index_versions.c.available_at, index_versions.c.created_at)
+        .limit(1)
+        .with_for_update(skip_locked=True)
+    ).one_or_none()
+
+
+def _claim_index(
+    session: Session,
+    row: Row[Any],
+    *,
+    lane: IndexWorkerLane,
+    worker_id: str,
+    now: datetime,
+    claim_until: datetime,
+) -> ClaimedIndexVersion:
+    attempt_count = cast(int, row.attempt_count) + 1
+    attempt_id = uuid4()
+    lane_attempt_column = (
+        index_versions.c.embedding_attempt_count
+        if lane == "embedding"
+        else index_versions.c.indexing_attempt_count
+    )
+    session.execute(
+        update(index_versions)
+        .where(index_versions.c.index_version_id == row.index_version_id)
+        .values(
+            status=_lane_status(lane, "running"),
+            processing_lane=lane,
+            attempt_count=attempt_count,
+            claimed_by=worker_id,
+            claim_until=claim_until,
+            active_attempt_id=attempt_id,
+            started_at=row.started_at or now,
+            failure_stage=None,
+            error_code=None,
+            error_message=None,
+            updated_at=now,
+            **{lane_attempt_column.key: lane_attempt_column + 1},
+        )
+    )
+    return ClaimedIndexVersion(
+        index_version_id=row.index_version_id,
+        job_attempt_id=attempt_id,
+        workspace_id=row.workspace_id,
+        knowledge_base_id=row.knowledge_base_id,
+        document_id=row.document_id,
+        document_version_id=row.document_version_id,
+        ingestion_job_id=row.ingestion_job_id,
+        source_id=row.source_id,
+        artifact_object_key=row.artifact_object_key,
+        source_content_hash=row.source_content_hash,
+        parsed_content_hash=row.parsed_content_hash,
+        attempt_count=attempt_count,
+        max_attempts=row.max_attempts,
+        claimed_by=worker_id,
+        processing_lane=lane,
+        chunker_version=row.chunker_version,
+        embedding_model_version=row.embedding_model_version,
+        tokenizer_version=row.tokenizer_version,
+        department_ids=tuple(row.department_ids),
+        visibility=cast(IndexVisibility, row.visibility),
+        security_level=cast(IndexSecurityLevel, row.security_level),
+        permission_labels=tuple(row.permission_labels),
+    )
+
+
+def _owned_index_row(
+    session: Session,
+    version: ClaimedIndexVersion,
+    *,
+    lane: IndexWorkerLane,
+    completed_at: datetime,
+) -> Row[Any] | None:
+    return session.execute(
+        select(index_versions)
+        .where(
+            index_versions.c.index_version_id == version.index_version_id,
+            index_versions.c.status == _lane_status(lane, "running"),
+            index_versions.c.processing_lane == lane,
+            index_versions.c.claimed_by == version.claimed_by,
+            index_versions.c.active_attempt_id == version.job_attempt_id,
+            index_versions.c.claim_until > completed_at,
+        )
+        .with_for_update()
+    ).one_or_none()
+
+
+def _owns_index_lease(
+    session: Session,
+    version: ClaimedIndexVersion,
+    *,
+    lane: IndexWorkerLane,
+    completed_at: datetime,
+) -> bool:
+    return (
+        _owned_index_row(
+            session,
+            version,
+            lane=lane,
+            completed_at=completed_at,
+        )
+        is not None
+    )
+
+
+def _upsert_staged_chunks(
+    session: Session,
+    chunks: tuple[BuiltIndexChunk, ...],
+    *,
+    created_at: datetime,
+) -> None:
+    statement = postgresql_insert(retrieval_chunks).values(
+        [
+            {
+                "index_version_id": chunk.index_version_id,
+                "chunk_id": chunk.chunk_id,
+                "workspace_id": chunk.workspace_id,
+                "knowledge_base_id": chunk.knowledge_base_id,
+                "document_id": chunk.document_id,
+                "document_version_id": chunk.document_version_id,
+                "ingestion_job_id": chunk.ingestion_job_id,
+                "source_id": chunk.source_id,
+                "sequence_no": chunk.sequence_no,
+                "content": chunk.content,
+                "content_hash": chunk.content_hash,
+                "embedding": list(chunk.embedding),
+                "keyword_text": chunk.keyword_text,
+                "department_ids": list(chunk.department_ids),
+                "visibility": chunk.visibility,
+                "security_level": chunk.security_level,
+                "permission_labels": list(chunk.permission_labels),
+                "source_position": chunk.source_position,
+                "parsed_content_hash": chunk.parsed_content_hash,
+                "parser_name": chunk.parser_name,
+                "ocr_used": chunk.ocr_used,
+                "created_at": created_at,
+                "active": False,
+            }
+            for chunk in chunks
+        ]
+    )
+    session.execute(
+        statement.on_conflict_do_update(
+            index_elements=[retrieval_chunks.c.index_version_id, retrieval_chunks.c.chunk_id],
+            set_={
+                "content": statement.excluded.content,
+                "content_hash": statement.excluded.content_hash,
+                "embedding": statement.excluded.embedding,
+                "keyword_text": statement.excluded.keyword_text,
+                "department_ids": statement.excluded.department_ids,
+                "visibility": statement.excluded.visibility,
+                "security_level": statement.excluded.security_level,
+                "permission_labels": statement.excluded.permission_labels,
+                "source_position": statement.excluded.source_position,
+                "parsed_content_hash": statement.excluded.parsed_content_hash,
+                "parser_name": statement.excluded.parser_name,
+                "ocr_used": statement.excluded.ocr_used,
+                "active": False,
+            },
+        )
+    )

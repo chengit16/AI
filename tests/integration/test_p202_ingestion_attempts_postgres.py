@@ -128,7 +128,12 @@ def p202_database() -> Iterator[P202Harness]:
         admin_engine.dispose()
 
 
-def create_job(harness: P202Harness, label: str) -> tuple[UUID, UUID]:
+def create_job(
+    harness: P202Harness,
+    label: str,
+    *,
+    extension: str = ".txt",
+) -> tuple[UUID, UUID]:
     now = datetime.now(UTC)
     knowledge_base = harness.knowledge.create_knowledge_base(
         harness.context,
@@ -139,9 +144,9 @@ def create_job(harness: P202Harness, label: str) -> tuple[UUID, UUID]:
         knowledge_base_id=knowledge_base.knowledge_base_id,
         title=f"合成可靠性文档 {label}",
         source_kind="upload",
-        source_name=f"synthetic-{label}.txt",
-        original_object_key=f"workspaces/{harness.workspace_id}/uploads/{uuid4().hex}.txt",
-        upload_media_type="text/plain",
+        source_name=f"synthetic-{label}{extension}",
+        original_object_key=(f"workspaces/{harness.workspace_id}/uploads/{uuid4().hex}{extension}"),
+        upload_media_type="application/pdf" if extension == ".pdf" else "text/plain",
         upload_size_bytes=128,
         upload_content_hash="a" * 64,
         upload_scan_status="clean",
@@ -156,6 +161,64 @@ def create_job(harness: P202Harness, label: str) -> tuple[UUID, UUID]:
         )
     assert isinstance(job_id, UUID)
     return job_id, version.document_version_id
+
+
+def test_parsing_and_ocr_lanes_never_claim_each_others_jobs(
+    p202_database: P202Harness,
+) -> None:
+    parsing_id, _ = create_job(p202_database, "parsing-lane")
+    ocr_id, _ = create_job(p202_database, "ocr-lane", extension=".pdf")
+    now = datetime.now(UTC) + timedelta(seconds=1)
+
+    # 1. 来源类型在 API 写入时即冻结，任务与阶段使用同一个 Lane 事实。
+    with p202_database.engine.connect() as connection:
+        lanes = connection.execute(
+            select(
+                ingestion_jobs.c.ingestion_job_id,
+                ingestion_jobs.c.processing_lane,
+                ingestion_job_stages.c.stage_key,
+            )
+            .join(
+                ingestion_job_stages,
+                ingestion_job_stages.c.ingestion_job_id == ingestion_jobs.c.ingestion_job_id,
+            )
+            .where(ingestion_jobs.c.ingestion_job_id.in_((parsing_id, ocr_id)))
+        ).all()
+    assert {row.ingestion_job_id: (row.processing_lane, row.stage_key) for row in lanes} == {
+        parsing_id: ("parsing", "parsing"),
+        ocr_id: ("ocr", "ocr"),
+    }
+
+    # 2. 两个 Worker 即使同时扫描，也只能取得自己的持久化 Lane。
+    parsing_claim = p202_database.store.claim_next(
+        worker_id="p203-parsing-worker",
+        lane="parsing",
+        now=now,
+        lease_seconds=60,
+    )
+    ocr_claim = p202_database.store.claim_next(
+        worker_id="p203-ocr-worker",
+        lane="ocr",
+        now=now,
+        lease_seconds=60,
+    )
+    assert parsing_claim is not None and parsing_claim.ingestion_job_id == parsing_id
+    assert ocr_claim is not None and ocr_claim.ingestion_job_id == ocr_id
+
+    # 3. 测试结束时形成稳定终态，避免模块内后续扫描拾取遗留任务。
+    for claim in (parsing_claim, ocr_claim):
+        assert (
+            p202_database.store.mark_failed(
+                claim,
+                stage="parse" if claim is parsing_claim else "ocr",
+                error_code="INGESTION_SYNTHETIC_STOP",
+                error_message="合成 Lane 隔离测试已结束",
+                retryable=False,
+                failed_at=now,
+                next_attempt_at=now,
+            )
+            == "failed"
+        )
 
 
 def artifact(harness: P202Harness, job_id: UUID, version_id: UUID) -> ParsedArtifact:

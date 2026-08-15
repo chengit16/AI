@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
@@ -17,7 +18,8 @@ IngestionJobStatus = Literal[
     "timed_out",
 ]
 IngestionFailureStage = Literal["source", "parse", "ocr", "artifact", "worker"]
-IngestionStageKey = Literal["ingestion"]
+IngestionLane = Literal["parsing", "ocr"]
+IngestionStageKey = Literal["parsing", "ocr"]
 IngestionAttemptStatus = Literal[
     "running",
     "succeeded",
@@ -36,6 +38,8 @@ IngestionAttemptTrigger = Literal[
 
 MAX_MANUAL_RECOVERIES = 3
 
+OCR_SOURCE_EXTENSIONS = frozenset({".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff"})
+
 MANUALLY_RETRYABLE_ERROR_CODES = frozenset(
     {
         "INGESTION_PARSER_UNAVAILABLE",
@@ -53,6 +57,12 @@ class InvalidIngestionJobError(Exception):
 
 class ManualIngestionRetryNotAllowedError(Exception):
     """任务未终止，或失败原因需要修复内容并上传新版本。"""
+
+
+def ingestion_lane_for_source(source_name: str) -> IngestionLane:
+    """按不可变来源名称冻结处理 Lane，避免重试时漂移到另一类 Worker。"""
+
+    return "ocr" if Path(source_name).suffix.lower() in OCR_SOURCE_EXTENSIONS else "parsing"
 
 
 @dataclass(frozen=True)

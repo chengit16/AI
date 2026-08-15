@@ -16,7 +16,10 @@ from ai_platform_backend.integration.sqlalchemy import (
 
 from ai_platform_worker.config import WorkerSettings, get_worker_settings
 from ai_platform_worker.consumers.publisher import CeleryTaskPublisher
-from ai_platform_worker.modules.indexing.application.build import IndexBuildProcessor
+from ai_platform_worker.modules.indexing.application.build import (
+    IndexCommitProcessor,
+    IndexEmbeddingProcessor,
+)
 from ai_platform_worker.modules.indexing.infrastructure.embeddings import (
     DeterministicHashEmbeddingAdapter,
 )
@@ -52,7 +55,8 @@ class WorkerRuntime:
     dispatcher: OutboxDispatcher
     consumers: SqlAlchemyConsumerUnitOfWork
     ingestion: IngestionJobProcessor
-    indexing: IndexBuildProcessor
+    embedding: IndexEmbeddingProcessor
+    indexing: IndexCommitProcessor
 
     def close(self) -> None:
         self.database.close()
@@ -61,12 +65,14 @@ class WorkerRuntime:
 def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntime:
     """构建Worker运行时，遵守任务幂等、有限重试和提交时机约束。"""
 
+    # 1. 先装配所有 Lane 共用的数据库、签名和解析 Adapter，避免任务间隐式全局连接。
     resolved = settings or get_worker_settings()
     database = PlatformDatabase.create(resolved.database_url)
     signer = HmacTaskEnvelopeSigner(SigningKeyFile(resolved.task_signing_key_path).load())
     worker_id = f"{socket.gethostname()}:{id(database)}"
     chinese_ocr = TikaChineseOcrAdapter(resolved.tika_url)
     tika_parser = TikaDocumentParser(resolved.tika_url)
+    # 2. 控制面和入库 Lane 各自取得短事务 Store，外部解析始终在事务之外执行。
     return WorkerRuntime(
         database=database,
         dispatcher=OutboxDispatcher(
@@ -104,7 +110,8 @@ def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntim
             lease_seconds=resolved.ingestion_lease_seconds,
             retry_base_seconds=resolved.ingestion_retry_base_seconds,
         ),
-        indexing=IndexBuildProcessor(
+        # 3. Embedding 与索引提交使用独立处理器，Compose 再将二者固定到不同进程。
+        embedding=IndexEmbeddingProcessor(
             SqlAlchemyIndexVersionStore(database.sessions),
             MinioIndexArtifactStorage(
                 endpoint=resolved.minio_endpoint,
@@ -126,5 +133,11 @@ def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntim
             max_attempts=resolved.indexing_max_attempts,
             chunker_version=resolved.indexing_chunker_version,
             tokenizer_version=TOKENIZER_VERSION,
+        ),
+        indexing=IndexCommitProcessor(
+            SqlAlchemyIndexVersionStore(database.sessions),
+            worker_id=worker_id,
+            lease_seconds=resolved.indexing_lease_seconds,
+            retry_base_seconds=resolved.indexing_retry_base_seconds,
         ),
     )

@@ -13,7 +13,11 @@ from ai_platform_backend.indexing.sqlalchemy import (
     deactivate_document_indexes,
     switch_active_document_index,
 )
-from ai_platform_backend.ingestion.domain import IngestionJob, IngestionJobStatus
+from ai_platform_backend.ingestion.domain import (
+    IngestionJob,
+    IngestionJobStatus,
+    ingestion_lane_for_source,
+)
 from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
@@ -719,6 +723,7 @@ def _ingestion_job_values(value: IngestionJob) -> dict[str, object]:
         "source_object_key": value.source_object_key,
         "source_media_type": value.source_media_type,
         "source_content_hash": value.source_content_hash,
+        "processing_lane": ingestion_lane_for_source(value.source_name),
         "status": value.status,
         "attempt_count": value.attempt_count,
         "max_attempts": value.max_attempts,
@@ -751,13 +756,13 @@ def _ingestion_job_values(value: IngestionJob) -> dict[str, object]:
 
 
 def _ingestion_stage_values(value: IngestionJob) -> dict[str, object]:
-    """新任务只建立一个入库阶段，后续 Worker Attempt 均追加到该稳定父级。"""
+    """按来源类型冻结解析或 OCR 阶段，后续恢复仍使用同一资源 Lane。"""
 
     return {
         "job_stage_id": value.ingestion_job_id,
         "workspace_id": value.workspace_id,
         "ingestion_job_id": value.ingestion_job_id,
-        "stage_key": "ingestion",
+        "stage_key": ingestion_lane_for_source(value.source_name),
         "sequence_no": 1,
         "status": value.status,
         "attempt_count": 0,

@@ -32,6 +32,7 @@ ingestion_jobs = Table(
     Column("source_object_key", String(1024), nullable=False),
     Column("source_media_type", String(255), nullable=False),
     Column("source_content_hash", String(64), nullable=False),
+    Column("processing_lane", String(32), nullable=False),
     Column("status", String(32), nullable=False),
     Column("attempt_count", Integer, nullable=False),
     Column("max_attempts", Integer, nullable=False),
@@ -108,6 +109,10 @@ ingestion_jobs = Table(
     CheckConstraint(
         "source_content_hash ~ '^[0-9a-f]{64}$'",
         name="ck_ingestion_jobs_source_hash",
+    ),
+    CheckConstraint(
+        "processing_lane IN ('parsing', 'ocr')",
+        name="ck_ingestion_jobs_processing_lane",
     ),
     CheckConstraint(
         "(status = 'running' AND claimed_by IS NOT NULL AND claim_until IS NOT NULL "
@@ -216,7 +221,10 @@ ingestion_job_stages = Table(
         name="fk_ingestion_job_stages_job",
         ondelete="CASCADE",
     ),
-    CheckConstraint("stage_key = 'ingestion'", name="ck_ingestion_job_stages_key"),
+    CheckConstraint(
+        "stage_key IN ('parsing', 'ocr')",
+        name="ck_ingestion_job_stages_key",
+    ),
     CheckConstraint("sequence_no = 1", name="ck_ingestion_job_stages_sequence"),
     CheckConstraint("attempt_count >= 0", name="ck_ingestion_job_stages_attempt_count"),
     CheckConstraint(

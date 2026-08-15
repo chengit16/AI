@@ -13,6 +13,12 @@ x-python-environment: &python-environment
   AI_PLATFORM_MINIO_BUCKET: ${MINIO_BUCKET:-ai-platform-documents}
   AI_PLATFORM_UPLOAD_MAX_FILE_SIZE_BYTES: ${UPLOAD_MAX_FILE_SIZE_BYTES:-20971520}
   AI_PLATFORM_INGESTION_MAX_ATTEMPTS: ${INGESTION_MAX_ATTEMPTS:-3}
+  AI_PLATFORM_INGESTION_BATCH_SIZE: ${INGESTION_BATCH_SIZE:-4}
+  AI_PLATFORM_INGESTION_LEASE_SECONDS: ${INGESTION_LEASE_SECONDS:-120}
+  AI_PLATFORM_INGESTION_RETRY_BASE_SECONDS: ${INGESTION_RETRY_BASE_SECONDS:-5}
+  AI_PLATFORM_INGESTION_DISPATCH_INTERVAL_SECONDS: ${INGESTION_DISPATCH_INTERVAL_SECONDS:-2}
+  AI_PLATFORM_INGESTION_MAX_FILE_SIZE_BYTES: ${INGESTION_MAX_FILE_SIZE_BYTES:-20971520}
+  AI_PLATFORM_INGESTION_MAX_PAGE_COUNT: ${INGESTION_MAX_PAGE_COUNT:-500}
   AI_PLATFORM_INDEXING_BATCH_SIZE: ${INDEXING_BATCH_SIZE:-4}
   AI_PLATFORM_INDEXING_LEASE_SECONDS: ${INDEXING_LEASE_SECONDS:-120}
   AI_PLATFORM_INDEXING_MAX_ATTEMPTS: ${INDEXING_MAX_ATTEMPTS:-3}
@@ -28,6 +34,26 @@ x-python-environment: &python-environment
   # 本地首次问答自动建立不联网的合成 Provider；真实供应商配置与调用路径保持独立。
   AI_PLATFORM_LOCAL_MOCK_BOOTSTRAP_ENABLED: ${AI_PLATFORM_LOCAL_MOCK_BOOTSTRAP_ENABLED:-true}
   AI_PLATFORM_MASTER_KEY_VERSION: ${MASTER_KEY_VERSION:-1}
+
+x-worker-common: &worker-common
+  image: ai-platform-worker:local
+  build:
+    context: ../..
+    dockerfile: infra/docker/worker.Dockerfile
+  volumes:
+    - ${AI_PLATFORM_ROOT:-../../.ai-platform}/secrets/task-signing.key:/run/secrets/ai-platform-task-signing.key:ro
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    postgres:
+      condition: service_healthy
+    valkey:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+    tika:
+      condition: service_healthy
+  restart: unless-stopped
 
 services:
   postgres:
@@ -142,37 +168,111 @@ services:
         condition: service_healthy
     restart: "no"
 
-  worker:
-    build:
-      context: ../..
-      dockerfile: infra/docker/worker.Dockerfile
+  worker-control:
+    <<: *worker-common
     environment:
       <<: *python-environment
       AI_PLATFORM_TASK_SIGNING_KEY_PATH: /run/secrets/ai-platform-task-signing.key
-    volumes:
-      - ${AI_PLATFORM_ROOT:-../../.ai-platform}/secrets/task-signing.key:/run/secrets/ai-platform-task-signing.key:ro
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      valkey:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      tika:
-        condition: service_healthy
+      AI_PLATFORM_WORKER_LANE: control
+      AI_PLATFORM_CONTROL_WORKER_CONCURRENCY: ${CONTROL_WORKER_CONCURRENCY:-2}
+    command:
+      [
+        "uv",
+        "run",
+        "--no-sync",
+        "celery",
+        "-A",
+        "ai_platform_worker.app.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=platform.control",
+        "--hostname=control@%h",
+      ]
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app inspect ping --destination celery@$$HOSTNAME --timeout 3 | grep -q pong",
+          "test \"$$(wc -c </run/secrets/ai-platform-task-signing.key 2>/dev/null)\" -eq 32 && uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app inspect ping --destination control@$$HOSTNAME --timeout 3 | grep -q pong",
         ]
       interval: 10s
       timeout: 5s
       retries: 20
       start_period: 10s
-    restart: unless-stopped
+
+  worker-parsing:
+    <<: *worker-common
+    environment:
+      <<: *python-environment
+      AI_PLATFORM_TASK_SIGNING_KEY_PATH: /run/secrets/ai-platform-task-signing.key
+      AI_PLATFORM_WORKER_LANE: parsing
+      AI_PLATFORM_PARSING_WORKER_CONCURRENCY: ${PARSING_WORKER_CONCURRENCY:-2}
+    command: ["uv", "run", "--no-sync", "celery", "-A", "ai_platform_worker.app.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=platform.parsing", "--hostname=parsing@%h"]
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(wc -c </run/secrets/ai-platform-task-signing.key 2>/dev/null)\" -eq 32 && uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app inspect ping --destination parsing@$$HOSTNAME --timeout 3 | grep -q pong"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  worker-ocr:
+    <<: *worker-common
+    environment:
+      <<: *python-environment
+      AI_PLATFORM_TASK_SIGNING_KEY_PATH: /run/secrets/ai-platform-task-signing.key
+      AI_PLATFORM_WORKER_LANE: ocr
+      AI_PLATFORM_OCR_WORKER_CONCURRENCY: ${OCR_WORKER_CONCURRENCY:-1}
+    command: ["uv", "run", "--no-sync", "celery", "-A", "ai_platform_worker.app.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=platform.ocr", "--hostname=ocr@%h"]
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(wc -c </run/secrets/ai-platform-task-signing.key 2>/dev/null)\" -eq 32 && uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app inspect ping --destination ocr@$$HOSTNAME --timeout 3 | grep -q pong"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  worker-embedding:
+    <<: *worker-common
+    environment:
+      <<: *python-environment
+      AI_PLATFORM_TASK_SIGNING_KEY_PATH: /run/secrets/ai-platform-task-signing.key
+      AI_PLATFORM_WORKER_LANE: embedding
+      AI_PLATFORM_EMBEDDING_WORKER_CONCURRENCY: ${EMBEDDING_WORKER_CONCURRENCY:-1}
+    command: ["uv", "run", "--no-sync", "celery", "-A", "ai_platform_worker.app.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=platform.embedding", "--hostname=embedding@%h"]
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(wc -c </run/secrets/ai-platform-task-signing.key 2>/dev/null)\" -eq 32 && uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app inspect ping --destination embedding@$$HOSTNAME --timeout 3 | grep -q pong"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  worker-indexing:
+    <<: *worker-common
+    environment:
+      <<: *python-environment
+      AI_PLATFORM_TASK_SIGNING_KEY_PATH: /run/secrets/ai-platform-task-signing.key
+      AI_PLATFORM_WORKER_LANE: indexing
+      AI_PLATFORM_INDEXING_WORKER_CONCURRENCY: ${INDEXING_WORKER_CONCURRENCY:-2}
+    command: ["uv", "run", "--no-sync", "celery", "-A", "ai_platform_worker.app.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=platform.indexing", "--hostname=indexing@%h"]
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(wc -c </run/secrets/ai-platform-task-signing.key 2>/dev/null)\" -eq 32 && uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app inspect ping --destination indexing@$$HOSTNAME --timeout 3 | grep -q pong"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  scheduler:
+    <<: *worker-common
+    environment:
+      <<: *python-environment
+      AI_PLATFORM_WORKER_LANE: scheduler
+    # Scheduler 只发布固定周期任务，不处理或签署业务信封，因此不挂载任务签名密钥。
+    volumes: []
+    command: ["uv", "run", "--no-sync", "celery", "-A", "ai_platform_worker.app.celery_app:celery_app", "beat", "--loglevel=INFO"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q celery /proc/1/cmdline && grep -q beat /proc/1/cmdline"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   web:
     build:

@@ -22,6 +22,7 @@ from ai_platform_worker.modules.ingestion.domain.jobs import (
     IngestionJobStore,
     IngestionObjectStorage,
     IngestionStorageUnavailableError,
+    IngestionWorkerLane,
     ParsedArtifact,
 )
 
@@ -59,7 +60,15 @@ class IngestionJobProcessor:
         self._lease_seconds = lease_seconds
         self._retry_base_seconds = retry_base_seconds
 
-    def run_batch(self, *, limit: int, now: datetime | None = None) -> IngestionBatchResult:
+    def run_batch(
+        self,
+        *,
+        lane: IngestionWorkerLane = "parsing",
+        limit: int,
+        now: datetime | None = None,
+    ) -> IngestionBatchResult:
+        """只领取指定资源 Lane，确保 OCR 耗尽不会占用普通解析进程。"""
+
         current = now or datetime.now(UTC)
         counts = {"claimed": 0, "succeeded": 0, "retried": 0, "failed": 0, "lost": 0}
         for _ in range(limit):
@@ -67,6 +76,7 @@ class IngestionJobProcessor:
                 worker_id=self._worker_id,
                 now=current,
                 lease_seconds=self._lease_seconds,
+                lane=lane,
             )
             if job is None:
                 break

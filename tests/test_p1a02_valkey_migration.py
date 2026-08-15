@@ -57,4 +57,14 @@ def test_compose_pins_valkey_and_removes_redis_service() -> None:
     assert valkey["healthcheck"]["test"] == ["CMD", "valkey-cli", "ping"]
     assert any("/data/valkey:/data" in volume for volume in valkey["volumes"])
     assert services["api"]["depends_on"]["valkey"]["condition"] == "service_healthy"
-    assert services["worker"]["depends_on"]["valkey"]["condition"] == "service_healthy"
+    assert all(
+        services[name]["depends_on"]["valkey"]["condition"] == "service_healthy"
+        for name in (
+            "worker-control",
+            "worker-parsing",
+            "worker-ocr",
+            "worker-embedding",
+            "worker-indexing",
+            "scheduler",
+        )
+    )

@@ -6,6 +6,8 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$PROJECT_DIR/infra/compose/compose.yaml"
 ENV_FILE="$PROJECT_DIR/.env"
 DEFAULT_ENV_FILE="$PROJECT_DIR/.env.example"
+WORKER_SERVICES=(worker-control worker-parsing worker-ocr worker-embedding worker-indexing scheduler)
+REQUIRED_RUNNING_SERVICES=(postgres valkey minio tika api web "${WORKER_SERVICES[@]}")
 
 log() {
   printf '[AI Platform] %s\n' "$*"
@@ -177,7 +179,8 @@ wait_until_healthy() {
     unhealthy="$(compose ps --format json | grep -cE '"Health":"(starting|unhealthy)"' || true)"
     local running
     running="$(compose ps --services --status running | wc -l | tr -d ' ')"
-    if [[ "$unhealthy" == "0" && "$running" == "7" ]]; then
+    # Migration 是一次性任务，不计入常驻服务；其余必需服务全部运行后才允许启动返回。
+    if [[ "$unhealthy" == "0" && "$running" == "${#REQUIRED_RUNNING_SERVICES[@]}" ]]; then
       return 0
     fi
     sleep 3
@@ -305,13 +308,13 @@ backup_local() {
     cleanup_backup() {
       rm -rf -- "$staging"
       if (( stopped == 1 )); then
-        compose up -d minio api worker >/dev/null 2>&1 || true
+        compose up -d minio api "${WORKER_SERVICES[@]}" >/dev/null 2>&1 || true
       fi
     }
     trap cleanup_backup EXIT
     mkdir -p "$staging/secrets"
     stopped=1
-    compose stop api worker minio >/dev/null
+    compose stop api "${WORKER_SERVICES[@]}" minio >/dev/null
     compose exec -T postgres pg_dump \
       --format=custom --no-owner --no-privileges \
       -U "$(env_value POSTGRES_USER ai_platform)" \
@@ -328,7 +331,7 @@ backup_local() {
       --output "$output_path" \
       --key-file "$AI_PLATFORM_ROOT/secrets/backup-encryption.key" \
       --schema-revision "$revision"
-    compose up -d minio api worker >/dev/null
+    compose up -d minio api "${WORKER_SERVICES[@]}" >/dev/null
     stopped=0
   )
   # 3. 业务容器全部恢复健康后才向调用方宣告备份成功。
@@ -368,7 +371,7 @@ restore_local() {
       --key-file "$AI_PLATFORM_ROOT/secrets/backup-encryption.key"
 
     # 3. 停止全部状态写入方后替换数据库、对象和文件密钥；失败时保持服务停止。
-    compose stop api worker minio valkey >/dev/null
+    compose stop api "${WORKER_SERVICES[@]}" minio valkey >/dev/null
     compose exec -T postgres pg_restore \
       --clean --if-exists --exit-on-error --no-owner --no-privileges \
       -U "$(env_value POSTGRES_USER ai_platform)" \
@@ -482,10 +485,10 @@ doctor() {
       'SELECT version_num FROM public.alembic_version' 2>/dev/null || true
   )"
   database_revision="$(printf '%s' "$database_revision" | tr -d '[:space:]')"
-  if [[ "$database_revision" == "20260815_0036" ]]; then
+  if [[ "$database_revision" == "20260815_0037" ]]; then
     log "数据库 Revision: 正常 ($database_revision)"
   else
-    log "数据库 Revision: 失败 (期望 20260815_0036，实际 ${database_revision:-unknown})"
+    log "数据库 Revision: 失败 (期望 20260815_0037，实际 ${database_revision:-unknown})"
     failed=1
   fi
   if [[ "$(compose exec -T valkey valkey-cli ping)" == "PONG" ]]; then
@@ -494,16 +497,19 @@ doctor() {
     log "Valkey: 失败"
     failed=1
   fi
-  local worker_ping
-  worker_ping="$(
-    compose exec -T worker sh -c \
-      'uv run --no-sync celery -A ai_platform_worker.app.celery_app:celery_app inspect ping --destination "celery@$HOSTNAME" --timeout 3' \
-      2>/dev/null || true
-  )"
-  if [[ "$worker_ping" == *pong* ]]; then
-    log "Worker: 正常"
+  local worker_service
+  for worker_service in worker-control worker-parsing worker-ocr worker-embedding worker-indexing; do
+    if compose ps --format json "$worker_service" | grep -q '"Health":"healthy"'; then
+      log "Worker ${worker_service#worker-}: 正常"
+    else
+      log "Worker ${worker_service#worker-}: 失败"
+      failed=1
+    fi
+  done
+  if compose ps --format json scheduler | grep -q '"Health":"healthy"'; then
+    log "Scheduler: 正常"
   else
-    log "Worker: 失败"
+    log "Scheduler: 失败"
     failed=1
   fi
 

@@ -46,7 +46,10 @@ from ai_platform_api.persistence.tables import (
 )
 from ai_platform_backend.indexing.domain import ClaimedIndexVersion
 from ai_platform_backend.indexing.tokenization import TOKENIZER_VERSION
-from ai_platform_worker.modules.indexing.application.build import IndexBuildProcessor
+from ai_platform_worker.modules.indexing.application.build import (
+    IndexCommitProcessor,
+    IndexEmbeddingProcessor,
+)
 from ai_platform_worker.modules.indexing.infrastructure.embeddings import (
     DeterministicHashEmbeddingAdapter,
 )
@@ -227,19 +230,30 @@ def complete_ingestion(
     return artifact_object_key, payload
 
 
-def processor(harness: IndexHarness, payloads: dict[str, bytes]) -> IndexBuildProcessor:
-    return IndexBuildProcessor(
-        harness.store,
-        MemoryArtifactStorage(payloads),
-        StructuralChunker(),
-        DeterministicHashEmbeddingAdapter(),
-        IngestionLimits(1024 * 1024, 10, 256, 32),
-        worker_id="synthetic-index-worker",
-        lease_seconds=120,
-        retry_base_seconds=5,
-        max_attempts=3,
-        chunker_version="structural-char-v1",
-        tokenizer_version=TOKENIZER_VERSION,
+def processors(
+    harness: IndexHarness,
+    payloads: dict[str, bytes],
+) -> tuple[IndexEmbeddingProcessor, IndexCommitProcessor]:
+    return (
+        IndexEmbeddingProcessor(
+            harness.store,
+            MemoryArtifactStorage(payloads),
+            StructuralChunker(),
+            DeterministicHashEmbeddingAdapter(),
+            IngestionLimits(1024 * 1024, 10, 256, 32),
+            worker_id="synthetic-embedding-worker",
+            lease_seconds=120,
+            retry_base_seconds=5,
+            max_attempts=3,
+            chunker_version="structural-char-v1",
+            tokenizer_version=TOKENIZER_VERSION,
+        ),
+        IndexCommitProcessor(
+            harness.store,
+            worker_id="synthetic-indexing-worker",
+            lease_seconds=120,
+            retry_base_seconds=5,
+        ),
     )
 
 
@@ -326,11 +340,35 @@ def test_index_build_publication_rebuild_and_revocation_are_atomic(
         completed_at=current,
     )
     payloads = {first_key: first_artifact}
-    worker = processor(index_database, payloads)
+    embedding_worker, indexing_worker = processors(index_database, payloads)
 
-    first_result = worker.run_batch(limit=1, now=current)
-
+    first_result = embedding_worker.run_batch(limit=1, now=current)
     assert (first_result.enqueued, first_result.succeeded) == (1, 1)
+
+    # Embedding Lane 只写入不可见 Chunk，索引版本必须等待独立提交 Worker。
+    with index_database.engine.connect() as connection:
+        staged = connection.execute(
+            select(index_versions).where(index_versions.c.document_version_id == first_version_id)
+        ).one()
+        assert (staged.status, staged.processing_lane, staged.staged_chunk_count) == (
+            "index_queued",
+            "indexing",
+            1,
+        )
+        assert (
+            connection.scalar(
+                select(func.count())
+                .select_from(retrieval_chunks)
+                .where(
+                    retrieval_chunks.c.index_version_id == staged.index_version_id,
+                    retrieval_chunks.c.active,
+                )
+            )
+            == 0
+        )
+
+    first_commit = indexing_worker.run_batch(limit=1, now=current)
+    assert first_commit.succeeded == 1
     with index_database.engine.connect() as connection:
         first_index = connection.execute(
             select(index_versions).where(index_versions.c.document_version_id == first_version_id)
@@ -413,8 +451,10 @@ def test_index_build_publication_rebuild_and_revocation_are_atomic(
 
     payloads.clear()
     payloads[second_key] = second_artifact
-    second_result = worker.run_batch(limit=1, now=current + timedelta(seconds=2))
+    second_result = embedding_worker.run_batch(limit=1, now=current + timedelta(seconds=2))
+    second_commit = indexing_worker.run_batch(limit=1, now=current + timedelta(seconds=2))
     assert (second_result.enqueued, second_result.succeeded) == (1, 1)
+    assert second_commit.succeeded == 1
 
     rebuilt_id = index_database.store.enqueue_rebuild(
         workspace_id=workspace.workspace_id,
@@ -425,8 +465,10 @@ def test_index_build_publication_rebuild_and_revocation_are_atomic(
         embedding_model_version="deterministic-hash-1024-v1",
         tokenizer_version=TOKENIZER_VERSION,
     )
-    rebuild_result = worker.run_batch(limit=1, now=current + timedelta(seconds=4))
+    rebuild_result = embedding_worker.run_batch(limit=1, now=current + timedelta(seconds=4))
+    rebuild_commit = indexing_worker.run_batch(limit=1, now=current + timedelta(seconds=4))
     assert rebuild_result.succeeded == 1
+    assert rebuild_commit.succeeded == 1
 
     with index_database.engine.connect() as connection:
         second_indexes = connection.execute(
@@ -514,3 +556,144 @@ def test_index_build_publication_rebuild_and_revocation_are_atomic(
             )
             == "draft"
         )
+
+
+def test_index_lane_replay_dead_letter_and_recovery_are_bounded(
+    index_database: IndexHarness,
+) -> None:
+    owner = register(index_database)
+    owner_context = context(owner, owner.personal_workspace_id)
+    knowledge_base = index_database.knowledge.create_knowledge_base(
+        owner_context,
+        name=f"合成 P2-03 知识库 {uuid4().hex}",
+    )
+    current = datetime.now(UTC) + timedelta(seconds=1)
+    _, version_id = upload_version(
+        index_database,
+        owner_context,
+        knowledge_base.knowledge_base_id,
+        None,
+        source_content=b"synthetic-p203",
+    )
+    artifact_key, payload = complete_ingestion(
+        index_database,
+        version_id,
+        text_content="P2-03 合成并发重放证据。",
+        completed_at=current,
+    )
+    embedding_worker, _ = processors(index_database, {artifact_key: payload})
+    assert embedding_worker.run_batch(limit=1, now=current).succeeded == 1
+
+    # 1. 同一索引阶段只能有一个有效租约，成功提交后重放旧租约不会重复发布。
+    claim = index_database.store.claim_indexing_next(
+        worker_id="p203-indexing-worker",
+        now=current + timedelta(seconds=1),
+        lease_seconds=60,
+    )
+    assert claim is not None
+    assert (
+        index_database.store.claim_indexing_next(
+            worker_id="p203-second-indexing-worker",
+            now=current + timedelta(seconds=1),
+            lease_seconds=60,
+        )
+        is None
+    )
+    assert index_database.store.mark_indexing_succeeded(
+        claim,
+        completed_at=current + timedelta(seconds=2),
+    )
+    assert not index_database.store.mark_indexing_succeeded(
+        claim,
+        completed_at=current + timedelta(seconds=3),
+    )
+
+    # 2. 新重建的非重试失败进入 Embedding 死信，恢复后旧 Attempt 身份继续失效。
+    dead_letter_id = index_database.store.enqueue_rebuild(
+        workspace_id=owner.personal_workspace_id,
+        document_version_id=version_id,
+        now=current + timedelta(seconds=4),
+        max_attempts=1,
+        chunker_version="structural-char-v1",
+        embedding_model_version="deterministic-hash-1024-v1",
+        tokenizer_version=TOKENIZER_VERSION,
+    )
+    failed_claim = index_database.store.claim_embedding_next(
+        worker_id="p203-embedding-worker",
+        now=current + timedelta(seconds=5),
+        lease_seconds=60,
+    )
+    assert failed_claim is not None and failed_claim.index_version_id == dead_letter_id
+    assert (
+        index_database.store.mark_failed(
+            failed_claim,
+            stage="embedding",
+            error_code="INDEX_SYNTHETIC_DEAD_LETTER",
+            error_message="合成不可重试 Embedding 失败",
+            retryable=False,
+            failed_at=current + timedelta(seconds=6),
+            next_attempt_at=current + timedelta(seconds=6),
+        )
+        == "dead_letter"
+    )
+
+    # 3. 每次恢复都开启新的有限窗口，第三次后仍失败时必须拒绝第四次恢复。
+    previous_claim = failed_claim
+    for recovery_number in range(1, 4):
+        recovered_at = current + timedelta(seconds=6 + recovery_number * 2)
+        assert index_database.store.recover_dead_letter(
+            dead_letter_id,
+            actor_id=owner.account_id,
+            recovered_at=recovered_at,
+        )
+        recovered_claim = index_database.store.claim_embedding_next(
+            worker_id="p203-embedding-worker",
+            now=recovered_at,
+            lease_seconds=60,
+        )
+        assert recovered_claim is not None
+        assert recovered_claim.job_attempt_id != previous_claim.job_attempt_id
+        assert (
+            index_database.store.mark_failed(
+                previous_claim,
+                stage="embedding",
+                error_code="INDEX_STALE_REPLAY",
+                error_message="旧租约重放必须被拒绝",
+                retryable=False,
+                failed_at=recovered_at,
+                next_attempt_at=recovered_at,
+            )
+            == "lost_claim"
+        )
+        assert (
+            index_database.store.mark_failed(
+                recovered_claim,
+                stage="embedding",
+                error_code="INDEX_SYNTHETIC_DEAD_LETTER",
+                error_message="合成恢复后仍失败",
+                retryable=False,
+                failed_at=recovered_at + timedelta(seconds=1),
+                next_attempt_at=recovered_at + timedelta(seconds=1),
+            )
+            == "dead_letter"
+        )
+        previous_claim = recovered_claim
+
+    assert not index_database.store.recover_dead_letter(
+        dead_letter_id,
+        actor_id=owner.account_id,
+        recovered_at=current + timedelta(seconds=20),
+    )
+    with index_database.engine.connect() as connection:
+        terminal = connection.execute(
+            select(
+                index_versions.c.status,
+                index_versions.c.processing_lane,
+                index_versions.c.manual_recovery_count,
+                index_versions.c.dead_lettered_at,
+            ).where(index_versions.c.index_version_id == dead_letter_id)
+        ).one()
+    assert terminal.status == "dead_letter"
+    assert terminal.processing_lane == "embedding"
+    assert terminal.manual_recovery_count == 3
+    assert terminal.dead_lettered_at is not None

@@ -18,7 +18,13 @@
               ├── Valkey :6379        Session、缓存、Broker 和可重建状态
               ├── MinIO :9000/:9001   上传原件与派生对象
               └── Tika :9998          文档解析与 OCR
-                    └── Worker         入库、索引和异步任务
+
+Scheduler                           周期唤醒，不执行业务任务
+  ├── Control Worker               Outbox 与内部集成事件
+  ├── Parsing Worker               TXT、Markdown、DOCX 解析
+  ├── OCR Worker                   PDF 与图片 OCR
+  ├── Embedding Worker             不可见 Chunk 与向量生成
+  └── Indexing Worker              索引提交与原子发布
 ```
 
 默认目录由 `.env` 控制：
@@ -69,12 +75,19 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 ./platform status
 ./platform logs
 ./platform logs api
-./platform logs worker
+./platform logs worker-control
+./platform logs worker-parsing
+./platform logs worker-ocr
+./platform logs worker-embedding
+./platform logs worker-indexing
+./platform logs scheduler
 ./platform restart
 ./platform stop
 ```
 
 `stop` 只停止容器并保留宿主机数据。`restart` 会重新构建当前源码对应镜像并执行 Migration，运行前应确认当前代码版本与数据版本兼容。
+
+启动、重建、恢复和诊断必须使用 `./platform`。不要用裸 `docker compose up` 代替统一入口，因为 `.env` 中相对数据目录需要先按项目根目录解析为绝对路径；绕过该步骤可能把空目录挂载为密钥文件或数据目录。
 
 ## 5. 账号、空间与平台管理员
 
@@ -105,20 +118,25 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 
 ## 7. 健康检查与日志定位
 
-`./platform doctor` 必须全部通过以下八项：Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey 和 Worker。建议先执行：
+`./platform doctor` 必须通过 13 项实际检查：Web、API、MinIO、Tika、PostgreSQL、数据库 Revision、Valkey、五个 Worker Lane 和 Scheduler。Worker 健康同时要求 32 字节任务签名密钥可读和 Celery 节点可响应；Scheduler 不挂载文件型密钥，健康检查要求 Beat 进程仍在运行。
+
+建议先执行：
 
 ```bash
 ./platform status
 ./platform doctor
 ./platform logs api
-./platform logs worker
+./platform logs worker-control
+./platform logs worker-ocr
+./platform logs scheduler
 ```
 
 日志排查原则：
 
 - 使用 Request ID、Trace ID、Run ID、任务 ID 或资源 ID 关联请求，不搜索用户正文和凭据。
 - Readiness 返回 `503` 时先查看结构化依赖状态；依赖降级不等于 API 进程不可达。
-- Worker 异常先检查 PostgreSQL、Valkey、MinIO 和 Tika，再检查任务重试、租约和死信事实。
+- 单个 Worker Lane 异常时先确认其他 Lane 是否仍健康，再检查 PostgreSQL、Valkey、MinIO、Tika、对应队列积压、租约和死信事实。
+- Scheduler 异常不会立即终止正在执行的任务，但新一轮扫描不会被唤醒；恢复后由 PostgreSQL 租约和幂等规则继续处理，不能手工复制任务绕过恢复机制。
 - 不把 Cookie、`Authorization`、模型 Key、字段级 ABAC 受限内容或完整文档正文粘贴到工单和文档。
 
 ## 8. 备份、导出、恢复与导入
@@ -131,7 +149,7 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 ./platform export AIPlatformBackups/export-20260815.aiprb
 ```
 
-`backup` 与 `export` 使用同一 V1 `.aiprb` 格式。平台先校验对象引用，再停止 API、Worker 和 MinIO 取得同一停写窗口的 PostgreSQL、对象和文件密钥快照，最后使用独立恢复密钥执行流式 AES-256-GCM 加密。输出文件不能已存在，也不能位于 `AI_PLATFORM_ROOT` 内。
+`backup` 与 `export` 使用同一 V1 `.aiprb` 格式。平台先校验对象引用，再停止 API、五个 Worker、Scheduler 和 MinIO，取得同一停写窗口的 PostgreSQL、对象和文件密钥快照，最后使用独立恢复密钥执行流式 AES-256-GCM 加密。输出文件不能已存在，也不能位于 `AI_PLATFORM_ROOT` 内。
 
 备份完成后必须记录文件路径、创建时间、Schema Revision 和恢复密钥保管位置。恢复包与 `.ai-platform/secrets/backup-encryption.key` 丢失任意一项都无法跨机器恢复。
 
@@ -144,7 +162,7 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 ./platform import AIPlatformBackups/export-20260815.aiprb --confirm-replace
 ```
 
-平台会先自动生成 `pre-restore-*.aiprb` 回退点，再验证恢复包认证标签、路径、校验和和文件集合；随后停止写入方、恢复数据库/对象/密钥、清空可重建 Valkey 状态、执行 Migration、检查对象引用和八项诊断。任一步失败时不得手工标记成功，应保持服务停止并使用操作前恢复点处理。
+平台会先自动生成 `pre-restore-*.aiprb` 回退点，再验证恢复包认证标签、路径、校验和和文件集合；随后停止写入方、恢复数据库/对象/密钥、清空可重建 Valkey 状态、执行 Migration、检查对象引用和 13 项诊断。任一步失败时不得手工标记成功，应保持服务停止并使用操作前恢复点处理。
 
 不要在公共或唯一实例上做无演练计划的恢复测试。优先使用独立目标目录和隔离数据库完成恢复演练。
 
@@ -187,7 +205,9 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 | 可用磁盘不足 | `df -h`、`AI_PLATFORM_MIN_FREE_DISK_GB` | 清理非平台文件或扩容；不得用过低阈值冒充正式基线 |
 | Web 正常但 API 为 `503` | `/api/v1/health/ready`、API 日志 | 根据结构化结果定位 PostgreSQL、Valkey、MinIO 或 Tika |
 | 数据库 Revision 失败 | `./platform doctor`、migrate 日志 | 停止写入，确认代码/Manifest/Schema 组合；失败升级按备份回退 |
-| Worker 不健康 | Worker、Valkey、PostgreSQL 日志 | 恢复依赖后观察有限重试和租约；不要直接改任务事实终态 |
+| 单个 Worker Lane 不健康 | 对应 Lane 日志、签名密钥挂载、Valkey、PostgreSQL | 保持其他 Lane 运行；通过 `./platform restart` 恢复后观察积压、有限重试和租约，不直接改任务事实终态 |
+| Scheduler 不健康 | Scheduler 日志、签名密钥挂载、Valkey | 通过统一入口恢复 Scheduler；依赖 PostgreSQL 扫描补偿，不手工跨队列投递 |
+| 某条队列持续积压 | 对应 Worker Lane、并发参数、任务阶段和死信 | 先排除依赖故障，再在 `1～8` 范围内单独调整该 Lane 并发；不得让其他 Worker 消费该队列 |
 | 文档解析失败 | Tika 状态、任务失败码、文件类型/大小 | 修复依赖或输入后使用受控人工重试，保留失败事实 |
 | 无法访问页面或接口 | 成员状态、角色、菜单发布、PDP 决策 | 按最小权限修正授权；不要把前端菜单显示当成授权证据 |
 | SSE 重连异常 | Run 状态、`Last-Event-ID`、事件保留期 | 在 24 小时保留期内按游标重连；超预算或过期时使用消息快照 |
@@ -203,4 +223,3 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 - 只使用合成数据做本地测试；真实敏感资料不得直接作为测试样本。
 - 真实供应商调用前确认域名、凭据、能力和数据政策均已审核。
 - 记录未执行的 Linux、容量、镜像扫描和真实 AI 质量状态，不用本地 Mock 结果替代。
-

@@ -19,6 +19,14 @@ def load_compose() -> dict[str, Any]:
 def test_compose_runs_migration_before_api_and_worker() -> None:
     services = load_compose()["services"]
     migrate = services["migrate"]
+    worker_services = (
+        "worker-control",
+        "worker-parsing",
+        "worker-ocr",
+        "worker-embedding",
+        "worker-indexing",
+        "scheduler",
+    )
 
     assert migrate["command"] == ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
     assert migrate["depends_on"]["postgres"]["condition"] == "service_healthy"
@@ -26,27 +34,36 @@ def test_compose_runs_migration_before_api_and_worker() -> None:
     assert services["api"]["depends_on"]["migrate"]["condition"] == (
         "service_completed_successfully"
     )
-    assert services["worker"]["depends_on"]["migrate"]["condition"] == (
-        "service_completed_successfully"
+    assert all(
+        services[name]["depends_on"]["migrate"]["condition"] == "service_completed_successfully"
+        for name in worker_services
     )
 
 
 def test_compose_exposes_each_secret_only_to_its_owner() -> None:
     services = load_compose()["services"]
     api = services["api"]
-    worker = services["worker"]
+    workers = [service for name, service in services.items() if name.startswith("worker-")]
 
     assert "AI_PLATFORM_MASTER_KEY_PATH" in api["environment"]
     assert "AI_PLATFORM_TASK_SIGNING_KEY_PATH" not in api["environment"]
-    assert "AI_PLATFORM_TASK_SIGNING_KEY_PATH" in worker["environment"]
-    assert "AI_PLATFORM_MASTER_KEY_PATH" not in worker["environment"]
+    assert all("AI_PLATFORM_TASK_SIGNING_KEY_PATH" in worker["environment"] for worker in workers)
+    assert all("AI_PLATFORM_MASTER_KEY_PATH" not in worker["environment"] for worker in workers)
     assert len(api["volumes"]) == 1
     assert "/secrets/master.key:/run/secrets/ai-platform-master.key:ro" in api["volumes"][0]
-    assert len(worker["volumes"]) == 1
-    assert (
-        "/secrets/task-signing.key:/run/secrets/ai-platform-task-signing.key:ro"
+    assert all(
+        len(worker["volumes"]) == 1
+        and "/secrets/task-signing.key:/run/secrets/ai-platform-task-signing.key:ro"
         in worker["volumes"][0]
+        for worker in workers
     )
+    assert all(
+        "/run/secrets/ai-platform-task-signing.key" in worker["healthcheck"]["test"][1]
+        for worker in workers
+    )
+    assert "AI_PLATFORM_TASK_SIGNING_KEY_PATH" not in services["scheduler"]["environment"]
+    assert services["scheduler"]["volumes"] == []
+    assert "beat" in services["scheduler"]["healthcheck"]["test"][1]
 
 
 def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> None:
@@ -54,8 +71,10 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
 
     assert "platform.outbox.dispatch.v1" in celery_app.tasks
     assert "platform.integration.consume.v1" in celery_app.tasks
-    assert "platform.ingestion.process.v1" in celery_app.tasks
-    assert "platform.indexing.process.v1" in celery_app.tasks
+    assert "platform.ingestion.parse.v1" in celery_app.tasks
+    assert "platform.ingestion.ocr.v1" in celery_app.tasks
+    assert "platform.indexing.embed.v1" in celery_app.tasks
+    assert "platform.indexing.commit.v1" in celery_app.tasks
     assert celery_app.conf.task_serializer == "json"
     assert celery_app.conf.accept_content == ["json"]
     assert celery_app.conf.result_backend is None
@@ -65,11 +84,21 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
     assert celery_app.conf.beat_schedule["dispatch-outbox"]["task"] == (
         "platform.outbox.dispatch.v1"
     )
-    assert celery_app.conf.beat_schedule["process-ingestion-jobs"]["task"] == (
-        "platform.ingestion.process.v1"
+    assert celery_app.conf.beat_schedule["process-parsing-jobs"]["task"] == (
+        "platform.ingestion.parse.v1"
     )
-    assert celery_app.conf.beat_schedule["process-index-versions"]["task"] == (
-        "platform.indexing.process.v1"
+    assert celery_app.conf.beat_schedule["process-ocr-jobs"]["task"] == (
+        "platform.ingestion.ocr.v1"
+    )
+    assert celery_app.conf.beat_schedule["process-index-embeddings"]["task"] == (
+        "platform.indexing.embed.v1"
+    )
+    assert celery_app.conf.beat_schedule["commit-index-versions"]["task"] == (
+        "platform.indexing.commit.v1"
+    )
+    assert celery_app.conf.task_routes["platform.ingestion.ocr.v1"]["queue"] == "platform.ocr"
+    assert celery_app.conf.task_routes["platform.indexing.commit.v1"]["queue"] == (
+        "platform.indexing"
     )
 
 
@@ -83,7 +112,12 @@ def test_runtime_files_fix_shared_paths_and_health_checks() -> None:
     assert 'os.environ.get("AI_PLATFORM_DATABASE_URL")' in migration_environment
     assert "PYTHONPATH=/app/apps/worker/src:/app/packages/backend/src" in worker_dockerfile
     assert 'CMD ["uv", "run", "--no-sync", "celery"' in worker_dockerfile
+    assert '"--beat"' not in worker_dockerfile
     assert "SELECT version_num FROM public.alembic_version" in platform_script
-    assert 'database_revision" == "20260815_0036"' in platform_script
+    assert 'database_revision" == "20260815_0037"' in platform_script
     assert "AI_PLATFORM_MIN_FREE_DISK_GB:-50" in platform_script
-    assert 'inspect ping --destination "celery@$HOSTNAME" --timeout 3' in platform_script
+    assert "worker-control worker-parsing worker-ocr worker-embedding worker-indexing" in (
+        platform_script
+    )
+    assert "REQUIRED_RUNNING_SERVICES=(postgres valkey minio tika api web" in platform_script
+    assert "compose ps --format json scheduler" in platform_script

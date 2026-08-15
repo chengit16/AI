@@ -8,7 +8,8 @@ from typing import Literal, Protocol
 from uuid import UUID
 
 IndexFailureStage = Literal["artifact", "chunk", "embedding", "index", "worker"]
-IndexFailureResult = Literal["retry_wait", "failed", "lost_claim"]
+IndexWorkerLane = Literal["embedding", "indexing"]
+IndexFailureResult = Literal["retry_wait", "dead_letter", "lost_claim"]
 IndexVisibility = Literal["private", "workspace", "departments"]
 IndexSecurityLevel = Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
 
@@ -18,6 +19,7 @@ class ClaimedIndexVersion:
     """记录 Worker 已领取的索引版本、租约和构建所需文档事实。"""
 
     index_version_id: UUID
+    job_attempt_id: UUID
     workspace_id: UUID
     knowledge_base_id: UUID
     document_id: UUID
@@ -30,6 +32,7 @@ class ClaimedIndexVersion:
     attempt_count: int
     max_attempts: int
     claimed_by: str
+    processing_lane: IndexWorkerLane
     chunker_version: str
     embedding_model_version: str
     tokenizer_version: str
@@ -79,7 +82,7 @@ class IndexVersionStore(Protocol):
         tokenizer_version: str,
     ) -> int: ...
 
-    def claim_next(
+    def claim_embedding_next(
         self,
         *,
         worker_id: str,
@@ -87,10 +90,25 @@ class IndexVersionStore(Protocol):
         lease_seconds: int,
     ) -> ClaimedIndexVersion | None: ...
 
-    def mark_succeeded(
+    def mark_embedding_succeeded(
         self,
         version: ClaimedIndexVersion,
         chunks: tuple[BuiltIndexChunk, ...],
+        *,
+        completed_at: datetime,
+    ) -> bool: ...
+
+    def claim_indexing_next(
+        self,
+        *,
+        worker_id: str,
+        now: datetime,
+        lease_seconds: int,
+    ) -> ClaimedIndexVersion | None: ...
+
+    def mark_indexing_succeeded(
+        self,
+        version: ClaimedIndexVersion,
         *,
         completed_at: datetime,
     ) -> bool: ...

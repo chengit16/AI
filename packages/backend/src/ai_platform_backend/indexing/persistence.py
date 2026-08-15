@@ -45,18 +45,27 @@ index_versions = Table(
     Column("security_level", String(32), nullable=False),
     Column("permission_labels", ARRAY(String(80)), nullable=False),
     Column("status", String(32), nullable=False),
+    Column("processing_lane", String(32), nullable=False),
     Column("attempt_count", Integer, nullable=False),
+    Column("embedding_attempt_count", Integer, nullable=False),
+    Column("indexing_attempt_count", Integer, nullable=False),
     Column("max_attempts", Integer, nullable=False),
     Column("available_at", DateTime(timezone=True), nullable=False),
     Column("claimed_by", String(255), nullable=True),
     Column("claim_until", DateTime(timezone=True), nullable=True),
+    Column("active_attempt_id", UUID(as_uuid=True), nullable=True),
     Column("started_at", DateTime(timezone=True), nullable=True),
     Column("completed_at", DateTime(timezone=True), nullable=True),
     Column("activated_at", DateTime(timezone=True), nullable=True),
     Column("chunk_count", Integer, nullable=True),
+    Column("staged_chunk_count", Integer, nullable=True),
     Column("failure_stage", String(32), nullable=True),
     Column("error_code", String(128), nullable=True),
     Column("error_message", String(1000), nullable=True),
+    Column("manual_recovery_count", Integer, nullable=False),
+    Column("last_recovered_by_actor_id", UUID(as_uuid=True), nullable=True),
+    Column("last_recovered_at", DateTime(timezone=True), nullable=True),
+    Column("dead_lettered_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint(
@@ -101,12 +110,22 @@ index_versions = Table(
     ),
     CheckConstraint("build_no >= 1", name="ck_index_versions_build_no"),
     CheckConstraint(
-        "status IN ('queued', 'running', 'retry_wait', 'ready', 'active', 'retired', 'failed')",
+        "status IN ('queued', 'embedding_running', 'embedding_retry_wait', "
+        "'index_queued', 'index_running', 'index_retry_wait', 'ready', 'active', "
+        "'retired', 'failed', 'dead_letter')",
         name="ck_index_versions_status",
     ),
     CheckConstraint(
-        "attempt_count >= 0 AND max_attempts >= 1 AND attempt_count <= max_attempts",
+        "attempt_count >= 0 AND embedding_attempt_count >= 0 "
+        "AND indexing_attempt_count >= 0 AND max_attempts >= 1 "
+        "AND attempt_count <= max_attempts "
+        "AND embedding_attempt_count <= max_attempts "
+        "AND indexing_attempt_count <= max_attempts",
         name="ck_index_versions_attempts",
+    ),
+    CheckConstraint(
+        "processing_lane IN ('embedding', 'indexing')",
+        name="ck_index_versions_processing_lane",
     ),
     CheckConstraint(
         "source_content_hash ~ '^[0-9a-f]{64}$' AND parsed_content_hash ~ '^[0-9a-f]{64}$'",
@@ -126,9 +145,11 @@ index_versions = Table(
         name="ck_index_versions_department_scope",
     ),
     CheckConstraint(
-        "(status = 'running' AND claimed_by IS NOT NULL AND claim_until IS NOT NULL "
-        "AND started_at IS NOT NULL) OR "
-        "(status <> 'running' AND claimed_by IS NULL AND claim_until IS NULL)",
+        "(status IN ('embedding_running', 'index_running') "
+        "AND claimed_by IS NOT NULL AND claim_until IS NOT NULL "
+        "AND active_attempt_id IS NOT NULL AND started_at IS NOT NULL) OR "
+        "(status NOT IN ('embedding_running', 'index_running') "
+        "AND claimed_by IS NULL AND claim_until IS NULL AND active_attempt_id IS NULL)",
         name="ck_index_versions_claim",
     ),
     CheckConstraint(
@@ -138,9 +159,11 @@ index_versions = Table(
         name="ck_index_versions_result",
     ),
     CheckConstraint(
-        "(status IN ('retry_wait', 'failed') AND failure_stage IS NOT NULL "
+        "(status IN ('embedding_retry_wait', 'index_retry_wait', 'failed', 'dead_letter') "
+        "AND failure_stage IS NOT NULL "
         "AND error_code IS NOT NULL AND error_message IS NOT NULL) OR "
-        "(status NOT IN ('retry_wait', 'failed') AND failure_stage IS NULL "
+        "(status NOT IN ('embedding_retry_wait', 'index_retry_wait', 'failed', 'dead_letter') "
+        "AND failure_stage IS NULL "
         "AND error_code IS NULL AND error_message IS NULL)",
         name="ck_index_versions_failure",
     ),
@@ -150,9 +173,34 @@ index_versions = Table(
         name="ck_index_versions_failure_stage",
     ),
     CheckConstraint(
-        "(status IN ('ready', 'active', 'retired', 'failed') AND completed_at IS NOT NULL) OR "
-        "(status IN ('queued', 'running', 'retry_wait') AND completed_at IS NULL)",
+        "(status IN ('ready', 'active', 'retired', 'failed', 'dead_letter') "
+        "AND completed_at IS NOT NULL) OR "
+        "(status IN ('queued', 'embedding_running', 'embedding_retry_wait', "
+        "'index_queued', 'index_running', 'index_retry_wait') AND completed_at IS NULL)",
         name="ck_index_versions_completed_at",
+    ),
+    CheckConstraint(
+        "(staged_chunk_count >= 1 AND (status IN ('index_queued', 'index_running', "
+        "'index_retry_wait', 'ready', 'active', 'retired') OR "
+        "(status = 'dead_letter' AND processing_lane = 'indexing'))) OR "
+        "(staged_chunk_count IS NULL AND (status NOT IN ('index_queued', 'index_running', "
+        "'index_retry_wait', 'ready', 'active', 'retired', 'dead_letter') OR "
+        "(status = 'dead_letter' AND processing_lane = 'embedding')))",
+        name="ck_index_versions_staged_result",
+    ),
+    CheckConstraint(
+        "manual_recovery_count BETWEEN 0 AND 3 AND "
+        "((manual_recovery_count = 0 AND last_recovered_by_actor_id IS NULL "
+        "AND last_recovered_at IS NULL) OR "
+        "(manual_recovery_count > 0 AND last_recovered_by_actor_id IS NOT NULL "
+        "AND last_recovered_at IS NOT NULL))",
+        name="ck_index_versions_manual_recovery",
+    ),
+    CheckConstraint(
+        "(status = 'dead_letter' AND dead_lettered_at IS NOT NULL "
+        "AND dead_lettered_at = completed_at) OR "
+        "(status <> 'dead_letter' AND dead_lettered_at IS NULL)",
+        name="ck_index_versions_dead_letter",
     ),
     CheckConstraint(
         "(status = 'active' AND activated_at IS NOT NULL) OR (status <> 'active')",

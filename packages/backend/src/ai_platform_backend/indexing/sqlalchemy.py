@@ -148,13 +148,24 @@ def deactivate_document_indexes(
         .where(
             index_versions.c.workspace_id == workspace_id,
             index_versions.c.document_id == document_id,
-            index_versions.c.status.in_(("queued", "running", "retry_wait")),
+            index_versions.c.status.in_(
+                (
+                    "queued",
+                    "embedding_running",
+                    "embedding_retry_wait",
+                    "index_queued",
+                    "index_running",
+                    "index_retry_wait",
+                )
+            ),
         )
         .values(
             status="failed",
             claimed_by=None,
             claim_until=None,
+            active_attempt_id=None,
             completed_at=deactivated_at,
+            staged_chunk_count=None,
             failure_stage="index",
             error_code="INDEX_DOCUMENT_REVOKED",
             error_message="文档已撤权: 索引构建已终止",

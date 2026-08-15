@@ -34,14 +34,16 @@ def dispatch_outbox() -> dict[str, int]:
         runtime.close()
 
 
-@shared_task(name="platform.ingestion.process.v1", ignore_result=True)
-def process_ingestion_jobs() -> dict[str, int]:
-    """处理处理入库任务集合，遵守任务幂等、有限重试和提交时机约束。"""
+def _process_ingestion_lane(lane: str) -> dict[str, int]:
+    """执行单一入库 Lane，资源隔离由任务路由和数据库过滤共同保证。"""
 
     settings = get_worker_settings()
     runtime = build_worker_runtime(settings)
     try:
-        result = runtime.ingestion.run_batch(limit=settings.ingestion_batch_size)
+        result = runtime.ingestion.run_batch(
+            lane="ocr" if lane == "ocr" else "parsing",
+            limit=settings.ingestion_batch_size,
+        )
         return {
             "claimed": result.claimed,
             "succeeded": result.succeeded,
@@ -53,16 +55,49 @@ def process_ingestion_jobs() -> dict[str, int]:
         runtime.close()
 
 
-@shared_task(name="platform.indexing.process.v1", ignore_result=True)
-def process_index_versions() -> dict[str, int]:
-    """处理处理索引版本集合，遵守任务幂等、有限重试和提交时机约束。"""
+@shared_task(name="platform.ingestion.parse.v1", ignore_result=True)
+def process_parsing_jobs() -> dict[str, int]:
+    """处理 TXT、Markdown 与 DOCX 解析任务，不占用 OCR Worker。"""
+
+    return _process_ingestion_lane("parsing")
+
+
+@shared_task(name="platform.ingestion.ocr.v1", ignore_result=True)
+def process_ocr_jobs() -> dict[str, int]:
+    """处理 PDF 与图片 OCR 任务，不阻塞普通解析 Worker。"""
+
+    return _process_ingestion_lane("ocr")
+
+
+@shared_task(name="platform.indexing.embed.v1", ignore_result=True)
+def process_index_embeddings() -> dict[str, int]:
+    """生成并持久化不可见 Chunk 与 Embedding，不执行索引发布。"""
+
+    settings = get_worker_settings()
+    runtime = build_worker_runtime(settings)
+    try:
+        result = runtime.embedding.run_batch(limit=settings.indexing_batch_size)
+        return {
+            "enqueued": result.enqueued,
+            "claimed": result.claimed,
+            "succeeded": result.succeeded,
+            "retried": result.retried,
+            "failed": result.failed,
+            "lost_claims": result.lost_claims,
+        }
+    finally:
+        runtime.close()
+
+
+@shared_task(name="platform.indexing.commit.v1", ignore_result=True)
+def commit_index_versions() -> dict[str, int]:
+    """提交已持久化的 Chunk 并原子切换索引版本。"""
 
     settings = get_worker_settings()
     runtime = build_worker_runtime(settings)
     try:
         result = runtime.indexing.run_batch(limit=settings.indexing_batch_size)
         return {
-            "enqueued": result.enqueued,
             "claimed": result.claimed,
             "succeeded": result.succeeded,
             "retried": result.retried,

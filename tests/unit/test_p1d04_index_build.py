@@ -16,7 +16,7 @@ from ai_platform_backend.indexing.domain import (
     IndexFailureStage,
 )
 from ai_platform_backend.indexing.tokenization import TOKENIZER_VERSION
-from ai_platform_worker.modules.indexing.application.build import IndexBuildProcessor
+from ai_platform_worker.modules.indexing.application.build import IndexEmbeddingProcessor
 from ai_platform_worker.modules.indexing.domain.errors import IndexStorageUnavailableError
 from ai_platform_worker.modules.indexing.infrastructure.embeddings import (
     DeterministicHashEmbeddingAdapter,
@@ -73,11 +73,14 @@ class FakeStore:
     def ensure_queued(self, **_: object) -> int:
         return self.enqueued
 
-    def claim_next(self, **_: object) -> ClaimedIndexVersion | None:
+    def claim_embedding_next(self, **_: object) -> ClaimedIndexVersion | None:
         value, self.claimed = self.claimed, None
         return value
 
-    def mark_succeeded(
+    def claim_indexing_next(self, **_: object) -> ClaimedIndexVersion | None:
+        return None
+
+    def mark_embedding_succeeded(
         self,
         _: ClaimedIndexVersion,
         chunks: tuple[BuiltIndexChunk, ...],
@@ -87,6 +90,14 @@ class FakeStore:
         assert completed_at == NOW
         self.completed = chunks
         return True
+
+    def mark_indexing_succeeded(
+        self,
+        _: ClaimedIndexVersion,
+        *,
+        completed_at: datetime,
+    ) -> bool:
+        return completed_at == NOW
 
     def mark_failed(
         self,
@@ -98,10 +109,10 @@ class FakeStore:
         retryable: bool,
         failed_at: datetime,
         next_attempt_at: datetime,
-    ) -> Literal["retry_wait", "failed", "lost_claim"]:
+    ) -> Literal["retry_wait", "dead_letter", "lost_claim"]:
         assert failed_at == NOW
         self.failure = (stage, error_code, error_message, retryable, next_attempt_at)
-        return "retry_wait" if retryable else "failed"
+        return "retry_wait" if retryable else "dead_letter"
 
 
 @dataclass
@@ -128,6 +139,7 @@ class InvalidEmbeddingAdapter:
 def version(payload: bytes, *, attempt_count: int = 1) -> ClaimedIndexVersion:
     return ClaimedIndexVersion(
         index_version_id=INGESTION_JOB_ID,
+        job_attempt_id=UUID("51000000-0000-4000-8000-000000000304"),
         workspace_id=WORKSPACE_ID,
         knowledge_base_id=KNOWLEDGE_BASE_ID,
         document_id=DOCUMENT_ID,
@@ -142,6 +154,7 @@ def version(payload: bytes, *, attempt_count: int = 1) -> ClaimedIndexVersion:
         attempt_count=attempt_count,
         max_attempts=3,
         claimed_by="synthetic-index-worker",
+        processing_lane="embedding",
         chunker_version="structural-char-v1",
         embedding_model_version="deterministic-hash-1024-v1",
         tokenizer_version=TOKENIZER_VERSION,
@@ -156,12 +169,12 @@ def processor(
     store: FakeStore,
     storage: FakeStorage,
     embedding: object | None = None,
-) -> IndexBuildProcessor:
+) -> IndexEmbeddingProcessor:
     from typing import cast
 
     from ai_platform_backend.indexing.domain import EmbeddingAdapter
 
-    return IndexBuildProcessor(
+    return IndexEmbeddingProcessor(
         store,
         storage,
         StructuralChunker(),
