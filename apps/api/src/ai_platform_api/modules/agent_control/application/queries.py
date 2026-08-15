@@ -4,6 +4,7 @@ from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.agent_control.application.errors import AgentNotFoundError
+from ai_platform_api.modules.agent_control.application.releases import require_valid_release
 from ai_platform_api.modules.agent_control.application.support import (
     browser_account,
     require_custom_agent,
@@ -50,4 +51,4 @@ def get_release(
         release = unit_of_work.agents.get_release(context.workspace_id, release_id)
         if release is None or release.agent_id != agent_id or release.release_kind != "custom":
             raise AgentNotFoundError
-        return release
+        return require_valid_release(release)

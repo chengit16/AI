@@ -26,6 +26,7 @@ from ai_platform_api.modules.agent_control.domain.models import (
     AgentControlUnitOfWork,
     AgentDraft,
     AgentDraftRevision,
+    AgentRelease,
     AgentReleaseCandidate,
     AgentWriteConflictError,
 )
@@ -37,6 +38,7 @@ MAX_CONFIGURATION_BYTES = 256 * 1024
 CREATE_OPERATION = "agent.create"
 UPDATE_DRAFT_OPERATION = "agent.draft.update"
 REQUEST_RELEASE_OPERATION = "agent.release.request"
+PUBLISH_RELEASE_OPERATION = "agent.release.publish"
 ARCHIVE_OPERATION = "agent.archive"
 
 
@@ -275,6 +277,21 @@ def replay_candidate(
     if candidate is None:
         raise AgentLifecycleConflictError
     return candidate
+
+
+def replay_release(
+    unit_of_work: AgentControlUnitOfWork,
+    workspace_id: UUID,
+    request: AgentControlRequest,
+) -> AgentRelease:
+    """重放发布请求绑定的不可变 Release，并拒绝损坏的结果类型。"""
+
+    if request.result_type != "release":
+        raise AgentLifecycleConflictError
+    release = unit_of_work.agents.get_release(workspace_id, request.result_id)
+    if release is None or release.release_kind != "custom":
+        raise AgentLifecycleConflictError
+    return release
 
 
 def replay_archived_agent(

@@ -205,6 +205,31 @@ class MemoryAgentRepository(AgentRepository):
         value = self.releases.get(release_id)
         return value if value is not None and value.workspace_id == workspace_id else None
 
+    def get_release_by_candidate(
+        self,
+        workspace_id: UUID,
+        candidate_id: UUID,
+    ) -> AgentRelease | None:
+        return next(
+            (
+                release
+                for release in self.releases.values()
+                if release.workspace_id == workspace_id and release.candidate_id == candidate_id
+            ),
+            None,
+        )
+
+    def next_release_version(self, workspace_id: UUID, agent_id: UUID) -> int:
+        versions = [
+            release.version
+            for release in self.releases.values()
+            if release.workspace_id == workspace_id and release.agent_id == agent_id
+        ]
+        return max(versions, default=0) + 1
+
+    def add_release(self, release: AgentRelease) -> None:
+        self.releases[release.release_id] = release
+
     def get_request(
         self,
         workspace_id: UUID,

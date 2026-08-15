@@ -13,7 +13,7 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
 )
-from sqlalchemy import CursorResult, insert, select, update
+from sqlalchemy import CursorResult, func, insert, select, update
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -339,6 +339,70 @@ class SqlAlchemyAgentRepository(AgentRepository):
         ).one_or_none()
         return _release(row) if row is not None else None
 
+    def get_release_by_candidate(
+        self,
+        workspace_id: UUID,
+        candidate_id: UUID,
+    ) -> AgentRelease | None:
+        """按候选读取唯一 Release，支持候选级并发发布重放。"""
+
+        row = self._session.execute(
+            select(agent_releases).where(
+                agent_releases.c.workspace_id == workspace_id,
+                agent_releases.c.candidate_id == candidate_id,
+            )
+        ).one_or_none()
+        return _release(row) if row is not None else None
+
+    def next_release_version(self, workspace_id: UUID, agent_id: UUID) -> int:
+        """在调用方持有 Agent 行锁时计算下一个单调发布版本。"""
+
+        current = self._session.scalar(
+            select(func.max(agent_releases.c.version)).where(
+                agent_releases.c.workspace_id == workspace_id,
+                agent_releases.c.agent_id == agent_id,
+            )
+        )
+        return int(current or 0) + 1
+
+    def add_release(self, release: AgentRelease) -> None:
+        """插入不可变自定义 Release，唯一键竞争映射为领域写冲突。"""
+
+        try:
+            # 1. 一次写入完整快照及四类来源身份，由数据库 Trigger 复核内容一致性。
+            self._session.execute(
+                insert(agent_releases).values(
+                    release_id=release.release_id,
+                    agent_id=release.agent_id,
+                    workspace_id=release.workspace_id,
+                    release_kind=release.release_kind,
+                    version=release.version,
+                    status="released",
+                    runtime_config_version_id=release.runtime_config_version_id,
+                    config_hash=release.config_hash,
+                    candidate_id=release.candidate_id,
+                    candidate_hash=release.candidate_hash,
+                    source_draft_id=release.source_draft_id,
+                    source_draft_revision=release.source_draft_revision,
+                    evaluation_run_id=release.evaluation_run_id,
+                    approval_binding_id=release.approval_binding_id,
+                    snapshot=release.snapshot,
+                    snapshot_hash=release.snapshot_hash,
+                    released_by_account_id=release.released_by_account_id,
+                    released_at=release.released_at,
+                )
+            )
+        except IntegrityError as error:
+            # 2. 候选和版本竞争需要稳定领域语义，其余约束统一隐藏为普通写冲突。
+            reason: Literal["candidate_source", "version", "write"]
+            if _constraint_name(error) == "uq_agent_releases_candidate":
+                reason = "candidate_source"
+            elif _constraint_name(error) == "uq_agent_releases_version":
+                reason = "version"
+            else:
+                reason = "write"
+            raise AgentWriteConflictError(reason) from error
+
     def get_request(
         self,
         workspace_id: UUID,
@@ -584,6 +648,10 @@ def _release(row: Row[Any]) -> AgentRelease:
         config_hash=row.config_hash,
         candidate_id=row.candidate_id,
         candidate_hash=row.candidate_hash,
+        source_draft_id=row.source_draft_id,
+        source_draft_revision=row.source_draft_revision,
+        evaluation_run_id=row.evaluation_run_id,
+        approval_binding_id=row.approval_binding_id,
         snapshot=cast("dict[str, object] | None", row.snapshot),
         snapshot_hash=row.snapshot_hash,
         released_by_account_id=row.released_by_account_id,

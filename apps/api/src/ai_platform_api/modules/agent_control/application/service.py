@@ -41,6 +41,7 @@ from ai_platform_api.modules.agent_control.application.evaluation import (
 )
 from ai_platform_api.modules.agent_control.application.lifecycle import archive_agent
 from ai_platform_api.modules.agent_control.application.queries import get_agent, get_release
+from ai_platform_api.modules.agent_control.application.releases import publish_agent_release
 from ai_platform_api.modules.agent_control.application.support import configuration_digest
 from ai_platform_api.modules.agent_control.domain.configuration import (
     AgentKnowledgeScopeVersion,
@@ -339,6 +340,22 @@ class AgentControlService:
             context,
             agent_id=agent_id,
             expected_version=expected_version,
+            idempotency_key=idempotency_key,
+        )
+
+    def publish_release(
+        self,
+        context: RequestContext,
+        *,
+        candidate_id: UUID,
+        idempotency_key: str,
+    ) -> AgentRelease:
+        """把已通过测试和审批的当前候选固化为不可变 Release。"""
+
+        return publish_agent_release(
+            self._unit_of_work,
+            context,
+            candidate_id=candidate_id,
             idempotency_key=idempotency_key,
         )
 

@@ -3258,7 +3258,7 @@ agent_control_requests = Table(
     ),
     CheckConstraint(
         "operation IN ('agent.create', 'agent.draft.update', 'agent.release.request', "
-        "'agent.archive')",
+        "'agent.release.publish', 'agent.archive')",
         name="ck_agent_control_requests_operation",
     ),
     CheckConstraint(
@@ -3270,7 +3270,7 @@ agent_control_requests = Table(
         name="ck_agent_control_requests_hash",
     ),
     CheckConstraint(
-        "result_type IN ('agent', 'draft', 'candidate')",
+        "result_type IN ('agent', 'draft', 'candidate', 'release')",
         name="ck_agent_control_requests_result_type",
     ),
     CheckConstraint(
@@ -3297,6 +3297,10 @@ agent_releases = Table(
     Column("config_hash", String(64), nullable=False),
     Column("candidate_id", UUID(as_uuid=True), nullable=True),
     Column("candidate_hash", String(64), nullable=True),
+    Column("source_draft_id", UUID(as_uuid=True), nullable=True),
+    Column("source_draft_revision", Integer, nullable=True),
+    Column("evaluation_run_id", UUID(as_uuid=True), nullable=True),
+    Column("approval_binding_id", UUID(as_uuid=True), nullable=True),
     Column("snapshot", JSONB, nullable=True),
     Column("snapshot_hash", String(64), nullable=True),
     Column("released_by_account_id", UUID(as_uuid=True), nullable=False),
@@ -3317,6 +3321,32 @@ agent_releases = Table(
             f"{SCHEMA_TOKEN}.agent_release_candidates.workspace_id",
         ],
         name="fk_agent_releases_candidate",
+    ),
+    ForeignKeyConstraint(
+        ["source_draft_id", "source_draft_revision", "agent_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_draft_revisions.draft_id",
+            f"{SCHEMA_TOKEN}.agent_draft_revisions.revision",
+            f"{SCHEMA_TOKEN}.agent_draft_revisions.agent_id",
+            f"{SCHEMA_TOKEN}.agent_draft_revisions.workspace_id",
+        ],
+        name="fk_agent_releases_source_revision",
+    ),
+    ForeignKeyConstraint(
+        ["evaluation_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.evaluation_run_id",
+            f"{SCHEMA_TOKEN}.agent_evaluation_runs.workspace_id",
+        ],
+        name="fk_agent_releases_evaluation_run",
+    ),
+    ForeignKeyConstraint(
+        ["approval_binding_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_approval_bindings.approval_binding_id",
+            f"{SCHEMA_TOKEN}.agent_approval_bindings.workspace_id",
+        ],
+        name="fk_agent_releases_approval_binding",
     ),
     ForeignKeyConstraint(
         ["runtime_config_version_id"],
@@ -3345,10 +3375,18 @@ agent_releases = Table(
     ),
     CheckConstraint(
         "(release_kind = 'system' AND candidate_id IS NULL AND candidate_hash IS NULL "
+        "AND source_draft_id IS NULL AND source_draft_revision IS NULL "
+        "AND evaluation_run_id IS NULL AND approval_binding_id IS NULL "
         "AND snapshot IS NULL AND snapshot_hash IS NULL) OR "
         "(release_kind = 'custom' AND candidate_id IS NOT NULL AND candidate_hash IS NOT NULL "
+        "AND source_draft_id IS NOT NULL AND source_draft_revision IS NOT NULL "
+        "AND evaluation_run_id IS NOT NULL AND approval_binding_id IS NOT NULL "
         "AND jsonb_typeof(snapshot) = 'object' AND snapshot_hash IS NOT NULL)",
         name="ck_agent_releases_kind_payload",
+    ),
+    CheckConstraint(
+        "source_draft_revision IS NULL OR source_draft_revision >= 1",
+        name="ck_agent_releases_source_revision",
     ),
 )
 Index(

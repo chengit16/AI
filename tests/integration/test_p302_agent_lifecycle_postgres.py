@@ -40,7 +40,7 @@ from ai_platform_api.persistence.tables import (
 )
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Engine, create_engine, delete, func, insert, select, text, update
+from sqlalchemy import Engine, create_engine, func, insert, select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -296,7 +296,7 @@ def test_concurrent_create_replays_one_committed_fact(agent_database: AgentHarne
         )
 
 
-def test_release_and_history_mutation_are_rejected_by_database(
+def test_direct_release_and_history_mutation_are_rejected_by_database(
     agent_database: AgentHarness,
 ) -> None:
     owner = register(agent_database, "immutable-owner")
@@ -316,17 +316,17 @@ def test_release_and_history_mutation_are_rejected_by_database(
         idempotency_key="synthetic-postgres-agent-immutable-candidate-0302",
     )
     runtime_config_id = _ensure_runtime_config(agent_database.sessions, owner.account_id)
-    release_id = uuid4()
     snapshot = {
         "snapshot_schema_version": 1,
         "source_draft_id": str(draft.draft_id),
         "source_draft_revision": draft.revision,
         "configuration": draft.configuration,
     }
-    with agent_database.sessions.begin() as session:
+    # P3-06 起自定义 Release 必须绑定完整评估和审批证据，早期直接插入路径应失败关闭。
+    with pytest.raises(DBAPIError), agent_database.sessions.begin() as session:
         session.execute(
             insert(agent_releases).values(
-                release_id=release_id,
+                release_id=uuid4(),
                 agent_id=agent.agent_id,
                 workspace_id=owner.workspace_id,
                 version=1,
@@ -342,15 +342,6 @@ def test_release_and_history_mutation_are_rejected_by_database(
                 snapshot_hash="8" * 64,
             )
         )
-
-    with pytest.raises(DBAPIError), agent_database.sessions.begin() as session:
-        session.execute(
-            update(agent_releases)
-            .where(agent_releases.c.release_id == release_id)
-            .values(snapshot_hash="9" * 64)
-        )
-    with pytest.raises(DBAPIError), agent_database.sessions.begin() as session:
-        session.execute(delete(agent_releases).where(agent_releases.c.release_id == release_id))
     with pytest.raises(DBAPIError), agent_database.sessions.begin() as session:
         session.execute(
             update(agent_draft_revisions)

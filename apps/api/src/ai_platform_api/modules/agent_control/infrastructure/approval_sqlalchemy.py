@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID, uuid5
 
 from sqlalchemy import CursorResult, func, insert, select, update
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ai_platform_api.modules.agent_control.domain.approval import (
     PERSONAL_OWNER_APPROVAL_POLICY_VERSION_ID,
     AgentApprovalBinding,
+    AgentApprovalDecision,
     AgentApprovalRepository,
 )
 from ai_platform_api.modules.agent_control.domain.models import (
@@ -36,6 +37,7 @@ from ai_platform_api.persistence.tables import (
     agent_evaluation_check_results,
     agent_evaluation_runs,
     agent_release_candidates,
+    approval_instances,
 )
 
 _AGENT_APPROVAL_NAMESPACE = UUID("a5000000-0000-4000-8000-000000000306")
@@ -82,6 +84,48 @@ class SqlAlchemyAgentApprovalRepository(AgentApprovalRepository):
             )
         ).one_or_none()
         return _binding(row) if row is not None else None
+
+    def get_decision_by_candidate(
+        self,
+        workspace_id: UUID,
+        candidate_id: UUID,
+        *,
+        for_share: bool = False,
+    ) -> AgentApprovalDecision | None:
+        """在发布事务内读取绑定的审批终态和完成时间。"""
+
+        statement = (
+            select(
+                agent_approval_bindings,
+                approval_instances.c.status.label("decision_status"),
+                approval_instances.c.completed_at.label("decision_completed_at"),
+            )
+            .join(
+                approval_instances,
+                (
+                    approval_instances.c.approval_instance_id
+                    == agent_approval_bindings.c.approval_instance_id
+                )
+                & (approval_instances.c.workspace_id == agent_approval_bindings.c.workspace_id),
+            )
+            .where(
+                agent_approval_bindings.c.workspace_id == workspace_id,
+                agent_approval_bindings.c.candidate_id == candidate_id,
+            )
+        )
+        if for_share:
+            statement = statement.with_for_update(read=True, of=approval_instances)
+        row = self._session.execute(statement).one_or_none()
+        if row is None:
+            return None
+        return AgentApprovalDecision(
+            binding=_binding(row),
+            status=cast(
+                "Literal['pending', 'approved', 'rejected', 'withdrawn']",
+                row.decision_status,
+            ),
+            completed_at=row.decision_completed_at,
+        )
 
 
 class SqlAlchemyAgentApprovalSubjectLifecycle(ApprovalSubjectLifecycle):

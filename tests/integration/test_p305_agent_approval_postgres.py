@@ -87,8 +87,7 @@ class ApprovalHarness(EvaluationHarness):
     approvals: ApprovalInstanceService
 
 
-@pytest.fixture(scope="module")
-def approval_database() -> Iterator[ApprovalHarness]:
+def approval_harness() -> Iterator[ApprovalHarness]:
     """从空 Schema 迁移到 head，并装配共享审批引擎与 Agent 生命周期 Adapter。"""
 
     database_url = os.environ.get("AI_PLATFORM_TEST_DATABASE_URL", DEFAULT_DATABASE_URL)
@@ -135,6 +134,13 @@ def approval_database() -> Iterator[ApprovalHarness]:
         with admin_engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
         admin_engine.dispose()
+
+
+@pytest.fixture(scope="module")
+def approval_database() -> Iterator[ApprovalHarness]:
+    """为 P3-05 用例注册独立的合成审批数据库。"""
+
+    yield from approval_harness()
 
 
 def register(harness: ApprovalHarness, identity: str) -> RegisteredAccount:

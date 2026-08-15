@@ -43,7 +43,7 @@ AgentReleaseCandidateStatus = Literal[
     "superseded",
 ]
 AgentReleaseKind = Literal["system", "custom"]
-AgentControlResultType = Literal["agent", "draft", "candidate"]
+AgentControlResultType = Literal["agent", "draft", "candidate", "release"]
 
 
 @dataclass(frozen=True)
@@ -124,6 +124,10 @@ class AgentRelease:
     config_hash: str
     candidate_id: UUID | None
     candidate_hash: str | None
+    source_draft_id: UUID | None
+    source_draft_revision: int | None
+    evaluation_run_id: UUID | None
+    approval_binding_id: UUID | None
     snapshot: dict[str, object] | None
     snapshot_hash: str | None
     released_by_account_id: UUID
@@ -231,6 +235,16 @@ class AgentRepository(Protocol):
     ) -> int: ...
 
     def get_release(self, workspace_id: UUID, release_id: UUID) -> AgentRelease | None: ...
+
+    def get_release_by_candidate(
+        self,
+        workspace_id: UUID,
+        candidate_id: UUID,
+    ) -> AgentRelease | None: ...
+
+    def next_release_version(self, workspace_id: UUID, agent_id: UUID) -> int: ...
+
+    def add_release(self, release: AgentRelease) -> None: ...
 
     def get_request(
         self,
