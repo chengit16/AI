@@ -12,6 +12,7 @@ from ai_platform_backend.integration.domain import AuditWriter
 
 from ai_platform_api.common.runtime import RuntimeConfigSnapshot
 from ai_platform_api.modules.integration.domain.events import OutboxWriter
+from ai_platform_api.modules.service_governance.domain.models import ServiceRepository
 
 ConversationStatus = Literal["active", "archived"]
 MessageRole = Literal["system", "user", "assistant", "tool"]
@@ -257,6 +258,9 @@ class AssistantUnitOfWork(Protocol):
 
     @property
     def assistant(self) -> AssistantRepository: ...
+
+    @property
+    def services(self) -> ServiceRepository: ...
 
     @property
     def audit(self) -> AuditWriter: ...

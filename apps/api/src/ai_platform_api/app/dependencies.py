@@ -152,6 +152,9 @@ from ai_platform_api.modules.retrieval.infrastructure.reranking import (
     DeterministicLexicalReranker,
 )
 from ai_platform_api.modules.retrieval.infrastructure.sqlalchemy import SqlAlchemySearchIndex
+from ai_platform_api.modules.service_governance.infrastructure.sqlalchemy import (
+    SqlAlchemyServiceRepository,
+)
 from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
 from ai_platform_api.modules.streaming.domain.models import StreamPolicy
 from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
@@ -338,7 +341,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         else None
     )
     assistant_conversations = AssistantConversationService(
-        SqlAlchemyAssistantUnitOfWork(database.sessions),
+        SqlAlchemyAssistantUnitOfWork(database.sessions, SqlAlchemyServiceRepository),
         runtime_bootstrap=runtime_bootstrap,
     )
     workflows = WorkflowDefinitionService(SqlAlchemyWorkflowUnitOfWork(database.sessions))

@@ -37,6 +37,7 @@ from ai_platform_api.modules.assistant.domain.models import (
     MessagePart,
     MessageSubmission,
 )
+from ai_platform_api.modules.service_governance.domain.models import ServiceRepository
 from ai_platform_api.persistence.tables import (
     agent_publications,
     agent_releases,
@@ -53,6 +54,7 @@ from ai_platform_api.persistence.tables import (
 )
 
 SessionFactory = Callable[[], Session]
+ServiceRepositoryFactory = Callable[[Session], ServiceRepository]
 SYSTEM_AGENT_KEY = "system_knowledge"
 SYSTEM_AGENT_NAME = "系统知识助手"
 
@@ -636,12 +638,18 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
 class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
     """为助手事实提供不可嵌套的显式 SQLAlchemy 事务边界。"""
 
-    def __init__(self, session_factory: SessionFactory) -> None:
+    def __init__(
+        self,
+        session_factory: SessionFactory,
+        service_repository_factory: ServiceRepositoryFactory,
+    ) -> None:
         self._session_factory = session_factory
+        self._service_repository_factory = service_repository_factory
         self._state: ContextVar[
             tuple[
                 Session,
                 SqlAlchemyAssistantRepository,
+                ServiceRepository,
                 SqlAlchemyAuditWriter,
                 SqlAlchemyOutboxWriter,
             ]
@@ -656,6 +664,7 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
             (
                 session,
                 SqlAlchemyAssistantRepository(session),
+                self._service_repository_factory(session),
                 SqlAlchemyAuditWriter(session),
                 SqlAlchemyOutboxWriter(session),
             )
@@ -680,12 +689,18 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
         return self._require_state()[1]
 
     @property
-    def audit(self) -> SqlAlchemyAuditWriter:
+    def services(self) -> ServiceRepository:
+        """向助手应用暴露服务治理端口，不允许直接访问服务表。"""
+
         return self._require_state()[2]
 
     @property
-    def outbox(self) -> SqlAlchemyOutboxWriter:
+    def audit(self) -> SqlAlchemyAuditWriter:
         return self._require_state()[3]
+
+    @property
+    def outbox(self) -> SqlAlchemyOutboxWriter:
+        return self._require_state()[4]
 
     def commit(self) -> None:
         self._require_state()[0].commit()
@@ -695,6 +710,7 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
     ) -> tuple[
         Session,
         SqlAlchemyAssistantRepository,
+        ServiceRepository,
         SqlAlchemyAuditWriter,
         SqlAlchemyOutboxWriter,
     ]:

@@ -87,6 +87,118 @@ def current_revision(connection: Connection, schema: str) -> str | None:
     return revision if isinstance(revision, str) else None
 
 
+def seed_existing_system_agent_publication(connection: Connection, schema: str) -> None:
+    """在 0046 结构中写入可被服务治理迁移接管的系统助手发布事实。"""
+
+    # 1. 先建立系统 Release 依赖的账号、个人空间和运行配置。
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".accounts (
+              account_id, login_name, display_name, password_hash, status, auth_version,
+              created_at, created_by_actor_id, updated_at, updated_by_actor_id, version
+            ) VALUES (
+              '10000000-0000-4000-8000-000000000307',
+              'synthetic.service.backfill@example.com', '合成服务回填用户',
+              'synthetic-password-hash', 'active', 1, '2026-08-16T00:00:00Z',
+              '10000000-0000-4000-8000-000000000307', '2026-08-16T00:00:00Z',
+              '10000000-0000-4000-8000-000000000307', 1
+            );
+            INSERT INTO "{schema}".workspaces (
+              workspace_id, workspace_type, name, owner_account_id, entitlement_version,
+              role_version, menu_version, status, created_at, created_by_actor_id,
+              updated_at, updated_by_actor_id, version
+            ) VALUES (
+              '20000000-0000-4000-8000-000000000307', 'personal', '合成服务回填空间',
+              '10000000-0000-4000-8000-000000000307', 1, 1, 1, 'active',
+              '2026-08-16T00:00:00Z', '10000000-0000-4000-8000-000000000307',
+              '2026-08-16T00:00:00Z', '10000000-0000-4000-8000-000000000307', 1
+            );
+            INSERT INTO "{schema}".ai_runtime_config_versions (
+              runtime_config_version_id, version_number, display_name, content_hash,
+              system_prompt_template, system_prompt_hash, component_versions,
+              attempt_timeout_ms, total_timeout_ms, max_attempts_per_route,
+              max_prompt_characters, max_output_tokens, max_response_characters,
+              circuit_failure_threshold, circuit_recovery_ms, rule_degradation_message,
+              max_estimated_cost_microunits, created_by_account_id, created_at
+            ) VALUES (
+              '30000000-0000-4000-8000-000000000307', 307, '合成服务回填配置',
+              '{"a" * 64}', '只使用合成授权证据回答。', '{"b" * 64}',
+              '{{"retrieval": "synthetic-p307"}}', 500, 2000, 1, 4000, 256, 8000,
+              3, 30000, NULL, 5000000,
+              '10000000-0000-4000-8000-000000000307', '2026-08-16T00:00:00Z'
+            );
+            """
+        )
+    )
+
+    # 2. 模拟已投入使用的知识助手，并保留一个不应被本次 Migration 接管的系统 Agent。
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".agents (
+              agent_id, workspace_id, agent_key, agent_kind, name, description, status,
+              created_by_account_id, created_at, updated_at, version
+            ) VALUES
+            (
+              '40000000-0000-4000-8000-000000000307',
+              '20000000-0000-4000-8000-000000000307', 'system_knowledge', 'system',
+              '合成系统知识助手', NULL, 'active',
+              '10000000-0000-4000-8000-000000000307',
+              '2026-08-16T00:00:00Z', '2026-08-16T00:00:00Z', 1
+            ),
+            (
+              '41000000-0000-4000-8000-000000000307',
+              '20000000-0000-4000-8000-000000000307', 'system-other', 'system',
+              '合成无关系统 Agent', NULL, 'active',
+              '10000000-0000-4000-8000-000000000307',
+              '2026-08-16T00:00:00Z', '2026-08-16T00:00:00Z', 1
+            );
+            INSERT INTO "{schema}".agent_releases (
+              release_id, agent_id, workspace_id, release_kind, version, status,
+              runtime_config_version_id, config_hash, candidate_id, candidate_hash,
+              source_draft_id, source_draft_revision, evaluation_run_id,
+              approval_binding_id, snapshot, snapshot_hash, released_by_account_id,
+              released_at
+            ) VALUES
+            (
+              '50000000-0000-4000-8000-000000000307',
+              '40000000-0000-4000-8000-000000000307',
+              '20000000-0000-4000-8000-000000000307', 'system', 1, 'released',
+              '30000000-0000-4000-8000-000000000307', '{"c" * 64}',
+              NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+              '10000000-0000-4000-8000-000000000307', '2026-08-16T00:01:00Z'
+            ),
+            (
+              '51000000-0000-4000-8000-000000000307',
+              '41000000-0000-4000-8000-000000000307',
+              '20000000-0000-4000-8000-000000000307', 'system', 1, 'released',
+              '30000000-0000-4000-8000-000000000307', '{"d" * 64}',
+              NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+              '10000000-0000-4000-8000-000000000307', '2026-08-16T00:01:00Z'
+            );
+            INSERT INTO "{schema}".agent_publications (
+              agent_id, workspace_id, release_id, generation,
+              published_by_account_id, published_at
+            ) VALUES
+            (
+              '40000000-0000-4000-8000-000000000307',
+              '20000000-0000-4000-8000-000000000307',
+              '50000000-0000-4000-8000-000000000307', 1,
+              '10000000-0000-4000-8000-000000000307', '2026-08-16T00:01:00Z'
+            ),
+            (
+              '41000000-0000-4000-8000-000000000307',
+              '20000000-0000-4000-8000-000000000307',
+              '51000000-0000-4000-8000-000000000307', 1,
+              '10000000-0000-4000-8000-000000000307', '2026-08-16T00:01:00Z'
+            );
+            """
+        )
+    )
+    connection.commit()
+
+
 def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     migration_database: tuple[Config, Connection, str],
 ) -> None:
@@ -96,7 +208,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260816_0046"
+    assert current_revision(connection, schema) == "20260816_0047"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -125,6 +237,11 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "agent_release_candidates",
         "agent_releases",
         "agents",
+        "service_access_policy_versions",
+        "service_control_requests",
+        "service_route_publications",
+        "service_routes",
+        "services",
         "ai_runtime_config_publication",
         "ai_runtime_config_versions",
         "ai_runtime_model_routes",
@@ -209,8 +326,95 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260816_0046"
+    assert current_revision(connection, schema) == "20260816_0047"
     assert schema_snapshot(connection, schema) == first_head
+
+
+def test_existing_system_publication_is_backfilled_as_current_service_route(
+    migration_database: tuple[Config, Connection, str],
+) -> None:
+    """0046 的系统发布升级后成为可追溯服务，且不会改变原发布身份。"""
+
+    config, connection, schema = migration_database
+    command.upgrade(config, "20260816_0046")
+    connection.commit()
+    seed_existing_system_agent_publication(connection, schema)
+
+    # 1. 升级只接管当前发布，生成单一系统 Service 及其首版策略和 Route。
+    command.upgrade(config, "20260816_0047")
+    connection.commit()
+    deployment = (
+        connection.execute(
+            text(
+                f"""
+            SELECT service.workspace_id, service.agent_id, service.service_key,
+                   service.service_type, service.status, service.version,
+                   policy.visibility, policy.version AS policy_version,
+                   route.primary_release_id, route.route_version,
+                   publication.generation
+            FROM "{schema}".services service
+            JOIN "{schema}".service_access_policy_versions policy
+              ON policy.access_policy_version_id = service.access_policy_version_id
+             AND policy.service_id = service.service_id
+             AND policy.workspace_id = service.workspace_id
+            JOIN "{schema}".service_route_publications publication
+              ON publication.service_id = service.service_id
+             AND publication.workspace_id = service.workspace_id
+            JOIN "{schema}".service_routes route
+              ON route.route_id = publication.route_id
+             AND route.service_id = publication.service_id
+             AND route.workspace_id = publication.workspace_id
+            """
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert deployment == {
+        "workspace_id": UUID("20000000-0000-4000-8000-000000000307"),
+        "agent_id": UUID("40000000-0000-4000-8000-000000000307"),
+        "service_key": "system-knowledge",
+        "service_type": "system_assistant",
+        "status": "active",
+        "version": 2,
+        "visibility": "workspace",
+        "policy_version": 1,
+        "primary_release_id": UUID("50000000-0000-4000-8000-000000000307"),
+        "route_version": 1,
+        "generation": 1,
+    }
+    # Alembic 使用独立连接执行 DDL；先结束本连接的隐式只读事务，避免持有表锁。
+    connection.commit()
+
+    # 2. 纯回填的系统服务允许安全降级，原有 Agent 发布事实仍完整保留。
+    command.downgrade(config, "20260816_0046")
+    connection.commit()
+    assert current_revision(connection, schema) == "20260816_0046"
+    assert "services" not in business_tables(connection, schema)
+    publications: list[tuple[UUID, UUID, int]] = [
+        (row.agent_id, row.release_id, row.generation)
+        for row in connection.execute(
+            text(
+                f"""
+                SELECT agent_id, release_id, generation
+                FROM "{schema}".agent_publications
+                ORDER BY agent_id
+                """
+            )
+        )
+    ]
+    assert publications == [
+        (
+            UUID("40000000-0000-4000-8000-000000000307"),
+            UUID("50000000-0000-4000-8000-000000000307"),
+            1,
+        ),
+        (
+            UUID("41000000-0000-4000-8000-000000000307"),
+            UUID("51000000-0000-4000-8000-000000000307"),
+            1,
+        ),
+    ]
 
 
 def test_owner_knowledge_permissions_are_backfilled_for_existing_spaces(

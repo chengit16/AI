@@ -3426,6 +3426,308 @@ agent_publications = Table(
     CheckConstraint("generation >= 1", name="ck_agent_publications_generation"),
 )
 
+service_access_policy_versions = Table(
+    "service_access_policy_versions",
+    metadata,
+    Column("access_policy_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("service_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("visibility", String(32), nullable=False),
+    Column(
+        "allowed_department_ids",
+        ARRAY(UUID(as_uuid=True)),
+        nullable=False,
+        server_default="{}",
+    ),
+    Column(
+        "allowed_account_ids",
+        ARRAY(UUID(as_uuid=True)),
+        nullable=False,
+        server_default="{}",
+    ),
+    Column("policy_hash", String(64), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "service_id",
+        "version",
+        name="uq_service_access_policies_version",
+    ),
+    UniqueConstraint(
+        "access_policy_version_id",
+        "service_id",
+        "workspace_id",
+        name="uq_service_access_policies_identity",
+    ),
+    ForeignKeyConstraint(
+        ["service_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.services.service_id", f"{SCHEMA_TOKEN}.services.workspace_id"],
+        name="fk_service_access_policies_service",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_service_access_policies_creator",
+    ),
+    CheckConstraint("version >= 1", name="ck_service_access_policies_version"),
+    CheckConstraint(
+        "visibility IN ('workspace', 'restricted')",
+        name="ck_service_access_policies_visibility",
+    ),
+    CheckConstraint(
+        "(visibility = 'workspace' AND cardinality(allowed_department_ids) = 0 "
+        "AND cardinality(allowed_account_ids) = 0) OR "
+        "(visibility = 'restricted' AND "
+        "(cardinality(allowed_department_ids) > 0 OR cardinality(allowed_account_ids) > 0))",
+        name="ck_service_access_policies_subjects",
+    ),
+    CheckConstraint(
+        "policy_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_service_access_policies_hash",
+    ),
+)
+
+services = Table(
+    "services",
+    metadata,
+    Column("service_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_id", UUID(as_uuid=True), nullable=False),
+    Column("service_key", String(80), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("service_type", String(32), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("access_policy_version_id", UUID(as_uuid=True), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("service_id", "workspace_id", name="uq_services_id_workspace"),
+    UniqueConstraint("workspace_id", "service_key", name="uq_services_workspace_key"),
+    ForeignKeyConstraint(
+        ["agent_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.agents.agent_id", f"{SCHEMA_TOKEN}.agents.workspace_id"],
+        name="fk_services_agent",
+    ),
+    ForeignKeyConstraint(
+        ["access_policy_version_id", "service_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.service_access_policy_versions.access_policy_version_id",
+            f"{SCHEMA_TOKEN}.service_access_policy_versions.service_id",
+            f"{SCHEMA_TOKEN}.service_access_policy_versions.workspace_id",
+        ],
+        name="fk_services_access_policy",
+        deferrable=True,
+        initially="DEFERRED",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_services_creator",
+    ),
+    ForeignKeyConstraint(
+        ["updated_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_services_updater",
+    ),
+    CheckConstraint(
+        "service_key ~ '^[a-z][a-z0-9-]{2,79}$'",
+        name="ck_services_key",
+    ),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_services_name",
+    ),
+    CheckConstraint(
+        "service_type IN ('system_assistant', 'custom_knowledge_agent', "
+        "'scenario_application', 'open_api')",
+        name="ck_services_type",
+    ),
+    CheckConstraint(
+        "status IN ('draft', 'active', 'suspended', 'archived')",
+        name="ck_services_status",
+    ),
+    CheckConstraint("version >= 1", name="ck_services_version"),
+)
+Index("ix_services_workspace_updated", services.c.workspace_id, services.c.updated_at)
+
+service_routes = Table(
+    "service_routes",
+    metadata,
+    Column("route_id", UUID(as_uuid=True), primary_key=True),
+    Column("service_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("route_version", Integer, nullable=False),
+    Column("route_mode", String(32), nullable=False),
+    Column("primary_release_id", UUID(as_uuid=True), nullable=False),
+    Column("canary_release_id", UUID(as_uuid=True), nullable=True),
+    Column("canary_percent", Integer, nullable=False),
+    Column("previous_route_id", UUID(as_uuid=True), nullable=True),
+    Column("route_hash", String(64), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("service_id", "route_version", name="uq_service_routes_version"),
+    UniqueConstraint(
+        "route_id",
+        "service_id",
+        "workspace_id",
+        name="uq_service_routes_identity",
+    ),
+    ForeignKeyConstraint(
+        ["service_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.services.service_id", f"{SCHEMA_TOKEN}.services.workspace_id"],
+        name="fk_service_routes_service",
+    ),
+    ForeignKeyConstraint(
+        ["primary_release_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_releases.release_id",
+            f"{SCHEMA_TOKEN}.agent_releases.workspace_id",
+        ],
+        name="fk_service_routes_primary_release",
+    ),
+    ForeignKeyConstraint(
+        ["canary_release_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_releases.release_id",
+            f"{SCHEMA_TOKEN}.agent_releases.workspace_id",
+        ],
+        name="fk_service_routes_canary_release",
+    ),
+    ForeignKeyConstraint(
+        ["previous_route_id", "service_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.service_routes.route_id",
+            f"{SCHEMA_TOKEN}.service_routes.service_id",
+            f"{SCHEMA_TOKEN}.service_routes.workspace_id",
+        ],
+        name="fk_service_routes_previous",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_service_routes_creator",
+    ),
+    CheckConstraint("route_version >= 1", name="ck_service_routes_version"),
+    CheckConstraint(
+        "route_mode IN ('active', 'canary', 'rollback')",
+        name="ck_service_routes_mode",
+    ),
+    CheckConstraint(
+        "(route_mode = 'canary' AND canary_release_id IS NOT NULL "
+        "AND canary_release_id <> primary_release_id AND canary_percent BETWEEN 1 AND 99) OR "
+        "(route_mode <> 'canary' AND canary_release_id IS NULL AND canary_percent = 0)",
+        name="ck_service_routes_canary",
+    ),
+    CheckConstraint(
+        "(route_version = 1 AND previous_route_id IS NULL) OR "
+        "(route_version > 1 AND previous_route_id IS NOT NULL)",
+        name="ck_service_routes_previous",
+    ),
+    CheckConstraint(
+        "route_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_service_routes_hash",
+    ),
+)
+Index(
+    "ix_service_routes_workspace_service_time",
+    service_routes.c.workspace_id,
+    service_routes.c.service_id,
+    service_routes.c.created_at,
+)
+
+service_route_publications = Table(
+    "service_route_publications",
+    metadata,
+    Column("service_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("route_id", UUID(as_uuid=True), nullable=False),
+    Column("generation", Integer, nullable=False),
+    Column("published_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["service_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.services.service_id", f"{SCHEMA_TOKEN}.services.workspace_id"],
+        name="fk_service_route_publications_service",
+    ),
+    ForeignKeyConstraint(
+        ["route_id", "service_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.service_routes.route_id",
+            f"{SCHEMA_TOKEN}.service_routes.service_id",
+            f"{SCHEMA_TOKEN}.service_routes.workspace_id",
+        ],
+        name="fk_service_route_publications_route",
+    ),
+    ForeignKeyConstraint(
+        ["published_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_service_route_publications_publisher",
+    ),
+    CheckConstraint("generation >= 1", name="ck_service_route_publications_generation"),
+)
+
+service_control_requests = Table(
+    "service_control_requests",
+    metadata,
+    Column("request_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=False),
+    Column("operation", String(64), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("service_id", UUID(as_uuid=True), nullable=False),
+    Column("result_snapshot", JSONB, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "actor_id",
+        "operation",
+        "idempotency_key",
+        name="uq_service_control_requests_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_service_control_requests_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["actor_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_service_control_requests_actor",
+    ),
+    ForeignKeyConstraint(
+        ["service_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.services.service_id", f"{SCHEMA_TOKEN}.services.workspace_id"],
+        name="fk_service_control_requests_service",
+    ),
+    CheckConstraint(
+        "operation IN ('service.create', 'service.update')",
+        name="ck_service_control_requests_operation",
+    ),
+    CheckConstraint(
+        "idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'",
+        name="ck_service_control_requests_idempotency",
+    ),
+    CheckConstraint(
+        "request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_service_control_requests_hash",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(result_snapshot) = 'object'",
+        name="ck_service_control_requests_snapshot",
+    ),
+)
+Index(
+    "ix_service_control_requests_workspace_time",
+    service_control_requests.c.workspace_id,
+    service_control_requests.c.created_at,
+)
+
 conversations = Table(
     "conversations",
     metadata,

@@ -40,6 +40,9 @@ from ai_platform_api.modules.integration.domain.events import IntegrationEvent
 from ai_platform_api.modules.model_gateway.domain.runtime_errors import (
     AiRuntimeConfigNotActiveError,
 )
+from ai_platform_api.modules.service_governance.application.system_assistant import (
+    ensure_system_service_route,
+)
 
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 FEEDBACK_RATINGS = frozenset({"helpful", "unhelpful"})
@@ -75,6 +78,7 @@ class AssistantConversationService:
     ) -> Conversation:
         """创建私有会话，并确保空间已有匹配当前模型配置的系统助手发布。"""
 
+        # 1. 先验证成员并同步系统 Release 与 Service Route，避免创建不可运行的空会话。
         account_id = _browser_account(context)
         normalized_title = _normalize_title(title)
         now = datetime.now(UTC)
@@ -85,12 +89,20 @@ class AssistantConversationService:
                 self._runtime_bootstrap,
                 account_id,
             )
-            unit_of_work.assistant.get_or_create_system_release(
+            release = unit_of_work.assistant.get_or_create_system_release(
                 workspace_id=context.workspace_id,
                 account_id=account_id,
                 runtime_config=runtime_config,
                 released_at=now,
             )
+            ensure_system_service_route(
+                unit_of_work,
+                context,
+                agent_id=release.agent_id,
+                release_id=release.release_id,
+                occurred_at=now,
+            )
+            # 2. 服务事实就绪后再创建会话，并与审计和 Outbox 一次提交。
             conversation = Conversation(
                 conversation_id=uuid4(),
                 workspace_id=context.workspace_id,
@@ -250,6 +262,13 @@ class AssistantConversationService:
                     account_id=account_id,
                     runtime_config=runtime_config,
                     released_at=now,
+                )
+                ensure_system_service_route(
+                    unit_of_work,
+                    context,
+                    agent_id=release.agent_id,
+                    release_id=release.release_id,
+                    occurred_at=now,
                 )
 
                 # 3. 用户消息、不可变 Part、排队 Run、审计和 Outbox 同事务提交。

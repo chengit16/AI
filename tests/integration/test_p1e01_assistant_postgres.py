@@ -30,6 +30,9 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityReader,
     SqlAlchemyRegistrationUnitOfWork,
 )
+from ai_platform_api.modules.service_governance.infrastructure.sqlalchemy import (
+    SqlAlchemyServiceRepository,
+)
 from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
 from ai_platform_api.modules.streaming.domain.models import StreamPolicy
 from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
@@ -47,6 +50,9 @@ from ai_platform_api.persistence.tables import (
     message_feedbacks,
     message_parts,
     outbox_events,
+    service_route_publications,
+    service_routes,
+    services,
 )
 from alembic import command
 from alembic.config import Config
@@ -110,7 +116,9 @@ def assistant_database() -> Iterator[AssistantHarness]:
                 SqlAlchemyRegistrationUnitOfWork(sessions),
                 Argon2idPasswordAdapter(),
             ),
-            AssistantConversationService(SqlAlchemyAssistantUnitOfWork(sessions)),
+            AssistantConversationService(
+                SqlAlchemyAssistantUnitOfWork(sessions, SqlAlchemyServiceRepository)
+            ),
         )
     finally:
         engine.dispose()
@@ -342,6 +350,36 @@ def test_message_run_freezes_release_and_runtime_config(
         ]
         assert session.scalar(select(func.count()).select_from(agents)) == 1
         assert session.scalar(select(func.count()).select_from(agent_publications)) == 1
+        assert session.scalar(select(func.count()).select_from(services)) == 1
+        assert session.scalar(select(func.count()).select_from(service_routes)) == 2
+        assert session.scalar(select(func.count()).select_from(service_route_publications)) == 1
+        assert session.scalar(select(services.c.version)) == 3
+        assert tuple(
+            session.scalars(
+                select(outbox_events.c.aggregate_version)
+                .where(outbox_events.c.event_type == "service.state.changed")
+                .order_by(outbox_events.c.occurred_at, outbox_events.c.event_id)
+            )
+        ) == (2, 3)
+        current_release_ids = session.execute(
+            select(
+                agent_publications.c.release_id,
+                service_routes.c.primary_release_id,
+            )
+            .join(
+                services,
+                services.c.agent_id == agent_publications.c.agent_id,
+            )
+            .join(
+                service_route_publications,
+                service_route_publications.c.service_id == services.c.service_id,
+            )
+            .join(
+                service_routes,
+                service_routes.c.route_id == service_route_publications.c.route_id,
+            )
+        ).one()
+        assert current_release_ids[0] == current_release_ids[1] == second.run.agent_release_id
         assert (session.scalar(select(func.count()).select_from(audit_records)) or 0) >= 4
         assert (session.scalar(select(func.count()).select_from(outbox_events)) or 0) >= 4
 

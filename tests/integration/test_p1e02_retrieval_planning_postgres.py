@@ -47,6 +47,9 @@ from ai_platform_api.modules.retrieval.infrastructure.planning_sqlalchemy import
 from ai_platform_api.modules.retrieval.infrastructure.reranking import (
     DeterministicLexicalReranker,
 )
+from ai_platform_api.modules.service_governance.infrastructure.sqlalchemy import (
+    SqlAlchemyServiceRepository,
+)
 from ai_platform_api.persistence.database import create_platform_engine, create_session_factory
 from ai_platform_api.persistence.tables import (
     ai_runtime_config_publication,
@@ -139,7 +142,9 @@ def create_retrieval_harness(*, schema_prefix: str) -> Iterator[RetrievalHarness
                 SqlAlchemyRegistrationUnitOfWork(sessions),
                 Argon2idPasswordAdapter(),
             ),
-            assistant=AssistantConversationService(SqlAlchemyAssistantUnitOfWork(sessions)),
+            assistant=AssistantConversationService(
+                SqlAlchemyAssistantUnitOfWork(sessions, SqlAlchemyServiceRepository)
+            ),
             knowledge=KnowledgeFactService(
                 SqlAlchemyKnowledgeUnitOfWork(sessions, SqlAlchemyEntitlementRepository)
             ),
