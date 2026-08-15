@@ -7,7 +7,7 @@
 | 阶段 | 阶段 2：可靠性、数据治理与运营增强 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P2-04` 索引巡检与重建进行中 |
+| 当前节点 | `P2-05` 跨实例 SSE 通知与恢复进行中 |
 | 阶段可靠性 | `not_run` |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | `provider_integration` | `not_configured` |
@@ -23,7 +23,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0037`；阶段 1 发布仍冻结在 `20260815_0035` |
+| 数据库基线 | PostgreSQL 16，当前开发 Revision `20260815_0038`；阶段 1 发布仍冻结在 `20260815_0035` |
 | 阶段 1 发布 | 本地 MVP `0.1.0`，ReleaseManifest 摘要 `e8983e87…b62943` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实 AI 质量 |
 
@@ -62,6 +62,16 @@
 - 健康与密钥：演练将 32 字节任务签名密钥校验纳入五个 Worker 健康检查，避免 Celery 节点可响应但任务无法装配的假健康；Scheduler 不挂载文件型密钥并具有独立 Beat 健康检查。启动器按 12 个常驻服务等待就绪，`./platform doctor` 实际检查 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker 和 Scheduler 共 13 项。
 - 自动验收：Worker 路由与并发专项 `18/18`，P2-02/P2-03 PostgreSQL 与 Migration `9/9`，检索 PostgreSQL 回归 `1/1`；统一 `./scripts/verify` 通过 React `37/37`、Python `473/473`、Ruff format/lint `433` 个文件、mypy strict `433` 个源文件、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。最终 `./platform start` 正常返回，Revision `20260815_0037` 和 13 项容器诊断全部通过。
 
+### P2-04 索引巡检、差异修复与全量重建
+
+- 状态：已完成，实现提交 `8fa9e90`。
+- 巡检事实：新增 `index_maintenance_runs` 和 `index_inspection_findings`，以 PostgreSQL 文档发布、成功入库、索引版本、索引发布和 Chunk 引用为唯一事实，覆盖发布缺失/版本错配、索引状态、来源摘要、Chunk 数量/引用、多余活动 Chunk 和孤儿活动版本 8 类稳定差异码；巡检证据不保存正文或向量。
+- 安全修复：每次修复重新锁定当前文档发布，过期报告不能恢复历史版本。相同当前文档版本存在完整 `ready/active/retired` 候选时原子恢复；没有候选时先撤销异常活动面，再从成功入库事实幂等排队新构建；没有成功来源时保持 `unresolved`，不伪造已排队结论。
+- 重建与清理：全量重建只扫描活动文档的当前发布版本，使用稳定维护运行 ID 保证重放不重复建构；健康旧索引在新构建完整提交前继续服务，失败和 staged Chunk 始终不可见。清理只删除永久失败或三次人工恢复耗尽版本的不可见 Chunk，摘要由实际删除 Chunk ID 生成，仍可恢复死信和活动发布保持不变。
+- 调度与边界：注册 `platform.indexing.inspect.v1` 并固定进入 `platform.indexing` Lane，Scheduler 默认每 300 秒投递，配置边界为 `60～86400` 秒。全量重建和清理已具备幂等应用层，人工权限、确认和审计入口仍按计划留给 `P2-10`，当前不提供绕过治理的直接改表操作。
+- 自动验收：P2-04 PostgreSQL 场景 `5/5`，覆盖健康零差异、损坏活动索引切换完整旧候选、无候选撤销并重建、全量重建重放幂等及恢复预算清理；统一 `./scripts/verify` 通过 React `37/37`、Python `480/480`、Ruff format/lint `438` 个文件、mypy strict `438` 个源文件、Migration 往返、模块依赖、中文注释、UnoCSS、OpenAPI/契约兼容、Secret Scanner、SBOM、ReleaseManifest 和生产构建。
+- 容器验收：`./platform start` 正常完成现有数据 `0037 → 0038` 升级，`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker 和 Scheduler 共 13 项通过。真实 Celery 投递 `platform.indexing.inspect.v1` 后由 Indexing Worker 写入 `inspection|1|0|0|0`，证明扫描 1 份已发布合成文档且无差异、修复或重建。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -71,4 +81,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P2-01`～`P2-03` 已完成可靠性契约、任务恢复事实、Worker 隔离和索引死信恢复，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-04`。
+`not_run`。`P2-01`～`P2-04` 已完成可靠性契约、任务恢复事实、Worker 隔离、索引巡检和安全重建，但阶段可靠性必须等待后续节点及 `P2-11` 联合演练；当前进入 `P2-05`。

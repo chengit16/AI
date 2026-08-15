@@ -4,13 +4,13 @@
 
 本目录的新增和修改统一执行 [`docs/governance/backend-code-standards.md`](../../docs/governance/backend-code-standards.md)。
 
-Worker 使用 Celery 5.5 和 Valkey Broker，PostgreSQL 仍是任务与业务状态的唯一事实来源。Scheduler 只负责周期唤醒，五个 Worker Lane 分别消费固定队列，共同承载六个版本化任务：
+Worker 使用 Celery 5.5 和 Valkey Broker，PostgreSQL 仍是任务与业务状态的唯一事实来源。Scheduler 只负责周期唤醒，五个 Worker Lane 分别消费固定队列，共同承载七个版本化任务：
 
 - `control`：`platform.outbox.dispatch.v1` 周期认领到期 Outbox；`platform.integration.consume.v1` 验签内部任务信封并幂等写入投影。
 - `parsing`：`platform.ingestion.parse.v1` 只认领 TXT、Markdown 和 DOCX 入库任务。
 - `ocr`：`platform.ingestion.ocr.v1` 只认领 PDF 和图片入库任务，避免 OCR 耗尽普通解析资源。
 - `embedding`：`platform.indexing.embed.v1` 生成权限元数据 Chunk、Embedding 和关键词索引，产物保持不可见。
-- `indexing`：`platform.indexing.commit.v1` 提交已生成的 Chunk，并原子切换索引版本和发布指针。
+- `indexing`：`platform.indexing.commit.v1` 提交已生成的 Chunk，并原子切换索引版本和发布指针；`platform.indexing.inspect.v1` 周期巡检并安全修复索引引用。
 
 任务按至少一次投递设计。发布成功但确认失败、Worker 退出或 Broker 重投都可能产生重复任务，消费者必须用 `consumer_name + event_id` 保证业务副作用幂等，不能依赖 Broker 去重。
 
@@ -64,5 +64,9 @@ AI_PLATFORM_TEST_TIKA_URL=http://127.0.0.1:9998 \
 Embedding Worker 在数据库事务外读取并复核 Artifact、执行结构化 Chunk 和 Embedding，在短事务内落库。Chunk 固化部门、可见性、密级、权限标签、来源位置、Parser、OCR 和摘要，构建期间始终 `active=false`。Indexing Worker 只提交已完整落库的构建；文档发布或已发布版本构建完成时才原子切换当前索引。删除文档会同步撤销全部 Chunk 并终止在途构建。
 
 索引自动尝试耗尽后进入稳定 `dead_letter`。受控人工恢复会开启新的恢复代次且最多执行三次；旧 Attempt、旧租约和并发重放均不能重复发布索引或改变当前发布指针。
+
+Scheduler 默认每 300 秒投递一次索引巡检，可通过 `INDEX_INSPECTION_INTERVAL_SECONDS` 在 `60～86400` 秒范围内调整。巡检以文档发布、成功入库和索引发布为事实，比较索引状态、来源摘要、Chunk 数量与引用链，并将不含正文的运行和发现分别写入 `index_maintenance_runs` 与 `index_inspection_findings`。完整旧候选会在同一事务中恢复；没有完整候选时先停用异常活动面，再幂等排队重建。
+
+全量重建始终从当前已发布文档创建新构建，健康旧索引在新构建提交前继续服务。永久失败或三次人工恢复耗尽的不可见 Chunk 可以清理，仍可恢复的死信必须保留。人工触发入口将在 `P2-10` 通过受控运营工作台接入权限、确认、幂等和审计；当前不得用手工改表代替维护应用层。
 
 本地默认 `DeterministicHashEmbeddingAdapter` 输出版本化 1024 维确定性向量，只用于功能闭环，不代表语义质量。后续接真实 Embedding 服务必须保持 `EmbeddingAdapter`、模型版本、维度校验、有限重试和数据外发策略边界。
