@@ -83,7 +83,7 @@
 
 ### P2-06 结构化日志、Trace、指标与健康告警基线
 
-- 状态：已完成，提交待回填。
+- 状态：已完成，提交 `9ea06f2`。
 - 字段安全：新增版本化可观测字段注册表，对日志、Span、Prometheus 标签和告警事实执行“未登记即拒绝”。凭据、Cookie、Session、正文、查询、Prompt、模型输入输出、事件 Payload、字段级 ABAC 受限值及用户/空间/资源等高基数标识不得进入普通可观测通道；第三方自由文本日志统一收敛为不复制原始消息的安全 JSON 事件。
 - Trace 传播：FastAPI 在 HTTP 边缘校验 W3C `traceparent` 并建立请求 Span，应用层通过标准 OTel Context 关联检索、模型、Assistant、工作流、审批和 Outbox。五个 Worker Lane 均记录任务 Span、结果与耗时，集成事件只有在 HMAC 信封验签成功后才能恢复父 Trace，未验证 Header、Broker 属性和任务载荷不能成为可信父链。
 - 指标与聚合：新增 HTTP、应用操作、Worker 任务、依赖健康、Outbox 积压/重试/死信和 SSE 发布/订阅/轮询/回查指标；HTTP 只使用路由模板，不使用真实资源路径。API 与 Worker 通过 `.ai-platform/runtime/prometheus` 共享多进程指标文件，启动前清理旧运行数据，子进程退出时清理 live Gauge；`/api/v1/metrics` 实际同时采集到 API 请求和五个 Worker Lane 的成功任务样本。
