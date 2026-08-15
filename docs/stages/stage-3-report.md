@@ -7,12 +7,12 @@
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-07` 服务与路由治理 |
+| 当前节点 | `P3-08` Runtime 隔离路由 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、发布审批与不可变 Release 已通过 |
-| 服务发布与回滚 | `not_run` |
+| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release 与服务治理已通过 |
+| 服务发布与回滚 | `in_progress`，单版本活动 Route 已通过，Runtime、灰度与回滚待建设 |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
 | `capacity_certification` | `not_run` |
@@ -26,7 +26,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0044` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0047` |
 | 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实供应商或 AI 质量 |
 
@@ -108,14 +108,27 @@
 - 当前边界：本节点只生成可被后续路由引用的 Release，不提前创建 `Service`、当前路由、灰度、回滚或 Runtime 装载；`P3-07` 起按顺序建设服务治理。
 - 提交：`1d3bec3`。
 
+### P3-07 服务与版本化路由治理
+
+- 状态：已完成，提交 `2cf0de8`。
+- 写入权与领域边界：接受 `ADR-007`，新增独立 `service_governance` 模块，独占 `Service`、不可变访问策略、不可变 `ServiceRoute`、当前 Route 指针和服务幂等请求的写入规则。自定义知识服务从 `draft v1` 在同一事务写入策略、首个活动 Route 与指针后激活为 `active v2`；创建和更新均冻结原始响应快照，后续幂等重放不受当前状态漂移影响。
+- 状态与访问策略：支持 `workspace` 和 `restricted` 两类版本化策略，限制策略的部门和账号必须是当前工作空间内的活动主体；名称、暂停、恢复、归档和策略变更使用服务乐观版本并遵循冻结状态机。服务、策略、路由、幂等请求、审计和 `service.state.changed` Outbox 保持同事务，事件不携带访问主体清单。
+- 系统助手兼容：阶段 1 `agent_publications` 继续作为旧问答链路兼容指针，助手 Unit of Work 通过注入的 `ServiceRepository` 在原事务创建或追加固定 `system-knowledge` 服务 Route。运行配置变化后两个当前指针指向同一 Release，旧 Run 仍绑定旧 Release；Route 同步同时推进 `Service.version`，保证 Outbox `aggregate_version` 严格单调。
+- 数据库与迁移：Revision `20260816_0047` 新增五张工作空间表、复合外键、延迟循环约束和状态/策略/Route/当前指针校验 Trigger。历史策略、Route 和幂等请求禁止更新或普通删除；生命周期受限事务仍可清除。升级只回填固定 `agent_key=system_knowledge` 的当前系统助手，其他系统 Agent 保持原样；存在自定义服务、历史 Route 或控制请求时拒绝不安全降级。
+- 专项验收：P3-07 单元 `4/4`、真实 PostgreSQL `3/3`，Migration 空库往返与带既有系统助手的 `0046 → 0047` 非空回填 `5/5`，P3-02～P3-07、阶段 1 系统助手、检索规划、Migration 和生命周期联合回归 `60/60`；覆盖幂等快照、策略版本、暂停/恢复、跨空间、跨 Agent Route、历史篡改、非法状态和 generation 跳跃拒绝。
+- 统一门禁：`./scripts/verify` 通过 React `42/42`、Python `605/605`、Ruff format/lint、mypy strict `552` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器验收：使用最终工作树重新构建 API、Migration、Web 和 Worker 镜像，公共数据库保持 Revision `20260816_0047`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker Lane 和 Scheduler 共 13 项通过。本节点未增加 HTTP 路由或页面，因此不执行浏览器验收。
+- 当前边界：本节点只建立单版本活动 Route 和服务控制面事实，不提前实现 `P3-08` Runtime 快照装载与控制面故障隔离、`P3-09` 灰度/晋级/回滚或 `P3-10` 服务出口。
+- 提交：`2cf0de8`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布供应链门禁继续阻断。
-- 阶段 3 尚未完成服务路由、灰度和回滚，不能把当前控制面事实描述为完整 Agent 发布平台。
+- 阶段 3 尚未完成 Runtime 隔离路由、灰度和回滚，不能把当前服务治理事实描述为完整 Agent 发布平台。
 - LLM Grading、多模态图片问答、真实多源连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 均保持后置。
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁和 `P3-06` 不可变发布快照已通过，当前进入 `P3-07` 服务与路由治理；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照和 `P3-07` 服务与路由治理已通过，当前进入 `P3-08` Runtime 隔离路由；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
