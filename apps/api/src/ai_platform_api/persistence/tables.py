@@ -3064,6 +3064,227 @@ Index(
     "ix_stream_events_expires_at",
     stream_events.c.expires_at,
 )
+
+lifecycle_export_records = Table(
+    "lifecycle_export_records",
+    metadata,
+    Column("export_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("registry_version", Integer, nullable=False),
+    Column("object_key", String(2048), nullable=True),
+    Column("bundle_size_bytes", BigInteger, nullable=True),
+    Column("bundle_sha256", String(64), nullable=True),
+    Column("object_manifest_sha256", String(64), nullable=True),
+    Column("table_count", Integer, nullable=True),
+    Column("object_count", Integer, nullable=True),
+    Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("request_id", UUID(as_uuid=True), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_lifecycle_exports_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_lifecycle_exports_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_lifecycle_exports_requester",
+    ),
+    CheckConstraint(
+        "status IN ('running', 'completed', 'failed')",
+        name="ck_lifecycle_exports_status",
+    ),
+    CheckConstraint("registry_version >= 1", name="ck_lifecycle_exports_registry"),
+    CheckConstraint(
+        "request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_lifecycle_exports_request_hash",
+    ),
+    CheckConstraint(
+        "(status = 'running' AND completed_at IS NULL AND error_code IS NULL) OR "
+        "(status = 'completed' AND completed_at IS NOT NULL AND error_code IS NULL "
+        "AND object_key IS NOT NULL AND bundle_size_bytes >= 0 "
+        "AND bundle_sha256 ~ '^[0-9a-f]{64}$' "
+        "AND object_manifest_sha256 ~ '^[0-9a-f]{64}$' "
+        "AND table_count >= 0 AND object_count >= 0) OR "
+        "(status = 'failed' AND completed_at IS NOT NULL AND error_code IS NOT NULL)",
+        name="ck_lifecycle_exports_completion",
+    ),
+)
+
+lifecycle_purge_requests = Table(
+    "lifecycle_purge_requests",
+    metadata,
+    Column("purge_request_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("reason_code", String(64), nullable=False),
+    Column("confirmed_workspace_name", String(120), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("database_cleared", Boolean, nullable=False),
+    Column("objects_cleared", Boolean, nullable=False),
+    Column("cache_cleared", Boolean, nullable=False),
+    Column("deleted_table_counts", JSONB, nullable=False),
+    Column("deleted_object_count", Integer, nullable=False),
+    Column("deleted_cache_key_count", Integer, nullable=False),
+    Column("last_error_code", String(128), nullable=True),
+    Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("request_id", UUID(as_uuid=True), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_lifecycle_purges_idempotency",
+    ),
+    UniqueConstraint(
+        "purge_request_id",
+        "workspace_id",
+        name="uq_lifecycle_purges_id_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_lifecycle_purges_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_lifecycle_purges_requester",
+    ),
+    CheckConstraint(
+        "status IN ('pending', 'retryable', 'completed')",
+        name="ck_lifecycle_purges_status",
+    ),
+    CheckConstraint(
+        "reason_code ~ '^[A-Z][A-Z0-9_]{2,63}$' AND request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_lifecycle_purges_request",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(deleted_table_counts) = 'object' "
+        "AND deleted_object_count >= 0 AND deleted_cache_key_count >= 0",
+        name="ck_lifecycle_purges_counts",
+    ),
+    CheckConstraint(
+        "(status = 'completed' AND database_cleared AND objects_cleared AND cache_cleared "
+        "AND completed_at IS NOT NULL AND last_error_code IS NULL) OR "
+        "(status <> 'completed' AND completed_at IS NULL)",
+        name="ck_lifecycle_purges_completion",
+    ),
+)
+
+lifecycle_deletion_certificates = Table(
+    "lifecycle_deletion_certificates",
+    metadata,
+    Column("certificate_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("purge_request_id", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("registry_version", Integer, nullable=False),
+    Column("deleted_table_counts", JSONB, nullable=False),
+    Column("deleted_object_count", Integer, nullable=False),
+    Column("deleted_cache_key_count", Integer, nullable=False),
+    Column("result_sha256", String(64), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["purge_request_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.lifecycle_purge_requests.purge_request_id",
+            f"{SCHEMA_TOKEN}.lifecycle_purge_requests.workspace_id",
+        ],
+        name="fk_lifecycle_certificates_request",
+        ondelete="RESTRICT",
+    ),
+    CheckConstraint(
+        "registry_version >= 1 AND deleted_object_count >= 0 "
+        "AND deleted_cache_key_count >= 0 AND jsonb_typeof(deleted_table_counts) = 'object' "
+        "AND result_sha256 ~ '^[0-9a-f]{64}$'",
+        name="ck_lifecycle_certificates_result",
+    ),
+)
+
+lifecycle_retention_runs = Table(
+    "lifecycle_retention_runs",
+    metadata,
+    Column("retention_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("cutoffs", JSONB, nullable=False),
+    Column("deleted_table_counts", JSONB, nullable=False),
+    Column("result_sha256", String(64), nullable=True),
+    Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_lifecycle_retention_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_lifecycle_retention_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_lifecycle_retention_requester",
+    ),
+    CheckConstraint(
+        "status IN ('running', 'completed', 'failed')",
+        name="ck_lifecycle_retention_status",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(cutoffs) = 'object' AND jsonb_typeof(deleted_table_counts) = 'object'",
+        name="ck_lifecycle_retention_documents",
+    ),
+    CheckConstraint(
+        "(status = 'running' AND completed_at IS NULL AND error_code IS NULL) OR "
+        "(status = 'completed' AND completed_at IS NOT NULL AND error_code IS NULL "
+        "AND result_sha256 ~ '^[0-9a-f]{64}$') OR "
+        "(status = 'failed' AND completed_at IS NOT NULL AND error_code IS NOT NULL)",
+        name="ck_lifecycle_retention_completion",
+    ),
+)
+Index(
+    "ix_lifecycle_exports_workspace_created",
+    lifecycle_export_records.c.workspace_id,
+    lifecycle_export_records.c.created_at,
+)
+Index(
+    "ix_lifecycle_purges_workspace_created",
+    lifecycle_purge_requests.c.workspace_id,
+    lifecycle_purge_requests.c.created_at,
+)
+Index(
+    "ix_lifecycle_certificates_workspace_completed",
+    lifecycle_deletion_certificates.c.workspace_id,
+    lifecycle_deletion_certificates.c.completed_at,
+)
+Index(
+    "ix_lifecycle_retention_workspace_created",
+    lifecycle_retention_runs.c.workspace_id,
+    lifecycle_retention_runs.c.created_at,
+)
 Index(
     "ix_retrieval_chunks_document_sequence",
     retrieval_chunks.c.workspace_id,

@@ -122,16 +122,18 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
 def test_runtime_files_fix_shared_paths_and_health_checks() -> None:
     alembic = (ROOT / "alembic.ini").read_text(encoding="utf-8")
     migration_environment = (ROOT / "infra/migrations/env.py").read_text(encoding="utf-8")
+    api_dockerfile = (ROOT / "infra/docker/api.Dockerfile").read_text(encoding="utf-8")
     worker_dockerfile = (ROOT / "infra/docker/worker.Dockerfile").read_text(encoding="utf-8")
     platform_script = (ROOT / "platform").read_text(encoding="utf-8")
 
     assert "prepend_sys_path = apps/api/src:packages/backend/src" in alembic
     assert 'os.environ.get("AI_PLATFORM_DATABASE_URL")' in migration_environment
+    assert "COPY contracts/lifecycle ./contracts/lifecycle" in api_dockerfile
     assert "PYTHONPATH=/app/apps/worker/src:/app/packages/backend/src" in worker_dockerfile
     assert 'CMD ["uv", "run", "--no-sync", "celery"' in worker_dockerfile
     assert '"--beat"' not in worker_dockerfile
     assert "SELECT version_num FROM public.alembic_version" in platform_script
-    assert 'database_revision" == "20260815_0039"' in platform_script
+    assert 'database_revision" == "20260815_0040"' in platform_script
     assert "AI_PLATFORM_MIN_FREE_DISK_GB:-50" in platform_script
     assert "worker-control worker-parsing worker-ocr worker-embedding worker-indexing" in (
         platform_script

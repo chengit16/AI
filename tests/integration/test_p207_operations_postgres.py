@@ -534,7 +534,7 @@ def test_migration_backfills_historical_receipts_and_existing_owner_permissions(
     assert tuple(historical_audit) == (None, None, None)
     assert permissions == {"operations.records.read", "operations.outbox.replay"}
     assert binding_count == 6
-    assert len(releases) == 2
+    assert len(releases) >= 3
     assert releases[0].snapshot["registry_version"] == 15
     assert len(releases[0].snapshot["menus"]) == 1
     assert releases[1].source_release_id is not None
@@ -546,6 +546,18 @@ def test_migration_backfills_historical_receipts_and_existing_owner_permissions(
         }
     )
     assert len(releases[1].snapshot["menu_api_bindings"]) == 6
+    lifecycle_release = next(
+        release for release in releases if release.snapshot["registry_version"] == 17
+    )
+    assert lifecycle_release.source_release_id is not None
+    assert {item["menu_id"] for item in lifecycle_release.snapshot["menus"]}.issuperset(
+        {
+            "82000000-0000-4000-8000-000000000191",
+            "82000000-0000-4000-8000-000000000192",
+            "82000000-0000-4000-8000-000000000193",
+        }
+    )
+    assert len(lifecycle_release.snapshot["menu_api_bindings"]) == 9
 
 
 def test_usage_ledger_reconciles_and_rejects_cross_workspace_cursor(

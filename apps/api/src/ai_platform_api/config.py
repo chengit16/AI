@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     resource_registry_path: str = "contracts/authorization/resource-registry.v1.json"
     field_policy_registry_path: str = "contracts/authorization/field-policy-registry.v1.json"
     observability_field_registry_path: str = "contracts/observability/field-registry.v1.json"
+    lifecycle_table_registry_path: str = "contracts/lifecycle/workspace-table-registry.v1.json"
     observability_otlp_endpoint: str | None = None
     observability_otlp_timeout_seconds: float = 2.0
     observability_safe_library_logging: bool = False

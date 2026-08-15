@@ -91,6 +91,14 @@ from ai_platform_api.modules.knowledge.infrastructure.upload_security import (
     BoundedUploadInspector,
     DeterministicUploadScanner,
 )
+from ai_platform_api.modules.lifecycle.application.service import WorkspaceLifecycleService
+from ai_platform_api.modules.lifecycle.infrastructure.cache import ValkeyWorkspaceCacheCleaner
+from ai_platform_api.modules.lifecycle.infrastructure.sqlalchemy import (
+    SqlAlchemyWorkspaceLifecycleStore,
+)
+from ai_platform_api.modules.lifecycle.infrastructure.storage import (
+    MinioLifecycleObjectStorage,
+)
 from ai_platform_api.modules.model_gateway.application.configurations import (
     ModelProviderConfigurationService,
 )
@@ -186,6 +194,8 @@ class ApplicationContainer:
     menu_configuration: MenuConfigurationService | None = None
     menu_releases: MenuReleaseService | None = None
     integration_operations: IntegrationOperationsService | None = None
+    workspace_lifecycle: WorkspaceLifecycleService | None = None
+    lifecycle_cache: ValkeyWorkspaceCacheCleaner | None = None
     knowledge_facts: KnowledgeFactService | None = None
     knowledge_uploads: KnowledgeUploadService | None = None
     knowledge_management: KnowledgeManagementService | None = None
@@ -217,9 +227,13 @@ class ApplicationContainer:
                     self.streaming.close()
             finally:
                 try:
-                    self.role_cache.close()
+                    if self.lifecycle_cache is not None:
+                        self.lifecycle_cache.close()
                 finally:
-                    self.sessions.close()
+                    try:
+                        self.role_cache.close()
+                    finally:
+                        self.sessions.close()
         finally:
             self.database.close()
 
@@ -272,6 +286,18 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         access_key=settings.minio_access_key,
         secret_key=settings.minio_secret_key.get_secret_value(),
         bucket=settings.minio_bucket,
+    )
+    lifecycle_cache = ValkeyWorkspaceCacheCleaner(settings.valkey_url)
+    lifecycle = WorkspaceLifecycleService(
+        SqlAlchemyWorkspaceLifecycleStore(database.sessions),
+        MinioLifecycleObjectStorage(
+            endpoint=settings.minio_endpoint,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key.get_secret_value(),
+            bucket=settings.minio_bucket,
+        ),
+        lifecycle_cache,
+        Path(settings.lifecycle_table_registry_path),
     )
     secret_cipher = EnvelopeSecretCipher(
         MasterKeyFile(settings.master_key_path, settings.master_key_version)
@@ -439,6 +465,8 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             integration_operations=IntegrationOperationsService(
                 SqlAlchemyIntegrationOperationsUnitOfWork(database.sessions)
             ),
+            workspace_lifecycle=lifecycle,
+            lifecycle_cache=lifecycle_cache,
             organization=OrganizationService(
                 unit_of_work=SqlAlchemyOrganizationUnitOfWork(database.sessions),
             ),

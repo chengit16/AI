@@ -406,6 +406,16 @@ class CurrentMessageFeedbackResponse(typing.TypedDict):
     item: MessageFeedbackResponse | None
 
 
+class DeletionCertificateResponse(typing.TypedDict):
+    certificate_id: str
+    completed_at: str
+    deleted_cache_key_count: int
+    deleted_object_count: int
+    deleted_table_counts: dict[str, int]
+    registry_version: int
+    result_sha256: str
+
+
 class DepartmentListResponse(typing.TypedDict):
     items: list[DepartmentResponse]
 
@@ -652,6 +662,35 @@ class KnowledgeDocumentSummaryResponse(typing.TypedDict):
     title: str
     updated_at: str
     visibility: typing.Literal["private", "workspace", "departments"]
+
+
+class LifecycleExportResponse(typing.TypedDict):
+    bundle_sha256: str | None
+    bundle_size_bytes: int | None
+    completed_at: str | None
+    created_at: str
+    error_code: str | None
+    export_id: str
+    object_count: int | None
+    object_key: str | None
+    object_manifest_sha256: str | None
+    status: str
+    table_count: int | None
+
+
+class LifecyclePurgeBody(typing.TypedDict):
+    confirmed_workspace_name: str
+    reason_code: str
+
+
+class LifecyclePurgeResponse(typing.TypedDict):
+    cache_cleared: bool
+    certificate: DeletionCertificateResponse
+    completed_at: str | None
+    database_cleared: bool
+    objects_cleared: bool
+    purge_request_id: str
+    status: str
 
 
 class LoginRequest(typing.TypedDict):
@@ -959,6 +998,16 @@ class ResolvedApprovalLevelResponse(typing.TypedDict):
     sequence_no: int
     timeout_action: typing.Literal["escalate", "transfer", "reject", "wait"]
     timeout_after_minutes: int
+
+
+class RetentionRunResponse(typing.TypedDict):
+    completed_at: str | None
+    created_at: str
+    cutoffs: dict[str, str]
+    deleted_table_counts: dict[str, int]
+    result_sha256: str | None
+    retention_run_id: str
+    status: str
 
 
 class ReviewModelProviderDataPolicyRequest(typing.TypedDict):

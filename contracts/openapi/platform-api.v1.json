@@ -3048,6 +3048,515 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/lifecycle/exports": {
+      "post": {
+        "tags": [
+          "数据生命周期"
+        ],
+        "summary": "Create Export",
+        "description": "同步生成版本化导出包并返回可复算摘要。",
+        "operationId": "createWorkspaceLifecycleExport",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleExportResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/lifecycle/purges": {
+      "post": {
+        "tags": [
+          "数据生命周期"
+        ],
+        "summary": "Purge Business Data",
+        "description": "保留可登录治理壳层，并清除业务数据与派生介质。",
+        "operationId": "purgeWorkspaceBusinessData",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecyclePurgeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecyclePurgeResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/lifecycle/retention-runs": {
+      "post": {
+        "tags": [
+          "数据生命周期"
+        ],
+        "summary": "Execute Retention",
+        "description": "执行冻结保留期并返回各事实表的删除计数。",
+        "operationId": "executeWorkspaceRetention",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionRunResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/organization/departments": {
       "post": {
         "tags": [
@@ -18771,6 +19280,56 @@
         "title": "CurrentMessageFeedbackResponse",
         "description": "表示反馈可能尚未提交的稳定读取包装。"
       },
+      "DeletionCertificateResponse": {
+        "properties": {
+          "certificate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Certificate Id"
+          },
+          "registry_version": {
+            "type": "integer",
+            "title": "Registry Version"
+          },
+          "deleted_table_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Deleted Table Counts"
+          },
+          "deleted_object_count": {
+            "type": "integer",
+            "title": "Deleted Object Count"
+          },
+          "deleted_cache_key_count": {
+            "type": "integer",
+            "title": "Deleted Cache Key Count"
+          },
+          "result_sha256": {
+            "type": "string",
+            "title": "Result Sha256"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "certificate_id",
+          "registry_version",
+          "deleted_table_counts",
+          "deleted_object_count",
+          "deleted_cache_key_count",
+          "result_sha256",
+          "completed_at"
+        ],
+        "title": "DeletionCertificateResponse",
+        "description": "返回不含原业务正文的删除证明。"
+      },
       "DepartmentListResponse": {
         "properties": {
           "items": {
@@ -20253,6 +20812,206 @@
         ],
         "title": "KnowledgeDocumentSummaryResponse",
         "description": "定义知识文档摘要操作的稳定响应结构。"
+      },
+      "LifecycleExportResponse": {
+        "properties": {
+          "export_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Export Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "object_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Key"
+          },
+          "bundle_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Size Bytes"
+          },
+          "bundle_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Sha256"
+          },
+          "object_manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Manifest Sha256"
+          },
+          "table_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Count"
+          },
+          "object_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "export_id",
+          "status",
+          "object_key",
+          "bundle_size_bytes",
+          "bundle_sha256",
+          "object_manifest_sha256",
+          "table_count",
+          "object_count",
+          "created_at",
+          "completed_at",
+          "error_code"
+        ],
+        "title": "LifecycleExportResponse",
+        "description": "返回导出包位置和双层完整性摘要。"
+      },
+      "LifecyclePurgeBody": {
+        "properties": {
+          "confirmed_workspace_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Confirmed Workspace Name"
+          },
+          "reason_code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,63}$",
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "confirmed_workspace_name",
+          "reason_code"
+        ],
+        "title": "LifecyclePurgeBody",
+        "description": "要求用户复述空间名称并提供结构化删除原因。"
+      },
+      "LifecyclePurgeResponse": {
+        "properties": {
+          "purge_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Purge Request Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "database_cleared": {
+            "type": "boolean",
+            "title": "Database Cleared"
+          },
+          "objects_cleared": {
+            "type": "boolean",
+            "title": "Objects Cleared"
+          },
+          "cache_cleared": {
+            "type": "boolean",
+            "title": "Cache Cleared"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "certificate": {
+            "$ref": "#/components/schemas/DeletionCertificateResponse"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purge_request_id",
+          "status",
+          "database_cleared",
+          "objects_cleared",
+          "cache_cleared",
+          "completed_at",
+          "certificate"
+        ],
+        "title": "LifecyclePurgeResponse",
+        "description": "返回跨存储完成状态及其不可变证明。"
       },
       "LoginRequest": {
         "properties": {
@@ -22092,6 +22851,74 @@
         ],
         "title": "ResolvedApprovalLevelResponse",
         "description": "返回一个层级的稳定审批人集合和冻结超时参数。"
+      },
+      "RetentionRunResponse": {
+        "properties": {
+          "retention_run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Retention Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "cutoffs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Cutoffs"
+          },
+          "deleted_table_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Deleted Table Counts"
+          },
+          "result_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Sha256"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "retention_run_id",
+          "status",
+          "cutoffs",
+          "deleted_table_counts",
+          "result_sha256",
+          "created_at",
+          "completed_at"
+        ],
+        "title": "RetentionRunResponse",
+        "description": "返回本次保留期边界、删除计数和摘要。"
       },
       "ReviewModelProviderDataPolicyRequest": {
         "properties": {
