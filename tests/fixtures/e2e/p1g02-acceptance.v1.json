@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "suite_version": "p1g02-v1",
+  "dataset_version": "p1g01-v1",
+  "synthetic": true,
+  "required_test_node_ids": [
+    "tests/test_p011_security_dataset.py::test_p011_fixture_has_expected_version_and_category_coverage",
+    "tests/test_p011_security_dataset.py::test_p011_cases_are_synthetic_and_case_ids_are_unique",
+    "tests/test_p011_security_dataset.py::test_p011_expected_errors_match_stable_error_catalog",
+    "tests/test_p011_security_dataset.py::test_p011_cases_declare_scope_and_recovery_guards",
+    "tests/test_p011_security_dataset.py::test_p011_contains_no_real_credential_patterns_or_non_synthetic_identifiers",
+    "tests/test_p011_security_dataset.py::test_p011_dangerous_categories_require_deny_result",
+    "apps/api/tests/test_trace_context.py::test_http_response_returns_trusted_trace_and_request_id",
+    "apps/api/tests/test_trace_context.py::test_http_response_replaces_untrusted_identifiers"
+  ],
+  "cases": [
+    {
+      "scenario_key": "personal-owner-main",
+      "test_node_ids": [
+        "tests/integration/test_p1e01_assistant_postgres.py::test_conversation_privacy_archive_and_http_contract"
+      ]
+    },
+    {
+      "scenario_key": "enterprise-owner-main",
+      "test_node_ids": [
+        "tests/integration/test_p1b02_enterprise_postgres.py::test_enterprise_invite_join_switch_disable_reactivate_and_leave"
+      ]
+    },
+    {
+      "scenario_key": "enterprise-member-readonly",
+      "test_node_ids": [
+        "tests/integration/test_p1c02_authorization_postgres.py::test_system_grants_and_custom_role_scope_are_persistent"
+      ]
+    },
+    {
+      "scenario_key": "cross-workspace-retrieval",
+      "test_node_ids": [
+        "tests/integration/test_p1e01_assistant_postgres.py::test_conversation_privacy_archive_and_http_contract",
+        "tests/integration/test_p1f04_approval_runtime_postgres.py::test_independent_instance_http_idempotency_visibility_and_cross_workspace_denial"
+      ]
+    },
+    {
+      "scenario_key": "inactive-member-request",
+      "test_node_ids": [
+        "tests/integration/test_p1b02_enterprise_postgres.py::test_enterprise_invite_join_switch_disable_reactivate_and_leave"
+      ]
+    },
+    {
+      "scenario_key": "department-scope-request",
+      "test_node_ids": [
+        "tests/integration/test_p1c02_authorization_postgres.py::test_system_grants_and_custom_role_scope_are_persistent"
+      ]
+    },
+    {
+      "scenario_key": "restricted-field-mask",
+      "test_node_ids": [
+        "tests/integration/test_p1c02_authorization_postgres.py::test_system_grants_and_custom_role_scope_are_persistent"
+      ]
+    },
+    {
+      "scenario_key": "stale-document-reference",
+      "test_node_ids": [
+        "tests/integration/test_p1e03_evidence_quality_postgres.py::test_current_evidence_revocation_and_immutable_snapshots"
+      ]
+    },
+    {
+      "scenario_key": "indirect-prompt-injection",
+      "test_node_ids": [
+        "tests/unit/test_p1e04_rag_safety.py::test_p011_security_cases_are_denied_before_model"
+      ]
+    },
+    {
+      "scenario_key": "sse-last-event-recovery",
+      "test_node_ids": [
+        "tests/integration/test_p1e01_assistant_postgres.py::test_http_sse_replays_only_events_after_last_event_id"
+      ]
+    },
+    {
+      "scenario_key": "workflow-approval-resume",
+      "test_node_ids": [
+        "tests/integration/test_p1f04_approval_runtime_postgres.py::test_workflow_approval_outcome_is_atomic_and_resume_skips_historical_steps"
+      ]
+    },
+    {
+      "scenario_key": "approval-reject",
+      "test_node_ids": [
+        "tests/integration/test_p1f04_approval_runtime_postgres.py::test_transfer_reject_withdraw_and_concurrent_action_idempotency"
+      ]
+    },
+    {
+      "scenario_key": "approval-transfer",
+      "test_node_ids": [
+        "tests/integration/test_p1f04_approval_runtime_postgres.py::test_transfer_reject_withdraw_and_concurrent_action_idempotency"
+      ]
+    },
+    {
+      "scenario_key": "approval-timeout",
+      "test_node_ids": [
+        "tests/integration/test_p1f04_approval_runtime_postgres.py::test_all_timeout_actions_and_action_facts_are_immutable"
+      ]
+    },
+    {
+      "scenario_key": "model-primary-fallback",
+      "test_node_ids": [
+        "tests/unit/test_p1d06_runtime_gateway.py::test_runtime_gateway_persists_version_attempts_usage_cost_and_credential_version"
+      ]
+    },
+    {
+      "scenario_key": "workspace-quota-exceeded",
+      "test_node_ids": [
+        "tests/integration/test_p1b05_entitlements_postgres.py::test_member_limit_and_database_constraints_are_enforced"
+      ]
+    }
+  ]
+}
