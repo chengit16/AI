@@ -7,12 +7,12 @@
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-09` 灰度发布与回滚 |
+| 当前节点 | `P3-10` 服务出口 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理与 Runtime 隔离已通过 |
-| 服务发布与回滚 | `in_progress`，单版本活动 Route 与 Runtime 发布装载已通过，灰度与回滚待建设 |
+| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离与灰度回滚已通过 |
+| 服务发布与回滚 | `in_progress`，内部灰度、晋级、回滚和并发发布控制已通过，三类服务出口待建设 |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
 | `capacity_certification` | `not_run` |
@@ -26,7 +26,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0048` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0049` |
 | 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实供应商或 AI 质量 |
 
@@ -134,14 +134,27 @@
 - 当前边界：当前 Route 在发布 Source 故障期间最多使用 300 秒可信缓存，服务暂停与 Source 故障同时发生时的主动失效由 P3-09 通过提交后事件完成。本节点不提前实现灰度稳定分配、晋级、回滚、服务出口或 Release 运营监控。
 - 提交：`328bcca`。
 
+### P3-09 灰度发布与回滚
+
+- 状态：已完成，提交 `6aa5a21`。
+- 稳定分配与隐私边界：接受 `ADR-009`，使用 `SHA-256(service_id + assignment_key) % 100` 形成固定百分位，同一服务和规范分配键重复解析不漂移，提高比例时既有低位灰度群体不重新洗牌。原始分配键不进入 Route、缓存键、日志、审计或 Outbox；Runtime Source 在同一发布查询中选择 primary 或 canary Release，Loader 再次复核 Route 结构、摘要和百分位结果。
+- 追加式发布控制：灰度、晋级和回滚均创建新的不可变 `ServiceRoute`，不修改 `AgentRelease` 或历史 Route。Route、publication、Service 版本、幂等请求、审计和 Outbox 在同一事务提交；`expected_generation` 与受锁当前态保证两个并发发布者只有一个胜者。回滚 `canary` 恢复稳定 primary，回滚已晋级 `active` 恢复紧邻前序 Route 的稳定 primary，并使用新的 `rollback` Route 保存事实。
+- 缓存与在途隔离：current 缓存升级为 `runtime-current:v2` 的固定 `0..99` 桶，最多每服务 100 个短租期键；发布、服务状态和系统助手自动 Route 变化均在事务提交后删除全部分桶及旧版单键，缓存失效失败只记录告警，不撤销数据库事实。新 Run 观察切换后的 Route，已冻结在途 Run 继续按原 Route、Route Version 和 Release 精确装载并完成。
+- 数据库与迁移：Revision `20260816_0049` 扩展灰度、晋级和回滚幂等操作，强化 Route 中灰度 Release 的工作空间、Agent、发布状态和快照门禁，并让 Run Trigger 只接受当前 `canary` 的 primary/canary Release 或当前 `active`、`rollback` 的唯一 primary。跨空间、跨 Agent、失效 Release、断裂 Route 链、跳跃 generation、非法 Run 绑定和绑定修改继续失败关闭；存在 P3-09 Route 或控制请求时拒绝降级到 active-only Runtime。
+- 专项验收：P3-07～P3-09 单元 `18/18`，P3-09 真实 PostgreSQL `3/3`，P3-07/P3-08 PostgreSQL 与完整 Migration 往返 `11/11`；覆盖固定分桶、100 桶主动失效、系统助手自动 Route 同步、灰度选择、晋级、回滚、Release 摘要不变、在途收敛、并发唯一胜者、失败事务零 Route/幂等请求/事件副作用和不安全降级拒绝。
+- 统一门禁：`./scripts/verify` 通过 React `42/42`、Python `625/625`、Ruff format/lint `568` 个文件、mypy strict `568` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器验收：通过 `./platform start` 使用最终工作树重建 API、Migration、Web 和 Worker 镜像，公共数据库真实升级至 Revision `20260816_0049`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker Lane 和 Scheduler 共 13 项通过。本节点未增加 HTTP 路由或页面，因此不执行浏览器验收。
+- 当前边界：本节点只完成内部路由用例和 Runtime 选择，不提前开放自定义知识 Agent、场景应用或 Open API 出口；三类出口由 `P3-10` 执行访问策略、API Key Scope、配额和限流后接入。基于 Release 质量、错误、延迟和成本指标的异常自动阻断仍由 `P3-12` 建设。
+- 提交：`6aa5a21`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布供应链门禁继续阻断。
-- 阶段 3 尚未完成灰度、回滚和服务出口，不能把当前单版本 Runtime 描述为完整 Agent 发布平台。
+- 阶段 3 尚未完成服务出口、控制台和 Release 运营监控，不能把当前内部路由能力描述为完整 Agent 发布平台。
 - LLM Grading、多模态图片问答、真实多源连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 均保持后置。
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理和 `P3-08` Runtime 隔离路由已通过，当前进入 `P3-09` 灰度发布与回滚；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理、`P3-08` Runtime 隔离路由和 `P3-09` 灰度发布与回滚已通过，当前进入 `P3-10` 服务出口；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
