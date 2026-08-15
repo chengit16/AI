@@ -49,7 +49,7 @@
 
 ### P3-02 Agent 生命周期与不可变发布事实
 
-- 状态：已完成，提交待本节点落库后回填。
+- 状态：已完成，提交 `6339144`。
 - 生命周期事实：在共享 `agents` 和 `agent_releases` 上区分 `system/custom` 写入边界，新增唯一当前 `AgentDraft`、只追加 `AgentDraftRevision`、绑定草稿 revision 的 `AgentReleaseCandidate` 和不可变 `AgentControlRequest`。系统知识助手仍由原 `assistant` 模块管理，自定义控制面读取系统或跨空间 Agent 时统一失败关闭。
 - 应用行为：支持自定义 Agent 创建、草稿乐观锁更新、历史 revision 查询、候选来源冻结、Agent 归档和自定义 Release 隔离读取；所有写操作使用稳定请求摘要和幂等键。并发创建可在唯一键竞争回滚后恢复同一提交结果，同键异参拒绝；业务事实、审计和 Outbox 保持同事务。应用层按创建、草稿、候选、归档和查询拆分职责，稳定 `AgentControlService` 接口未变化。
 - 不可变与演进：Revision `20260816_0042` 为 `agents`、`agent_releases` 兼容扩展，并新增四张工作空间表；数据库 Trigger 拒绝修改或删除草稿修订、幂等请求和 Release，候选只允许后续节点推进状态，不能篡改来源身份。生命周期清除仅能通过既有受限 GUC 删除；存在自定义 Agent 数据时拒绝降级，避免静默丢失草稿与候选。
@@ -57,7 +57,7 @@
 - 统一门禁：`./scripts/verify` 通过 React `42/42`、Python `565/565`、Ruff format/lint `515` 个文件、mypy strict `515` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、权限注册表、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。相对 `stage-2-complete` 及 `HEAD` 的同主版本契约兼容检查均通过。
 - 容器验收：重新构建 API、Migration、Web 和 Worker 镜像后，`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision `20260816_0042`、Valkey、五个 Worker Lane 和 Scheduler 共 13 项通过；公共数据库已真实升级。本节点未增加 HTTP 路由或页面，因此不执行浏览器验收。
 - 当前边界：候选只进入 `created`，不提前实现 P3-03 配置引用校验、P3-04 自动评估、P3-05 审批、P3-06 Release 生成、P3-07 服务路由或控制台页面。
-- 提交：待本节点验收提交后回填。
+- 提交：`6339144`。
 
 ## 4. 当前限制
 
