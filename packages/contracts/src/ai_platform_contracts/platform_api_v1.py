@@ -531,7 +531,9 @@ class IngestionJobResponse(typing.TypedDict):
     attempt_count: int
     available_at: str
     block_count: int | None
+    can_cancel: typing.NotRequired[bool]
     can_retry_manually: bool
+    cancelled_at: typing.NotRequired[str | None]
     completed_at: str | None
     created_at: str
     document_id: str
@@ -552,7 +554,9 @@ class IngestionJobResponse(typing.TypedDict):
     source_media_type: str
     source_name: str
     started_at: str | None
-    status: typing.Literal["queued", "running", "retry_wait", "succeeded", "failed"]
+    status: typing.Literal[
+        "queued", "running", "retry_wait", "succeeded", "failed", "cancelled", "timed_out"
+    ]
     updated_at: str
 
 

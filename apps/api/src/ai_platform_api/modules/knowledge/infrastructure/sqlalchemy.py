@@ -13,7 +13,7 @@ from ai_platform_backend.indexing.sqlalchemy import (
     deactivate_document_indexes,
     switch_active_document_index,
 )
-from ai_platform_backend.ingestion.domain import IngestionJob
+from ai_platform_backend.ingestion.domain import IngestionJob, IngestionJobStatus
 from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
@@ -43,6 +43,8 @@ from ai_platform_api.persistence.tables import (
     document_sources,
     document_versions,
     documents,
+    ingestion_job_attempts,
+    ingestion_job_stages,
     ingestion_jobs,
     knowledge_bases,
     workspace_memberships,
@@ -292,6 +294,9 @@ class SqlAlchemyKnowledgeRepository:
 
     def add_ingestion_job(self, ingestion_job: IngestionJob) -> None:
         self._session.execute(insert(ingestion_jobs).values(**_ingestion_job_values(ingestion_job)))
+        self._session.execute(
+            insert(ingestion_job_stages).values(**_ingestion_stage_values(ingestion_job))
+        )
 
     def list_ingestion_jobs(
         self,
@@ -352,7 +357,7 @@ class SqlAlchemyKnowledgeRepository:
                 .where(
                     ingestion_jobs.c.workspace_id == ingestion_job.workspace_id,
                     ingestion_jobs.c.ingestion_job_id == ingestion_job.ingestion_job_id,
-                    ingestion_jobs.c.status == "failed",
+                    ingestion_jobs.c.status.in_(("failed", "timed_out")),
                     ingestion_jobs.c.manual_retry_count == ingestion_job.manual_retry_count - 1,
                 )
                 .values(**_ingestion_job_values(ingestion_job))
@@ -360,6 +365,77 @@ class SqlAlchemyKnowledgeRepository:
         )
         if result.rowcount != 1:
             raise KnowledgeWriteConflictError
+        self._session.execute(
+            update(ingestion_job_stages)
+            .where(
+                ingestion_job_stages.c.workspace_id == ingestion_job.workspace_id,
+                ingestion_job_stages.c.ingestion_job_id == ingestion_job.ingestion_job_id,
+                ingestion_job_stages.c.status.in_(("failed", "timed_out")),
+            )
+            .values(
+                status="queued",
+                completed_at=None,
+                failure_stage=None,
+                error_code=None,
+                error_message=None,
+                updated_at=ingestion_job.updated_at,
+            )
+        )
+
+    def save_cancelled_ingestion_job(
+        self,
+        ingestion_job: IngestionJob,
+        *,
+        previous_status: IngestionJobStatus,
+    ) -> None:
+        """原子取消任务与活动 Attempt，使迟到 Worker 失去终态写入资格。"""
+
+        # 1. 任务状态必须仍与锁定时一致，否则拒绝覆盖并发产生的新终态。
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(ingestion_jobs)
+                .where(
+                    ingestion_jobs.c.workspace_id == ingestion_job.workspace_id,
+                    ingestion_jobs.c.ingestion_job_id == ingestion_job.ingestion_job_id,
+                    ingestion_jobs.c.status == previous_status,
+                )
+                .values(**_ingestion_job_values(ingestion_job))
+            ),
+        )
+        if result.rowcount != 1 or ingestion_job.cancelled_at is None:
+            raise KnowledgeWriteConflictError
+        # 2. 运行中任务必须恰好关闭一个 Attempt，随后阶段与任务共同形成取消终态。
+        attempt_result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(ingestion_job_attempts)
+                .where(
+                    ingestion_job_attempts.c.workspace_id == ingestion_job.workspace_id,
+                    ingestion_job_attempts.c.ingestion_job_id == ingestion_job.ingestion_job_id,
+                    ingestion_job_attempts.c.status == "running",
+                )
+                .values(status="cancelled", completed_at=ingestion_job.cancelled_at)
+            ),
+        )
+        expected_attempts = 1 if previous_status == "running" else 0
+        if attempt_result.rowcount != expected_attempts:
+            raise KnowledgeWriteConflictError
+        self._session.execute(
+            update(ingestion_job_stages)
+            .where(
+                ingestion_job_stages.c.workspace_id == ingestion_job.workspace_id,
+                ingestion_job_stages.c.ingestion_job_id == ingestion_job.ingestion_job_id,
+            )
+            .values(
+                status="cancelled",
+                completed_at=ingestion_job.cancelled_at,
+                failure_stage=None,
+                error_code=None,
+                error_message=None,
+                updated_at=ingestion_job.updated_at,
+            )
+        )
 
     def get_document_version(
         self,
@@ -649,6 +725,7 @@ def _ingestion_job_values(value: IngestionJob) -> dict[str, object]:
         "available_at": value.available_at,
         "claimed_by": value.claimed_by,
         "claim_until": value.claim_until,
+        "active_attempt_id": value.active_attempt_id,
         "requested_by_actor_id": value.requested_by_actor_id,
         "trace_id": value.trace_id,
         "traceparent": value.traceparent,
@@ -666,6 +743,29 @@ def _ingestion_job_values(value: IngestionJob) -> dict[str, object]:
         "manual_retry_count": value.manual_retry_count,
         "last_retried_by_actor_id": value.last_retried_by_actor_id,
         "last_retried_at": value.last_retried_at,
+        "cancelled_by_actor_id": value.cancelled_by_actor_id,
+        "cancelled_at": value.cancelled_at,
+        "created_at": value.created_at,
+        "updated_at": value.updated_at,
+    }
+
+
+def _ingestion_stage_values(value: IngestionJob) -> dict[str, object]:
+    """新任务只建立一个入库阶段，后续 Worker Attempt 均追加到该稳定父级。"""
+
+    return {
+        "job_stage_id": value.ingestion_job_id,
+        "workspace_id": value.workspace_id,
+        "ingestion_job_id": value.ingestion_job_id,
+        "stage_key": "ingestion",
+        "sequence_no": 1,
+        "status": value.status,
+        "attempt_count": 0,
+        "started_at": value.started_at,
+        "completed_at": value.completed_at,
+        "failure_stage": value.failure_stage,
+        "error_code": value.error_code,
+        "error_message": value.error_message,
         "created_at": value.created_at,
         "updated_at": value.updated_at,
     }
@@ -812,6 +912,7 @@ def _ingestion_job(value: Row[Any]) -> IngestionJob:
         updated_at=value.updated_at,
         claimed_by=value.claimed_by,
         claim_until=value.claim_until,
+        active_attempt_id=value.active_attempt_id,
         started_at=value.started_at,
         completed_at=value.completed_at,
         failure_stage=value.failure_stage,
@@ -826,6 +927,8 @@ def _ingestion_job(value: Row[Any]) -> IngestionJob:
         manual_retry_count=value.manual_retry_count,
         last_retried_by_actor_id=value.last_retried_by_actor_id,
         last_retried_at=value.last_retried_at,
+        cancelled_by_actor_id=value.cancelled_by_actor_id,
+        cancelled_at=value.cancelled_at,
     )
 
 

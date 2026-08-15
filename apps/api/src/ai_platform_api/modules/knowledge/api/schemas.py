@@ -185,7 +185,15 @@ class IngestionJobResponse(BaseModel):
     source_id: UUID
     source_name: str
     source_media_type: str
-    status: Literal["queued", "running", "retry_wait", "succeeded", "failed"]
+    status: Literal[
+        "queued",
+        "running",
+        "retry_wait",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "timed_out",
+    ]
     attempt_count: int
     max_attempts: int
     available_at: datetime
@@ -200,8 +208,10 @@ class IngestionJobResponse(BaseModel):
     page_count: int | None
     block_count: int | None
     can_retry_manually: bool
+    can_cancel: bool = False
     manual_retry_count: int
     last_retried_at: datetime | None
+    cancelled_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

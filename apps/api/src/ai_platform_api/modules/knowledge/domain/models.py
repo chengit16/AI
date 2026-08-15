@@ -8,7 +8,7 @@ from types import TracebackType
 from typing import Literal, Protocol
 from uuid import UUID
 
-from ai_platform_backend.ingestion.domain import IngestionJob
+from ai_platform_backend.ingestion.domain import IngestionJob, IngestionJobStatus
 from ai_platform_backend.integration.domain import AuditWriter
 
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
@@ -326,6 +326,13 @@ class KnowledgeRepository(Protocol):
     ) -> IngestionJob | None: ...
 
     def save_ingestion_job(self, ingestion_job: IngestionJob) -> None: ...
+
+    def save_cancelled_ingestion_job(
+        self,
+        ingestion_job: IngestionJob,
+        *,
+        previous_status: IngestionJobStatus,
+    ) -> None: ...
 
     def get_document_version(
         self,

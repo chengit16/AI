@@ -19,6 +19,8 @@ export const ingestionStatus = {
   retry_wait: { label: "等待重试", color: "warning" },
   succeeded: { label: "已完成", color: "success" },
   failed: { label: "失败", color: "error" },
+  cancelled: { label: "已取消", color: "default" },
+  timed_out: { label: "已超时", color: "error" },
 } as const satisfies Record<IngestionJob["status"], { label: string; color: string }>;
 
 /** 文档可见范围的中文标签。 */

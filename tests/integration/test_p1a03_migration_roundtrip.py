@@ -96,7 +96,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260815_0035"
+    assert current_revision(connection, schema) == "20260815_0036"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -120,6 +120,8 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "document_sources",
         "document_versions",
         "documents",
+        "ingestion_job_attempts",
+        "ingestion_job_stages",
         "ingestion_jobs",
         "index_versions",
         "knowledge_bases",
@@ -182,7 +184,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260815_0035"
+    assert current_revision(connection, schema) == "20260815_0036"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -261,7 +263,7 @@ def test_owner_knowledge_permissions_are_backfilled_for_existing_spaces(
     )
 
 
-def test_existing_clean_upload_is_backfilled_as_queued_ingestion_job(
+def test_existing_clean_upload_is_backfilled_and_cancelled_job_can_downgrade(
     migration_database: tuple[Config, Connection, str],
 ) -> None:
     config, connection, schema = migration_database
@@ -364,6 +366,40 @@ def test_existing_clean_upload_is_backfilled_as_queued_ingestion_job(
         UUID("10000000-0000-4000-8000-000000000319"),
         32,
         55,
+    )
+
+    # P2-02 的取消终态降级为阶段 1 可理解的失败态，同时清除阶段 2 专属取消元数据。
+    connection.execute(
+        text(
+            f"""
+            UPDATE "{schema}".ingestion_jobs
+               SET status = 'cancelled',
+                   completed_at = '2026-08-15T00:00:00Z',
+                   cancelled_by_actor_id = '10000000-0000-4000-8000-000000000319',
+                   cancelled_at = '2026-08-15T00:00:00Z',
+                   updated_at = '2026-08-15T00:00:00Z'
+             WHERE ingestion_job_id = '42000000-0000-4000-8000-000000000319'
+            """
+        )
+    )
+    connection.commit()
+
+    command.downgrade(config, "20260815_0035")
+    connection.commit()
+    downgraded = connection.execute(
+        text(
+            f"""
+            SELECT status, failure_stage, error_code, error_message
+              FROM "{schema}".ingestion_jobs
+             WHERE ingestion_job_id = '42000000-0000-4000-8000-000000000319'
+            """
+        )
+    ).one()
+    assert tuple(downgraded) == (
+        "failed",
+        "worker",
+        "INGESTION_JOB_CANCELLED",
+        "任务在降级前已取消",
     )
 
 

@@ -570,8 +570,10 @@ def _ingestion_job(value: IngestionJob) -> IngestionJobResponse:
         page_count=value.page_count,
         block_count=value.block_count,
         can_retry_manually=value.can_retry_manually,
+        can_cancel=value.can_cancel,
         manual_retry_count=value.manual_retry_count,
         last_retried_at=value.last_retried_at,
+        cancelled_at=value.cancelled_at,
         created_at=value.created_at,
         updated_at=value.updated_at,
     )

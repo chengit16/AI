@@ -30,8 +30,10 @@ const job: IngestionJob = {
   page_count: null,
   block_count: null,
   can_retry_manually: true,
+  can_cancel: false,
   manual_retry_count: 0,
   last_retried_at: null,
+  cancelled_at: null,
   created_at: "2026-08-14T10:00:00Z",
   updated_at: "2026-08-14T10:00:02Z",
 };
@@ -77,7 +79,42 @@ describe("P1D-07 知识生产表格", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     expect(onRetry).toHaveBeenCalledWith(job.ingestion_job_id);
-    expect(screen.getByText("不可重试")).toBeInTheDocument();
+    expect(screen.getByText("不可恢复")).toBeInTheDocument();
+  });
+
+  it("区分超时、取消和普通等待状态，避免把稳定终态显示为处理中", () => {
+    render(
+      <IngestionTable
+        items={[
+          {
+            ...job,
+            ingestion_job_id: "timed-out",
+            status: "timed_out",
+            error_code: "INGESTION_WORKER_LEASE_EXPIRED",
+            error_message: "合成租约已过期",
+          },
+          {
+            ...job,
+            ingestion_job_id: "cancelled",
+            status: "cancelled",
+            failure_stage: null,
+            error_code: null,
+            error_message: null,
+            cancelled_at: "2026-08-15T00:00:00Z",
+          },
+        ]}
+        isLoading={false}
+        canRetry={false}
+        isRetrying={false}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("已超时")).toBeInTheDocument();
+    expect(screen.getByText("INGESTION_WORKER_LEASE_EXPIRED")).toBeInTheDocument();
+    expect(screen.getByText("已取消")).toBeInTheDocument();
+    expect(screen.getByText("任务已由用户取消")).toBeInTheDocument();
+    expect(screen.queryByText("等待处理")).not.toBeInTheDocument();
   });
 
   it("解析成功后以服务端摘要确认当前文档版本就绪", () => {

@@ -63,19 +63,26 @@ export function IngestionTable({
     {
       title: "结果 / 失败定位",
       key: "result",
-      render: (_, record) =>
-        record.status === "failed" ? (
-          <div className="grid max-w-[360px] min-w-0 gap-[3px]">
-            <strong className="text-xs text-danger-text">{record.error_code ?? "UNKNOWN"}</strong>
-            <span className="overflow-hidden text-ellipsis whitespace-normal text-xs text-text-muted">
-              {record.error_message ?? "未提供错误详情"}
-            </span>
-          </div>
-        ) : (
+      render: (_, record) => {
+        if (record.status === "failed" || record.status === "timed_out") {
+          return (
+            <div className="grid max-w-[360px] min-w-0 gap-[3px]">
+              <strong className="text-xs text-danger-text">{record.error_code ?? "UNKNOWN"}</strong>
+              <span className="overflow-hidden text-ellipsis whitespace-normal text-xs text-text-muted">
+                {record.error_message ?? "未提供错误详情"}
+              </span>
+            </div>
+          );
+        }
+        if (record.status === "cancelled") {
+          return <span className="text-xs text-text-muted">任务已由用户取消</span>;
+        }
+        return (
           <span className="text-xs text-text-muted">
             {record.block_count === null ? "等待处理" : `${record.block_count} 个内容块`}
           </span>
-        ),
+        );
+      },
     },
     {
       title: "更新时间",
@@ -98,9 +105,9 @@ export function IngestionTable({
           >
             重试
           </Button>
-        ) : record.status === "failed" ? (
-          <Tooltip title="内容或格式错误需要修复后上传新版本">
-            <span className="text-xs text-text-muted">不可重试</span>
+        ) : record.status === "failed" || record.status === "timed_out" ? (
+          <Tooltip title="任务已达到恢复上限或错误不允许安全重放">
+            <span className="text-xs text-text-muted">不可恢复</span>
           </Tooltip>
         ) : null,
     },

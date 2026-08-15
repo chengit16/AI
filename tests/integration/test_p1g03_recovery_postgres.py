@@ -364,7 +364,8 @@ def test_logical_database_dump_restores_to_clean_database_and_survives_migration
     _create_database(recovery_database.database_url, source_name)
     _create_database(recovery_database.database_url, target_name)
     try:
-        command.upgrade(_migration_config(source_url), "head")
+        # 该用例属于阶段 1 发布证据，必须固定在当时的发布 Revision，不能随开发 head 漂移。
+        command.upgrade(_migration_config(source_url), "20260815_0035")
         source_engine = create_platform_engine(source_url, "public")
         source_sessions = create_session_factory(source_engine)
         try:
@@ -406,7 +407,7 @@ def test_logical_database_dump_restores_to_clean_database_and_survives_migration
         # 3. 恢复库降级一个 Revision 后重新升级，核心事实计数和最终 Revision 必须保持一致。
         target_config = _migration_config(target_url)
         command.downgrade(target_config, "-1")
-        command.upgrade(target_config, "head")
+        command.upgrade(target_config, "20260815_0035")
         target_engine = create_platform_engine(target_url, "public")
         try:
             with target_engine.connect() as connection:

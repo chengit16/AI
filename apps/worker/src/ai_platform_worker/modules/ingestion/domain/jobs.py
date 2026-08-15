@@ -20,6 +20,8 @@ class ClaimedIngestionJob:
     """保存由当前 Worker 租约保护的入库任务及领取标识。"""
 
     ingestion_job_id: UUID
+    job_stage_id: UUID
+    job_attempt_id: UUID
     workspace_id: UUID
     knowledge_base_id: UUID
     document_id: UUID
@@ -30,6 +32,7 @@ class ClaimedIngestionJob:
     source_media_type: str
     source_content_hash: str
     attempt_count: int
+    generation: int
     max_attempts: int
     claimed_by: str
     trace_id: str

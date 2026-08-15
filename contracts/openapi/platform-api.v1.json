@@ -18300,7 +18300,9 @@
               "running",
               "retry_wait",
               "succeeded",
-              "failed"
+              "failed",
+              "cancelled",
+              "timed_out"
             ],
             "title": "Status"
           },
@@ -18440,6 +18442,11 @@
             "type": "boolean",
             "title": "Can Retry Manually"
           },
+          "can_cancel": {
+            "type": "boolean",
+            "title": "Can Cancel",
+            "default": false
+          },
           "manual_retry_count": {
             "type": "integer",
             "title": "Manual Retry Count"
@@ -18455,6 +18462,18 @@
               }
             ],
             "title": "Last Retried At"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
           },
           "created_at": {
             "type": "string",

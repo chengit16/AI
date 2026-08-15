@@ -3070,8 +3070,15 @@ export type components = {
       readonly available_at: string;
       /** Block Count */
       readonly block_count: number | null;
+      /**
+       * Can Cancel
+       * @default false
+       */
+      readonly can_cancel: boolean;
       /** Can Retry Manually */
       readonly can_retry_manually: boolean;
+      /** Cancelled At */
+      readonly cancelled_at?: string | null;
       /** Completed At */
       readonly completed_at: string | null;
       /**
@@ -3134,7 +3141,8 @@ export type components = {
        * Status
        * @enum {string}
        */
-      readonly status: "queued" | "running" | "retry_wait" | "succeeded" | "failed";
+      readonly status:
+        "queued" | "running" | "retry_wait" | "succeeded" | "failed" | "cancelled" | "timed_out";
       /**
        * Updated At
        * Format: date-time

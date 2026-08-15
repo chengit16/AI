@@ -1374,8 +1374,10 @@ document_sources = Table(
     ),
 )
 
-# API 与 Worker 使用同一张入库任务表；复制到主 Metadata 后，Alembic 自动比较仍能看到完整外键。
+# API 与 Worker 共享任务、阶段和 Attempt Metadata，确保 Migration 能比较完整外键与约束。
 ingestion_jobs = ingestion_tables.ingestion_jobs.to_metadata(metadata)
+ingestion_job_stages = ingestion_tables.ingestion_job_stages.to_metadata(metadata)
+ingestion_job_attempts = ingestion_tables.ingestion_job_attempts.to_metadata(metadata)
 
 document_publications = Table(
     "document_publications",

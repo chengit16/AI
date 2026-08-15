@@ -121,6 +121,8 @@ class FakeStorage:
 def job(*, source_hash: str | None = None, attempt_count: int = 1) -> ClaimedIngestionJob:
     return ClaimedIngestionJob(
         ingestion_job_id=UUID("50000000-0000-4000-8000-000000000303"),
+        job_stage_id=UUID("50000000-0000-4000-8000-000000000303"),
+        job_attempt_id=UUID("51000000-0000-4000-8000-000000000303"),
         workspace_id=WORKSPACE_ID,
         knowledge_base_id=UUID("30000000-0000-4000-8000-000000000303"),
         document_id=UUID("40000000-0000-4000-8000-000000000303"),
@@ -131,6 +133,7 @@ def job(*, source_hash: str | None = None, attempt_count: int = 1) -> ClaimedIng
         source_media_type="text/plain",
         source_content_hash=source_hash or hashlib.sha256(CONTENT).hexdigest(),
         attempt_count=attempt_count,
+        generation=0,
         max_attempts=3,
         claimed_by="synthetic-worker",
         trace_id="1" * 32,
