@@ -7,7 +7,7 @@
 | 阶段 | 阶段 1：工作空间、企业治理与知识问答 MVP |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-15 |
-| 当前节点 | `P1G-03` 本地备份、恢复、导入导出与升级演练待开始 |
+| 当前节点 | `P1G-04` 全业务 UI/UX、响应式、可访问性和主色调评审待开始 |
 | `core_functional` | `passed` |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -626,6 +626,17 @@
 - 容器与边界：`./platform doctor` 确认 Web、API、MinIO、Tika、PostgreSQL、数据库 Revision `20260815_0035`、Valkey 和 Worker 八项诊断全部通过。模型主备场景使用固定 Mock Provider 验证路由、失败注入和可追溯事实，不代表真实供应商兼容性、质量或成本结论；容量、Linux、镜像扫描和 AI 质量继续保持 `not_run`/`not_configured`。
 - 提交：`40f5ba4`。
 
+### P1G-03 本地备份、恢复与升级演练
+
+- 状态：通过。
+- 恢复边界：接受 [`ADR-004`](../decisions/ADR-004-local-recovery-bundle.md)，将 PostgreSQL 业务事实、MinIO 物理对象快照、平台主密钥、主密钥版本和任务签名密钥组成 `ai-platform-recovery` V1 恢复包；Valkey、日志和 `runtime` 明确排除并在恢复后重建。`backup/restore` 与 `export/import` 共用 `.aiprb` 格式、Manifest、校验和安全解包流程，不维护第二套导入导出语义。
+- 加密与安全：恢复包使用独立 `0600` 恢复密钥执行流式 AES-256-GCM 加密，固定包头作为关联数据；Manifest 固定 Schema Revision、文件集合、大小和 SHA-256。错误密钥、密文或认证标签变更、缺失文件、非空目标、路径穿越、符号链接和对象引用缺口均失败关闭；恢复输出禁止写入 `.ai-platform` 事实目录，可能含明文密钥的临时解包目录在成功或异常退出时清理。
+- 恢复与轮换：恢复必须显式提供 `--confirm-replace`，替换前自动生成加密恢复点，随后停止 API、Worker、MinIO 和 Valkey，恢复 PostgreSQL、对象和文件密钥，清空可重建状态、执行 Migration、对象引用检查和八项诊断。主密钥轮换同样先备份，并在单一数据库事务中只重包裹供应商凭据数据密钥；供应商 Key 正文密文和数据 Nonce 保持不变，版本必须单调递增。
+- 自动验收：恢复包与密钥轮换单元/集成专项 `12/12` 通过，覆盖认证篡改、安全解包、对象快照往返、对象缺失检测和事务性数据密钥重包裹；真实 PG16 Custom Dump 恢复到隔离干净数据库后完成 `20260815_0034 → 20260815_0035` 降级再升级，核心账号和 388 个文档来源事实保持一致。统一 `./scripts/verify` 全部通过，包括 React `31/31`、Python `437/437`、Ruff、mypy strict（427 个源文件）、注释、UnoCSS、架构、契约、Secret Scanner、供应链和生产构建。
+- 真实本地备份：公共本地实例在同一停写窗口生成加密恢复包，备份前对象引用 `referenced=10, missing=0`，快照包含 44 个 MinIO 物理文件，Manifest Revision 为 `20260815_0035`；服务恢复后 `./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey 和 Worker 八项全部通过。为避免无必要覆盖当前公共合成实例，本节点未对该实例执行破坏性的 `./platform restore`；恢复正确性由隔离干净数据库、临时对象目录和加密包解包验证承担，后续故障演练仍必须使用独立目标或显式确认。
+- 当前边界：V1 MinIO 快照依赖本地固定 MinIO 物理格式，不等同于任意外部 S3 迁移；跨机器恢复必须把恢复加密密钥与包分开保管。在线零停机备份、定期保留清理、Linux、SaaS、外部 S3 和容量认证不进入本节点，也未引入真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+- 提交：`7dfcf0d`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、质量、成本或数据政策结论。
@@ -636,4 +647,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1G-02`，`core_functional=passed`，当前进入 `P1G-03`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前联合验收、统一门禁与 Revision `20260815_0035` 八项容器诊断均通过，知识问答、工作流、审批、个人/企业权限页面和跨空间安全恢复已经闭环；阶段整体结论仍等待备份演练、全业务 UI/UX 评审和 MVP 阶段关闭节点完成。
+`not_run`。阶段 0 已关闭；阶段 1 业务主线已完成至 `P1G-03`，`core_functional=passed`，当前进入 `P1G-04`；`P1S-00`～`P1S-05` 样式治理轨道与 `P1Q-01`～`P1Q-02` 注释治理已完成，后续代码直接执行 UnoCSS 完成态规范和增强后的前后端注释规范。当前联合验收、本地加密恢复、统一门禁与 Revision `20260815_0035` 八项容器诊断均通过，知识问答、工作流、审批、个人/企业权限页面、跨空间安全和本地恢复边界已经闭环；阶段整体结论仍等待全业务 UI/UX 评审和 MVP 阶段关闭节点完成。
