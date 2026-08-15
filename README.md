@@ -2,7 +2,7 @@
 
 本仓库用于建设同时支持个人空间和企业空间的 AI 智能平台。产品采用浏览器访问的 Web 形态，首期以 Docker Compose 在本地运行。
 
-阶段 0～2 已完成并冻结，本地个人版、企业版 MVP 及可靠性、数据治理与运营增强均已通过；下一建设阶段为阶段 3：Agent 控制面、发布、灰度与回滚。完整产品与架构设计见 [AI 智能平台 V2 架构设计](./ai-intelligent-platform-v2-design.md)，实时进度见 [项目进度看板](./docs/project-progress.md)。
+阶段 0～2 已完成并冻结，本地个人版、企业版 MVP 及可靠性、数据治理与运营增强均已通过；当前进入阶段 3：Agent 控制面、发布、灰度与回滚。完整产品与架构设计见 [AI 智能平台 V2 架构设计](./ai-intelligent-platform-v2-design.md)，实时进度见 [项目进度看板](./docs/project-progress.md)。
 
 ## 文档入口
 
@@ -17,6 +17,8 @@
 - [阶段 2 实施计划](./docs/stages/stage-2-plan.md)：可靠性、跨实例 SSE、可观测性、数据生命周期和故障演练建设顺序。
 - [阶段 2 验证报告](./docs/stages/stage-2-report.md)：阶段 2 的完整验证事实、限制和关闭结论。
 - [阶段 2 本地可靠性发布报告](./docs/releases/stage-2-local-reliability/README.md)：`0.2.0` ReleaseManifest、最终门禁和正式发布边界。
+- [阶段 3 实施计划](./docs/stages/stage-3-plan.md)：Agent 生命周期、测试评估、审批发布、服务路由、灰度和回滚建设顺序。
+- [阶段 3 验证报告](./docs/stages/stage-3-report.md)：阶段 3 的持续验证事实、限制和结论。
 - [供应链与许可证基线](./docs/supply-chain/README.md)：生产依赖 SBOM、漏洞审计和商业发布边界。
 - [前端 UI/UX 设计基线](./docs/design/ui-ux-baseline.md)：布局、动态菜单、响应式、可访问性和阶段 1 优化清单。
 - [Web 前端代码规范](./docs/governance/frontend-code-standards.md)：React、目录、状态、接口、样式、测试和质量门禁。
