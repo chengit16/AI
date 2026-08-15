@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
 import { errorMessage } from "@/api/client";
@@ -105,6 +106,7 @@ export function AppShell() {
     : navigation;
   const clearSession = useSessionStore((state) => state.clear);
   const accountId = useSessionStore((state) => state.accountId);
+  const mainContentRef = useRef<HTMLElement>(null);
   const logout = useMutation({
     mutationFn: logoutCurrentSession,
     onSettled: () => {
@@ -123,6 +125,11 @@ export function AppShell() {
     { key: "logout", label: "退出登录", icon: <LogOut size={16} /> },
   ];
 
+  useEffect(() => {
+    // 路由切换后把阅读起点交给主内容，避免键盘和读屏用户仍停留在旧导航位置。
+    mainContentRef.current?.focus({ preventScroll: true });
+  }, [location.pathname]);
+
   return (
     <div
       className={cn(
@@ -130,6 +137,9 @@ export function AppShell() {
         collapsed ? "grid-cols-[72px_minmax(0,1fr)]" : "grid-cols-[240px_minmax(0,1fr)]",
       )}
     >
+      <a className="ui-skip-link" href="#main-content">
+        跳到主要内容
+      </a>
       <aside className="sticky top-0 z-10 flex h-[100dvh] flex-col overflow-hidden border-r border-r-solid border-nav-divider bg-nav-bg text-nav-text nav-mobile:hidden landscape-mobile:hidden">
         <div className="flex h-16 items-center border-b border-b-solid border-nav-divider px-[18px]">
           <PlatformMark compact={collapsed} />
@@ -180,6 +190,7 @@ export function AppShell() {
           </div>
         </header>
         <main
+          ref={mainContentRef}
           className="mx-auto w-[min(1280px,100%)] px-[clamp(18px,3vw,40px)] pb-12 pt-8 outline-none nav-mobile:pt-6 landscape-mobile:pt-6"
           id="main-content"
           tabIndex={-1}
@@ -193,6 +204,11 @@ export function AppShell() {
         placement="left"
         size="default"
         open={mobileOpen}
+        focusable={{ focusTriggerAfterClose: false }}
+        afterOpenChange={(open) => {
+          // 移动抽屉关闭会把焦点还给触发按钮，此时需恢复路由变化后的主内容阅读起点。
+          if (!open) mainContentRef.current?.focus({ preventScroll: true });
+        }}
         onClose={() => setMobileOpen(false)}
       >
         <Navigation

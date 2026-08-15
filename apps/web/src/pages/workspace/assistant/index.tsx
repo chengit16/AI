@@ -29,6 +29,7 @@ export default function AssistantConversationsPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="问答会话未能加载"
         description={errorMessage(model.conversations.error)}
         action={<Button onClick={() => void model.conversations.refetch()}>重新加载</Button>}

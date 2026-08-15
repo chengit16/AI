@@ -1,6 +1,6 @@
 /** @description 应用根路由与会话状态的集成测试。 */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -48,7 +48,7 @@ describe("平台路由与运行状态", () => {
     ]);
   });
 
-  it("有发布快照时按后端返回的当前菜单加载页面", async () => {
+  it("按发布快照导航，并在路由变化后聚焦主内容", async () => {
     // 1. 建立已登录的合成个人空间，确保动态菜单请求具有可信会话上下文。
     useSessionStore
       .getState()
@@ -92,6 +92,20 @@ describe("平台路由与运行状态", () => {
                     permission_code: "workspace.overview.access",
                     icon_key: "layout-dashboard",
                     sort_order: 10,
+                    source: "system",
+                    status: "active",
+                    visible: true,
+                  },
+                  {
+                    menu_id: "status",
+                    menu_key: "navigation.workspace.status",
+                    parent_menu_id: "directory",
+                    name: "运行状态",
+                    menu_type: "page",
+                    page_resource_id: "80000000-0000-4000-8000-000000000005",
+                    permission_code: "system.runtime.access",
+                    icon_key: "activity",
+                    sort_order: 20,
                     source: "system",
                     status: "active",
                     visible: true,
@@ -154,6 +168,20 @@ describe("平台路由与运行状态", () => {
           ),
         );
       }
+      if (url.endsWith("/api/v1/health/ready")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              service: "ai-platform-api",
+              status: "ok",
+              version: "0.0.0",
+              environment: "local",
+              checks: { api: "ok", configuration: "ok" },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
       return Promise.resolve(
         new Response(JSON.stringify({ items: [] }), {
           status: 200,
@@ -166,6 +194,21 @@ describe("平台路由与运行状态", () => {
     renderApp(pageRoutes.WorkspaceOverviewPage);
 
     expect((await screen.findAllByText("已发布总览")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("link", { name: "跳到主要内容" })).toHaveAttribute(
+      "href",
+      "#main-content",
+    );
+
+    // 4. 下拉选项必须暴露业务名称，不能把内部 UUID 当成辅助技术可读标签。
+    const workspaceSelect = screen.getByRole("combobox", { name: "切换工作空间" });
+    fireEvent.mouseDown(workspaceSelect);
+    expect(await screen.findByRole("option", { name: "合成个人空间" })).toBeInTheDocument();
+    fireEvent.keyDown(workspaceSelect, { key: "Escape" });
+
+    // 5. 导航到另一个真实页面，确认路由变化后焦点回到主要内容阅读起点。
+    fireEvent.click(screen.getByRole("link", { name: "运行状态" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "运行状态" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("main")).toHaveFocus());
   });
 
   it("展示后端返回的健康状态", async () => {

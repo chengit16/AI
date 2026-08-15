@@ -47,6 +47,7 @@ export default function WorkspaceOrganizationPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="空间信息未能加载"
         description={errorMessage(workspaces.error)}
       />
@@ -55,6 +56,7 @@ export default function WorkspaceOrganizationPage() {
     return (
       <StateView
         kind="empty"
+        headingLevel={1}
         title="个人空间不需要组织架构"
         description="组织部门、岗位和成员归属只在企业空间中启用。"
       />
@@ -64,6 +66,7 @@ export default function WorkspaceOrganizationPage() {
     return (
       <StateView
         kind="denied"
+        headingLevel={1}
         title="当前账号没有组织治理权限"
         description="组织树、岗位和成员归属属于企业治理能力，仅空间所有者可查看和修改。"
       />
@@ -72,6 +75,7 @@ export default function WorkspaceOrganizationPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="组织数据未能加载"
         description={errorMessage(queryError)}
         action={

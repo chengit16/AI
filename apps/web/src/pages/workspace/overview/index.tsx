@@ -82,6 +82,7 @@ export default function WorkspaceOverviewPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="空间信息未能加载"
         description={errorMessage(workspaces.error ?? entitlement.error)}
         action={
@@ -207,13 +208,16 @@ export default function WorkspaceOverviewPage() {
               : "当前套餐不包含 Open API"}
           </p>
         </div>
-        <Switch
-          aria-label="Open API 开关"
-          checked={entitlement.data.open_api_enabled}
-          loading={toggleOpenApi.isPending}
-          disabled={!entitlement.data.open_api_allowed || !isOwner}
-          onChange={(checked) => toggleOpenApi.mutate(checked)}
-        />
+        <span className="grid h-11 w-11 flex-none place-items-center">
+          <Switch
+            aria-label="Open API 开关"
+            className="ui-touch-switch"
+            checked={entitlement.data.open_api_enabled}
+            loading={toggleOpenApi.isPending}
+            disabled={!entitlement.data.open_api_allowed || !isOwner}
+            onChange={(checked) => toggleOpenApi.mutate(checked)}
+          />
+        </span>
       </section>
 
       <Modal

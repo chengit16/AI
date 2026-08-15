@@ -7,7 +7,14 @@ import { getPlatformHealth } from "@/api/health";
 import { PageHeader } from "@/components/PageHeader/PageHeader";
 import { cn } from "@/utils/cn";
 
-const serviceLabels: Record<string, string> = { api: "平台 API", configuration: "配置中心" };
+const serviceLabels: Record<string, string> = {
+  api: "平台 API",
+  configuration: "配置中心",
+  postgres: "关系数据库",
+  valkey: "缓存与会话服务",
+  object_storage: "对象存储",
+  document_parser: "文档解析服务",
+};
 
 /** 展示本地运行健康快照；30 秒轮询只用于观测，不替代部署层 Readiness。 */
 export default function StatusPage() {
@@ -47,7 +54,11 @@ export default function StatusPage() {
             aria-live="polite"
           >
             <span className="grid h-12 w-12 flex-none place-items-center rounded-panel bg-accent text-nav-bg">
-              {health.isError ? <CircleAlert size={24} /> : <CheckCircle2 size={24} />}
+              {health.isError || !isHealthy ? (
+                <CircleAlert size={24} />
+              ) : (
+                <CheckCircle2 size={24} />
+              )}
             </span>
             <div>
               <p className="mb-2 mt-0 text-xs font-700 text-status-label">平台运行状态</p>

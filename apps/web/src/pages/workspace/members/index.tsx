@@ -59,6 +59,7 @@ export default function WorkspaceMembersPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="空间信息未能加载"
         description={errorMessage(workspaces.error)}
       />
@@ -67,6 +68,7 @@ export default function WorkspaceMembersPage() {
     return (
       <StateView
         kind="empty"
+        headingLevel={1}
         title="个人空间无需成员管理"
         description="个人空间只有唯一所有者。切换到企业空间后可邀请和治理成员。"
       />
@@ -78,6 +80,7 @@ export default function WorkspaceMembersPage() {
     return (
       <StateView
         kind="denied"
+        headingLevel={1}
         title="当前账号没有成员治理权限"
         description="企业普通成员可以使用空间能力，但成员清单与停用操作仅向空间所有者开放。"
       />
@@ -86,6 +89,7 @@ export default function WorkspaceMembersPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="成员清单未能加载"
         description={errorMessage(members.error)}
         action={<Button onClick={() => void members.refetch()}>重新加载</Button>}

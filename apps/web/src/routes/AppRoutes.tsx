@@ -41,6 +41,7 @@ function RequireMenuRoute({ children }: { children: ReactNode }) {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="菜单暂时无法加载"
         description="当前空间导航未能同步，请稍后重试。"
       />
@@ -50,6 +51,7 @@ function RequireMenuRoute({ children }: { children: ReactNode }) {
     return (
       <StateView
         kind="denied"
+        headingLevel={1}
         title="没有访问此页面的权限"
         description="当前空间的菜单发布或角色配置未向当前账号开放此页面。"
       />
@@ -65,6 +67,7 @@ function RequirePlatformAdministrator({ children }: { children: ReactNode }) {
     return (
       <StateView
         kind="denied"
+        headingLevel={1}
         title="仅平台管理员可访问"
         description="模型供应商和运行配置属于平台级治理，不接受工作空间角色授权。"
       />
@@ -74,6 +77,7 @@ function RequirePlatformAdministrator({ children }: { children: ReactNode }) {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="平台权限暂时无法核验"
         description="未能从服务端确认平台管理员资格，请稍后重试。"
       />

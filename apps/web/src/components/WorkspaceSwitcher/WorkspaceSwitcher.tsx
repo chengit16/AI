@@ -63,17 +63,11 @@ export function WorkspaceSwitcher() {
 
   const options = (workspaces.data ?? []).map((workspace) => ({
     value: workspace.workspace_id,
-    label: (
-      <span className="inline-flex items-center gap-2">
-        {workspace.workspace_type === "personal" ? (
-          <UserRound size={15} />
-        ) : (
-          <Building2 size={15} />
-        )}
-        {workspace.name}
-      </span>
-    ),
+    label: workspace.name,
   }));
+  const workspaceById = new Map(
+    (workspaces.data ?? []).map((workspace) => [workspace.workspace_id, workspace]),
+  );
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -82,6 +76,19 @@ export function WorkspaceSwitcher() {
         aria-label="切换工作空间"
         className="w-[min(260px,28vw)] nav-mobile:w-[min(210px,calc(100vw-196px))]"
         loading={workspaces.isLoading || switchMutation.isPending}
+        optionRender={(option) => {
+          const workspace = workspaceById.get(String(option.value));
+          return (
+            <span className="inline-flex items-center gap-2">
+              {workspace?.workspace_type === "personal" ? (
+                <UserRound size={15} aria-hidden="true" />
+              ) : (
+                <Building2 size={15} aria-hidden="true" />
+              )}
+              {option.label}
+            </span>
+          );
+        }}
         options={options}
         value={workspaceId ?? undefined}
         onChange={(value) => switchMutation.mutate(value)}

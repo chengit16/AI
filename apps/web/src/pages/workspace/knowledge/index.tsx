@@ -45,6 +45,7 @@ export default function KnowledgeProductionPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="知识生产台未能加载"
         description={errorMessage(model.bases.error)}
         action={<Button onClick={() => void model.bases.refetch()}>重新加载</Button>}

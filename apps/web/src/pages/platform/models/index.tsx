@@ -37,6 +37,7 @@ export default function PlatformModelsPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="模型治理数据未能加载"
         description={errorMessage(model.providers.error)}
         action={<Button onClick={() => void model.providers.refetch()}>重新加载</Button>}

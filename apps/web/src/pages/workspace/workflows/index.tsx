@@ -79,6 +79,7 @@ export default function WorkflowDesignPage() {
     return (
       <StateView
         kind="error"
+        headingLevel={1}
         title="工作流工作台未能加载"
         description={errorMessage(workflows.workflows.error)}
         action={<Button onClick={() => void workflows.workflows.refetch()}>重新加载</Button>}

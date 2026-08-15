@@ -1,6 +1,7 @@
 /** @description 应用级 Ant Design、TanStack Query 与错误边界 Provider 编排。 */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp, ConfigProvider } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import type { PropsWithChildren } from "react";
 
 const queryClient = new QueryClient({
@@ -14,6 +15,7 @@ const queryClient = new QueryClient({
 export function AppProviders({ children }: PropsWithChildren) {
   return (
     <ConfigProvider
+      locale={zhCN}
       theme={{
         token: {
           colorPrimary: "#176b52",
@@ -21,6 +23,7 @@ export function AppProviders({ children }: PropsWithChildren) {
           colorSuccess: "#2d7a59",
           colorWarning: "#b56f18",
           colorError: "#b43a3a",
+          colorTextSecondary: "#596a63",
           borderRadius: 6,
           controlHeight: 44,
           fontFamily: '"Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif',

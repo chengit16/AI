@@ -23,8 +23,29 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 :focus-visible {
-  outline: 3px solid rgba(23, 107, 82, 0.35);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-focus-contrast);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+.ui-skip-link {
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  padding: var(--space-3) var(--space-4);
+}
+.ui-skip-link:focus-visible {
+  transform: translateY(0);
+}
+.ui-touch-switch::after {
+  position: absolute;
+  inset-block: -11px;
+  inset-inline: 0;
+  content: "";
 }
 .ant-btn {
   min-height: 44px;

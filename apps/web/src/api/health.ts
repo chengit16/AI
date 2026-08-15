@@ -10,15 +10,33 @@ export interface HealthResponse {
   checks: Record<string, HealthStatus>;
 }
 
-/** 查询匿名就绪探针；非成功响应作为页面不可达状态抛出。 */
+function isHealthResponse(value: unknown): value is HealthResponse {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<HealthResponse>;
+  const checks = candidate.checks;
+  return (
+    typeof candidate.service === "string" &&
+    (candidate.status === "ok" || candidate.status === "degraded") &&
+    typeof candidate.version === "string" &&
+    typeof candidate.environment === "string" &&
+    Boolean(checks) &&
+    typeof checks === "object" &&
+    !Array.isArray(checks) &&
+    Object.values(checks).every((status) => status === "ok" || status === "degraded")
+  );
+}
+
+/** 查询匿名就绪探针；依赖降级的 503 响应仍保留结构化健康详情。 */
 export async function getPlatformHealth(): Promise<HealthResponse> {
   const response = await fetch("/api/v1/health/ready", {
     headers: { Accept: "application/json" },
   });
 
-  if (!response.ok) {
+  const payload: unknown = await response.json().catch(() => null);
+  // Readiness 使用 503 表示“进程可达但依赖未就绪”，页面必须与网络不可达明确区分。
+  if (response.status === 503 && isHealthResponse(payload)) return payload;
+  if (!response.ok || !isHealthResponse(payload)) {
     throw new Error(`健康检查失败：HTTP ${response.status}`);
   }
-
-  return response.json() as Promise<HealthResponse>;
+  return payload;
 }

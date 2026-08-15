@@ -11,6 +11,8 @@ interface StateViewProps {
   description: string;
   /** 可选恢复、重试或导航动作。 */
   action?: ReactNode;
+  /** 整页状态使用一级标题，页面内部状态保持二级标题。 */
+  headingLevel?: 1 | 2;
 }
 
 const icons = { empty: Inbox, error: AlertTriangle, denied: LockKeyhole };
@@ -20,8 +22,9 @@ const icons = { empty: Inbox, error: AlertTriangle, denied: LockKeyhole };
  *
  * 错误状态使用 `alert` 供辅助技术主动播报，其他状态使用 `status`，避免普通空态打断用户。
  */
-export function StateView({ kind, title, description, action }: StateViewProps) {
+export function StateView({ kind, title, description, action, headingLevel = 2 }: StateViewProps) {
   const Icon = icons[kind];
+  const Heading = headingLevel === 1 ? "h1" : "h2";
   return (
     <section
       className="ui-surface-panel flex min-h-45 items-center justify-center gap-4 p-8 text-text"
@@ -31,7 +34,7 @@ export function StateView({ kind, title, description, action }: StateViewProps) 
         <Icon size={22} aria-hidden="true" />
       </span>
       <div>
-        <h2 className="m-0 text-[17px]">{title}</h2>
+        <Heading className="m-0 text-[17px]">{title}</Heading>
         <p className="mb-0 mt-2 max-w-130 leading-[1.65] text-text-muted">{description}</p>
         {action && <div className="mt-4">{action}</div>}
       </div>
