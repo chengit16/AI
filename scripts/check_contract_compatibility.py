@@ -19,6 +19,7 @@ CONTRACT_DIRS = (
     "events",
     "errors",
     "release",
+    "agent-control",
 )
 
 

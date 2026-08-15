@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "baseline_id": "p3-01-v1",
+  "status": "frozen",
+  "state_machines": [
+    {
+      "entity": "agent",
+      "initial_state": "active",
+      "terminal_states": ["archived"],
+      "states": ["active", "archived"],
+      "transitions": [
+        { "from": "active", "to": "archived", "guard": "只有具有 agent.definition.archive 权限的主体可归档，历史 Release 保持可追溯。" }
+      ]
+    },
+    {
+      "entity": "agent_draft",
+      "initial_state": "editing",
+      "terminal_states": ["superseded"],
+      "states": ["editing", "testing", "test_failed", "ready_for_approval", "approval_pending", "approved", "rejected", "superseded"],
+      "transitions": [
+        { "from": "editing", "to": "testing", "guard": "草稿配置完整、引用可见且摘要已冻结为测试候选。" },
+        { "from": "testing", "to": "test_failed", "guard": "任一必需测试失败、超时或跳过。" },
+        { "from": "testing", "to": "ready_for_approval", "guard": "全部必需测试通过且测试证据不可变。" },
+        { "from": "test_failed", "to": "editing", "guard": "任何修订生成新的草稿 revision 并使旧测试证据失效。" },
+        { "from": "ready_for_approval", "to": "approval_pending", "guard": "审批实例绑定候选摘要、测试结果和策略版本。" },
+        { "from": "ready_for_approval", "to": "editing", "guard": "配置变化生成新 revision，旧候选不得继续审批。" },
+        { "from": "approval_pending", "to": "approved", "guard": "个人所有者或企业审批链按冻结策略全部通过。" },
+        { "from": "approval_pending", "to": "rejected", "guard": "任一有效审批动作拒绝该候选。" },
+        { "from": "approval_pending", "to": "editing", "guard": "配置或策略版本变化使当前审批上下文失效。" },
+        { "from": "rejected", "to": "editing", "guard": "修改后创建新 revision，拒绝记录保持不可变。" },
+        { "from": "approved", "to": "superseded", "guard": "发布快照已生成或新的草稿 revision 取代当前候选。" }
+      ]
+    },
+    {
+      "entity": "service",
+      "initial_state": "draft",
+      "terminal_states": ["archived"],
+      "states": ["draft", "active", "suspended", "archived"],
+      "transitions": [
+        { "from": "draft", "to": "active", "guard": "存在指向有效 AgentRelease 的可验证初始路由。" },
+        { "from": "active", "to": "suspended", "guard": "授权主体显式停止服务，现有 Run 仍按冻结版本完成。" },
+        { "from": "suspended", "to": "active", "guard": "当前路由和访问策略重新通过完整校验。" },
+        { "from": "draft", "to": "archived", "guard": "未发布服务可归档且保留审计。" },
+        { "from": "active", "to": "archived", "guard": "先停止新 Run，再保留历史路由与运行追溯。" },
+        { "from": "suspended", "to": "archived", "guard": "保留历史路由、Release 与运行追溯。" }
+      ]
+    }
+  ],
+  "invariants": [
+    {
+      "invariant_id": "p3_runtime_release_only",
+      "statement": "Runtime 只能装载不可变 AgentRelease，不能执行 AgentDraft、发布候选或可变当前配置。",
+      "enforcement_layers": ["contract", "application", "runtime", "integration_test"],
+      "evidence_sources": ["Runtime 装载请求", "AgentRelease 外键", "草稿执行拒绝测试"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p3_release_immutable",
+      "statement": "AgentRelease 创建后不能更新或删除，配置变化必须创建新发布版本。",
+      "enforcement_layers": ["contract", "application", "database", "integration_test"],
+      "evidence_sources": ["发布快照摘要", "数据库不可变触发器", "更新与删除拒绝测试"],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "p3_run_release_binding_unique",
+      "statement": "每个 Run 只绑定一个 service_id、路由版本和 agent_release_id，绑定后不能随当前路由漂移。",
+      "enforcement_layers": ["contract", "application", "database", "runtime", "integration_test"],
+      "evidence_sources": ["Run 绑定事实", "ServiceRoute 版本", "在途路由切换测试"],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "p3_snapshot_evidence_complete",
+      "statement": "发布快照必须固定配置、测试集、全部必需测试结果、审批实例、审批策略版本和对应摘要。",
+      "enforcement_layers": ["contract", "application", "database", "integration_test"],
+      "evidence_sources": ["Release Snapshot", "Evaluation Run", "Approval Instance"],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "p3_control_plane_runtime_isolation",
+      "statement": "控制面不可用时，已发布服务继续从独立发布事实装载并运行，不能回读草稿作为降级。",
+      "enforcement_layers": ["application", "runtime", "integration_test"],
+      "evidence_sources": ["控制面故障注入", "发布事实读取记录", "已发布 Run 结果"],
+      "failure_result": "rollback_required"
+    },
+    {
+      "invariant_id": "p3_publish_fail_closed",
+      "statement": "测试、审批、摘要、权限或引用任一门禁不满足时都不能生成 Release 或切换服务路由。",
+      "enforcement_layers": ["contract", "application", "policy", "database", "integration_test"],
+      "evidence_sources": ["发布门禁决策", "拒绝审计", "Release 与路由计数"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p3_route_change_only",
+      "statement": "灰度、晋级和回滚只追加版本化 ServiceRoute，不修改 AgentRelease 或历史路由事实。",
+      "enforcement_layers": ["contract", "application", "database", "integration_test"],
+      "evidence_sources": ["ServiceRoute 版本链", "AgentRelease 摘要", "回滚审计"],
+      "failure_result": "rollback_required"
+    },
+    {
+      "invariant_id": "p3_workspace_authorization",
+      "statement": "个人和企业空间的菜单、接口、配置引用、测试、审批与发布均执行可信工作空间和统一策略校验。",
+      "enforcement_layers": ["contract", "application", "policy", "database", "integration_test"],
+      "evidence_sources": ["可信 RequestContext", "策略决策", "跨空间越权测试"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p3_read_only_tools_only",
+      "statement": "阶段三发布快照只能引用已登记、已授权的只读工具，写工具和凭证内容不得进入配置。",
+      "enforcement_layers": ["contract", "application", "policy", "integration_test"],
+      "evidence_sources": ["工具注册表", "发布配置校验", "写工具拒绝测试"],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "p3_offline_deterministic_evaluation",
+      "statement": "阶段三自动评估只使用固定合成数据、确定性规则和现有指标，不调用 LLM Grading 或多模态图片问答。",
+      "enforcement_layers": ["contract", "application", "integration_test"],
+      "evidence_sources": ["评估策略版本", "数据集摘要", "模型调用记录"],
+      "failure_result": "release_blocked"
+    }
+  ],
+  "reserved_permissions": [
+    "agent.page.access",
+    "agent.definition.create",
+    "agent.definition.read",
+    "agent.definition.update",
+    "agent.definition.archive",
+    "agent.test.execute",
+    "agent.test.read",
+    "agent.release.request",
+    "agent.release.read",
+    "agent.release.approve",
+    "agent.release.publish",
+    "service.page.access",
+    "service.definition.create",
+    "service.definition.read",
+    "service.definition.update",
+    "service.route.canary",
+    "service.route.promote",
+    "service.route.rollback",
+    "agent.operations.read"
+  ],
+  "reserved_menus": [
+    { "menu_key": "workspace.agents", "menu_type": "page", "permission_code": "agent.page.access", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.agents.create", "menu_type": "button", "permission_code": "agent.definition.create", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.agents.update", "menu_type": "button", "permission_code": "agent.definition.update", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.agents.archive", "menu_type": "button", "permission_code": "agent.definition.archive", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.agents.test", "menu_type": "button", "permission_code": "agent.test.execute", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.agents.release_request", "menu_type": "button", "permission_code": "agent.release.request", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.agents.release_approve", "menu_type": "button", "permission_code": "agent.release.approve", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.agents.release_publish", "menu_type": "button", "permission_code": "agent.release.publish", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.services", "menu_type": "page", "permission_code": "service.page.access", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.services.create", "menu_type": "button", "permission_code": "service.definition.create", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.services.update", "menu_type": "button", "permission_code": "service.definition.update", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.services.canary", "menu_type": "button", "permission_code": "service.route.canary", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.services.promote", "menu_type": "button", "permission_code": "service.route.promote", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.services.rollback", "menu_type": "button", "permission_code": "service.route.rollback", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.agent_operations", "menu_type": "page", "permission_code": "agent.operations.read", "workspace_types": ["personal", "enterprise"] }
+  ],
+  "planned_api_operations": [
+    { "operation_id": "listAgents", "permission_code": "agent.definition.read", "menu_key": "workspace.agents", "surface": "browser" },
+    { "operation_id": "createAgent", "permission_code": "agent.definition.create", "menu_key": "workspace.agents.create", "surface": "browser" },
+    { "operation_id": "updateAgentDraft", "permission_code": "agent.definition.update", "menu_key": "workspace.agents.update", "surface": "browser" },
+    { "operation_id": "archiveAgent", "permission_code": "agent.definition.archive", "menu_key": "workspace.agents.archive", "surface": "browser" },
+    { "operation_id": "runAgentEvaluation", "permission_code": "agent.test.execute", "menu_key": "workspace.agents.test", "surface": "browser" },
+    { "operation_id": "listAgentEvaluations", "permission_code": "agent.test.read", "menu_key": "workspace.agents", "surface": "browser" },
+    { "operation_id": "requestAgentRelease", "permission_code": "agent.release.request", "menu_key": "workspace.agents.release_request", "surface": "browser" },
+    { "operation_id": "listAgentReleases", "permission_code": "agent.release.read", "menu_key": "workspace.agents", "surface": "browser" },
+    { "operation_id": "approveAgentRelease", "permission_code": "agent.release.approve", "menu_key": "workspace.agents.release_approve", "surface": "browser" },
+    { "operation_id": "publishAgentRelease", "permission_code": "agent.release.publish", "menu_key": "workspace.agents.release_publish", "surface": "browser" },
+    { "operation_id": "listServices", "permission_code": "service.definition.read", "menu_key": "workspace.services", "surface": "browser" },
+    { "operation_id": "createService", "permission_code": "service.definition.create", "menu_key": "workspace.services.create", "surface": "browser" },
+    { "operation_id": "updateService", "permission_code": "service.definition.update", "menu_key": "workspace.services.update", "surface": "browser" },
+    { "operation_id": "startServiceCanary", "permission_code": "service.route.canary", "menu_key": "workspace.services.canary", "surface": "browser" },
+    { "operation_id": "promoteServiceRoute", "permission_code": "service.route.promote", "menu_key": "workspace.services.promote", "surface": "browser" },
+    { "operation_id": "rollbackServiceRoute", "permission_code": "service.route.rollback", "menu_key": "workspace.services.rollback", "surface": "browser" },
+    { "operation_id": "getAgentReleaseOperations", "permission_code": "agent.operations.read", "menu_key": "workspace.agent_operations", "surface": "browser" },
+    { "operation_id": "invokePublishedService", "permission_code": "service.definition.read", "menu_key": "workspace.services", "surface": "open_api" },
+    { "operation_id": "loadAgentReleaseSnapshot", "permission_code": "agent.release.read", "menu_key": "workspace.agents", "surface": "runtime_internal" }
+  ],
+  "integration_event_types": [
+    "agent.draft.changed",
+    "agent.test.completed",
+    "agent.release.requested",
+    "agent.release.published",
+    "service.state.changed",
+    "service.route.canary_started",
+    "service.route.promoted",
+    "service.route.rolled_back"
+  ],
+  "evaluation_policy": {
+    "required_check_codes": ["functional", "authorization", "prompt_injection", "citation", "output_contract"],
+    "failure_handling": "block_release",
+    "timeout_handling": "count_as_failure",
+    "skipped_handling": "count_as_failure",
+    "online_llm_grading": false,
+    "multimodal_image_qa": false
+  },
+  "approval_modes": [
+    { "workspace_type": "personal", "approver_source": "workspace_owner", "minimum_levels": 1, "self_approval": "allowed_for_owner" },
+    { "workspace_type": "enterprise", "approver_source": "approval_policy", "minimum_levels": 1, "self_approval": "policy_defined" }
+  ],
+  "deferred_capabilities": [
+    "saas",
+    "go_runtime",
+    "real_data_source_connectors",
+    "llm_grading",
+    "multimodal_image_qa",
+    "channel_gateway",
+    "durable_run",
+    "external_write_tools"
+  ]
+}

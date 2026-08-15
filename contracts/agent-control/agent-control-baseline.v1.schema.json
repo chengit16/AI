@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/agent-control/agent-control-baseline.v1.schema.json",
+  "title": "Agent 控制面阶段基线 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "status",
+    "state_machines",
+    "invariants",
+    "reserved_permissions",
+    "reserved_menus",
+    "planned_api_operations",
+    "integration_event_types",
+    "evaluation_policy",
+    "approval_modes",
+    "deferred_capabilities"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "baseline_id": { "const": "p3-01-v1" },
+    "status": { "const": "frozen" },
+    "state_machines": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/state_machine" }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 10,
+      "items": { "$ref": "#/$defs/invariant" }
+    },
+    "reserved_permissions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/permission_code" }
+    },
+    "reserved_menus": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/menu_reservation" }
+    },
+    "planned_api_operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/api_operation" }
+    },
+    "integration_event_types": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/event_type" }
+    },
+    "evaluation_policy": { "$ref": "#/$defs/evaluation_policy" },
+    "approval_modes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/approval_mode" }
+    },
+    "deferred_capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "saas",
+          "go_runtime",
+          "real_data_source_connectors",
+          "llm_grading",
+          "multimodal_image_qa",
+          "channel_gateway",
+          "durable_run",
+          "external_write_tools"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "registry_key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "permission_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "guard"],
+      "properties": {
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "guard": { "type": "string", "minLength": 1 }
+      }
+    },
+    "state_machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "initial_state", "terminal_states", "states", "transitions"],
+      "properties": {
+        "entity": { "enum": ["agent", "agent_draft", "service"] },
+        "initial_state": { "type": "string", "minLength": 1 },
+        "terminal_states": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "transitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/transition" }
+        }
+      }
+    },
+    "invariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invariant_id", "statement", "enforcement_layers", "evidence_sources", "failure_result"],
+      "properties": {
+        "invariant_id": { "type": "string", "pattern": "^p3_[a-z0-9_]+$" },
+        "statement": { "type": "string", "minLength": 1 },
+        "enforcement_layers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["contract", "application", "database", "policy", "runtime", "integration_test"] }
+        },
+        "evidence_sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "failure_result": { "enum": ["fail_closed", "release_blocked", "rollback_required"] }
+      }
+    },
+    "menu_reservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["menu_key", "menu_type", "permission_code", "workspace_types"],
+      "properties": {
+        "menu_key": { "$ref": "#/$defs/registry_key" },
+        "menu_type": { "enum": ["page", "button"] },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "workspace_types": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["personal", "enterprise"] }
+        }
+      }
+    },
+    "api_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "permission_code", "menu_key", "surface"],
+      "properties": {
+        "operation_id": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]+$" },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "menu_key": { "$ref": "#/$defs/registry_key" },
+        "surface": { "enum": ["browser", "open_api", "runtime_internal"] }
+      }
+    },
+    "evaluation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_check_codes",
+        "failure_handling",
+        "timeout_handling",
+        "skipped_handling",
+        "online_llm_grading",
+        "multimodal_image_qa"
+      ],
+      "properties": {
+        "required_check_codes": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["functional", "authorization", "prompt_injection", "citation", "output_contract"]
+          }
+        },
+        "failure_handling": { "const": "block_release" },
+        "timeout_handling": { "const": "count_as_failure" },
+        "skipped_handling": { "const": "count_as_failure" },
+        "online_llm_grading": { "const": false },
+        "multimodal_image_qa": { "const": false }
+      }
+    },
+    "approval_mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_type", "approver_source", "minimum_levels", "self_approval"],
+      "properties": {
+        "workspace_type": { "enum": ["personal", "enterprise"] },
+        "approver_source": { "enum": ["workspace_owner", "approval_policy"] },
+        "minimum_levels": { "type": "integer", "minimum": 1 },
+        "self_approval": { "enum": ["allowed_for_owner", "policy_defined"] }
+      }
+    }
+  }
+}

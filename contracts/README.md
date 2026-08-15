@@ -13,6 +13,7 @@
 | `errors/`        | 稳定错误码目录                                               |
 | `release/`       | `ReleaseManifest`、兼容矩阵及运行组合规则                    |
 | `reliability/`   | 可靠性不变量、SLO、保留期、传播时限和故障场景契约            |
+| `agent-control/` | Agent 草稿、发布快照、服务路由、运行绑定和阶段安全基线       |
 | `fixtures/`      | Python 和未来 Go 实现共用的 Golden Fixtures                  |
 
 ## 2. 版本规则
@@ -31,6 +32,7 @@
 - `field_mask` 和 `resource_scope` 由数据责任模块执行，代理层不能自行降低约束。
 - SSE 和集成事件的 `event_id` 用于幂等，业务顺序分别由 `sequence_no` 和 `aggregate_version` 表达。
 - 内部任务信封必须在生产者签名、消费者验签后才能恢复可信主体和 Trace；Broker 中的普通载荷不构成身份事实。
+- Agent Runtime 只能装载不可变 `AgentRelease`；草稿、候选、测试结果或当前配置不能通过旁路成为运行输入。
 
 ## 4. 验证
 

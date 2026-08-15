@@ -64,6 +64,20 @@ def test_core_domain_contract_fixture() -> None:
     )
 
 
+def test_agent_control_contract_fixture() -> None:
+    assert_valid(
+        "agent-control/agent-control.v1.schema.json",
+        "fixtures/agent-control.v1.valid.json",
+    )
+
+
+def test_agent_control_baseline_contract() -> None:
+    assert_valid(
+        "agent-control/agent-control-baseline.v1.schema.json",
+        "agent-control/agent-control-baseline.v1.json",
+    )
+
+
 def test_policy_contract_fixture() -> None:
     assert_valid(
         "policy/decision.v1.schema.json",
@@ -181,6 +195,14 @@ def test_error_codes_are_unique_and_stable() -> None:
         "MODEL_PROVIDER_PROBE_FAILED",
         "MODEL_PROVIDER_DATA_POLICY_DENIED",
         "MODEL_PROVIDER_CREDENTIAL_UNAVAILABLE",
+        "AGENT_CONFIGURATION_INVALID",
+        "AGENT_LIFECYCLE_CONFLICT",
+        "AGENT_TEST_GATE_FAILED",
+        "AGENT_RELEASE_APPROVAL_REQUIRED",
+        "AGENT_RELEASE_IMMUTABLE",
+        "AGENT_RUNTIME_RELEASE_REQUIRED",
+        "SERVICE_ROUTE_CONFLICT",
+        "SERVICE_ROUTE_UNAVAILABLE",
         "SSE_EVENT_EXPIRED",
         "ORGANIZATION_CONFLICT",
         "ROLE_CONFLICT",

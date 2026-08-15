@@ -1,0 +1,398 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/agent-control/agent-control.v1.schema.json",
+  "title": "Agent 控制面核心事实契约 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "agent_draft",
+    "release_candidate",
+    "agent_release",
+    "service",
+    "service_route",
+    "run_binding"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "agent": { "$ref": "#/$defs/agent" },
+    "agent_draft": { "$ref": "#/$defs/agent_draft" },
+    "release_candidate": { "$ref": "#/$defs/release_candidate" },
+    "agent_release": { "$ref": "#/$defs/agent_release" },
+    "service": { "$ref": "#/$defs/service" },
+    "service_route": { "$ref": "#/$defs/service_route" },
+    "run_binding": { "$ref": "#/$defs/run_binding" }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "workspace_id",
+        "name",
+        "status",
+        "created_by_actor_id",
+        "created_at",
+        "updated_at",
+        "version"
+      ],
+      "properties": {
+        "agent_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "status": { "enum": ["active", "archived"] },
+        "created_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "created_at": { "$ref": "#/$defs/timestamp" },
+        "updated_at": { "$ref": "#/$defs/timestamp" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "agent_configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt_version_id",
+        "runtime_config_version_id",
+        "knowledge_scope_version_ids",
+        "workflow_release_id",
+        "read_only_tools",
+        "output_schema_version_id",
+        "safety_policy_version_id",
+        "limits"
+      ],
+      "properties": {
+        "prompt_version_id": { "$ref": "#/$defs/uuid" },
+        "runtime_config_version_id": { "$ref": "#/$defs/uuid" },
+        "knowledge_scope_version_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uuid" }
+        },
+        "workflow_release_id": {
+          "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "read_only_tools": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/read_only_tool" }
+        },
+        "output_schema_version_id": { "$ref": "#/$defs/uuid" },
+        "safety_policy_version_id": { "$ref": "#/$defs/uuid" },
+        "limits": { "$ref": "#/$defs/runtime_limits" }
+      }
+    },
+    "read_only_tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_id", "tool_version", "access_mode", "permission_code"],
+      "properties": {
+        "tool_id": { "$ref": "#/$defs/uuid" },
+        "tool_version": { "type": "integer", "minimum": 1 },
+        "access_mode": { "const": "read" },
+        "permission_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+        }
+      }
+    },
+    "runtime_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_execution_seconds",
+        "max_cost_microunits"
+      ],
+      "properties": {
+        "max_input_tokens": { "type": "integer", "minimum": 1 },
+        "max_output_tokens": { "type": "integer", "minimum": 1 },
+        "max_execution_seconds": { "type": "integer", "minimum": 1, "maximum": 600 },
+        "max_cost_microunits": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "agent_draft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "draft_id",
+        "agent_id",
+        "workspace_id",
+        "revision",
+        "status",
+        "configuration",
+        "config_hash",
+        "updated_by_actor_id",
+        "updated_at"
+      ],
+      "properties": {
+        "draft_id": { "$ref": "#/$defs/uuid" },
+        "agent_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "status": {
+          "enum": [
+            "editing",
+            "testing",
+            "test_failed",
+            "ready_for_approval",
+            "approval_pending",
+            "approved",
+            "rejected",
+            "superseded"
+          ]
+        },
+        "configuration": { "$ref": "#/$defs/agent_configuration" },
+        "config_hash": { "$ref": "#/$defs/sha256" },
+        "updated_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "updated_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "required_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_code", "status", "evidence_hash"],
+      "properties": {
+        "check_code": {
+          "enum": [
+            "functional",
+            "authorization",
+            "prompt_injection",
+            "citation",
+            "output_contract"
+          ]
+        },
+        "status": { "const": "passed" },
+        "evidence_hash": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "evaluation_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluation_run_id",
+        "dataset_version",
+        "evaluation_policy_version_id",
+        "status",
+        "required_checks",
+        "completed_at"
+      ],
+      "properties": {
+        "evaluation_run_id": { "$ref": "#/$defs/uuid" },
+        "dataset_version": { "type": "string", "pattern": "^p3[0-9]{2}-[a-z0-9-]+-v[1-9][0-9]*$" },
+        "evaluation_policy_version_id": { "$ref": "#/$defs/uuid" },
+        "status": { "const": "passed" },
+        "required_checks": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/required_check" }
+        },
+        "completed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "approval_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approval_instance_id",
+        "approval_policy_version_id",
+        "candidate_hash",
+        "status",
+        "approved_at"
+      ],
+      "properties": {
+        "approval_instance_id": { "$ref": "#/$defs/uuid" },
+        "approval_policy_version_id": { "$ref": "#/$defs/uuid" },
+        "candidate_hash": { "$ref": "#/$defs/sha256" },
+        "status": { "const": "approved" },
+        "approved_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "release_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "agent_id",
+        "draft_id",
+        "workspace_id",
+        "draft_revision",
+        "candidate_hash",
+        "config_hash",
+        "status",
+        "evaluation",
+        "approval",
+        "created_at"
+      ],
+      "properties": {
+        "candidate_id": { "$ref": "#/$defs/uuid" },
+        "agent_id": { "$ref": "#/$defs/uuid" },
+        "draft_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "draft_revision": { "type": "integer", "minimum": 1 },
+        "candidate_hash": { "$ref": "#/$defs/sha256" },
+        "config_hash": { "$ref": "#/$defs/sha256" },
+        "status": { "const": "approved" },
+        "evaluation": { "$ref": "#/$defs/evaluation_evidence" },
+        "approval": { "$ref": "#/$defs/approval_evidence" },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "release_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_schema_version",
+        "source_draft_id",
+        "source_draft_revision",
+        "configuration",
+        "evaluation",
+        "approval"
+      ],
+      "properties": {
+        "snapshot_schema_version": { "const": 1 },
+        "source_draft_id": { "$ref": "#/$defs/uuid" },
+        "source_draft_revision": { "type": "integer", "minimum": 1 },
+        "configuration": { "$ref": "#/$defs/agent_configuration" },
+        "evaluation": { "$ref": "#/$defs/evaluation_evidence" },
+        "approval": { "$ref": "#/$defs/approval_evidence" }
+      }
+    },
+    "agent_release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "release_id",
+        "agent_id",
+        "workspace_id",
+        "release_version",
+        "status",
+        "candidate_hash",
+        "config_hash",
+        "snapshot_hash",
+        "snapshot",
+        "released_by_actor_id",
+        "released_at"
+      ],
+      "properties": {
+        "release_id": { "$ref": "#/$defs/uuid" },
+        "agent_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "release_version": { "type": "integer", "minimum": 1 },
+        "status": { "const": "released" },
+        "candidate_hash": { "$ref": "#/$defs/sha256" },
+        "config_hash": { "$ref": "#/$defs/sha256" },
+        "snapshot_hash": { "$ref": "#/$defs/sha256" },
+        "snapshot": { "$ref": "#/$defs/release_snapshot" },
+        "released_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "released_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_id",
+        "workspace_id",
+        "name",
+        "service_type",
+        "status",
+        "access_policy_version_id",
+        "version"
+      ],
+      "properties": {
+        "service_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "service_type": {
+          "enum": ["system_assistant", "custom_knowledge_agent", "scenario_application", "open_api"]
+        },
+        "status": { "enum": ["draft", "active", "suspended", "archived"] },
+        "access_policy_version_id": { "$ref": "#/$defs/uuid" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "service_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route_id",
+        "service_id",
+        "workspace_id",
+        "route_version",
+        "route_mode",
+        "primary_release_id",
+        "canary_release_id",
+        "canary_percent",
+        "previous_route_id",
+        "route_hash",
+        "created_by_actor_id",
+        "created_at"
+      ],
+      "properties": {
+        "route_id": { "$ref": "#/$defs/uuid" },
+        "service_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "route_version": { "type": "integer", "minimum": 1 },
+        "route_mode": { "enum": ["active", "canary", "rollback"] },
+        "primary_release_id": { "$ref": "#/$defs/uuid" },
+        "canary_release_id": {
+          "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "canary_percent": { "type": "integer", "minimum": 0, "maximum": 99 },
+        "previous_route_id": {
+          "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "route_hash": { "$ref": "#/$defs/sha256" },
+        "created_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "route_mode": { "const": "canary" } } },
+          "then": {
+            "properties": {
+              "canary_release_id": { "$ref": "#/$defs/uuid" },
+              "canary_percent": { "minimum": 1, "maximum": 99 }
+            }
+          },
+          "else": {
+            "properties": {
+              "canary_release_id": { "type": "null" },
+              "canary_percent": { "const": 0 }
+            }
+          }
+        }
+      ]
+    },
+    "run_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "workspace_id",
+        "service_id",
+        "service_route_id",
+        "service_route_version",
+        "agent_release_id",
+        "bound_at"
+      ],
+      "properties": {
+        "run_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "service_id": { "$ref": "#/$defs/uuid" },
+        "service_route_id": { "$ref": "#/$defs/uuid" },
+        "service_route_version": { "type": "integer", "minimum": 1 },
+        "agent_release_id": { "$ref": "#/$defs/uuid" },
+        "bound_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}

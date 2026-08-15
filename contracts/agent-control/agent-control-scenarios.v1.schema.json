@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/agent-control/agent-control-scenarios.v1.schema.json",
+  "title": "Agent 控制面合成验收场景 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_version",
+    "baseline_ref",
+    "synthetic",
+    "description",
+    "categories",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "dataset_version": { "const": "p3-01-v1" },
+    "baseline_ref": { "const": "contracts/agent-control/agent-control-baseline.v1.json" },
+    "synthetic": { "const": true },
+    "description": { "type": "string", "minLength": 1 },
+    "categories": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/category" }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 16,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "category": {
+      "enum": [
+        "lifecycle",
+        "runtime_boundary",
+        "evaluation_gate",
+        "approval_gate",
+        "workspace_isolation",
+        "immutability",
+        "control_plane_outage",
+        "routing",
+        "canary",
+        "rollback",
+        "concurrency",
+        "menu_authorization",
+        "tool_boundary"
+      ]
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "category",
+        "workspace_type",
+        "synthetic",
+        "preconditions",
+        "action",
+        "expected",
+        "cleanup"
+      ],
+      "properties": {
+        "case_id": { "type": "string", "pattern": "^p301-[a-z0-9-]+-[0-9]{3}$" },
+        "category": { "$ref": "#/$defs/category" },
+        "workspace_type": { "enum": ["personal", "enterprise", "not_applicable"] },
+        "synthetic": { "const": true },
+        "preconditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["surface", "operation", "input_kind"],
+          "properties": {
+            "surface": { "enum": ["control_plane", "runtime", "menu", "api"] },
+            "operation": { "type": "string", "minLength": 1 },
+            "input_kind": { "enum": ["agent_draft", "release_candidate", "agent_release", "service_route", "permission_context", "tool_reference"] }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome",
+            "error_code",
+            "retryable",
+            "runtime_release_source",
+            "route_behavior",
+            "duplicate_side_effects",
+            "cross_workspace_exposure",
+            "verified_invariants",
+            "evidence_sources"
+          ],
+          "properties": {
+            "outcome": { "enum": ["allowed", "denied", "continues"] },
+            "error_code": { "type": ["string", "null"] },
+            "retryable": { "type": "boolean" },
+            "runtime_release_source": { "enum": ["agent_release", "none"] },
+            "route_behavior": { "enum": ["unchanged", "selected_release", "rolled_back", "not_applicable"] },
+            "duplicate_side_effects": { "const": 0 },
+            "cross_workspace_exposure": { "const": false },
+            "verified_invariants": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^p3_[a-z0-9_]+$" }
+            },
+            "evidence_sources": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

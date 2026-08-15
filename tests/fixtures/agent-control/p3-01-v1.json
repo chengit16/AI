@@ -1,0 +1,364 @@
+{
+  "schema_version": 1,
+  "dataset_version": "p3-01-v1",
+  "baseline_ref": "contracts/agent-control/agent-control-baseline.v1.json",
+  "synthetic": true,
+  "description": "阶段三 Agent 控制面全合成验收基线，不包含真实客户、Prompt、文档、凭证或供应商数据。",
+  "categories": [
+    "lifecycle",
+    "runtime_boundary",
+    "evaluation_gate",
+    "approval_gate",
+    "workspace_isolation",
+    "immutability",
+    "control_plane_outage",
+    "routing",
+    "canary",
+    "rollback",
+    "concurrency",
+    "menu_authorization",
+    "tool_boundary"
+  ],
+  "cases": [
+    {
+      "case_id": "p301-personal-owner-release-001",
+      "category": "lifecycle",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["个人空间所有者创建的候选已通过全部必需测试。", "审批绑定候选摘要和个人所有者策略。"],
+      "action": { "surface": "control_plane", "operation": "由个人空间所有者批准并生成发布快照", "input_kind": "release_candidate" },
+      "expected": {
+        "outcome": "allowed",
+        "error_code": null,
+        "retryable": false,
+        "runtime_release_source": "agent_release",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_snapshot_evidence_complete", "p3_publish_fail_closed", "p3_workspace_authorization"],
+        "evidence_sources": ["个人所有者审批实例", "Release Snapshot 与摘要", "发布审计和 Outbox"]
+      },
+      "cleanup": ["删除合成空间内尚未进入历史保留期的测试候选。"]
+    },
+    {
+      "case_id": "p301-enterprise-multilevel-release-002",
+      "category": "approval_gate",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["企业审批策略包含两个顺序层级。", "两个层级的合成审批人均处于活动成员状态。"],
+      "action": { "surface": "control_plane", "operation": "完成企业多级审批并生成唯一发布快照", "input_kind": "release_candidate" },
+      "expected": {
+        "outcome": "allowed",
+        "error_code": null,
+        "retryable": false,
+        "runtime_release_source": "agent_release",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_snapshot_evidence_complete", "p3_publish_fail_closed", "p3_workspace_authorization"],
+        "evidence_sources": ["冻结的企业审批策略版本", "两级审批动作", "唯一 AgentRelease"]
+      },
+      "cleanup": ["清理合成企业空间的活动测试配置，保留不可变审批证据。"]
+    },
+    {
+      "case_id": "p301-draft-runtime-denied-003",
+      "category": "runtime_boundary",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["AgentDraft 处于 editing 状态。", "当前服务没有指向该草稿的有效 Release。"],
+      "action": { "surface": "runtime", "operation": "尝试将 AgentDraft 直接作为运行输入", "input_kind": "agent_draft" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "AGENT_RUNTIME_RELEASE_REQUIRED",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_runtime_release_only", "p3_publish_fail_closed"],
+        "evidence_sources": ["Runtime 输入类型拒绝", "不存在新增 Run", "拒绝审计"]
+      },
+      "cleanup": ["清理未执行的合成草稿。"]
+    },
+    {
+      "case_id": "p301-functional-test-failed-004",
+      "category": "evaluation_gate",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["固定测试集中的功能样本失败。", "候选没有通过发布阈值。"],
+      "action": { "surface": "control_plane", "operation": "请求发布测试未达标的候选", "input_kind": "release_candidate" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "AGENT_TEST_GATE_FAILED",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_publish_fail_closed", "p3_offline_deterministic_evaluation"],
+        "evidence_sources": ["失败测试样本", "测试门禁结论", "Release 计数不变"]
+      },
+      "cleanup": ["清理失败候选，保留不可变测试结果。"]
+    },
+    {
+      "case_id": "p301-security-test-skipped-005",
+      "category": "evaluation_gate",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["提示注入必需测试被标记为 skipped。", "普通质量规则均通过。"],
+      "action": { "surface": "control_plane", "operation": "请求发布缺少安全测试结果的候选", "input_kind": "release_candidate" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "AGENT_TEST_GATE_FAILED",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_publish_fail_closed", "p3_offline_deterministic_evaluation"],
+        "evidence_sources": ["安全测试 skipped 事实", "失败关闭评估策略", "Release 计数不变"]
+      },
+      "cleanup": ["重置合成测试执行器的跳过注入。"]
+    },
+    {
+      "case_id": "p301-approval-missing-006",
+      "category": "approval_gate",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["候选测试全部通过。", "企业审批实例尚未完成最后一级。"],
+      "action": { "surface": "control_plane", "operation": "绕过未完成审批直接生成 Release", "input_kind": "release_candidate" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "AGENT_RELEASE_APPROVAL_REQUIRED",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_snapshot_evidence_complete", "p3_publish_fail_closed"],
+        "evidence_sources": ["活动审批层级", "发布门禁拒绝", "Release 计数不变"]
+      },
+      "cleanup": ["撤回合成审批实例。"]
+    },
+    {
+      "case_id": "p301-stale-approval-hash-007",
+      "category": "approval_gate",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["旧候选已获得个人所有者批准。", "草稿修订产生了新的配置摘要。"],
+      "action": { "surface": "control_plane", "operation": "使用旧审批批准新摘要候选", "input_kind": "release_candidate" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "AGENT_RELEASE_APPROVAL_REQUIRED",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_snapshot_evidence_complete", "p3_publish_fail_closed"],
+        "evidence_sources": ["候选摘要差异", "旧审批失效记录", "不存在新 Release"]
+      },
+      "cleanup": ["清理新修订草稿，保留旧审批记录。"]
+    },
+    {
+      "case_id": "p301-cross-workspace-publish-008",
+      "category": "workspace_isolation",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["请求主体属于合成企业空间 A。", "目标候选属于合成企业空间 B。"],
+      "action": { "surface": "api", "operation": "使用空间 A 上下文读取并发布空间 B 候选", "input_kind": "release_candidate" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "POLICY_DENIED",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_workspace_authorization", "p3_publish_fail_closed"],
+        "evidence_sources": ["可信 RequestContext", "策略拒绝", "响应不含候选字段"]
+      },
+      "cleanup": ["删除两个合成空间的临时主体绑定。"]
+    },
+    {
+      "case_id": "p301-release-mutation-denied-009",
+      "category": "immutability",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["AgentRelease 已创建并被一次历史 Run 引用。"],
+      "action": { "surface": "control_plane", "operation": "原地更新已发布快照中的 Prompt 版本", "input_kind": "agent_release" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "AGENT_RELEASE_IMMUTABLE",
+        "retryable": false,
+        "runtime_release_source": "agent_release",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_release_immutable", "p3_run_release_binding_unique"],
+        "evidence_sources": ["数据库不可变约束", "发布摘要不变", "历史 Run 绑定不变"]
+      },
+      "cleanup": ["保留不可变 Release，回滚测试事务。"]
+    },
+    {
+      "case_id": "p301-control-plane-outage-010",
+      "category": "control_plane_outage",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["服务当前路由指向有效 AgentRelease。", "Runtime 可读取独立发布事实。"],
+      "action": { "surface": "runtime", "operation": "控制面查询故障期间创建并完成新 Run", "input_kind": "agent_release" },
+      "expected": {
+        "outcome": "continues",
+        "error_code": null,
+        "retryable": false,
+        "runtime_release_source": "agent_release",
+        "route_behavior": "selected_release",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_control_plane_runtime_isolation", "p3_runtime_release_only", "p3_run_release_binding_unique"],
+        "evidence_sources": ["控制面故障注入", "发布事实读取", "Run 终态与绑定"]
+      },
+      "cleanup": ["恢复控制面查询并清理合成 Run。"]
+    },
+    {
+      "case_id": "p301-stable-canary-route-011",
+      "category": "canary",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["服务存在主版本和 10% 灰度版本。", "灰度分配键和路由版本已冻结。"],
+      "action": { "surface": "runtime", "operation": "同一分配键重复解析灰度路由", "input_kind": "service_route" },
+      "expected": {
+        "outcome": "allowed",
+        "error_code": null,
+        "retryable": false,
+        "runtime_release_source": "agent_release",
+        "route_behavior": "selected_release",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_route_change_only", "p3_run_release_binding_unique"],
+        "evidence_sources": ["灰度分配输入摘要", "路由版本", "重复解析结果"]
+      },
+      "cleanup": ["删除合成灰度分配样本。"]
+    },
+    {
+      "case_id": "p301-one-click-rollback-012",
+      "category": "rollback",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["当前路由版本引用异常 Release。", "上一有效路由和 Release 完整可用。"],
+      "action": { "surface": "control_plane", "operation": "创建回滚路由版本并切换当前指针", "input_kind": "service_route" },
+      "expected": {
+        "outcome": "allowed",
+        "error_code": null,
+        "retryable": false,
+        "runtime_release_source": "agent_release",
+        "route_behavior": "rolled_back",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_route_change_only", "p3_release_immutable", "p3_run_release_binding_unique"],
+        "evidence_sources": ["新回滚路由版本", "上一 Release 摘要", "回滚审计与 Outbox"]
+      },
+      "cleanup": ["保留路由版本链并清理合成运行样本。"]
+    },
+    {
+      "case_id": "p301-concurrent-route-promote-013",
+      "category": "concurrency",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["两个发布者读取相同当前路由 generation。", "两个候选 Release 均通过独立发布门禁。"],
+      "action": { "surface": "control_plane", "operation": "并发晋级两个不同 Release", "input_kind": "service_route" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "SERVICE_ROUTE_CONFLICT",
+        "retryable": true,
+        "runtime_release_source": "agent_release",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_route_change_only", "p3_run_release_binding_unique"],
+        "evidence_sources": ["路由 generation 乐观锁", "唯一当前路由", "冲突审计"]
+      },
+      "cleanup": ["保留获胜路由并清理失败请求的合成幂等键。"]
+    },
+    {
+      "case_id": "p301-hidden-menu-api-denied-014",
+      "category": "menu_authorization",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["主体菜单快照不包含发布按钮。", "主体同时缺少 agent.release.publish 接口权限。"],
+      "action": { "surface": "api", "operation": "绕过隐藏菜单直接调用发布接口", "input_kind": "permission_context" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "POLICY_DENIED",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_workspace_authorization", "p3_publish_fail_closed"],
+        "evidence_sources": ["菜单权限快照", "后端策略拒绝", "不存在发布副作用"]
+      },
+      "cleanup": ["恢复合成主体的默认个人所有者权限。"]
+    },
+    {
+      "case_id": "p301-write-tool-denied-015",
+      "category": "tool_boundary",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["工具注册项声明 access_mode=write。", "阶段三只允许只读工具进入发布配置。"],
+      "action": { "surface": "control_plane", "operation": "将写工具加入 AgentDraft 并申请测试", "input_kind": "tool_reference" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "AGENT_CONFIGURATION_INVALID",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "not_applicable",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_read_only_tools_only", "p3_publish_fail_closed"],
+        "evidence_sources": ["工具风险分类", "配置校验拒绝", "草稿 revision 不变"]
+      },
+      "cleanup": ["删除合成写工具注册项。"]
+    },
+    {
+      "case_id": "p301-run-binding-rewrite-016",
+      "category": "routing",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["Run 已绑定路由版本 4 和 Release 2。", "当前服务已切换到路由版本 5 和 Release 3。"],
+      "action": { "surface": "runtime", "operation": "尝试把在途 Run 改绑当前新 Release", "input_kind": "agent_release" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "AGENT_RELEASE_IMMUTABLE",
+        "retryable": false,
+        "runtime_release_source": "agent_release",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_run_release_binding_unique", "p3_release_immutable"],
+        "evidence_sources": ["Run 原始绑定", "当前路由版本", "数据库更新拒绝"]
+      },
+      "cleanup": ["允许合成在途 Run 按原 Release 完成。"]
+    },
+    {
+      "case_id": "p301-open-api-scope-denied-017",
+      "category": "workspace_isolation",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["Open API Key 只具有服务 A 的最小 Scope。", "请求目标为同空间服务 B。"],
+      "action": { "surface": "api", "operation": "使用服务 A Key 调用服务 B", "input_kind": "permission_context" },
+      "expected": {
+        "outcome": "denied",
+        "error_code": "POLICY_DENIED",
+        "retryable": false,
+        "runtime_release_source": "none",
+        "route_behavior": "unchanged",
+        "duplicate_side_effects": 0,
+        "cross_workspace_exposure": false,
+        "verified_invariants": ["p3_workspace_authorization", "p3_run_release_binding_unique"],
+        "evidence_sources": ["API Key Scope", "服务访问策略", "不存在新 Run"]
+      },
+      "cleanup": ["撤销合成 Open API Key。"]
+    }
+  ]
+}
