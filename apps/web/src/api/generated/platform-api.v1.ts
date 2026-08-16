@@ -2244,6 +2244,150 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/tool-runs": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Tool Runs
+     * @description 列出 PDP 资源范围内的工具任务历史。
+     */
+    readonly get: operations["listToolRuns"];
+    readonly put?: never;
+    /**
+     * Create Tool Run
+     * @description 幂等创建 Run 并冻结完整只读计划，失败时关闭已创建的空 Run。
+     */
+    readonly post: operations["createToolRun"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Tool Run
+     * @description 返回 Run、步骤、确认和 Attempt 的脱敏历史详情。
+     */
+    readonly get: operations["getToolRun"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}/cancel": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Cancel Tool Run
+     * @description 提交取消事实；终态幂等返回，活动 Adapter 只做尽力传播。
+     */
+    readonly post: operations["cancelToolRun"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}/confirmations/{confirmation_id}/confirm": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Confirm Tool Call
+     * @description 通过当前确认指派；最终批准后重新执行 PDP 才恢复 Step。
+     */
+    readonly post: operations["confirmToolCall"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}/confirmations/{confirmation_id}/reject": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Reject Tool Call
+     * @description 驳回当前确认指派，并在最终拒绝时关闭未执行任务。
+     */
+    readonly post: operations["rejectToolCall"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}/events": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Stream Tool Run
+     * @description 只回放持久化进度；重连不会创建 Run、Step 或 Attempt。
+     */
+    readonly get: operations["streamToolRun"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/tools": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Available Tools
+     * @description 返回平台注册、套餐和当前工具权限三层交集。
+     */
+    readonly get: operations["listAvailableTools"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/workflows": {
     readonly parameters: {
       readonly query?: never;
@@ -3805,6 +3949,34 @@ export type components = {
        * @enum {string}
        */
       readonly visibility: "workspace" | "restricted";
+    };
+    /**
+     * CreateToolRunRequest
+     * @description 创建并冻结只读工具计划；预算只能在平台硬上限内收窄。
+     */
+    readonly CreateToolRunRequest: {
+      /**
+       * Agent Release Id
+       * Format: uuid
+       */
+      readonly agent_release_id: string;
+      /**
+       * Max Attempts Per Step
+       * @default 3
+       */
+      readonly max_attempts_per_step: number;
+      /**
+       * Max Execution Seconds
+       * @default 300
+       */
+      readonly max_execution_seconds: number;
+      /**
+       * Service Id
+       * Format: uuid
+       */
+      readonly service_id: string;
+      /** Tool Calls */
+      readonly tool_calls: readonly components["schemas"]["ToolIntentRequest"][];
     };
     /**
      * CreateUserMessageRequest
@@ -6310,6 +6482,302 @@ export type components = {
        * @enum {string}
        */
       readonly rating: "helpful" | "unhelpful";
+    };
+    /**
+     * ToolAttemptResponse
+     * @description 返回一次 Attempt 的状态、用量和结果安全结论。
+     */
+    readonly ToolAttemptResponse: {
+      /**
+       * Attempt Id
+       * Format: uuid
+       */
+      readonly attempt_id: string;
+      /** Attempt No */
+      readonly attempt_no: number;
+      /** Call State */
+      readonly call_state: string;
+      /** Completed At */
+      readonly completed_at: string | null;
+      /** Cost Microunits */
+      readonly cost_microunits: number | null;
+      /** Duration Ms */
+      readonly duration_ms: number | null;
+      /** Error Code */
+      readonly error_code: string | null;
+      /** Recovery Generation */
+      readonly recovery_generation: number;
+      /** Result Size Bytes */
+      readonly result_size_bytes: number | null;
+      /** Result Status */
+      readonly result_status: string | null;
+      /**
+       * Started At
+       * Format: date-time
+       */
+      readonly started_at: string;
+      /** State */
+      readonly state: string;
+      /**
+       * Tool Call Id
+       * Format: uuid
+       */
+      readonly tool_call_id: string;
+      /** Trigger */
+      readonly trigger: string;
+    };
+    /**
+     * ToolCatalogItemResponse
+     * @description 返回可执行工具的 Schema 与治理属性，不包含任何凭证值。
+     */
+    readonly ToolCatalogItemResponse: {
+      /** Access Mode */
+      readonly access_mode: string;
+      /** Credential Requirement */
+      readonly credential_requirement: string;
+      /** Description */
+      readonly description: string;
+      /** Display Name */
+      readonly display_name: string;
+      /** Input Schema */
+      readonly input_schema: {
+        readonly [key: string]: unknown;
+      };
+      /** Permission Code */
+      readonly permission_code: string;
+      /** Retry Mode */
+      readonly retry_mode: string;
+      /** Risk Level */
+      readonly risk_level: string;
+      /** Synthetic */
+      readonly synthetic: boolean;
+      /** Timeout Seconds */
+      readonly timeout_seconds: number;
+      /**
+       * Tool Id
+       * Format: uuid
+       */
+      readonly tool_id: string;
+      /** Tool Key */
+      readonly tool_key: string;
+      /** Tool Version */
+      readonly tool_version: number;
+    };
+    /**
+     * ToolCatalogResponse
+     * @description 返回当前工作空间套餐与当前权限的目录交集。
+     */
+    readonly ToolCatalogResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["ToolCatalogItemResponse"][];
+    };
+    /**
+     * ToolConfirmationActionRequest
+     * @description 提供工具确认动作的稳定幂等键和可选原因码。
+     */
+    readonly ToolConfirmationActionRequest: {
+      /** Idempotency Key */
+      readonly idempotency_key: string;
+      /** Reason Code */
+      readonly reason_code?: string | null;
+    };
+    /**
+     * ToolConfirmationResponse
+     * @description 返回工具确认当前状态和浏览器可执行性。
+     */
+    readonly ToolConfirmationResponse: {
+      /**
+       * Approval Instance Id
+       * Format: uuid
+       */
+      readonly approval_instance_id: string;
+      /** Can Respond */
+      readonly can_respond: boolean;
+      /** Confirmation Hash */
+      readonly confirmation_hash: string;
+      /**
+       * Confirmation Id
+       * Format: uuid
+       */
+      readonly confirmation_id: string;
+      /**
+       * Expires At
+       * Format: date-time
+       */
+      readonly expires_at: string;
+      /**
+       * Mode
+       * @enum {string}
+       */
+      readonly mode: "personal_owner" | "enterprise_approval";
+      /** Resolved At */
+      readonly resolved_at: string | null;
+      /** Risk Level */
+      readonly risk_level: string;
+      /** State */
+      readonly state: string;
+      /** Version */
+      readonly version: number;
+    };
+    /**
+     * ToolIntentRequest
+     * @description 提交一个严格版本化的只读工具候选调用。
+     */
+    readonly ToolIntentRequest: {
+      /** Arguments */
+      readonly arguments: {
+        readonly [key: string]: unknown;
+      };
+      /**
+       * Tool Id
+       * Format: uuid
+       */
+      readonly tool_id: string;
+      /** Tool Key */
+      readonly tool_key: string;
+      /** Tool Version */
+      readonly tool_version: number;
+    };
+    /**
+     * ToolRunDetailResponse
+     * @description 返回一个 Run 的完整控制台投影。
+     */
+    readonly ToolRunDetailResponse: {
+      /** Latest Cursor */
+      readonly latest_cursor: number;
+      readonly run: components["schemas"]["ToolRunSummaryResponse"];
+      /** Steps */
+      readonly steps: readonly components["schemas"]["ToolStepResponse"][];
+    };
+    /**
+     * ToolRunListResponse
+     * @description 返回授权范围内的 Run 历史。
+     */
+    readonly ToolRunListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["ToolRunSummaryResponse"][];
+    };
+    /**
+     * ToolRunSummaryResponse
+     * @description 返回 Run 状态、预算和低敏运营聚合。
+     */
+    readonly ToolRunSummaryResponse: {
+      /**
+       * Agent Release Id
+       * Format: uuid
+       */
+      readonly agent_release_id: string;
+      /** Agent Release Version */
+      readonly agent_release_version: number;
+      /** Cancel Requested At */
+      readonly cancel_requested_at: string | null;
+      /** Completed At */
+      readonly completed_at: string | null;
+      /** Completed Step Count */
+      readonly completed_step_count: number;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Deadline At
+       * Format: date-time
+       */
+      readonly deadline_at: string;
+      /** Max Attempts Per Step */
+      readonly max_attempts_per_step: number;
+      /** Max Cost Microunits */
+      readonly max_cost_microunits: number;
+      /** Max Execution Seconds */
+      readonly max_execution_seconds: number;
+      /** Max Steps */
+      readonly max_steps: number;
+      /** Pending Confirmation Count */
+      readonly pending_confirmation_count: number;
+      /**
+       * Requested By Account Id
+       * Format: uuid
+       */
+      readonly requested_by_account_id: string;
+      /**
+       * Run Id
+       * Format: uuid
+       */
+      readonly run_id: string;
+      /**
+       * Service Id
+       * Format: uuid
+       */
+      readonly service_id: string;
+      /** Service Name */
+      readonly service_name: string;
+      /** State */
+      readonly state: string;
+      /** Step Count */
+      readonly step_count: number;
+      /** Total Cost Microunits */
+      readonly total_cost_microunits: number;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+    };
+    /**
+     * ToolStepResponse
+     * @description 返回冻结 Step、工具属性、确认和 Attempt 历史。
+     */
+    readonly ToolStepResponse: {
+      /** Access Mode */
+      readonly access_mode: string;
+      /** Attempts */
+      readonly attempts: readonly components["schemas"]["ToolAttemptResponse"][];
+      /** Canonical Arguments Hash */
+      readonly canonical_arguments_hash: string;
+      readonly confirmation: components["schemas"]["ToolConfirmationResponse"] | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Current Attempt No */
+      readonly current_attempt_no: number | null;
+      /** Display Name */
+      readonly display_name: string;
+      /** Max Attempts */
+      readonly max_attempts: number;
+      /** Max Result Bytes */
+      readonly max_result_bytes: number;
+      /** Risk Level */
+      readonly risk_level: string;
+      /** Sequence No */
+      readonly sequence_no: number;
+      /** State */
+      readonly state: string;
+      /**
+       * Step Id
+       * Format: uuid
+       */
+      readonly step_id: string;
+      /** Timeout Seconds */
+      readonly timeout_seconds: number;
+      /**
+       * Tool Id
+       * Format: uuid
+       */
+      readonly tool_id: string;
+      /** Tool Key */
+      readonly tool_key: string;
+      /** Tool Version */
+      readonly tool_version: number;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
     };
     /**
      * TransferApprovalRequest
@@ -18857,6 +19325,768 @@ export interface operations {
         };
         content: {
           readonly "application/json": components["schemas"]["WorkspaceSummaryResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listToolRuns: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ToolRunListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createToolRun: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateToolRunRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ToolRunDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getToolRun: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly run_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ToolRunDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly cancelToolRun: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly run_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ToolRunDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly confirmToolCall: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly confirmation_id: string;
+        readonly run_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["ToolConfirmationActionRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ToolRunDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly rejectToolCall: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly confirmation_id: string;
+        readonly run_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["ToolConfirmationActionRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ToolRunDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly streamToolRun: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "Last-Event-ID"?: number | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly run_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description 按连续整数游标返回可恢复工具进度 */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "text/event-stream": string;
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listAvailableTools: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ToolCatalogResponse"];
         };
       };
       /** @description 请求上下文无效 */

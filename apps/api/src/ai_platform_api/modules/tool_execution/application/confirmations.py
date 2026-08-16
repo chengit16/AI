@@ -429,6 +429,7 @@ def _binding_invalidation_reason(
 
 __all__ = [
     "ToolApprovalRuntime",
+    "ToolCallBinding",
     "ToolConfirmationRequestResult",
     "ToolConfirmationService",
 ]

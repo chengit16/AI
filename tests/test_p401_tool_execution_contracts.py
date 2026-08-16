@@ -232,7 +232,7 @@ def test_p401_baseline_freezes_all_stage_invariants_and_deferred_scope() -> None
     }.issubset(deferred)
 
 
-def test_p401_reserved_menu_and_api_identifiers_are_not_activated_early() -> None:
+def test_p401_browser_identifiers_activate_while_internal_operations_stay_closed() -> None:
     baseline = load_object(BASELINE_PATH)
     registry = load_object(RESOURCE_REGISTRY_PATH)
     permissions = cast(list[str], baseline["reserved_permissions"])
@@ -248,9 +248,16 @@ def test_p401_reserved_menu_and_api_identifiers_are_not_activated_early() -> Non
     assert {item["permission_code"] for item in menus}.issubset(set(permissions))
     assert {item["permission_code"] for item in operations}.issubset(set(permissions))
     assert all(set(item["workspace_types"]) == {"personal", "enterprise"} for item in menus)
-    assert set(permissions).isdisjoint(active_permissions)
-    assert {item["menu_key"] for item in menus}.isdisjoint(active_menu_keys)
-    assert {item["operation_id"] for item in operations}.isdisjoint(active_operations)
+    assert set(permissions).issubset(active_permissions)
+    assert {item["menu_key"] for item in menus}.issubset(active_menu_keys)
+    browser_operations = {
+        item["operation_id"] for item in operations if item["surface"] == "browser"
+    }
+    internal_operations = {
+        item["operation_id"] for item in operations if item["surface"] != "browser"
+    }
+    assert browser_operations.issubset(active_operations)
+    assert internal_operations.isdisjoint(active_operations)
 
 
 def test_p401_initial_tool_permissions_exist_in_active_registry() -> None:

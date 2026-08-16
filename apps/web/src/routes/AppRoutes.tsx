@@ -24,6 +24,8 @@ const WorkflowDesignPage = lazy(() => import("@/pages/workspace/workflows"));
 const AgentControlPage = lazy(() => import("@/pages/workspace/agents"));
 const ServiceManagementPage = lazy(() => import("@/pages/workspace/services"));
 const AgentOperationsPage = lazy(() => import("@/pages/workspace/agentOperations"));
+const ToolExecutionConsolePage = lazy(() => import("@/pages/workspace/tools"));
+const ToolRunHistoryPage = lazy(() => import("@/pages/workspace/toolRuns"));
 const PlatformModelsPage = lazy(() => import("@/pages/platform/models"));
 
 function RequireSession() {
@@ -166,6 +168,22 @@ export function AppRoutes() {
               element={
                 <RequireMenuRoute>
                   <AgentOperationsPage />
+                </RequireMenuRoute>
+              }
+            />
+            <Route
+              path={pageRoutes.ToolExecutionConsolePage}
+              element={
+                <RequireMenuRoute>
+                  <ToolExecutionConsolePage />
+                </RequireMenuRoute>
+              }
+            />
+            <Route
+              path={pageRoutes.ToolRunHistoryPage}
+              element={
+                <RequireMenuRoute>
+                  <ToolRunHistoryPage />
                 </RequireMenuRoute>
               }
             />

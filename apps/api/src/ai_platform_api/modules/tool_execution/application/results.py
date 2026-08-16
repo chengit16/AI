@@ -15,6 +15,7 @@ from ai_platform_api.modules.tool_execution.application.errors import (
 from ai_platform_api.modules.tool_execution.domain.adapters import ToolAdapterResult
 from ai_platform_api.modules.tool_execution.domain.results import (
     ToolAttemptOutcomeFacts,
+    ToolProgressEvent,
     ToolProgressPage,
     ToolProgressStore,
     ToolSafeResult,
@@ -212,4 +213,10 @@ class ToolProgressService:
         return page
 
 
-__all__ = ["EXPECTED_CHECKS", "ToolProgressService", "ToolResultFactsService"]
+__all__ = [
+    "EXPECTED_CHECKS",
+    "ToolProgressEvent",
+    "ToolProgressPage",
+    "ToolProgressService",
+    "ToolResultFactsService",
+]

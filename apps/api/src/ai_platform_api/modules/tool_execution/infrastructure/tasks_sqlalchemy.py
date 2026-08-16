@@ -955,7 +955,13 @@ class SqlAlchemyToolTaskStore:
                 return _run(row)
             if row["state"] == "cancellation_requested":
                 return _run(row)
-            if row["state"] not in {"pending", "running", "manual_recovery"}:
+            if row["state"] not in {
+                "pending",
+                "running",
+                "waiting_confirmation",
+                "waiting_approval",
+                "manual_recovery",
+            }:
                 raise ToolRunConflictError
 
             # 1. 先提交取消事实，后续领取条件立即失效；未运行步骤同步关闭。
@@ -1015,6 +1021,7 @@ class SqlAlchemyToolTaskStore:
                 active = None
             if active is None:
                 _finish_run_cancellation(session, run_id, requested_at)
+            # 3. 从当前事务回读收敛后的 Run，保证返回状态与进度事件在同一次提交中一致。
             current = (
                 session.execute(select(tool_runs).where(tool_runs.c.run_id == run_id))
                 .mappings()

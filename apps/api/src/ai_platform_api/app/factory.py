@@ -44,6 +44,7 @@ from ai_platform_api.modules.service_governance.api.routes import (
 )
 from ai_platform_api.modules.system.api.health import router as health_router
 from ai_platform_api.modules.system.api.observability import router as observability_router
+from ai_platform_api.modules.tool_execution.api.routes import router as tool_execution_router
 from ai_platform_api.modules.workflow.api.approval_routes import router as approval_policy_router
 from ai_platform_api.modules.workflow.api.approval_runtime_routes import (
     router as approval_instance_router,
@@ -132,6 +133,12 @@ def create_app(
     application.state.workflow_run_executor = dependencies.workflow_run_executor
     application.state.approval_policy_service = dependencies.approval_policies
     application.state.approval_instance_service = dependencies.approval_instances
+    application.state.tool_catalog_service = dependencies.tool_catalogs
+    application.state.tool_task_service = dependencies.tool_tasks
+    application.state.tool_planning_service = dependencies.tool_planning
+    application.state.tool_console_service = dependencies.tool_console
+    application.state.tool_progress_service = dependencies.tool_progress
+    application.state.tool_confirmation_service = dependencies.tool_confirmations
     # 3. 中间件、错误映射和 Router 在状态装配后注册，所有业务入口共享同一安全边界。
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     application.add_middleware(TraceContextMiddleware, observability=observability)
@@ -159,4 +166,5 @@ def create_app(
     application.include_router(workflow_router, prefix="/api/v1")
     application.include_router(approval_policy_router, prefix="/api/v1")
     application.include_router(approval_instance_router, prefix="/api/v1")
+    application.include_router(tool_execution_router, prefix="/api/v1")
     return application

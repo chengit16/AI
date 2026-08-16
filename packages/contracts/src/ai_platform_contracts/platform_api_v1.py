@@ -522,6 +522,14 @@ class CreateServiceRequest(typing.TypedDict):
     visibility: typing.Literal["workspace", "restricted"]
 
 
+class CreateToolRunRequest(typing.TypedDict):
+    agent_release_id: str
+    max_attempts_per_step: typing.NotRequired[int]
+    max_execution_seconds: typing.NotRequired[int]
+    service_id: str
+    tool_calls: list[ToolIntentRequest]
+
+
 class CreateUserMessageRequest(typing.TypedDict):
     parts: list[CreateMessagePartRequest]
 
@@ -1486,6 +1494,123 @@ class SubmitMessageFeedbackRequest(typing.TypedDict):
         list[typing.Literal["incorrect", "missing_source", "source_mismatch", "unsafe", "other"]]
     ]
     rating: typing.Literal["helpful", "unhelpful"]
+
+
+class ToolAttemptResponse(typing.TypedDict):
+    attempt_id: str
+    attempt_no: int
+    call_state: str
+    completed_at: str | None
+    cost_microunits: int | None
+    duration_ms: int | None
+    error_code: str | None
+    recovery_generation: int
+    result_size_bytes: int | None
+    result_status: str | None
+    started_at: str
+    state: str
+    tool_call_id: str
+    trigger: str
+
+
+class ToolCatalogItemResponse(typing.TypedDict):
+    access_mode: str
+    credential_requirement: str
+    description: str
+    display_name: str
+    input_schema: dict[str, object]
+    permission_code: str
+    retry_mode: str
+    risk_level: str
+    synthetic: bool
+    timeout_seconds: int
+    tool_id: str
+    tool_key: str
+    tool_version: int
+
+
+class ToolCatalogResponse(typing.TypedDict):
+    items: list[ToolCatalogItemResponse]
+
+
+class ToolConfirmationActionRequest(typing.TypedDict):
+    idempotency_key: str
+    reason_code: typing.NotRequired[str | None]
+
+
+class ToolConfirmationResponse(typing.TypedDict):
+    approval_instance_id: str
+    can_respond: bool
+    confirmation_hash: str
+    confirmation_id: str
+    expires_at: str
+    mode: typing.Literal["personal_owner", "enterprise_approval"]
+    resolved_at: str | None
+    risk_level: str
+    state: str
+    version: int
+
+
+class ToolIntentRequest(typing.TypedDict):
+    arguments: dict[str, object]
+    tool_id: str
+    tool_key: str
+    tool_version: int
+
+
+class ToolRunDetailResponse(typing.TypedDict):
+    latest_cursor: int
+    run: ToolRunSummaryResponse
+    steps: list[ToolStepResponse]
+
+
+class ToolRunListResponse(typing.TypedDict):
+    items: list[ToolRunSummaryResponse]
+
+
+class ToolRunSummaryResponse(typing.TypedDict):
+    agent_release_id: str
+    agent_release_version: int
+    cancel_requested_at: str | None
+    completed_at: str | None
+    completed_step_count: int
+    created_at: str
+    deadline_at: str
+    max_attempts_per_step: int
+    max_cost_microunits: int
+    max_execution_seconds: int
+    max_steps: int
+    pending_confirmation_count: int
+    requested_by_account_id: str
+    run_id: str
+    service_id: str
+    service_name: str
+    state: str
+    step_count: int
+    total_cost_microunits: int
+    updated_at: str
+    version: int
+
+
+class ToolStepResponse(typing.TypedDict):
+    access_mode: str
+    attempts: list[ToolAttemptResponse]
+    canonical_arguments_hash: str
+    confirmation: ToolConfirmationResponse | None
+    created_at: str
+    current_attempt_no: int | None
+    display_name: str
+    max_attempts: int
+    max_result_bytes: int
+    risk_level: str
+    sequence_no: int
+    state: str
+    step_id: str
+    timeout_seconds: int
+    tool_id: str
+    tool_key: str
+    tool_version: int
+    updated_at: str
 
 
 class TransferApprovalRequest(typing.TypedDict):

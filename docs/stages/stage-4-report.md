@@ -6,8 +6,8 @@
 | --- | --- |
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
-| 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-11` 工具目录、执行计划、确认审批、任务进度、取消和历史页面 |
+| 报告日期 | 2026-08-17 |
+| 当前节点 | `P4-12` 重复投递、超时、响应丢失、撤权、取消和 Worker 重启联合演练 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -25,7 +25,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16；`P4-11` 节点前 Revision `20260816_0060`，公共本地实例当前为 `20260816_0060` |
+| 数据库基线 | PostgreSQL 16；`P4-11` 节点前 Revision `20260816_0060`，公共本地实例当前为 `20260816_0061` |
 | 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据、模型与工具 | 只使用版本化合成数据、Mock Provider 和合成内部副作用 Adapter；不包含真实客户系统或凭证 |
 
@@ -160,6 +160,19 @@
 - 运行诊断：使用最终工作树重建 API、Web、Migration、Worker、Scheduler 和 Tika 镜像并启动成功，公共数据库真实升级至 Revision `20260816_0060`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过，入口 `http://127.0.0.1:3000/status` 未复现此前 `503`。
 - 验收结论：`passed`。当前证明不可信结果隔离、完整终态用量、连续进度回放、最小审计与 Outbox、固定低基数指标和失败样本保留成立；工具浏览器 API、SSE 帧输出、目录与任务控制台由 `P4-11` 接续，联合故障演练由 `P4-12` 接续。
 
+### P4-11 工具任务控制台
+
+- 状态：已完成，完成日期为 2026-08-17，实现提交待本次 Git 收口后回填。
+- 交付范围：已接入工具目录、Run 创建与历史详情、确认、驳回、取消和 `Last-Event-ID` 可恢复 SSE；前端已交付工具执行与工具任务页面、Draft 2020-12 参数表单、预算、步骤计划、危险动作确认、失败清空陈旧详情和菜单权限裁剪。API 只返回脱敏投影，不暴露参数正文、结果正文、凭证、Worker 身份或 Trace。
+- 权限与数据库：Revision `20260816_0061` 激活 6 项工具权限、8 个浏览器 API Operation、2 个页面和对应菜单发布快照，并回填现有个人/企业 Owner；降级恢复 Registry 21 原发布指针。Runtime 与 Worker 的 `loadToolExecutionPlan`、`executeToolAttempt` 继续保持内部入口，不注册为浏览器 API。
+- 自动验证：P4-11 HTTP、权限、SSE、PostgreSQL 与 P4-06/P4-09/P4-10 相邻联合回归为 `24/24`；P4-01 激活边界与 P4-11 HTTP 单元为 `20/20`；前端全量为 `58/58`，契约生成与漂移、Registry、架构、注释、UnoCSS、Ruff、mypy strict `673` 个源文件和生产构建均已通过。Codex 审批恢复后，原样 `./scripts/verify` 首次真实访问 PostgreSQL、Valkey、MinIO 和 Tika 并得到 Python `770/772`；两项失败均为历史测试仍断言 Registry 21，而 Revision `0061` 已把当前发布升级到 Registry 22。只修改这两处 head 期望后定向 PostgreSQL 回归 `2/2`、第二次完整统一门禁 Python `772/772`，其余全部检查继续通过。
+- 浏览器问题与修复：内置 Browser 恢复访问后注册全合成个人账号，并在本机 `public` 数据库通过正式状态机写入一条全合成高风险待确认 Run。真实页面暴露服务端 `personal_owner` 与前端错误判断 `personal` 的契约错配，导致个人空间误显示“企业审批”；已把领域投影和 HTTP Schema 收紧为 `personal_owner | enterprise_approval`，同步重新生成 TypeScript/Python 契约，并修正页面判断和夹具。修复后前端全量 `58/58`、P4-11 API `2/2` 通过，真实页面正确显示“个人确认”，危险批准弹层明确提示重新核验当前权限及可能执行冻结参数。
+- 运行诊断：个人确认修复后的最终工作树再次重建 API、Web、Migration、Tika、Worker 和 Scheduler 镜像并启动成功，公共数据库保持 Revision `20260816_0061`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过，入口不再返回 503。
+- 浏览器验收：在 Browser 固定 `1280×720` 视口下，工具执行页正确展示 5 个正式只读工具，工具任务页正确展示脱敏 Run、连续进度游标 5、个人高风险确认与危险弹层；两页 `document.scrollWidth == document.clientWidth`，浏览器控制台为空。随后使用可调整视口 Playwright 在 `1440×900` 和 `390×844` 复验工具目录、执行计划、任务历史、详情和危险确认；两个视口均满足 `document.scrollWidth == document.clientWidth`，移动端滚动到操作区后危险弹层完整落在视口内，没有文字或按钮遮挡。
+- 浏览器 SSE 恢复：在 `390×844` 真实任务详情页，以一次性浏览器注入只中断首个 HTTP `200` 后的 SSE response body，不修改产品代码或服务端状态；产品内置重连逻辑自动发起第二次请求。Playwright 捕获的首连与重连请求均为同一 Run，均携带 `Last-Event-ID: 5`，网络记录为连续两个 `200`，重连后页面未出现“实时流”“重连”“错误”或“未能”提示，证明浏览器侧主动断线后从最新持久化游标恢复。
+- 最终统一门禁：个人确认契约修复及导入排序收口后再次原样执行 `./scripts/verify`，React `58/58`、Python `772/772`、Ruff、mypy strict `673` 个源文件、OpenAPI 与生成类型、Registry、ReleaseManifest、契约兼容、架构、注释、UnoCSS、开发级供应链、生产构建和 Secret Scanner 全部通过。
+- 验收结论：`passed`。工具目录、计划冻结、个人确认、任务控制、脱敏历史、持久化 SSE、规定桌面与移动视口、浏览器主动断线恢复、最终统一门禁、最终镜像和 13 项运行诊断均已通过；P4-11 可以形成独立提交并进入 P4-12 联合故障演练。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -170,4 +183,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-10` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-11` 已通过，当前进入 `P4-12` 联合故障演练，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。

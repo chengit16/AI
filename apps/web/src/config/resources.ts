@@ -6,12 +6,14 @@ import {
   Activity,
   Bot,
   Cpu,
+  History,
   LibraryBig,
   LayoutDashboard,
   MessageSquareText,
   Network,
   Route,
   UsersRound,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,12 +28,14 @@ export const iconByKey = {
   activity: Activity,
   bot: Bot,
   cpu: Cpu,
+  history: History,
   "library-big": LibraryBig,
   "layout-dashboard": LayoutDashboard,
   network: Network,
   route: Route,
   "message-square-text": MessageSquareText,
   "users-round": UsersRound,
+  wrench: Wrench,
 } satisfies Record<string, LucideIcon>;
 
 /** 按组件键暴露类型安全的页面路由表。 */

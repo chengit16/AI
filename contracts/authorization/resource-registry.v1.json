@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 21,
+  "registry_version": 22,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -106,6 +106,12 @@
     ,{ "code": "service.route.promote", "resource_type": "service_route", "action": "promote", "scope": "resource", "status": "active" }
     ,{ "code": "service.route.rollback", "resource_type": "service_route", "action": "rollback", "scope": "resource", "status": "active" }
     ,{ "code": "agent.operations.read", "resource_type": "agent_operations", "action": "read", "scope": "workspace", "status": "active" }
+    ,{ "code": "tool.page.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" }
+    ,{ "code": "tool.catalog.read", "resource_type": "tool_definition", "action": "read", "scope": "workspace", "status": "active" }
+    ,{ "code": "tool.run.create", "resource_type": "tool_run", "action": "create", "scope": "workspace", "status": "active" }
+    ,{ "code": "tool.run.read", "resource_type": "tool_run", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "tool.run.cancel", "resource_type": "tool_run", "action": "cancel", "scope": "resource", "status": "active" }
+    ,{ "code": "tool.confirmation.respond", "resource_type": "tool_confirmation", "action": "respond", "scope": "resource", "status": "active" }
   ],
   "page_resources": [
     {
@@ -237,6 +243,28 @@
       "layout_key": "layout.workspace",
       "access_level": "authorized",
       "permission_code": "agent.operations.read",
+      "resource_version": 1,
+      "status": "active"
+    },
+    {
+      "page_resource_id": "80000000-0000-4000-8000-000000000013",
+      "page_key": "tool.console",
+      "route": "/workspace/tools",
+      "component_key": "ToolExecutionConsolePage",
+      "layout_key": "layout.workspace",
+      "access_level": "authorized",
+      "permission_code": "tool.page.access",
+      "resource_version": 1,
+      "status": "active"
+    },
+    {
+      "page_resource_id": "80000000-0000-4000-8000-000000000014",
+      "page_key": "tool.runs",
+      "route": "/workspace/tool-runs",
+      "component_key": "ToolRunHistoryPage",
+      "layout_key": "layout.workspace",
+      "access_level": "authorized",
+      "permission_code": "tool.run.read",
       "resource_version": 1,
       "status": "active"
     }
@@ -380,7 +408,15 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000136", "api_key": "service.route.canary", "operation_id": "startServiceCanary", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/canary", "access_level": "authorized", "permission_code": "service.route.canary", "risk_level": "critical", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000137", "api_key": "service.route.promote", "operation_id": "promoteServiceRoute", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/promote", "access_level": "authorized", "permission_code": "service.route.promote", "risk_level": "critical", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000138", "api_key": "service.route.rollback", "operation_id": "rollbackServiceRoute", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/rollback", "access_level": "authorized", "permission_code": "service.route.rollback", "risk_level": "critical", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000139", "api_key": "agent.operations.report", "operation_id": "getAgentReleaseOperations", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/agent-release-operations", "access_level": "authorized", "permission_code": "agent.operations.read", "risk_level": "high", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000139", "api_key": "agent.operations.report", "operation_id": "getAgentReleaseOperations", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/agent-release-operations", "access_level": "authorized", "permission_code": "agent.operations.read", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000140", "api_key": "tool.catalog.list", "operation_id": "listAvailableTools", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/tools", "access_level": "authorized", "permission_code": "tool.catalog.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000141", "api_key": "tool.run.create", "operation_id": "createToolRun", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/tool-runs", "access_level": "authorized", "permission_code": "tool.run.create", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000142", "api_key": "tool.run.list", "operation_id": "listToolRuns", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/tool-runs", "access_level": "authorized", "permission_code": "tool.run.read", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000143", "api_key": "tool.run.get", "operation_id": "getToolRun", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}", "access_level": "authorized", "permission_code": "tool.run.read", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000144", "api_key": "tool.run.stream", "operation_id": "streamToolRun", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}/events", "access_level": "authorized", "permission_code": "tool.run.read", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000145", "api_key": "tool.confirmation.confirm", "operation_id": "confirmToolCall", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}/confirmations/{confirmation_id}/confirm", "access_level": "authorized", "permission_code": "tool.confirmation.respond", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000146", "api_key": "tool.confirmation.reject", "operation_id": "rejectToolCall", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}/confirmations/{confirmation_id}/reject", "access_level": "authorized", "permission_code": "tool.confirmation.respond", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000147", "api_key": "tool.run.cancel", "operation_id": "cancelToolRun", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/tool-runs/{run_id}/cancel", "access_level": "authorized", "permission_code": "tool.run.cancel", "risk_level": "critical", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -497,6 +533,13 @@
     { "menu_id": "82000000-0000-4000-8000-000000000218", "menu_key": "workspace.services.read", "parent_menu_key": "workspace.services", "name": "查看服务", "menu_type": "action", "page_resource_id": null, "permission_code": "service.definition.read", "icon_key": null, "sort_order": 150, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000219", "menu_key": "workspace.agent_operations", "parent_menu_key": "navigation.workspace", "name": "Release 运营", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000012", "permission_code": "agent.operations.read", "icon_key": "activity", "sort_order": 380, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000220", "menu_key": "workspace.agent_operations.read", "parent_menu_key": "workspace.agent_operations", "name": "查看 Release 运营", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.operations.read", "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000221", "menu_key": "workspace.tools", "parent_menu_key": "navigation.workspace", "name": "工具执行", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000013", "permission_code": "tool.page.access", "icon_key": "wrench", "sort_order": 390, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000222", "menu_key": "workspace.tools.execute", "parent_menu_key": "workspace.tools", "name": "创建工具任务", "menu_type": "action", "page_resource_id": null, "permission_code": "tool.run.create", "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000223", "menu_key": "workspace.tool_runs", "parent_menu_key": "navigation.workspace", "name": "工具任务", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000014", "permission_code": "tool.run.read", "icon_key": "history", "sort_order": 395, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000224", "menu_key": "workspace.tool_runs.confirm", "parent_menu_key": "workspace.tool_runs", "name": "处理工具确认", "menu_type": "action", "page_resource_id": null, "permission_code": "tool.confirmation.respond", "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000225", "menu_key": "workspace.tool_runs.cancel", "parent_menu_key": "workspace.tool_runs", "name": "取消工具任务", "menu_type": "action", "page_resource_id": null, "permission_code": "tool.run.cancel", "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000226", "menu_key": "workspace.tools.catalog_read", "parent_menu_key": "workspace.tools", "name": "查看工具目录", "menu_type": "action", "page_resource_id": null, "permission_code": "tool.catalog.read", "icon_key": null, "sort_order": 90, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000227", "menu_key": "workspace.tool_runs.read", "parent_menu_key": "workspace.tool_runs", "name": "查看工具任务", "menu_type": "action", "page_resource_id": null, "permission_code": "tool.run.read", "icon_key": null, "sort_order": 90, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000152", "menu_key": "navigation.platform.models.provider_query", "parent_menu_key": "navigation.platform.models", "name": "查看模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000153", "menu_key": "navigation.platform.models.provider_create", "parent_menu_key": "navigation.platform.models", "name": "创建模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000154", "menu_key": "navigation.platform.models.credential_rotate", "parent_menu_key": "navigation.platform.models", "name": "轮换模型凭证", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
@@ -641,6 +684,14 @@
     { "menu_id": "82000000-0000-4000-8000-000000000212", "api_resource_id": "81000000-0000-4000-8000-000000000136", "action_type": "publish" },
     { "menu_id": "82000000-0000-4000-8000-000000000213", "api_resource_id": "81000000-0000-4000-8000-000000000137", "action_type": "publish" },
     { "menu_id": "82000000-0000-4000-8000-000000000214", "api_resource_id": "81000000-0000-4000-8000-000000000138", "action_type": "publish" },
-    { "menu_id": "82000000-0000-4000-8000-000000000220", "api_resource_id": "81000000-0000-4000-8000-000000000139", "action_type": "query" }
+    { "menu_id": "82000000-0000-4000-8000-000000000220", "api_resource_id": "81000000-0000-4000-8000-000000000139", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000226", "api_resource_id": "81000000-0000-4000-8000-000000000140", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000222", "api_resource_id": "81000000-0000-4000-8000-000000000141", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000227", "api_resource_id": "81000000-0000-4000-8000-000000000142", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000227", "api_resource_id": "81000000-0000-4000-8000-000000000143", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000227", "api_resource_id": "81000000-0000-4000-8000-000000000144", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000224", "api_resource_id": "81000000-0000-4000-8000-000000000145", "action_type": "approve" },
+    { "menu_id": "82000000-0000-4000-8000-000000000224", "api_resource_id": "81000000-0000-4000-8000-000000000146", "action_type": "approve" },
+    { "menu_id": "82000000-0000-4000-8000-000000000225", "api_resource_id": "81000000-0000-4000-8000-000000000147", "action_type": "mutation" }
   ]
 }

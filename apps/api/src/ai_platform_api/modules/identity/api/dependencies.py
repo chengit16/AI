@@ -255,6 +255,10 @@ def _resource_reference(
                 "workflow_id",
                 "event_id",
                 "service_id",
+                "confirmation_id",
+                "tool_call_id",
+                "step_id",
+                "run_id",
             )
             if (value := values.get(key)) is not None
         ),
@@ -279,6 +283,10 @@ def _resource_reference(
             "workflow_id",
             "event_id",
             "service_id",
+            "confirmation_id",
+            "tool_call_id",
+            "step_id",
+            "run_id",
         )
         if (value := values.get(key)) is not None
     }

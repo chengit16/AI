@@ -168,3 +168,6 @@ class ToolCatalogService:
                 surface="api",
             )
         )
+
+
+__all__ = ["ToolCatalogService", "ToolDefinition"]
