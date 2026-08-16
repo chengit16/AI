@@ -150,7 +150,7 @@
 
 ### P4-10 工具结果安全与运营事实
 
-- 状态：已完成，完成日期为 2026-08-16，实现提交待回填。
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `a7918f5`。
 - 交付范围：Adapter 的接受结果新增冻结输出 Schema 摘要与规范序列化字节数；新增不含结果正文的 `ToolSafeResult`、`ToolAttemptOutcomeFacts`、`ToolUsageRecord` 和 `ToolProgressEvent` 领域事实，固定 Schema、大小、敏感字段和 Prompt Injection 四项检查、十类进度事件及包含失败、取消、超时、迟到结果和人工恢复的用量终态集合。
 - 数据库与原子性：Revision `20260816_0060` 新增不可变 `tool_safe_results`、`tool_usage_records` 和 `tool_progress_events`；每个 Attempt 和 ToolCall 新终态必须存在唯一用量记录，成功调用必须存在四项全通过且可进入模型上下文的安全结果。Worker、合成副作用、取消、租约过期、总超时、迟到结果、人工恢复和未知结果对账均在原状态事务中追加用量与连续 Run 游标进度，成功、失败、审计和 Outbox 任一写入失败都会整体回滚；工作空间 Registry 升级为 `v9`，存在运营事实时拒绝破坏性降级。
 - 结果与最小事实：结果正文只停留在受控 Adapter 边缘，安全结果只保存输出 Schema 摘要、内容摘要、规范字节数和固定检查结论；调用终态审计与 Outbox 只包含工具版本、访问模式、风险、终态和稳定错误码，不复制参数、结果、凭证或主体正文。合成副作用使用固定摘要形成安全结果，未知结果成功对账只追加安全结果和进度，保留原 Attempt 的 `manual_recovery` 用量，不篡改历史事实。
