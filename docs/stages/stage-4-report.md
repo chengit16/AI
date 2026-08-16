@@ -49,7 +49,7 @@
 
 ### P4-02 工具注册与版本治理
 
-- 状态：已完成，完成日期为 2026-08-16，实现提交待回填。
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `43d099e`。
 - 交付范围：新增独立 `tool_execution` 模块，原地扩展既有 `agent_tool_definitions` 唯一工具定义事实源，并新增不可变 `tool_plan_availability` 套餐映射；没有创建第二套工具定义表，也没有激活 HTTP API、菜单、工具执行、Run/Step/Attempt、凭证值或真实 Adapter。
 - 定义治理：不可变工具版本完整固定 Draft 2020-12 参数与结果 JSON Schema、对应 SHA-256、完整定义摘要、读写类型、风险、Permission、Adapter、超时、重试、凭证需求、状态和合成标记；Schema 必须为关闭对象，未知字段、错误方言、任意 HTTP Adapter、非法读写/重试组合及摘要篡改全部失败关闭。
 - 工作空间目录：五个冻结内部只读工具 V1 同时映射 `personal_local` 和 `enterprise_simulated`；可见目录严格取平台注册的每个工具最新 `active` 版本、当前活动套餐允许版本和当前 PDP Permission 允许结果的交集，菜单可见性不参与授权。
