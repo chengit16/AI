@@ -8,13 +8,21 @@ from ai_platform_api.modules.tool_execution.application.definitions import (
 from ai_platform_api.modules.tool_execution.application.errors import (
     ToolDefinitionInvalidError,
     ToolExecutionDeniedError,
+    ToolRunBudgetExceededError,
+    ToolRunConflictError,
+    ToolRunTerminalError,
     ToolVersionNotAvailableError,
 )
+from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
 
 __all__ = [
     "ToolCatalogService",
     "ToolDefinitionInvalidError",
     "ToolExecutionDeniedError",
+    "ToolRunBudgetExceededError",
+    "ToolRunConflictError",
+    "ToolRunTerminalError",
+    "ToolTaskService",
     "ToolVersionNotAvailableError",
     "parse_tool_definition",
     "verify_tool_definition",

@@ -3,5 +3,8 @@
 from ai_platform_api.modules.tool_execution.infrastructure.sqlalchemy import (
     SqlAlchemyToolCatalogRepository,
 )
+from ai_platform_api.modules.tool_execution.infrastructure.tasks_sqlalchemy import (
+    SqlAlchemyToolTaskStore,
+)
 
-__all__ = ["SqlAlchemyToolCatalogRepository"]
+__all__ = ["SqlAlchemyToolCatalogRepository", "SqlAlchemyToolTaskStore"]

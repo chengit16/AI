@@ -2664,6 +2664,301 @@ tool_plan_availability = Table(
     ),
 )
 
+tool_runs = Table(
+    "tool_runs",
+    metadata,
+    Column("run_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("service_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_release_id", UUID(as_uuid=True), nullable=False),
+    Column("state", String(32), nullable=False),
+    Column("max_steps", Integer, nullable=False),
+    Column("max_attempts_per_step", Integer, nullable=False),
+    Column("max_execution_seconds", Integer, nullable=False),
+    Column("max_cost_microunits", BigInteger, nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("cancel_requested_at", DateTime(timezone=True), nullable=True),
+    Column("deadline_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("run_id", "workspace_id", name="uq_tool_runs_id_workspace"),
+    UniqueConstraint(
+        "workspace_id",
+        "requested_by_actor_id",
+        "idempotency_key",
+        name="uq_tool_runs_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_tool_runs_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["requested_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_tool_runs_requester",
+    ),
+    ForeignKeyConstraint(
+        ["service_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.services.service_id", f"{SCHEMA_TOKEN}.services.workspace_id"],
+        name="fk_tool_runs_service",
+    ),
+    ForeignKeyConstraint(
+        ["agent_release_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_releases.release_id",
+            f"{SCHEMA_TOKEN}.agent_releases.workspace_id",
+        ],
+        name="fk_tool_runs_agent_release",
+    ),
+    CheckConstraint(
+        "state IN ('pending', 'planning', 'running', 'waiting_confirmation', "
+        "'waiting_approval', 'cancellation_requested', 'completed', 'failed', "
+        "'cancelled', 'timed_out')",
+        name="ck_tool_runs_state",
+    ),
+    CheckConstraint(
+        "max_steps BETWEEN 1 AND 50 AND max_attempts_per_step BETWEEN 1 AND 5 "
+        "AND max_execution_seconds BETWEEN 1 AND 1800 AND max_cost_microunits >= 0",
+        name="ck_tool_runs_budget",
+    ),
+    CheckConstraint(
+        "idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$' "
+        "AND request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_tool_runs_idempotency",
+    ),
+    CheckConstraint("trace_id ~ '^[0-9a-f]{32}$'", name="ck_tool_runs_trace_id"),
+    CheckConstraint("deadline_at > created_at", name="ck_tool_runs_deadline"),
+    CheckConstraint(
+        "(state IN ('completed', 'failed', 'cancelled', 'timed_out') "
+        "AND completed_at IS NOT NULL) OR "
+        "(state NOT IN ('completed', 'failed', 'cancelled', 'timed_out') "
+        "AND completed_at IS NULL)",
+        name="ck_tool_runs_completion",
+    ),
+    CheckConstraint(
+        "(state IN ('cancellation_requested', 'cancelled') "
+        "AND cancel_requested_at IS NOT NULL) OR "
+        "(state NOT IN ('cancellation_requested', 'cancelled'))",
+        name="ck_tool_runs_cancellation",
+    ),
+    CheckConstraint("version >= 1", name="ck_tool_runs_version"),
+)
+Index("ix_tool_runs_workspace_time", tool_runs.c.workspace_id, tool_runs.c.created_at)
+Index("ix_tool_runs_claim", tool_runs.c.state, tool_runs.c.deadline_at)
+
+tool_steps = Table(
+    "tool_steps",
+    metadata,
+    Column("step_id", UUID(as_uuid=True), primary_key=True),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("sequence_no", Integer, nullable=False),
+    Column("tool_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_version", Integer, nullable=False),
+    Column("canonical_arguments_hash", String(64), nullable=False),
+    Column("state", String(32), nullable=False),
+    Column("current_attempt_no", Integer, nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("run_id", "sequence_no", name="uq_tool_steps_run_sequence"),
+    UniqueConstraint(
+        "step_id",
+        "run_id",
+        "workspace_id",
+        name="uq_tool_steps_run_identity",
+    ),
+    UniqueConstraint(
+        "step_id",
+        "run_id",
+        "workspace_id",
+        "tool_id",
+        "tool_version",
+        "canonical_arguments_hash",
+        name="uq_tool_steps_call_binding",
+    ),
+    ForeignKeyConstraint(
+        ["run_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.tool_runs.run_id", f"{SCHEMA_TOKEN}.tool_runs.workspace_id"],
+        name="fk_tool_steps_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["tool_id", "tool_version"],
+        [
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_id",
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_version",
+        ],
+        name="fk_tool_steps_definition",
+    ),
+    CheckConstraint("sequence_no >= 1", name="ck_tool_steps_sequence"),
+    CheckConstraint("tool_version >= 1", name="ck_tool_steps_tool_version"),
+    CheckConstraint(
+        "canonical_arguments_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_tool_steps_arguments_hash",
+    ),
+    CheckConstraint(
+        "state IN ('planned', 'policy_checking', 'waiting_confirmation', "
+        "'waiting_approval', 'ready', 'running', 'completed', 'failed', "
+        "'cancelled', 'timed_out')",
+        name="ck_tool_steps_state",
+    ),
+    CheckConstraint(
+        "current_attempt_no IS NULL OR current_attempt_no BETWEEN 1 AND 5",
+        name="ck_tool_steps_current_attempt",
+    ),
+    CheckConstraint(
+        "state <> 'running' OR current_attempt_no IS NOT NULL",
+        name="ck_tool_steps_running_attempt",
+    ),
+    CheckConstraint("version >= 1", name="ck_tool_steps_version"),
+)
+Index("ix_tool_steps_claim", tool_steps.c.state, tool_steps.c.created_at)
+
+tool_attempts = Table(
+    "tool_attempts",
+    metadata,
+    Column("attempt_id", UUID(as_uuid=True), primary_key=True),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("attempt_no", Integer, nullable=False),
+    Column("lease_generation", Integer, nullable=False),
+    Column("state", String(32), nullable=False),
+    Column("worker_id", String(120), nullable=False),
+    Column("lease_started_at", DateTime(timezone=True), nullable=False),
+    Column("lease_expires_at", DateTime(timezone=True), nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    UniqueConstraint("step_id", "attempt_no", name="uq_tool_attempts_step_attempt"),
+    UniqueConstraint(
+        "attempt_id",
+        "step_id",
+        "run_id",
+        "workspace_id",
+        name="uq_tool_attempts_identity",
+    ),
+    ForeignKeyConstraint(
+        ["step_id", "run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.tool_steps.step_id",
+            f"{SCHEMA_TOKEN}.tool_steps.run_id",
+            f"{SCHEMA_TOKEN}.tool_steps.workspace_id",
+        ],
+        name="fk_tool_attempts_step",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("attempt_no BETWEEN 1 AND 5", name="ck_tool_attempts_number"),
+    CheckConstraint("lease_generation >= 1", name="ck_tool_attempts_generation"),
+    CheckConstraint(
+        "char_length(btrim(worker_id)) BETWEEN 1 AND 120",
+        name="ck_tool_attempts_worker",
+    ),
+    CheckConstraint(
+        "lease_expires_at > lease_started_at AND started_at >= lease_started_at",
+        name="ck_tool_attempts_lease",
+    ),
+    CheckConstraint(
+        "state IN ('leased', 'executing', 'succeeded', 'failed', 'cancelled', "
+        "'timed_out', 'ignored_late_result')",
+        name="ck_tool_attempts_state",
+    ),
+    CheckConstraint(
+        "(state IN ('leased', 'executing') AND completed_at IS NULL) OR "
+        "(state NOT IN ('leased', 'executing') AND completed_at IS NOT NULL)",
+        name="ck_tool_attempts_completion",
+    ),
+)
+Index("ix_tool_attempts_lease", tool_attempts.c.state, tool_attempts.c.lease_expires_at)
+
+tool_calls = Table(
+    "tool_calls",
+    metadata,
+    Column("tool_call_id", UUID(as_uuid=True), primary_key=True),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=False),
+    Column("attempt_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_version", Integer, nullable=False),
+    Column("canonical_arguments_hash", String(64), nullable=False),
+    Column("access_mode", String(16), nullable=False),
+    Column("risk_level", String(16), nullable=False),
+    Column("credential_ref", String(69), nullable=True),
+    Column("state", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    UniqueConstraint("attempt_id", name="uq_tool_calls_attempt"),
+    ForeignKeyConstraint(
+        ["attempt_id", "step_id", "run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.tool_attempts.attempt_id",
+            f"{SCHEMA_TOKEN}.tool_attempts.step_id",
+            f"{SCHEMA_TOKEN}.tool_attempts.run_id",
+            f"{SCHEMA_TOKEN}.tool_attempts.workspace_id",
+        ],
+        name="fk_tool_calls_attempt",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        [
+            "step_id",
+            "run_id",
+            "workspace_id",
+            "tool_id",
+            "tool_version",
+            "canonical_arguments_hash",
+        ],
+        [
+            f"{SCHEMA_TOKEN}.tool_steps.step_id",
+            f"{SCHEMA_TOKEN}.tool_steps.run_id",
+            f"{SCHEMA_TOKEN}.tool_steps.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_steps.tool_id",
+            f"{SCHEMA_TOKEN}.tool_steps.tool_version",
+            f"{SCHEMA_TOKEN}.tool_steps.canonical_arguments_hash",
+        ],
+        name="fk_tool_calls_step_binding",
+    ),
+    CheckConstraint("tool_version >= 1", name="ck_tool_calls_tool_version"),
+    CheckConstraint(
+        "canonical_arguments_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_tool_calls_arguments_hash",
+    ),
+    CheckConstraint("access_mode IN ('read', 'write')", name="ck_tool_calls_access_mode"),
+    CheckConstraint(
+        "risk_level IN ('low', 'medium', 'high', 'critical')",
+        name="ck_tool_calls_risk",
+    ),
+    CheckConstraint(
+        "credential_ref IS NULL OR credential_ref ~ '^cred_[a-z0-9]{16,64}$'",
+        name="ck_tool_calls_credential_ref",
+    ),
+    CheckConstraint(
+        "state IN ('proposed', 'authorized', 'confirmed', 'executing', "
+        "'succeeded', 'failed', 'cancelled', 'timed_out')",
+        name="ck_tool_calls_state",
+    ),
+    CheckConstraint(
+        "(state IN ('succeeded', 'failed', 'cancelled', 'timed_out') "
+        "AND completed_at IS NOT NULL) OR "
+        "(state NOT IN ('succeeded', 'failed', 'cancelled', 'timed_out') "
+        "AND completed_at IS NULL)",
+        name="ck_tool_calls_completion",
+    ),
+)
+Index("ix_tool_calls_workspace_time", tool_calls.c.workspace_id, tool_calls.c.created_at)
+
 agents = Table(
     "agents",
     metadata,

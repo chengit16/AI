@@ -4,5 +4,18 @@ from ai_platform_api.modules.tool_execution.domain.catalog import (
     ToolCatalogRepository,
     ToolDefinition,
 )
+from ai_platform_api.modules.tool_execution.domain.tasks import (
+    ClaimedToolAttempt,
+    ToolRun,
+    ToolRunBudget,
+    ToolStep,
+)
 
-__all__ = ["ToolCatalogRepository", "ToolDefinition"]
+__all__ = [
+    "ClaimedToolAttempt",
+    "ToolCatalogRepository",
+    "ToolDefinition",
+    "ToolRun",
+    "ToolRunBudget",
+    "ToolStep",
+]

@@ -187,8 +187,12 @@ from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
 )
 from ai_platform_api.modules.streaming.infrastructure.valkey import ValkeyStreamNotifier
 from ai_platform_api.modules.tool_execution.application.catalog import ToolCatalogService
+from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
 from ai_platform_api.modules.tool_execution.infrastructure.sqlalchemy import (
     SqlAlchemyToolCatalogRepository,
+)
+from ai_platform_api.modules.tool_execution.infrastructure.tasks_sqlalchemy import (
+    SqlAlchemyToolTaskStore,
 )
 from ai_platform_api.modules.workflow.application.approval_runtime import ApprovalInstanceService
 from ai_platform_api.modules.workflow.application.approvals import ApprovalPolicyService
@@ -263,6 +267,7 @@ class ApplicationContainer:
     approval_policies: ApprovalPolicyService | None = None
     approval_instances: ApprovalInstanceService | None = None
     tool_catalogs: ToolCatalogService | None = None
+    tool_tasks: ToolTaskService | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
@@ -447,6 +452,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         entitlement_access,
         policy,
     )
+    tool_tasks = ToolTaskService(SqlAlchemyToolTaskStore(database.sessions))
     retrieval_planning = BoundedRetrievalPlanningService(
         SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
         policy,
@@ -549,6 +555,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             approval_policies=approval_policies,
             approval_instances=approval_instances,
             tool_catalogs=tool_catalogs,
+            tool_tasks=tool_tasks,
             workflow_run_executor=WorkflowRunExecutor(
                 SqlAlchemyWorkflowExecutionStore(database.sessions),
                 policy,
