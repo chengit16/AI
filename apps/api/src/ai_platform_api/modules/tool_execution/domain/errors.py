@@ -37,3 +37,21 @@ class ToolRunBudgetExceededError(PlatformError):
     """任务已经超过冻结的步骤、尝试、时限或成本预算。"""
 
     error_code = "TOOL_RUN_BUDGET_EXCEEDED"
+
+
+class ToolAdapterNotAllowedError(PlatformError):
+    """当前工具定义不是阶段 4 允许的内部只读 Adapter。"""
+
+    error_code = "TOOL_ADAPTER_NOT_ALLOWED"
+
+
+class ToolAdapterUnavailableError(PlatformError):
+    """已登记的内部只读 Adapter 暂时不可用。"""
+
+    error_code = "TOOL_ADAPTER_UNAVAILABLE"
+
+
+class ToolResultRejectedError(PlatformError):
+    """工具结果未通过结构、大小、敏感字段或 Prompt Injection 检查。"""
+
+    error_code = "TOOL_RESULT_REJECTED"
