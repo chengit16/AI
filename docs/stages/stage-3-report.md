@@ -5,13 +5,13 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
-| 状态 | 进行中 |
+| 状态 | 已完成 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-13` 联合验收与阶段关闭 |
+| 当前节点 | `P3-13` 联合验收与阶段关闭已完成 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离、灰度回滚、统一服务出口、控制台与运营监控已通过 |
+| Agent 控制面 | `passed`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离、灰度回滚、统一服务出口、控制台与运营监控已通过 |
 | 服务发布与回滚 | `passed`，自定义知识 Agent、场景应用和 Open API 三类出口已接入同一发布路由与安全门禁 |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -28,6 +28,7 @@
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
 | 数据库基线 | PostgreSQL 16，Revision `20260816_0052` |
 | 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
+| 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实供应商或 AI 质量 |
 
 ## 3. 节点记录
@@ -188,6 +189,17 @@
 - 当前边界：真实模型供应商、真实 AI 质量、容量、LLM Grading、多模态图片问答、真实连接器、外部写工具、SaaS、Go、Channel Gateway 和 Durable Run 继续保持既定边界。运营指标和告警已经形成确定性闭环，但不能据此宣称真实模型质量或生产容量已通过。
 - 提交：`6ca4c51`。
 
+### P3-13 联合验收与阶段关闭
+
+- 状态：已完成；联合验收实现提交 `bbf5303`，阶段关闭提交在进度看板回填，关闭标签为 `stage-3-complete`。
+- 冻结清单与证据：新增 `p3-13-v1` 联合验收清单、清单/证据 JSON Schema 和 `./platform accept-stage-3`。15 个真实测试节点逐项追溯 `p3-01-v1` 合成场景并完整覆盖 10 条阶段不变量；前置诊断、pytest 进程、任一场景或恢复诊断失败都会关闭整次验收。证据只保存清单摘要、Git Revision、工作树状态、耗时、稳定原因码和场景状态，不保存 pytest 输出、Prompt、正文、主体或 Trace。
+- 核心门禁：联合验收覆盖 Runtime 不执行草稿、控制面故障不影响可信已发布快照、Run 唯一追溯 Service/Route/Release、测试失败无法发布、异常版本可回滚和 `service_id` 稳定路由六项核心门禁；同时覆盖个人所有者与企业两级审批、Release 不可变、写工具拒绝、跨空间攻击、服务暂停后在途收敛、同 generation 并发唯一胜者、三类服务出口、控制台全链路和运营晋级阻断。
+- 最终联合证据：干净提交 `bbf5303b6fc63191a5c14125c0fee9b95e6f63ab` 上执行 `./platform accept-stage-3`，固定场景 `15/15` 通过，前置、场景执行和恢复三类检查均为 `passed`，前后各 13 项容器诊断通过，总耗时 `20.579557s`，证据 `repository_dirty=false`、清单摘要 `5a2c29b9…72235f`。
+- 统一门禁：最终 `./scripts/verify` 通过 React `53/53`、Python `665/665`、Ruff format/lint、mypy strict `607` 个源文件，以及前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、Registry 21、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器与浏览器：`./platform doctor` 在 Revision `20260816_0052` 上连续通过 Web、API、MinIO、Tika、PostgreSQL、Valkey、五个 Worker Lane 和 Scheduler 13 项诊断。P3-11/P3-12 已在当前前端产物上完成 `1440×900` 与 `390×844` 的 Agent、服务和运营页面验收，无页面级横向溢出或控制台错误；P3-13 未修改前端产物，因此不重复制造一份等价浏览器证据。
+- ReleaseManifest：新增 [`阶段 3 本地 Agent 平台发布报告`](../releases/stage-3-local-agent-platform/README.md)，生成 `0.3.0` V1 清单，固定提交 `bbf5303` 的 Web、API、Worker 与契约源码摘要、数据库 Revision `20260816_0052`、Node.js `24.19.0`、Python `3.12.12` 和 7 个 `linux/arm64` 本地镜像内容摘要。清单自摘要为 `sha256:60e5d17d345803503c8d959440e2f5d6887ad71f672a8b5741e2db48373e7c81`，生成漂移、兼容矩阵和开发级供应链检查通过。
+- 发布与范围边界：正式发布级门禁按设计返回 `blocked`，原因仍为镜像漏洞扫描 `not_configured` 和 Linux 宿主机验收 `not_run`，因此不创建正式供应链归档。真实模型供应商、AI 质量和容量仍分别为 `not_configured`、`not_configured` 和 `not_run`；不提前实现阶段 4 工具副作用、阶段 5 真实质量与合规，也不扩展 SaaS、Go、真实连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
@@ -198,4 +210,6 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理、`P3-08` Runtime 隔离路由、`P3-09` 灰度发布与回滚、`P3-10` 统一服务出口、`P3-11` Agent 控制台和 `P3-12` AgentRelease 运营监控已通过，当前进入 `P3-13` 联合验收与阶段关闭；在核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`passed`。`P3-01`～`P3-13` 全部完成，Agent 控制面、测试与审批、不可变 Release、服务路由、Runtime 隔离、灰度回滚、统一服务出口、控制台和确定性运营晋级门禁均形成自动化、数据库、容器或浏览器证据。最终统一门禁 React `53/53`、Python `665/665`，阶段联合验收 `15/15`，Revision `20260816_0052` 的前后两轮 13 项容器诊断通过，`0.3.0` 本地 Agent 平台版本以 `stage-3-complete` 标签冻结。
+
+该结论不改变独立状态：真实供应商和 AI 质量为 `not_configured`，容量与 Linux 为 `not_run`，镜像扫描为 `not_configured`，正式发布门禁继续 `blocked`。下一正式建设阶段为阶段 4 受控工具执行、确认、幂等和任务状态机。

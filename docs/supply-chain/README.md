@@ -49,7 +49,7 @@ Python SBOM 从锁文件生成，包含满足各目标平台 Marker 的 55 个�
 `ReleaseManifest` 门禁通过；镜像扫描为 `not_configured`，Linux 验收为 `not_run`，所以
 `development_status=passed`、`release_status=blocked`。未配置项不允许静默跳过或人工改写为通过。
 
-阶段 2 本地可靠性版本 `0.2.0` 的清单位于 [`docs/releases/stage-2-local-reliability`](../releases/stage-2-local-reliability/README.md)，固定 Revision `20260815_0041`、Node.js `24.19.0`、Python `3.12.12` 和当前 `linux/arm64` 本地镜像内容 ID。该清单已通过 V1 Schema、`p1a-02-v1` 兼容矩阵和生成漂移检查，但不改变上述正式发布阻断状态。
+阶段 2 本地可靠性版本 `0.2.0` 的清单位于 [`docs/releases/stage-2-local-reliability`](../releases/stage-2-local-reliability/README.md)。当前阶段 3 本地 Agent 平台版本 `0.3.0` 的清单位于 [`docs/releases/stage-3-local-agent-platform`](../releases/stage-3-local-agent-platform/README.md)，固定 Revision `20260816_0052`、Node.js `24.19.0`、Python `3.12.12` 和当前 `linux/arm64` 本地镜像内容 ID。两个清单均已通过 V1 Schema、`p1a-02-v1` 兼容矩阵和生成漂移检查，但不改变上述正式发布阻断状态。
 
 正式流水线必须在 `artifacts/security/` 提供原始证据。镜像证据需包含支持的扫描器、版本、镜像
 摘要，以及每个镜像严重和高危漏洞均为 0；Linux 证据需明确 `os=linux` 并至少完成

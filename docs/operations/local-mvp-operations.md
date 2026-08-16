@@ -197,12 +197,24 @@ P2-07 提供工作空间级运营 API，P2-10 已将任务、索引、Outbox、�
 
 最新结果原子写入 `.ai-platform/evidence/p2-11-latest.json`。该忽略目录只保存本机证据，不进入 Git 或业务备份；JSON 记录清单摘要、Git Revision、工作区是否干净、起止时间、耗时、检查结果和稳定原因码，不保存测试 stdout、stderr、异常正文、业务载荷或凭据。失败时先根据控制台中的测试节点和稳定原因码修复根因，确认平台诊断正常后完整重跑，不能只单独改写失败项。该演练验证小规模正确性，不代表条件容量认证。
 
+### 7.5 阶段 3 联合验收
+
+平台运行且 `./platform doctor` 正常时，可执行阶段 3 全合成联合验收：
+
+```bash
+./platform accept-stage-3
+```
+
+命令固定读取 `tests/fixtures/agent-control/p3-13-v1.json`，调用 15 个已登记 pytest 节点，完整覆盖阶段 3 的 10 条冻结不变量。验收包含个人/企业审批、失败测试与跨空间发布阻断、Release 不可变、写工具拒绝、草稿执行拒绝、控制面故障、Run 精确绑定、在途完成、灰度回滚、并发晋级、三类服务出口、控制台全链路和运营晋级门禁，不访问真实供应商或客户资料。
+
+执行器先运行 13 项前置诊断，再一次性执行场景并解析 JUnit，最后无条件运行恢复诊断。前置诊断、pytest、任一场景或恢复诊断失败都会使整次验收非零退出。最新证据原子写入 `.ai-platform/evidence/p3-13-latest.json`，只记录清单摘要、Git Revision、工作树状态、耗时、稳定原因码和场景状态；阶段关闭证据必须来自干净提交且 `repository_dirty=false`。
+
 阶段关闭或本地版本切换后还应复验目标 `ReleaseManifest` 和供应链状态：
 
 ```bash
 .venv/bin/python scripts/generate_release_manifest.py \
-  --inputs docs/releases/stage-2-local-reliability/release-manifest-input.v1.json \
-  --output docs/releases/stage-2-local-reliability/release-manifest.v1.json \
+  --inputs docs/releases/stage-3-local-agent-platform/release-manifest-input.v1.json \
+  --output docs/releases/stage-3-local-agent-platform/release-manifest.v1.json \
   --check
 .venv/bin/python -m scripts.check_release_readiness --require development --check
 .venv/bin/python -m scripts.check_release_readiness --require release --check
