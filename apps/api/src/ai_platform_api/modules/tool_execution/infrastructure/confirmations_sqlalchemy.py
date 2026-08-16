@@ -30,6 +30,7 @@ from ai_platform_api.modules.tool_execution.domain.errors import (
 )
 from ai_platform_api.modules.tool_execution.domain.planning import ToolPolicyDecisionRecord
 from ai_platform_api.modules.tool_execution.domain.tasks import (
+    ToolAttemptTrigger,
     ToolRun,
     ToolRunBudget,
     ToolRunState,
@@ -547,6 +548,11 @@ def _run(row: Mapping[Any, Any]) -> ToolRun:
         created_at=cast(datetime, row["created_at"]),
         updated_at=cast(datetime, row["updated_at"]),
         completed_at=cast(datetime | None, row["completed_at"]),
+        recovery_generation=cast(int, row["recovery_generation"]),
+        recovery_reason_code=cast(str | None, row["recovery_reason_code"]),
+        recovery_required_at=cast(datetime | None, row["recovery_required_at"]),
+        last_recovered_by_actor_id=cast(UUID | None, row["last_recovered_by_actor_id"]),
+        last_recovered_at=cast(datetime | None, row["last_recovered_at"]),
         version=cast(int, row["version"]),
     )
 
@@ -567,7 +573,10 @@ def _step(row: Mapping[Any, Any]) -> ToolStep:
             cast(int, row["max_cost_microunits"]),
         ),
         state=cast(ToolStepState, row["state"]),
+        recovery_generation=cast(int, row["recovery_generation"]),
         current_attempt_no=cast(int | None, row["current_attempt_no"]),
+        available_at=cast(datetime, row["available_at"]),
+        next_attempt_trigger=cast(ToolAttemptTrigger, row["next_attempt_trigger"]),
         created_at=cast(datetime, row["created_at"]),
         updated_at=cast(datetime, row["updated_at"]),
         version=cast(int, row["version"]),

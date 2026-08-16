@@ -35,6 +35,7 @@ from ai_platform_api.modules.tool_execution.domain.side_effects import (
 )
 from ai_platform_api.modules.tool_execution.domain.tasks import (
     ClaimedToolAttempt,
+    ToolAttemptTrigger,
     ToolRun,
     ToolRunBudget,
     ToolStep,
@@ -51,6 +52,7 @@ __all__ = [
     "SyntheticSideEffectReceipt",
     "ToolAdapterRequest",
     "ToolAdapterResult",
+    "ToolAttemptTrigger",
     "ToolCallBinding",
     "ToolCatalogRepository",
     "ToolConfirmation",

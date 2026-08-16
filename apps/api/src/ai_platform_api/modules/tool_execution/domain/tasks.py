@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Literal, Protocol
 from uuid import UUID
 
+from ai_platform_backend.integration.domain import AuditAuthorization
+
 ToolRunState = Literal[
     "pending",
     "planning",
@@ -14,6 +16,7 @@ ToolRunState = Literal[
     "waiting_confirmation",
     "waiting_approval",
     "cancellation_requested",
+    "manual_recovery",
     "completed",
     "failed",
     "cancelled",
@@ -25,7 +28,9 @@ ToolStepState = Literal[
     "waiting_confirmation",
     "waiting_approval",
     "ready",
+    "retry_wait",
     "running",
+    "manual_recovery",
     "completed",
     "failed",
     "cancelled",
@@ -50,7 +55,19 @@ ToolCallState = Literal[
     "cancelled",
     "timed_out",
 ]
-AttemptResult = Literal["succeeded", "failed", "ignored_late_result"]
+ToolAttemptTrigger = Literal[
+    "automatic",
+    "automatic_retry",
+    "lease_recovery",
+    "manual_recovery",
+]
+AttemptResult = Literal[
+    "succeeded",
+    "failed",
+    "retry_wait",
+    "manual_recovery",
+    "ignored_late_result",
+]
 
 
 @dataclass(frozen=True)
@@ -90,6 +107,11 @@ class ToolRun:
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
+    recovery_generation: int
+    recovery_reason_code: str | None
+    recovery_required_at: datetime | None
+    last_recovered_by_actor_id: UUID | None
+    last_recovered_at: datetime | None
     version: int
 
 
@@ -106,7 +128,10 @@ class ToolStep:
     canonical_arguments_hash: str
     budget: ToolStepBudget
     state: ToolStepState
+    recovery_generation: int
     current_attempt_no: int | None
+    available_at: datetime
+    next_attempt_trigger: ToolAttemptTrigger
     created_at: datetime
     updated_at: datetime
     version: int
@@ -124,8 +149,10 @@ class ClaimedToolAttempt:
     tool_id: UUID
     tool_version: int
     canonical_arguments_hash: str
+    recovery_generation: int
     attempt_no: int
     lease_generation: int
+    trigger: ToolAttemptTrigger
     worker_id: str
     lease_expires_at: datetime
 
@@ -197,6 +224,21 @@ class ToolTaskStore(Protocol):
         started_at: datetime,
     ) -> bool: ...
 
+    def renew_lease(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        renewed_at: datetime,
+        lease_seconds: int,
+    ) -> ClaimedToolAttempt | None: ...
+
+    def observe_cancellation(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        observed_at: datetime,
+    ) -> bool: ...
+
     def transition_call(
         self,
         claim: ClaimedToolAttempt,
@@ -212,7 +254,31 @@ class ToolTaskStore(Protocol):
         succeeded: bool,
         completed_at: datetime,
         error_code: str | None,
+        retryable: bool,
+        next_attempt_at: datetime | None,
     ) -> AttemptResult: ...
+
+    def require_manual_recovery(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        error_code: str,
+        occurred_at: datetime,
+    ) -> AttemptResult: ...
+
+    def recover_manually(
+        self,
+        *,
+        workspace_id: UUID,
+        run_id: UUID,
+        actor_id: UUID,
+        account_id: UUID,
+        request_id: UUID,
+        trace_id: str,
+        traceparent: str,
+        authorization: AuditAuthorization | None,
+        recovered_at: datetime,
+    ) -> ToolRun: ...
 
     def request_cancellation(
         self,

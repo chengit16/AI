@@ -16,6 +16,7 @@ from ai_platform_api.modules.tool_execution.application.errors import (
     ToolConfirmationStaleError,
     ToolIdempotencyConflictError,
     ToolOutcomeUnknownError,
+    ToolRetryNotAllowedError,
     ToolRunConflictError,
 )
 from ai_platform_api.modules.tool_execution.application.side_effects import ToolSideEffectService
@@ -152,6 +153,34 @@ def _idempotency_row(database: SideEffectDatabase, ready: ReadyWrite) -> RowMapp
             .mappings()
             .one()
         )
+
+
+def _append_ready_followup(database: SideEffectDatabase, ready: ReadyWrite) -> UUID:
+    """追加一个仅用于验证顺序恢复的合成后续 Step。"""
+
+    step_id = uuid4()
+    created_at = datetime.now(UTC)
+    with database.harness.sessions.begin() as session:
+        source = (
+            session.execute(select(tool_steps).where(tool_steps.c.step_id == ready.claim.step_id))
+            .mappings()
+            .one()
+        )
+        values = dict(source)
+        values.update(
+            step_id=step_id,
+            sequence_no=int(source["sequence_no"]) + 1,
+            state="ready",
+            recovery_generation=0,
+            current_attempt_no=None,
+            available_at=created_at,
+            next_attempt_trigger="automatic",
+            created_at=created_at,
+            updated_at=created_at,
+            version=1,
+        )
+        session.execute(insert(tool_steps).values(**values))
+    return step_id
 
 
 def test_success_replay_and_atomic_task_lifecycle_are_secret_free(
@@ -311,6 +340,41 @@ def test_committed_side_effect_with_lost_response_can_only_be_reconciled(
     with pytest.raises(ToolOutcomeUnknownError):
         service.execute(ready.claim, occurred_at=datetime.now(UTC))
     assert _idempotency_row(side_effect_database, ready)["state"] == "outcome_unknown"
+    with side_effect_database.harness.sessions() as session:
+        assert (
+            session.scalar(
+                select(tool_runs.c.state).where(tool_runs.c.run_id == ready.claim.run_id)
+            )
+            == "manual_recovery"
+        )
+        assert (
+            session.scalar(
+                select(tool_steps.c.state).where(tool_steps.c.step_id == ready.claim.step_id)
+            )
+            == "manual_recovery"
+        )
+        assert (
+            session.scalar(
+                select(tool_attempts.c.state).where(
+                    tool_attempts.c.attempt_id == ready.claim.attempt_id
+                )
+            )
+            == "failed"
+        )
+        assert (
+            session.scalar(
+                select(tool_calls.c.state).where(
+                    tool_calls.c.tool_call_id == ready.claim.tool_call_id
+                )
+            )
+            == "executing"
+        )
+    with pytest.raises(ToolRetryNotAllowedError):
+        ready.environment.tasks.recover_manually(
+            ready.environment.request_context,
+            ready.claim.run_id,
+            recovered_at=datetime.now(UTC),
+        )
 
     with pytest.raises(ToolOutcomeUnknownError):
         service.execute(ready.claim, occurred_at=datetime.now(UTC))
@@ -318,6 +382,83 @@ def test_committed_side_effect_with_lost_response_can_only_be_reconciled(
     assert reconciled.replayed is True
     assert reconciled.record.state == "succeeded"
     assert _row_counts(side_effect_database, ready)[0] == 1
+    with side_effect_database.harness.sessions() as session:
+        assert (
+            session.scalar(
+                select(tool_runs.c.state).where(tool_runs.c.run_id == ready.claim.run_id)
+            )
+            == "completed"
+        )
+        assert (
+            session.scalar(
+                select(tool_attempts.c.state).where(
+                    tool_attempts.c.attempt_id == ready.claim.attempt_id
+                )
+            )
+            == "failed"
+        )
+        assert (
+            session.scalar(
+                select(tool_calls.c.state).where(
+                    tool_calls.c.tool_call_id == ready.claim.tool_call_id
+                )
+            )
+            == "succeeded"
+        )
+
+
+def test_reconciled_multistep_run_resumes_remaining_step(
+    side_effect_database: SideEffectDatabase,
+) -> None:
+    """多步 Run 对账成功后恢复运行态，后续顺序 Step 可以继续领取。"""
+
+    ready = _ready_write(side_effect_database, "lost-response-followup")
+    followup_step_id = _append_ready_followup(side_effect_database, ready)
+
+    class LostResponseAdapter:
+        """提交合成事实后模拟响应丢失，并允许只读对账读取提交结果。"""
+
+        def execute(
+            self,
+            command: SyntheticSideEffectCommand,
+            *,
+            committed_at: datetime,
+        ) -> SyntheticSideEffectReceipt:
+            side_effect_database.adapter.execute(command, committed_at=committed_at)
+            raise ToolOutcomeUnknownError
+
+        def reconcile(
+            self,
+            record: ToolIdempotencyRecord,
+        ) -> SyntheticSideEffectReceipt | None:
+            return side_effect_database.adapter.reconcile(record)
+
+    service = ToolSideEffectService(side_effect_database.store, LostResponseAdapter())
+    with pytest.raises(ToolOutcomeUnknownError):
+        service.execute(ready.claim, occurred_at=datetime.now(UTC))
+    assert (
+        ready.environment.tasks.get_run(
+            ready.environment.request_context,
+            ready.claim.run_id,
+        ).state
+        == "manual_recovery"
+    )
+
+    service.reconcile(ready.claim, reconciled_at=datetime.now(UTC))
+    assert (
+        ready.environment.tasks.get_run(
+            ready.environment.request_context,
+            ready.claim.run_id,
+        ).state
+        == "running"
+    )
+    followup = ready.environment.tasks.claim_next(
+        worker_id="synthetic-p408-followup-worker",
+        now=datetime.now(UTC),
+        lease_seconds=30,
+    )
+    assert followup is not None
+    assert followup.step_id == followup_step_id
 
 
 def test_uncommitted_unknown_outcome_stays_unknown_without_automatic_call(

@@ -96,7 +96,10 @@ class RecordingPlanStore:
                 canonical_arguments_hash=item.canonical_arguments_hash,
                 budget=item.budget,
                 state="ready",
+                recovery_generation=0,
                 current_attempt_no=None,
+                available_at=frozen_at,
+                next_attempt_trigger="automatic",
                 created_at=frozen_at,
                 updated_at=frozen_at,
                 version=3,
@@ -185,6 +188,11 @@ def _run() -> ToolRun:
         created_at=NOW,
         updated_at=NOW,
         completed_at=None,
+        recovery_generation=0,
+        recovery_reason_code=None,
+        recovery_required_at=None,
+        last_recovered_by_actor_id=None,
+        last_recovered_at=None,
         version=1,
     )
 

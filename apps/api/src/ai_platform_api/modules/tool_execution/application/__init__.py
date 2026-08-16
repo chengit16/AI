@@ -20,6 +20,7 @@ from ai_platform_api.modules.tool_execution.application.errors import (
     ToolIdempotencyConflictError,
     ToolOutcomeUnknownError,
     ToolResultRejectedError,
+    ToolRetryNotAllowedError,
     ToolRunBudgetExceededError,
     ToolRunConflictError,
     ToolRunTerminalError,
@@ -31,11 +32,19 @@ from ai_platform_api.modules.tool_execution.application.planning import (
 )
 from ai_platform_api.modules.tool_execution.application.side_effects import ToolSideEffectService
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
+from ai_platform_api.modules.tool_execution.application.worker import (
+    ToolAttemptControl,
+    ToolAttemptExecutionError,
+    ToolWorkerBatchResult,
+    ToolWorkerProcessor,
+)
 
 __all__ = [
     "ToolAdapterNotAllowedError",
     "ToolAdapterService",
     "ToolAdapterUnavailableError",
+    "ToolAttemptControl",
+    "ToolAttemptExecutionError",
     "ToolCatalogService",
     "ToolConfirmationRequiredError",
     "ToolConfirmationService",
@@ -49,12 +58,15 @@ __all__ = [
     "ToolIdempotencyConflictError",
     "ToolOutcomeUnknownError",
     "ToolResultRejectedError",
+    "ToolRetryNotAllowedError",
     "ToolRunBudgetExceededError",
     "ToolRunConflictError",
     "ToolRunTerminalError",
     "ToolSideEffectService",
     "ToolTaskService",
     "ToolVersionNotAvailableError",
+    "ToolWorkerBatchResult",
+    "ToolWorkerProcessor",
     "parse_candidate_tool_intents",
     "parse_tool_definition",
     "verify_tool_definition",

@@ -86,6 +86,11 @@ def _run(values: dict[str, Any]) -> ToolRun:
         created_at=values["created_at"],
         updated_at=values["created_at"],
         completed_at=None,
+        recovery_generation=0,
+        recovery_reason_code=None,
+        recovery_required_at=None,
+        last_recovered_by_actor_id=None,
+        last_recovered_at=None,
         version=1,
     )
 
@@ -204,8 +209,10 @@ def test_claim_identity_cannot_be_reinterpreted_as_workspace_request() -> None:
         tool_id=uuid4(),
         tool_version=1,
         canonical_arguments_hash="a" * 64,
+        recovery_generation=0,
         attempt_no=1,
         lease_generation=1,
+        trigger="automatic",
         worker_id="p403-worker",
         lease_expires_at=NOW + timedelta(seconds=60),
     )

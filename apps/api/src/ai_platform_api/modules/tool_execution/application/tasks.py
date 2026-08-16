@@ -164,6 +164,33 @@ class ToolTaskService:
 
         return self._store.begin_attempt(claim, started_at=started_at)
 
+    def renew_lease(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        renewed_at: datetime,
+        lease_seconds: int,
+    ) -> ClaimedToolAttempt | None:
+        """在冻结步骤时限内续租，失租、取消或超时统一返回空结果。"""
+
+        if not 1 <= lease_seconds <= 300:
+            raise ToolRunConflictError
+        return self._store.renew_lease(
+            claim,
+            renewed_at=renewed_at,
+            lease_seconds=lease_seconds,
+        )
+
+    def observe_cancellation(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        observed_at: datetime,
+    ) -> bool:
+        """供 Adapter 尽力传播取消，并留下不含参数正文的观察时间。"""
+
+        return self._store.observe_cancellation(claim, observed_at=observed_at)
+
     def transition_call(
         self,
         claim: ClaimedToolAttempt,
@@ -182,6 +209,8 @@ class ToolTaskService:
         succeeded: bool,
         completed_at: datetime,
         error_code: str | None = None,
+        retryable: bool = False,
+        next_attempt_at: datetime | None = None,
     ) -> AttemptResult:
         """按完整租约身份提交结果，失租或父级终止时只返回迟到结论。"""
 
@@ -190,6 +219,47 @@ class ToolTaskService:
             succeeded=succeeded,
             completed_at=completed_at,
             error_code=error_code,
+            retryable=retryable,
+            next_attempt_at=next_attempt_at,
+        )
+
+    def require_manual_recovery(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        error_code: str,
+        occurred_at: datetime,
+    ) -> AttemptResult:
+        """关闭当前 Attempt 并把父级置为人工恢复，禁止 Worker 自动接管。"""
+
+        if not error_code or len(error_code) > 128:
+            raise ToolRunConflictError
+        return self._store.require_manual_recovery(
+            claim,
+            error_code=error_code,
+            occurred_at=occurred_at,
+        )
+
+    def recover_manually(
+        self,
+        context: RequestContext,
+        run_id: UUID,
+        *,
+        recovered_at: datetime,
+    ) -> ToolRun:
+        """由可信主体开启下一恢复代际，结果未知的副作用仍只能走对账入口。"""
+
+        account_id = _require_principal(context)
+        return self._store.recover_manually(
+            workspace_id=context.workspace_id,
+            run_id=run_id,
+            actor_id=context.actor_id,
+            account_id=account_id,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
+            recovered_at=recovered_at,
         )
 
     def request_cancellation(

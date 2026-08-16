@@ -7,7 +7,9 @@ from datetime import datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import Row, and_, exists, func, insert, or_, select, update
+from ai_platform_backend.integration.domain import AuditAuthorization, AuditRecord, IntegrationEvent
+from ai_platform_backend.integration.sqlalchemy import SqlAlchemyAuditWriter, SqlAlchemyOutboxWriter
+from sqlalchemy import Row, and_, exists, func, insert, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
@@ -15,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from ai_platform_api.modules.tool_execution.domain.errors import (
     ToolExecutionDeniedError,
+    ToolRetryNotAllowedError,
     ToolRunBudgetExceededError,
     ToolRunConflictError,
     ToolRunTerminalError,
@@ -27,6 +30,7 @@ from ai_platform_api.modules.tool_execution.domain.planning import (
 from ai_platform_api.modules.tool_execution.domain.tasks import (
     AttemptResult,
     ClaimedToolAttempt,
+    ToolAttemptTrigger,
     ToolCallState,
     ToolRun,
     ToolRunBudget,
@@ -39,6 +43,7 @@ from ai_platform_api.persistence.tables import (
     agent_tool_definitions,
     tool_attempts,
     tool_calls,
+    tool_idempotency_records,
     tool_policy_decisions,
     tool_runs,
     tool_steps,
@@ -61,18 +66,22 @@ RUN_TRANSITIONS: dict[str, frozenset[str]] = {
             "completed",
             "failed",
             "cancellation_requested",
+            "manual_recovery",
             "timed_out",
         }
     ),
     "waiting_confirmation": frozenset({"running"}),
     "waiting_approval": frozenset({"running"}),
     "cancellation_requested": frozenset({"cancelled"}),
+    "manual_recovery": frozenset({"running", "completed", "cancellation_requested"}),
 }
 STEP_TRANSITIONS: dict[str, frozenset[str]] = {
     "planned": frozenset({"policy_checking", "cancelled"}),
     "policy_checking": frozenset({"ready", "waiting_confirmation", "waiting_approval"}),
     "waiting_confirmation": frozenset({"ready"}),
     "waiting_approval": frozenset({"ready"}),
+    "retry_wait": frozenset({"running", "cancelled"}),
+    "manual_recovery": frozenset({"ready", "completed", "cancelled"}),
 }
 CALL_TRANSITIONS: dict[str, frozenset[str]] = {
     "proposed": frozenset({"authorized"}),
@@ -127,6 +136,11 @@ class SqlAlchemyToolTaskStore:
             "created_at": created_at,
             "updated_at": created_at,
             "completed_at": None,
+            "recovery_generation": 0,
+            "recovery_reason_code": None,
+            "recovery_required_at": None,
+            "last_recovered_by_actor_id": None,
+            "last_recovered_at": None,
             "version": 1,
         }
         # 2. 唯一键竞争只产生一个 Run；冲突后读取已提交事实并核对载荷摘要。
@@ -323,7 +337,10 @@ class SqlAlchemyToolTaskStore:
                             max_result_bytes=262_144,
                             max_cost_microunits=0,
                             state="planned",
+                            recovery_generation=0,
                             current_attempt_no=None,
+                            available_at=created_at,
+                            next_attempt_trigger="automatic",
                             created_at=created_at,
                             updated_at=created_at,
                             version=1,
@@ -393,13 +410,15 @@ class SqlAlchemyToolTaskStore:
         lease_seconds: int,
     ) -> ClaimedToolAttempt | None:
         with self._session_factory() as session, session.begin():
-            # 1. Worker 重启没有异常回调，领取前先稳定关闭过期租约和父级事实。
+            # 1. 总时限优先于租约恢复，先关闭已经越过绝对截止时间的 Run。
+            _expire_due_runs(session, now)
+            # 2. Worker 重启没有异常回调，领取前稳定收敛过期租约。
             _expire_stale_attempts(session, now)
-            # 2. 只锁定顺序已满足的 ready Step，多 Worker 使用 SKIP LOCKED 竞争。
+            # 3. 只锁定顺序已满足且退避到期的 Step，多 Worker 使用 SKIP LOCKED 竞争。
             row = _select_claimable_step(session, now)
             if row is None:
                 return None
-            # 3. Step、Attempt 与 ToolCall 在同一事务建立，队列重复投递不会留下半事实。
+            # 4. Step、Attempt 与 ToolCall 在同一事务建立，队列重复投递不会留下半事实。
             return _claim_step(
                 session,
                 row,
@@ -426,6 +445,75 @@ class SqlAlchemyToolTaskStore:
                 .values(state="executing", started_at=started_at)
             )
             return True
+
+    def renew_lease(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        renewed_at: datetime,
+        lease_seconds: int,
+    ) -> ClaimedToolAttempt | None:
+        """续租不得超过 Step 冻结时限和 Run 总截止时间。"""
+
+        with self._session_factory() as session, session.begin():
+            _expire_due_runs(session, renewed_at)
+            _expire_stale_attempts(session, renewed_at)
+            row = _locked_claim(session, claim)
+            if row is None or not _claim_is_current(row, claim, renewed_at):
+                return None
+            if row["attempt_state"] not in {"leased", "executing"}:
+                return None
+
+            # 续租上限同时受单步相对时限和 Run 绝对截止时间约束，心跳不能延长冻结预算。
+            upper_bound = min(
+                cast(datetime, row["deadline_at"]),
+                cast(datetime, row["lease_started_at"])
+                + timedelta(seconds=cast(int, row["timeout_seconds"])),
+            )
+            expires_at = min(renewed_at + timedelta(seconds=lease_seconds), upper_bound)
+            if expires_at <= renewed_at:
+                _expire_claim(session, row, renewed_at)
+                return None
+            session.execute(text("SET LOCAL ai_platform.tool_lease_write = 'on'"))
+            updated = session.execute(
+                update(tool_attempts)
+                .where(
+                    tool_attempts.c.attempt_id == claim.attempt_id,
+                    tool_attempts.c.lease_expires_at == claim.lease_expires_at,
+                )
+                .values(lease_expires_at=expires_at)
+                .returning(tool_attempts.c.lease_expires_at)
+            ).scalar_one_or_none()
+            if updated is None:
+                return None
+            return _claim_from_row(row, claim, lease_expires_at=updated)
+
+    def observe_cancellation(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        observed_at: datetime,
+    ) -> bool:
+        """仅当前执行者可以记录取消观察，返回值表示是否存在取消事实。"""
+
+        with self._session_factory() as session, session.begin():
+            row = _locked_claim(session, claim)
+            if row is None or row["attempt_state"] not in {"leased", "executing"}:
+                return False
+            if not _claim_identity_matches(row, claim):
+                return False
+            cancellation_requested = bool(
+                row["run_state"] == "cancellation_requested"
+                or row["cancel_requested_at"] is not None
+            )
+            if cancellation_requested and row["cancel_observed_at"] is None:
+                session.execute(text("SET LOCAL ai_platform.tool_lease_write = 'on'"))
+                session.execute(
+                    update(tool_attempts)
+                    .where(tool_attempts.c.attempt_id == claim.attempt_id)
+                    .values(cancel_observed_at=observed_at)
+                )
+            return cancellation_requested
 
     def transition_call(
         self,
@@ -458,8 +546,11 @@ class SqlAlchemyToolTaskStore:
         succeeded: bool,
         completed_at: datetime,
         error_code: str | None,
+        retryable: bool,
+        next_attempt_at: datetime | None,
     ) -> AttemptResult:
         with self._session_factory() as session, session.begin():
+            _expire_due_runs(session, completed_at)
             _expire_stale_attempts(session, completed_at)
             row = _locked_claim(session, claim)
             if row is None:
@@ -472,7 +563,33 @@ class SqlAlchemyToolTaskStore:
                 return "ignored_late_result"
             if row["attempt_state"] != "executing" or row["call_state"] != "executing":
                 return "ignored_late_result"
-            # 2. 当前有效租约才可原子关闭 Call、Attempt、Step；失败同步关闭 Run。
+            # 2. 成功和稳定失败直接收口；只有 safe_read 且预算未耗尽时才能进入退避重试。
+            if not succeeded and retryable:
+                if not _is_safe_read(row):
+                    retryable = False
+                elif cast(int, row["attempt_no"]) < cast(int, row["max_attempts"]):
+                    if next_attempt_at is None or next_attempt_at <= completed_at:
+                        raise ToolRunConflictError
+                    _close_for_retry(
+                        session,
+                        row,
+                        claim,
+                        completed_at=completed_at,
+                        error_code=error_code or "TOOL_ADAPTER_UNAVAILABLE",
+                        next_attempt_at=next_attempt_at,
+                        trigger="automatic_retry",
+                    )
+                    return "retry_wait"
+                else:
+                    _close_for_manual_recovery(
+                        session,
+                        row,
+                        claim,
+                        error_code=error_code or "TOOL_ADAPTER_UNAVAILABLE",
+                        occurred_at=completed_at,
+                    )
+                    return "manual_recovery"
+
             outcome: AttemptResult = "succeeded" if succeeded else "failed"
             _close_current_attempt(
                 session,
@@ -483,6 +600,119 @@ class SqlAlchemyToolTaskStore:
                 error_code=error_code,
             )
             return outcome
+
+    def require_manual_recovery(
+        self,
+        claim: ClaimedToolAttempt,
+        *,
+        error_code: str,
+        occurred_at: datetime,
+    ) -> AttemptResult:
+        """把结果未知或不能自动接管的调用稳定转入人工恢复。"""
+
+        with self._session_factory() as session, session.begin():
+            _expire_due_runs(session, occurred_at)
+            row = _locked_claim(session, claim)
+            if row is None:
+                return "ignored_late_result"
+            if row["run_state"] == "manual_recovery" and row["step_state"] == "manual_recovery":
+                return "manual_recovery"
+            if row["run_state"] == "cancellation_requested":
+                _close_cancelled_claim(session, row, claim, occurred_at)
+                return "ignored_late_result"
+            if not _claim_is_current(row, claim, occurred_at):
+                return "ignored_late_result"
+            _close_for_manual_recovery(
+                session,
+                row,
+                claim,
+                error_code=error_code,
+                occurred_at=occurred_at,
+            )
+            return "manual_recovery"
+
+    def recover_manually(
+        self,
+        *,
+        workspace_id: UUID,
+        run_id: UUID,
+        actor_id: UUID,
+        account_id: UUID,
+        request_id: UUID,
+        trace_id: str,
+        traceparent: str,
+        authorization: AuditAuthorization | None,
+        recovered_at: datetime,
+    ) -> ToolRun:
+        """开启下一恢复代际，并把恢复动作和事件放入同一事务。"""
+
+        try:
+            with self._session_factory() as session, session.begin():
+                # 1. 锁定死信 Run，先处理总时限、未知副作用和三代上限。
+                run = _locked_run(session, workspace_id, run_id)
+                if run["state"] != "manual_recovery":
+                    _raise_for_closed_state(cast(str, run["state"]))
+                if recovered_at >= cast(datetime, run["deadline_at"]):
+                    _time_out_run(session, run, recovered_at)
+                    return _run(_locked_run(session, workspace_id, run_id))
+                if run["recovery_reason_code"] == "TOOL_OUTCOME_UNKNOWN":
+                    raise ToolRetryNotAllowedError
+                generation = cast(int, run["recovery_generation"]) + 1
+                if generation > 3:
+                    raise ToolRunBudgetExceededError
+                step = _manual_recovery_step(session, run_id)
+
+                # 2. 受控递增 Run/Step 代际，并在同一事务记录操作者审计与状态事件。
+                session.execute(text("SET LOCAL ai_platform.tool_recovery_write = 'on'"))
+                session.execute(
+                    update(tool_steps)
+                    .where(tool_steps.c.step_id == step["step_id"])
+                    .values(
+                        state="ready",
+                        recovery_generation=generation,
+                        current_attempt_no=None,
+                        available_at=recovered_at,
+                        next_attempt_trigger="manual_recovery",
+                        updated_at=recovered_at,
+                        version=cast(int, step["version"]) + 1,
+                    )
+                )
+                updated = (
+                    session.execute(
+                        update(tool_runs)
+                        .where(
+                            tool_runs.c.run_id == run_id,
+                            tool_runs.c.workspace_id == workspace_id,
+                        )
+                        .values(
+                            state="running",
+                            recovery_generation=generation,
+                            recovery_reason_code=None,
+                            recovery_required_at=None,
+                            last_recovered_by_actor_id=actor_id,
+                            last_recovered_at=recovered_at,
+                            updated_at=recovered_at,
+                            version=cast(int, run["version"]) + 1,
+                        )
+                        .returning(tool_runs)
+                    )
+                    .mappings()
+                    .one()
+                )
+                _record_manual_recovery(
+                    session,
+                    updated,
+                    actor_id=actor_id,
+                    account_id=account_id,
+                    request_id=request_id,
+                    trace_id=trace_id,
+                    traceparent=traceparent,
+                    authorization=authorization,
+                    occurred_at=recovered_at,
+                )
+                return _run(updated)
+        except IntegrityError as error:
+            raise ToolRunConflictError from error
 
     def request_cancellation(
         self,
@@ -497,7 +727,7 @@ class SqlAlchemyToolTaskStore:
                 return _run(row)
             if row["state"] == "cancellation_requested":
                 return _run(row)
-            if row["state"] not in {"pending", "running"}:
+            if row["state"] not in {"pending", "running", "manual_recovery"}:
                 raise ToolRunConflictError
 
             # 1. 先提交取消事实，后续领取条件立即失效；未运行步骤同步关闭。
@@ -507,6 +737,8 @@ class SqlAlchemyToolTaskStore:
                 .values(
                     state="cancellation_requested",
                     cancel_requested_at=requested_at,
+                    recovery_reason_code=None,
+                    recovery_required_at=None,
                     updated_at=requested_at,
                     version=cast(int, row["version"]) + 1,
                 )
@@ -522,11 +754,14 @@ class SqlAlchemyToolTaskStore:
                             "waiting_confirmation",
                             "waiting_approval",
                             "ready",
+                            "retry_wait",
+                            "manual_recovery",
                         )
                     ),
                 )
                 .values(
                     state="cancelled",
+                    available_at=requested_at,
                     updated_at=requested_at,
                     version=tool_steps.c.version + 1,
                 )
@@ -551,6 +786,7 @@ def _select_claimable_step(session: Session, now: datetime) -> Row[Any] | None:
     return session.execute(
         select(
             tool_steps,
+            tool_runs.c.deadline_at,
             agent_tool_definitions.c.access_mode,
             agent_tool_definitions.c.risk_level,
         )
@@ -563,7 +799,8 @@ def _select_claimable_step(session: Session, now: datetime) -> Row[Any] | None:
             ),
         )
         .where(
-            tool_steps.c.state == "ready",
+            tool_steps.c.state.in_(("ready", "retry_wait")),
+            tool_steps.c.available_at <= now,
             tool_runs.c.state == "running",
             tool_runs.c.cancel_requested_at.is_(None),
             tool_runs.c.deadline_at > now,
@@ -594,14 +831,20 @@ def _claim_step(
     lease_expires_at: datetime,
 ) -> ClaimedToolAttempt:
     # 1. 在已锁定 Step 上生成不可复用的 Attempt、ToolCall 和租约代际。
+    lease_expires_at = min(
+        lease_expires_at,
+        cast(datetime, row.deadline_at),
+        now + timedelta(seconds=cast(int, row.timeout_seconds)),
+    )
+    recovery_generation = cast(int, row.recovery_generation)
     attempt_no = cast(int | None, row.current_attempt_no) or 0
     attempt_no += 1
     attempt_id = uuid4()
     tool_call_id = uuid4()
-    # 2. 三类事实同事务提交；延迟约束在提交时确认 current_attempt_no 对应真实 Attempt。
+    # 2. 先推进 Step 并插入租约 Attempt；延迟约束在提交时核对当前 Attempt。
     session.execute(
         update(tool_steps)
-        .where(tool_steps.c.step_id == row.step_id, tool_steps.c.state == "ready")
+        .where(tool_steps.c.step_id == row.step_id, tool_steps.c.state.in_(("ready", "retry_wait")))
         .values(
             state="running",
             current_attempt_no=attempt_no,
@@ -615,8 +858,10 @@ def _claim_step(
             run_id=row.run_id,
             step_id=row.step_id,
             workspace_id=row.workspace_id,
+            recovery_generation=recovery_generation,
             attempt_no=attempt_no,
-            lease_generation=attempt_no,
+            lease_generation=recovery_generation * 10 + attempt_no,
+            trigger=row.next_attempt_trigger,
             state="leased",
             worker_id=worker_id,
             lease_started_at=now,
@@ -624,8 +869,10 @@ def _claim_step(
             started_at=now,
             completed_at=None,
             error_code=None,
+            cancel_observed_at=None,
         )
     )
+    # 3. ToolCall 与 Attempt 同事务绑定，返回给 Worker 的 Claim 冻结完整租约身份。
     session.execute(
         insert(tool_calls).values(
             tool_call_id=tool_call_id,
@@ -655,8 +902,10 @@ def _claim_step(
         tool_id=row.tool_id,
         tool_version=row.tool_version,
         canonical_arguments_hash=row.canonical_arguments_hash,
+        recovery_generation=recovery_generation,
         attempt_no=attempt_no,
-        lease_generation=attempt_no,
+        lease_generation=recovery_generation * 10 + attempt_no,
+        trigger=cast(ToolAttemptTrigger, row.next_attempt_trigger),
         worker_id=worker_id,
         lease_expires_at=lease_expires_at,
     )
@@ -673,22 +922,43 @@ def _locked_claim(
                 tool_attempts.c.run_id,
                 tool_attempts.c.step_id,
                 tool_attempts.c.workspace_id,
+                tool_attempts.c.recovery_generation,
                 tool_attempts.c.attempt_no,
                 tool_attempts.c.lease_generation,
+                tool_attempts.c.trigger,
                 tool_attempts.c.worker_id,
+                tool_attempts.c.lease_started_at,
                 tool_attempts.c.lease_expires_at,
+                tool_attempts.c.cancel_observed_at,
                 tool_attempts.c.state.label("attempt_state"),
+                tool_steps.c.recovery_generation.label("step_recovery_generation"),
                 tool_steps.c.current_attempt_no,
+                tool_steps.c.timeout_seconds,
+                tool_steps.c.max_attempts,
                 tool_steps.c.state.label("step_state"),
                 tool_steps.c.version.label("step_version"),
+                tool_runs.c.deadline_at,
+                tool_runs.c.cancel_requested_at,
                 tool_runs.c.state.label("run_state"),
                 tool_runs.c.version.label("run_version"),
                 tool_calls.c.tool_call_id,
+                tool_calls.c.tool_id,
+                tool_calls.c.tool_version,
+                tool_calls.c.canonical_arguments_hash,
+                tool_calls.c.access_mode,
                 tool_calls.c.state.label("call_state"),
+                agent_tool_definitions.c.retry_mode,
             )
             .join(tool_steps, tool_steps.c.step_id == tool_attempts.c.step_id)
             .join(tool_runs, tool_runs.c.run_id == tool_attempts.c.run_id)
             .join(tool_calls, tool_calls.c.attempt_id == tool_attempts.c.attempt_id)
+            .join(
+                agent_tool_definitions,
+                and_(
+                    agent_tool_definitions.c.tool_id == tool_calls.c.tool_id,
+                    agent_tool_definitions.c.tool_version == tool_calls.c.tool_version,
+                ),
+            )
             .where(
                 tool_attempts.c.attempt_id == claim.attempt_id,
                 tool_attempts.c.run_id == claim.run_id,
@@ -709,21 +979,59 @@ def _claim_is_current(
     occurred_at: datetime,
 ) -> bool:
     return bool(
-        row["attempt_no"] == claim.attempt_no
+        _claim_identity_matches(row, claim)
         and row["lease_generation"] == claim.lease_generation
-        and row["worker_id"] == claim.worker_id
         and row["current_attempt_no"] == claim.attempt_no
+        and row["step_recovery_generation"] == claim.recovery_generation
         and row["lease_expires_at"] > occurred_at
+        and row["deadline_at"] > occurred_at
         and row["run_state"] not in RUN_TERMINAL
         and row["step_state"] not in STEP_TERMINAL
     )
 
 
-def _expire_stale_attempts(session: Session, now: datetime) -> None:
-    """有界关闭过期租约；本节点不重试，P4-09 再引入安全恢复代际。"""
+def _claim_identity_matches(row: RowMapping, claim: ClaimedToolAttempt) -> bool:
+    """比较不可复用的租约身份，续租只允许截止时间发生变化。"""
 
-    # 1. 使用 SKIP LOCKED 有界领取过期 Attempt，多个 Worker 重启扫描互不阻塞。
-    rows = session.execute(
+    return bool(
+        row["attempt_id"] == claim.attempt_id
+        and row["run_id"] == claim.run_id
+        and row["step_id"] == claim.step_id
+        and row["workspace_id"] == claim.workspace_id
+        and row["recovery_generation"] == claim.recovery_generation
+        and row["attempt_no"] == claim.attempt_no
+        and row["lease_generation"] == claim.lease_generation
+        and row["trigger"] == claim.trigger
+        and row["worker_id"] == claim.worker_id
+        and row["tool_call_id"] == claim.tool_call_id
+    )
+
+
+def _expire_due_runs(session: Session, now: datetime) -> None:
+    """有界关闭超过绝对截止时间的 Run，避免无活动租约时永久停留。"""
+
+    rows = (
+        session.execute(
+            select(tool_runs)
+            .where(
+                tool_runs.c.state.in_(("running", "manual_recovery")),
+                tool_runs.c.deadline_at <= now,
+            )
+            .order_by(tool_runs.c.deadline_at)
+            .limit(100)
+            .with_for_update(skip_locked=True)
+        )
+        .mappings()
+        .all()
+    )
+    for row in rows:
+        _time_out_run(session, row, now)
+
+
+def _expire_stale_attempts(session: Session, now: datetime) -> None:
+    """将 Worker 重启遗留租约收敛为安全重试、人工恢复或总超时。"""
+
+    attempt_ids = session.scalars(
         select(tool_attempts.c.attempt_id)
         .where(
             tool_attempts.c.state.in_(("leased", "executing")),
@@ -733,95 +1041,409 @@ def _expire_stale_attempts(session: Session, now: datetime) -> None:
         .limit(100)
         .with_for_update(skip_locked=True)
     ).all()
-    for (attempt_id,) in rows:
-        row = (
-            session.execute(
-                select(
-                    tool_attempts.c.attempt_id,
-                    tool_attempts.c.run_id,
-                    tool_attempts.c.step_id,
-                    tool_attempts.c.state.label("attempt_state"),
-                    tool_steps.c.version.label("step_version"),
-                    tool_calls.c.tool_call_id,
-                    tool_calls.c.state.label("call_state"),
-                    tool_runs.c.version.label("run_version"),
-                    tool_runs.c.state.label("run_state"),
-                )
-                .join(tool_steps, tool_steps.c.step_id == tool_attempts.c.step_id)
-                .join(tool_calls, tool_calls.c.attempt_id == tool_attempts.c.attempt_id)
-                .join(tool_runs, tool_runs.c.run_id == tool_attempts.c.run_id)
-                .where(tool_attempts.c.attempt_id == attempt_id)
-                .with_for_update()
-            )
-            .mappings()
-            .one()
-        )
-        if row["run_state"] in RUN_TERMINAL:
+    for attempt_id in attempt_ids:
+        row = _attempt_recovery_row(session, attempt_id)
+        if row["run_state"] in RUN_TERMINAL or row["attempt_state"] in ATTEMPT_TERMINAL:
             continue
-        # 2. 取消事实优先于租约超时；执行中结果只进入迟到终态，未执行租约直接取消。
+        # 取消和总截止时间均高于恢复决定，旧 Worker 的迟到结果只能留下历史终态。
         if row["run_state"] == "cancellation_requested":
-            session.execute(
-                update(tool_calls)
-                .where(tool_calls.c.tool_call_id == row["tool_call_id"])
-                .values(state="cancelled", completed_at=now, updated_at=now)
-            )
-            session.execute(
-                update(tool_attempts)
-                .where(tool_attempts.c.attempt_id == attempt_id)
-                .values(
-                    state=(
-                        "cancelled" if row["attempt_state"] == "leased" else "ignored_late_result"
-                    ),
-                    completed_at=now,
-                )
-            )
-            session.execute(
-                update(tool_steps)
-                .where(tool_steps.c.step_id == row["step_id"])
-                .values(
-                    state="cancelled",
-                    updated_at=now,
-                    version=cast(int, row["step_version"]) + 1,
-                )
-            )
-            _finish_run_cancellation(session, cast(UUID, row["run_id"]), now)
+            _close_cancelled_row(session, row, now)
             continue
-        # 3. 普通过期租约按 Attempt、Call、Step、Run 顺序关闭，旧 Worker 不再拥有写资格。
+        if cast(datetime, row["deadline_at"]) <= now:
+            _time_out_run(session, row, now)
+            continue
+        _expire_claim(session, row, now)
+
+
+def _expire_claim(session: Session, row: RowMapping, now: datetime) -> None:
+    """按工具重试安全性处理一条已锁定的过期租约。"""
+
+    claim = _claim_from_recovery_row(row)
+    if _is_safe_read(row) and cast(int, row["attempt_no"]) < cast(int, row["max_attempts"]):
+        _close_for_retry(
+            session,
+            row,
+            claim,
+            completed_at=now,
+            error_code="TOOL_ADAPTER_UNAVAILABLE",
+            next_attempt_at=now + timedelta(seconds=1),
+            trigger="lease_recovery",
+            timed_out=True,
+        )
+        return
+    reason = _lease_recovery_reason(session, row)
+    _close_for_manual_recovery(
+        session,
+        row,
+        claim,
+        error_code=reason,
+        occurred_at=now,
+        attempt_state="timed_out",
+        keep_call_executing=reason == "TOOL_OUTCOME_UNKNOWN",
+    )
+
+
+def _attempt_recovery_row(session: Session, attempt_id: UUID) -> RowMapping:
+    """锁定恢复判断所需的最小完整快照。"""
+
+    return (
+        session.execute(
+            select(
+                tool_attempts,
+                tool_attempts.c.state.label("attempt_state"),
+                tool_steps.c.current_attempt_no,
+                tool_steps.c.recovery_generation.label("step_recovery_generation"),
+                tool_steps.c.max_attempts,
+                tool_steps.c.timeout_seconds,
+                tool_steps.c.version.label("step_version"),
+                tool_steps.c.state.label("step_state"),
+                tool_runs.c.deadline_at,
+                tool_runs.c.cancel_requested_at,
+                tool_runs.c.version.label("run_version"),
+                tool_runs.c.state.label("run_state"),
+                tool_calls.c.tool_call_id,
+                tool_calls.c.tool_id,
+                tool_calls.c.tool_version,
+                tool_calls.c.canonical_arguments_hash,
+                tool_calls.c.access_mode,
+                tool_calls.c.state.label("call_state"),
+                agent_tool_definitions.c.retry_mode,
+            )
+            .join(tool_steps, tool_steps.c.step_id == tool_attempts.c.step_id)
+            .join(tool_runs, tool_runs.c.run_id == tool_attempts.c.run_id)
+            .join(tool_calls, tool_calls.c.attempt_id == tool_attempts.c.attempt_id)
+            .join(
+                agent_tool_definitions,
+                and_(
+                    agent_tool_definitions.c.tool_id == tool_calls.c.tool_id,
+                    agent_tool_definitions.c.tool_version == tool_calls.c.tool_version,
+                ),
+            )
+            .where(tool_attempts.c.attempt_id == attempt_id)
+            .with_for_update()
+        )
+        .mappings()
+        .one()
+    )
+
+
+def _close_for_retry(
+    session: Session,
+    row: RowMapping,
+    claim: ClaimedToolAttempt,
+    *,
+    completed_at: datetime,
+    error_code: str,
+    next_attempt_at: datetime,
+    trigger: ToolAttemptTrigger,
+    timed_out: bool = False,
+) -> None:
+    """关闭本代 Attempt，并让同一恢复代际在退避后领取下一次尝试。"""
+
+    outcome = "timed_out" if timed_out else "failed"
+    if row["call_state"] not in CALL_TERMINAL:
+        session.execute(
+            update(tool_calls)
+            .where(tool_calls.c.tool_call_id == claim.tool_call_id)
+            .values(
+                state=outcome,
+                completed_at=completed_at,
+                updated_at=completed_at,
+                error_code=error_code,
+            )
+        )
+    session.execute(
+        update(tool_attempts)
+        .where(tool_attempts.c.attempt_id == claim.attempt_id)
+        .values(state=outcome, completed_at=completed_at, error_code=error_code)
+    )
+    session.execute(
+        update(tool_steps)
+        .where(tool_steps.c.step_id == claim.step_id)
+        .values(
+            state="retry_wait",
+            available_at=next_attempt_at,
+            next_attempt_trigger=trigger,
+            updated_at=completed_at,
+            version=cast(int, row["step_version"]) + 1,
+        )
+    )
+
+
+def _close_for_manual_recovery(
+    session: Session,
+    row: RowMapping,
+    claim: ClaimedToolAttempt,
+    *,
+    error_code: str,
+    occurred_at: datetime,
+    attempt_state: str = "failed",
+    keep_call_executing: bool = False,
+) -> None:
+    """把不可自动处理的事实移入死信状态，保留原 Attempt 不可变历史。"""
+
+    # 1. 原 Call 与 Attempt 先关闭；未知副作用例外保留 executing Call 给只读对账。
+    if not keep_call_executing and row["call_state"] not in CALL_TERMINAL:
+        call_state = "timed_out" if attempt_state == "timed_out" else "failed"
+        session.execute(
+            update(tool_calls)
+            .where(tool_calls.c.tool_call_id == claim.tool_call_id)
+            .values(
+                state=call_state,
+                completed_at=occurred_at,
+                updated_at=occurred_at,
+                error_code=error_code,
+            )
+        )
+    if row["attempt_state"] not in ATTEMPT_TERMINAL:
         session.execute(
             update(tool_attempts)
-            .where(tool_attempts.c.attempt_id == attempt_id)
-            .values(state="timed_out", completed_at=now, error_code="TOOL_ADAPTER_UNAVAILABLE")
+            .where(tool_attempts.c.attempt_id == claim.attempt_id)
+            .values(state=attempt_state, completed_at=occurred_at, error_code=error_code)
         )
-        if row["call_state"] not in CALL_TERMINAL:
-            session.execute(
-                update(tool_calls)
-                .where(tool_calls.c.tool_call_id == row["tool_call_id"])
-                .values(
-                    state="timed_out",
-                    completed_at=now,
-                    updated_at=now,
-                    error_code="TOOL_ADAPTER_UNAVAILABLE",
-                )
+    # 2. 父级统一进入人工恢复并冻结原因，Worker 领取条件立即失效。
+    session.execute(
+        update(tool_steps)
+        .where(tool_steps.c.step_id == claim.step_id)
+        .values(
+            state="manual_recovery",
+            available_at=occurred_at,
+            updated_at=occurred_at,
+            version=cast(int, row["step_version"]) + 1,
+        )
+    )
+    session.execute(
+        update(tool_runs)
+        .where(tool_runs.c.run_id == claim.run_id)
+        .values(
+            state="manual_recovery",
+            recovery_reason_code=error_code,
+            recovery_required_at=occurred_at,
+            updated_at=occurred_at,
+            version=cast(int, row["run_version"]) + 1,
+        )
+    )
+
+
+def _is_safe_read(row: RowMapping) -> bool:
+    return bool(row["access_mode"] == "read" and row["retry_mode"] == "safe_read")
+
+
+def _lease_recovery_reason(session: Session, row: RowMapping) -> str:
+    """写调用一旦存在执行前预留，就只能按未知副作用进入只读对账。"""
+
+    if row["access_mode"] == "write" and row["call_state"] == "executing":
+        reserved = session.scalar(
+            select(func.count())
+            .select_from(tool_idempotency_records)
+            .where(
+                tool_idempotency_records.c.tool_call_id == row["tool_call_id"],
+                tool_idempotency_records.c.state.in_(("reserved", "outcome_unknown")),
             )
+        )
+        if int(reserved or 0) > 0:
+            return "TOOL_OUTCOME_UNKNOWN"
+    return "TOOL_ADAPTER_UNAVAILABLE" if _is_safe_read(row) else "TOOL_RETRY_NOT_ALLOWED"
+
+
+def _claim_from_recovery_row(row: RowMapping) -> ClaimedToolAttempt:
+    return ClaimedToolAttempt(
+        attempt_id=cast(UUID, row["attempt_id"]),
+        run_id=cast(UUID, row["run_id"]),
+        step_id=cast(UUID, row["step_id"]),
+        tool_call_id=cast(UUID, row["tool_call_id"]),
+        workspace_id=cast(UUID, row["workspace_id"]),
+        tool_id=cast(UUID, row["tool_id"]),
+        tool_version=cast(int, row["tool_version"]),
+        canonical_arguments_hash=cast(str, row["canonical_arguments_hash"]),
+        recovery_generation=cast(int, row["recovery_generation"]),
+        attempt_no=cast(int, row["attempt_no"]),
+        lease_generation=cast(int, row["lease_generation"]),
+        trigger=cast(ToolAttemptTrigger, row["trigger"]),
+        worker_id=cast(str, row["worker_id"]),
+        lease_expires_at=cast(datetime, row["lease_expires_at"]),
+    )
+
+
+def _claim_from_row(
+    row: RowMapping,
+    claim: ClaimedToolAttempt,
+    *,
+    lease_expires_at: datetime,
+) -> ClaimedToolAttempt:
+    """续租只替换截止时间，其余冻结身份继续使用调用方 Claim。"""
+
+    del row
+    return ClaimedToolAttempt(
+        attempt_id=claim.attempt_id,
+        run_id=claim.run_id,
+        step_id=claim.step_id,
+        tool_call_id=claim.tool_call_id,
+        workspace_id=claim.workspace_id,
+        tool_id=claim.tool_id,
+        tool_version=claim.tool_version,
+        canonical_arguments_hash=claim.canonical_arguments_hash,
+        recovery_generation=claim.recovery_generation,
+        attempt_no=claim.attempt_no,
+        lease_generation=claim.lease_generation,
+        trigger=claim.trigger,
+        worker_id=claim.worker_id,
+        lease_expires_at=lease_expires_at,
+    )
+
+
+def _close_cancelled_row(session: Session, row: RowMapping, occurred_at: datetime) -> None:
+    """在无 Claim 对象的租约扫描中复用取消优先规则。"""
+
+    if row["call_state"] not in CALL_TERMINAL:
         session.execute(
-            update(tool_steps)
-            .where(tool_steps.c.step_id == row["step_id"])
-            .values(
-                state="timed_out",
-                updated_at=now,
-                version=cast(int, row["step_version"]) + 1,
-            )
+            update(tool_calls)
+            .where(tool_calls.c.tool_call_id == row["tool_call_id"])
+            .values(state="cancelled", completed_at=occurred_at, updated_at=occurred_at)
         )
+    session.execute(
+        update(tool_attempts)
+        .where(tool_attempts.c.attempt_id == row["attempt_id"])
+        .values(
+            state="cancelled" if row["attempt_state"] == "leased" else "ignored_late_result",
+            completed_at=occurred_at,
+        )
+    )
+    session.execute(
+        update(tool_steps)
+        .where(tool_steps.c.step_id == row["step_id"])
+        .values(
+            state="cancelled",
+            updated_at=occurred_at,
+            version=cast(int, row["step_version"]) + 1,
+        )
+    )
+    _finish_run_cancellation(session, cast(UUID, row["run_id"]), occurred_at)
+
+
+def _time_out_run(session: Session, source: RowMapping, occurred_at: datetime) -> None:
+    """关闭 Run 下全部未终止事实，总截止时间不允许被人工恢复绕过。"""
+
+    run_id = cast(UUID, source["run_id"])
+    run = (
+        session.execute(select(tool_runs).where(tool_runs.c.run_id == run_id).with_for_update())
+        .mappings()
+        .one()
+    )
+    if run["state"] in RUN_TERMINAL:
+        return
+    # 1. 先关闭所有未终止 Call 和活动 Attempt，迟到 Worker 随即失去写资格。
+    session.execute(
+        update(tool_calls)
+        .where(tool_calls.c.run_id == run_id, ~tool_calls.c.state.in_(CALL_TERMINAL))
+        .values(
+            state="timed_out",
+            completed_at=occurred_at,
+            updated_at=occurred_at,
+            error_code="TOOL_RUN_DEADLINE_EXCEEDED",
+        )
+    )
+    # 2. 再关闭未终止 Step 和 Run，清理人工恢复原因并固化绝对超时终态。
+    session.execute(
+        update(tool_attempts)
+        .where(tool_attempts.c.run_id == run_id, tool_attempts.c.state.in_(("leased", "executing")))
+        .values(
+            state="timed_out",
+            completed_at=occurred_at,
+            error_code="TOOL_RUN_DEADLINE_EXCEEDED",
+        )
+    )
+    session.execute(
+        update(tool_steps)
+        .where(tool_steps.c.run_id == run_id, ~tool_steps.c.state.in_(STEP_TERMINAL))
+        .values(
+            state="timed_out",
+            available_at=occurred_at,
+            updated_at=occurred_at,
+            version=tool_steps.c.version + 1,
+        )
+    )
+    session.execute(
+        update(tool_runs)
+        .where(tool_runs.c.run_id == run_id)
+        .values(
+            state="timed_out",
+            recovery_reason_code=None,
+            recovery_required_at=None,
+            updated_at=occurred_at,
+            completed_at=occurred_at,
+            version=cast(int, run["version"]) + 1,
+        )
+    )
+
+
+def _manual_recovery_step(session: Session, run_id: UUID) -> RowMapping:
+    rows = (
         session.execute(
-            update(tool_runs)
-            .where(tool_runs.c.run_id == row["run_id"])
-            .values(
-                state="timed_out",
-                updated_at=now,
-                completed_at=now,
-                version=cast(int, row["run_version"]) + 1,
-            )
+            select(tool_steps)
+            .where(tool_steps.c.run_id == run_id, tool_steps.c.state == "manual_recovery")
+            .with_for_update()
         )
+        .mappings()
+        .all()
+    )
+    if len(rows) != 1:
+        raise ToolRunConflictError
+    return rows[0]
+
+
+def _record_manual_recovery(
+    session: Session,
+    run: RowMapping,
+    *,
+    actor_id: UUID,
+    account_id: UUID,
+    request_id: UUID,
+    trace_id: str,
+    traceparent: str,
+    authorization: AuditAuthorization | None,
+    occurred_at: datetime,
+) -> None:
+    """只记录恢复代际和目标状态，不把参数、结果或凭证写入横切事实。"""
+
+    attributes: dict[str, object] = {
+        "recovery_generation": cast(int, run["recovery_generation"]),
+        "state": "running",
+    }
+    SqlAlchemyAuditWriter(session).add(
+        AuditRecord(
+            audit_id=uuid4(),
+            workspace_id=cast(UUID, run["workspace_id"]),
+            actor_id=actor_id,
+            user_id=account_id,
+            action="tool.run.state_changed",
+            resource_type="tool_run",
+            resource_id=cast(UUID, run["run_id"]),
+            outcome="succeeded",
+            occurred_at=occurred_at,
+            request_id=request_id,
+            trace_id=trace_id,
+            traceparent=traceparent,
+            authorization=authorization,
+            attributes=attributes,
+        )
+    )
+    SqlAlchemyOutboxWriter(session).add(
+        IntegrationEvent(
+            event_id=uuid4(),
+            event_type="tool.run.state_changed",
+            workspace_id=cast(UUID, run["workspace_id"]),
+            aggregate_id=cast(UUID, run["run_id"]),
+            aggregate_version=cast(int, run["version"]),
+            occurred_at=occurred_at,
+            trace_id=trace_id,
+            traceparent=traceparent,
+            actor_id=actor_id,
+            user_id=account_id,
+            request_id=request_id,
+            payload=attributes,
+        )
+    )
 
 
 def _close_current_attempt(
@@ -1076,7 +1698,10 @@ def _freeze_step(
                     max_result_bytes=budget.max_result_bytes,
                     max_cost_microunits=budget.max_cost_microunits,
                     state="planned",
+                    recovery_generation=0,
                     current_attempt_no=None,
+                    available_at=frozen_at,
+                    next_attempt_trigger="automatic",
                     created_at=frozen_at,
                     updated_at=frozen_at,
                     version=1,
@@ -1209,6 +1834,11 @@ def _run(row: RowMapping) -> ToolRun:
         created_at=cast(datetime, row["created_at"]),
         updated_at=cast(datetime, row["updated_at"]),
         completed_at=cast(datetime | None, row["completed_at"]),
+        recovery_generation=cast(int, row["recovery_generation"]),
+        recovery_reason_code=cast(str | None, row["recovery_reason_code"]),
+        recovery_required_at=cast(datetime | None, row["recovery_required_at"]),
+        last_recovered_by_actor_id=cast(UUID | None, row["last_recovered_by_actor_id"]),
+        last_recovered_at=cast(datetime | None, row["last_recovered_at"]),
         version=cast(int, row["version"]),
     )
 
@@ -1229,7 +1859,10 @@ def _step(row: RowMapping) -> ToolStep:
             max_cost_microunits=cast(int, row["max_cost_microunits"]),
         ),
         state=cast(ToolStepState, row["state"]),
+        recovery_generation=cast(int, row["recovery_generation"]),
         current_attempt_no=cast(int | None, row["current_attempt_no"]),
+        available_at=cast(datetime, row["available_at"]),
+        next_attempt_trigger=cast(ToolAttemptTrigger, row["next_attempt_trigger"]),
         created_at=cast(datetime, row["created_at"]),
         updated_at=cast(datetime, row["updated_at"]),
         version=cast(int, row["version"]),

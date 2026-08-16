@@ -115,6 +115,7 @@ class SqlAlchemyToolSideEffectStore:
 
         try:
             with self._session_factory() as session, session.begin():
+                # 1. 锁定调用与幂等事实，分别验证实时执行和结果未知对账两条合法路径。
                 row = _claim_row(session, claim, for_update=True)
                 stored = _locked_record(session, receipt.idempotency_record_id)
                 record = _record(stored)
@@ -123,11 +124,26 @@ class SqlAlchemyToolSideEffectStore:
                 allowed_states = {"reserved", "outcome_unknown"} if reconciled else {"reserved"}
                 if record.state not in allowed_states:
                     raise ToolRunConflictError
-                _require_current_claim(row, claim, completed_at, expected_call_state="executing")
+                if reconciled and record.state == "outcome_unknown":
+                    _require_reconcilable_claim(row, claim)
+                else:
+                    _require_current_claim(
+                        row,
+                        claim,
+                        completed_at,
+                        expected_call_state="executing",
+                    )
                 _require_receipt(record, claim, receipt)
 
+                # 2. 幂等终态、任务父级、审计和 Outbox 共用事务，任一失败都整体回滚。
                 updated = _update_success_record(session, record, receipt, completed_at)
-                _close_successful_claim(session, row, claim, completed_at)
+                _close_successful_claim(
+                    session,
+                    row,
+                    claim,
+                    completed_at,
+                    reconciled=reconciled,
+                )
                 _record_lifecycle(
                     session,
                     row,
@@ -185,7 +201,7 @@ class SqlAlchemyToolSideEffectStore:
         *,
         occurred_at: datetime,
     ) -> ToolIdempotencyRecord:
-        """只关闭幂等事实并保留当前任务，P4-09 再交付父级人工恢复状态。"""
+        """关闭原 Attempt 并进入人工恢复；ToolCall 保留 executing 供只读对账收敛。"""
 
         try:
             with self._session_factory() as session, session.begin():
@@ -203,6 +219,7 @@ class SqlAlchemyToolSideEffectStore:
                     error_code="TOOL_OUTCOME_UNKNOWN",
                     completed_at=occurred_at,
                 )
+                _close_unknown_claim(session, row, claim, occurred_at)
                 _record_lifecycle(
                     session,
                     row,
@@ -313,13 +330,17 @@ def _claim_row(
             tool_calls,
             tool_calls.c.state.label("call_state"),
             tool_attempts.c.state.label("attempt_state"),
+            tool_attempts.c.recovery_generation,
+            tool_attempts.c.attempt_no,
             tool_attempts.c.worker_id,
             tool_attempts.c.lease_generation,
             tool_attempts.c.lease_expires_at,
             tool_steps.c.current_attempt_no,
+            tool_steps.c.recovery_generation.label("step_recovery_generation"),
             tool_steps.c.state.label("step_state"),
             tool_steps.c.version.label("step_version"),
             tool_runs.c.state.label("run_state"),
+            tool_runs.c.recovery_generation.label("run_recovery_generation"),
             tool_runs.c.version.label("run_version"),
             tool_runs.c.cancel_requested_at,
             tool_runs.c.requested_by_actor_id,
@@ -359,6 +380,8 @@ def _require_current_claim(
         or row["tool_id"] != claim.tool_id
         or row["tool_version"] != claim.tool_version
         or row["canonical_arguments_hash"] != claim.canonical_arguments_hash
+        or row["recovery_generation"] != claim.recovery_generation
+        or row["step_recovery_generation"] != claim.recovery_generation
         or row["worker_id"] != claim.worker_id
         or row["lease_generation"] != claim.lease_generation
         or row["current_attempt_no"] != claim.attempt_no
@@ -369,6 +392,29 @@ def _require_current_claim(
         or row["call_state"] != expected_call_state
         or occurred_at >= cast(datetime, row["lease_expires_at"])
         or claim.lease_expires_at != row["lease_expires_at"]
+    ):
+        raise ToolRunConflictError
+
+
+def _require_reconcilable_claim(row: RowMapping, claim: ClaimedToolAttempt) -> None:
+    """对账只接受原结果未知 Attempt，故意不要求已失效租约仍然有效。"""
+
+    if (
+        row["attempt_id"] != claim.attempt_id
+        or row["run_id"] != claim.run_id
+        or row["step_id"] != claim.step_id
+        or row["workspace_id"] != claim.workspace_id
+        or row["tool_id"] != claim.tool_id
+        or row["tool_version"] != claim.tool_version
+        or row["canonical_arguments_hash"] != claim.canonical_arguments_hash
+        or row["recovery_generation"] != claim.recovery_generation
+        or row["attempt_no"] != claim.attempt_no
+        or row["lease_generation"] != claim.lease_generation
+        or row["worker_id"] != claim.worker_id
+        or row["attempt_state"] != "failed"
+        or row["step_state"] != "manual_recovery"
+        or row["run_state"] != "manual_recovery"
+        or row["call_state"] != "executing"
     ):
         raise ToolRunConflictError
 
@@ -482,6 +528,7 @@ def _insert_record(
     record: ToolIdempotencyRecord,
     confirmation_id: UUID,
 ) -> None:
+    # 1. 正常执行关闭 Call 与 Attempt；对账保留原失败 Attempt 作为不可变历史。
     session.execute(
         insert(tool_idempotency_records).values(
             idempotency_record_id=record.idempotency_record_id,
@@ -574,22 +621,28 @@ def _close_successful_claim(
     row: RowMapping,
     claim: ClaimedToolAttempt,
     completed_at: datetime,
+    *,
+    reconciled: bool,
 ) -> None:
+    # 1. 先收敛调用事实；对账恢复不得把原失败 Attempt 改写为成功历史。
     session.execute(
         update(tool_calls)
         .where(tool_calls.c.tool_call_id == claim.tool_call_id)
         .values(state="succeeded", completed_at=completed_at, updated_at=completed_at)
     )
-    session.execute(
-        update(tool_attempts)
-        .where(tool_attempts.c.attempt_id == claim.attempt_id)
-        .values(state="succeeded", completed_at=completed_at, error_code=None)
-    )
+    if not reconciled:
+        session.execute(
+            update(tool_attempts)
+            .where(tool_attempts.c.attempt_id == claim.attempt_id)
+            .values(state="succeeded", completed_at=completed_at, error_code=None)
+        )
+    # 2. Step 完成后仅在全部顺序步骤已完成时关闭 Run，并清理人工恢复原因。
     session.execute(
         update(tool_steps)
         .where(tool_steps.c.step_id == claim.step_id)
         .values(
             state="completed",
+            available_at=completed_at,
             updated_at=completed_at,
             version=cast(int, row["step_version"]) + 1,
         )
@@ -599,17 +652,73 @@ def _close_successful_claim(
         .select_from(tool_steps)
         .where(tool_steps.c.run_id == claim.run_id, tool_steps.c.state != "completed")
     )
-    if int(incomplete or 0) == 0:
+    incomplete_count = int(incomplete or 0)
+    if incomplete_count == 0:
         session.execute(
             update(tool_runs)
             .where(tool_runs.c.run_id == claim.run_id)
             .values(
                 state="completed",
+                recovery_reason_code=None,
+                recovery_required_at=None,
                 updated_at=completed_at,
                 completed_at=completed_at,
                 version=cast(int, row["run_version"]) + 1,
             )
         )
+    elif reconciled:
+        # 结果未知对账成功后恢复父级运行态，否则多步 Run 会永久滞留在人工恢复。
+        session.execute(
+            update(tool_runs)
+            .where(tool_runs.c.run_id == claim.run_id)
+            .values(
+                state="running",
+                recovery_reason_code=None,
+                recovery_required_at=None,
+                updated_at=completed_at,
+                version=cast(int, row["run_version"]) + 1,
+            )
+        )
+
+
+def _close_unknown_claim(
+    session: Session,
+    row: RowMapping,
+    claim: ClaimedToolAttempt,
+    occurred_at: datetime,
+) -> None:
+    """保留调用可对账状态，同时关闭 Worker 租约并建立死信父级事实。"""
+
+    session.execute(
+        update(tool_attempts)
+        .where(tool_attempts.c.attempt_id == claim.attempt_id)
+        .values(
+            state="failed",
+            completed_at=occurred_at,
+            error_code="TOOL_OUTCOME_UNKNOWN",
+        )
+    )
+    session.execute(
+        update(tool_steps)
+        .where(tool_steps.c.step_id == claim.step_id)
+        .values(
+            state="manual_recovery",
+            available_at=occurred_at,
+            updated_at=occurred_at,
+            version=cast(int, row["step_version"]) + 1,
+        )
+    )
+    session.execute(
+        update(tool_runs)
+        .where(tool_runs.c.run_id == claim.run_id)
+        .values(
+            state="manual_recovery",
+            recovery_reason_code="TOOL_OUTCOME_UNKNOWN",
+            recovery_required_at=occurred_at,
+            updated_at=occurred_at,
+            version=cast(int, row["run_version"]) + 1,
+        )
+    )
 
 
 def _close_failed_claim(

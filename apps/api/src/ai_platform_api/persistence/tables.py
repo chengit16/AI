@@ -2693,6 +2693,11 @@ tool_runs = Table(
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("recovery_generation", Integer, nullable=False),
+    Column("recovery_reason_code", String(128), nullable=True),
+    Column("recovery_required_at", DateTime(timezone=True), nullable=True),
+    Column("last_recovered_by_actor_id", UUID(as_uuid=True), nullable=True),
+    Column("last_recovered_at", DateTime(timezone=True), nullable=True),
     Column("version", Integer, nullable=False),
     UniqueConstraint("run_id", "workspace_id", name="uq_tool_runs_id_workspace"),
     UniqueConstraint(
@@ -2727,7 +2732,7 @@ tool_runs = Table(
     CheckConstraint(
         "state IN ('pending', 'planning', 'running', 'waiting_confirmation', "
         "'waiting_approval', 'cancellation_requested', 'completed', 'failed', "
-        "'cancelled', 'timed_out')",
+        "'cancelled', 'timed_out', 'manual_recovery')",
         name="ck_tool_runs_state",
     ),
     CheckConstraint(
@@ -2755,6 +2760,18 @@ tool_runs = Table(
         "(state NOT IN ('cancellation_requested', 'cancelled'))",
         name="ck_tool_runs_cancellation",
     ),
+    CheckConstraint(
+        "recovery_generation BETWEEN 0 AND 3 AND "
+        "((state = 'manual_recovery' AND recovery_reason_code IS NOT NULL "
+        "AND recovery_required_at IS NOT NULL) OR "
+        "(state <> 'manual_recovery' AND recovery_reason_code IS NULL "
+        "AND recovery_required_at IS NULL)) AND "
+        "((recovery_generation = 0 AND last_recovered_by_actor_id IS NULL "
+        "AND last_recovered_at IS NULL) OR "
+        "(recovery_generation > 0 AND last_recovered_by_actor_id IS NOT NULL "
+        "AND last_recovered_at IS NOT NULL))",
+        name="ck_tool_runs_recovery",
+    ),
     CheckConstraint("version >= 1", name="ck_tool_runs_version"),
 )
 Index("ix_tool_runs_workspace_time", tool_runs.c.workspace_id, tool_runs.c.created_at)
@@ -2775,7 +2792,10 @@ tool_steps = Table(
     Column("max_result_bytes", Integer, nullable=False),
     Column("max_cost_microunits", BigInteger, nullable=False),
     Column("state", String(32), nullable=False),
+    Column("recovery_generation", Integer, nullable=False),
     Column("current_attempt_no", Integer, nullable=True),
+    Column("available_at", DateTime(timezone=True), nullable=False),
+    Column("next_attempt_trigger", String(32), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("version", Integer, nullable=False),
@@ -2823,7 +2843,7 @@ tool_steps = Table(
     CheckConstraint(
         "state IN ('planned', 'policy_checking', 'waiting_confirmation', "
         "'waiting_approval', 'ready', 'running', 'completed', 'failed', "
-        "'cancelled', 'timed_out')",
+        "'cancelled', 'timed_out', 'retry_wait', 'manual_recovery')",
         name="ck_tool_steps_state",
     ),
     CheckConstraint(
@@ -2833,6 +2853,15 @@ tool_steps = Table(
     CheckConstraint(
         "state <> 'running' OR current_attempt_no IS NOT NULL",
         name="ck_tool_steps_running_attempt",
+    ),
+    CheckConstraint(
+        "recovery_generation BETWEEN 0 AND 3",
+        name="ck_tool_steps_recovery_generation",
+    ),
+    CheckConstraint(
+        "next_attempt_trigger IN ('automatic', 'automatic_retry', "
+        "'lease_recovery', 'manual_recovery')",
+        name="ck_tool_steps_attempt_trigger",
     ),
     CheckConstraint("version >= 1", name="ck_tool_steps_version"),
 )
@@ -3168,8 +3197,10 @@ tool_attempts = Table(
     Column("run_id", UUID(as_uuid=True), nullable=False),
     Column("step_id", UUID(as_uuid=True), nullable=False),
     Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("recovery_generation", Integer, nullable=False),
     Column("attempt_no", Integer, nullable=False),
     Column("lease_generation", Integer, nullable=False),
+    Column("trigger", String(32), nullable=False),
     Column("state", String(32), nullable=False),
     Column("worker_id", String(120), nullable=False),
     Column("lease_started_at", DateTime(timezone=True), nullable=False),
@@ -3177,7 +3208,13 @@ tool_attempts = Table(
     Column("started_at", DateTime(timezone=True), nullable=False),
     Column("completed_at", DateTime(timezone=True), nullable=True),
     Column("error_code", String(128), nullable=True),
-    UniqueConstraint("step_id", "attempt_no", name="uq_tool_attempts_step_attempt"),
+    Column("cancel_observed_at", DateTime(timezone=True), nullable=True),
+    UniqueConstraint(
+        "step_id",
+        "recovery_generation",
+        "attempt_no",
+        name="uq_tool_attempts_step_generation_attempt",
+    ),
     UniqueConstraint(
         "attempt_id",
         "step_id",
@@ -3196,7 +3233,15 @@ tool_attempts = Table(
         ondelete="CASCADE",
     ),
     CheckConstraint("attempt_no BETWEEN 1 AND 5", name="ck_tool_attempts_number"),
-    CheckConstraint("lease_generation >= 1", name="ck_tool_attempts_generation"),
+    CheckConstraint(
+        "recovery_generation BETWEEN 0 AND 3 AND "
+        "lease_generation = recovery_generation * 10 + attempt_no",
+        name="ck_tool_attempts_generation",
+    ),
+    CheckConstraint(
+        "trigger IN ('automatic', 'automatic_retry', 'lease_recovery', 'manual_recovery')",
+        name="ck_tool_attempts_trigger",
+    ),
     CheckConstraint(
         "char_length(btrim(worker_id)) BETWEEN 1 AND 120",
         name="ck_tool_attempts_worker",
@@ -3214,6 +3259,10 @@ tool_attempts = Table(
         "(state IN ('leased', 'executing') AND completed_at IS NULL) OR "
         "(state NOT IN ('leased', 'executing') AND completed_at IS NOT NULL)",
         name="ck_tool_attempts_completion",
+    ),
+    CheckConstraint(
+        "cancel_observed_at IS NULL OR cancel_observed_at >= lease_started_at",
+        name="ck_tool_attempts_cancel_observed",
     ),
 )
 Index("ix_tool_attempts_lease", tool_attempts.c.state, tool_attempts.c.lease_expires_at)

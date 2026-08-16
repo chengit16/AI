@@ -323,7 +323,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     connection.commit()
 
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0058"
+        "20260816_0059"
     )
     tables = {
         row[0]
@@ -354,7 +354,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     command.upgrade(config, "head")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0058"
+        "20260816_0059"
     )
 
 
@@ -513,7 +513,15 @@ def test_cancellation_late_success_and_worker_restart_timeout_never_overwrite_te
             )
             is None
         )
-        assert database.service.get_run(database.context, timeout_run_id).state == "timed_out"
+        assert database.service.get_run(database.context, timeout_run_id).state == "running"
+        recovered_claim = database.service.claim_next(
+            worker_id="p403-worker-restarted",
+            now=NOW + timedelta(minutes=3, seconds=8),
+            lease_seconds=60,
+        )
+        assert recovered_claim is not None
+        assert recovered_claim.attempt_no == 2
+        assert recovered_claim.trigger == "lease_recovery"
         assert (
             database.service.finish_attempt(
                 timeout_claim,
@@ -522,6 +530,6 @@ def test_cancellation_late_success_and_worker_restart_timeout_never_overwrite_te
             )
             == "ignored_late_result"
         )
-        assert database.service.get_run(database.context, timeout_run_id).state == "timed_out"
+        assert database.service.get_run(database.context, timeout_run_id).state == "running"
     finally:
         database.engine.dispose()

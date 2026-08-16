@@ -39,6 +39,12 @@ class ToolRunBudgetExceededError(PlatformError):
     error_code = "TOOL_RUN_BUDGET_EXCEEDED"
 
 
+class ToolRetryNotAllowedError(PlatformError):
+    """工具或当前副作用事实不具备自动重放条件。"""
+
+    error_code = "TOOL_RETRY_NOT_ALLOWED"
+
+
 class ToolAdapterNotAllowedError(PlatformError):
     """当前工具定义不是阶段 4 允许的内部只读 Adapter。"""
 
