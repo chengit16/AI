@@ -7,12 +7,12 @@
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-10` 服务出口 |
+| 当前节点 | `P3-11` Agent 控制台 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离与灰度回滚已通过 |
-| 服务发布与回滚 | `in_progress`，内部灰度、晋级、回滚和并发发布控制已通过，三类服务出口待建设 |
+| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离、灰度回滚与统一服务出口已通过 |
+| 服务发布与回滚 | `passed`，自定义知识 Agent、场景应用和 Open API 三类出口已接入同一发布路由与安全门禁 |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
 | `capacity_certification` | `not_run` |
@@ -26,7 +26,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0049` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0050` |
 | 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实供应商或 AI 质量 |
 
@@ -147,14 +147,28 @@
 - 当前边界：本节点只完成内部路由用例和 Runtime 选择，不提前开放自定义知识 Agent、场景应用或 Open API 出口；三类出口由 `P3-10` 执行访问策略、API Key Scope、配额和限流后接入。基于 Release 质量、错误、延迟和成本指标的异常自动阻断仍由 `P3-12` 建设。
 - 提交：`6aa5a21`。
 
+### P3-10 统一服务出口
+
+- 状态：已完成，提交 `0822475`。
+- 统一出口：接受 `ADR-010`，新增独立 `service_delivery` 模块，把 `custom_knowledge_agent`、`scenario_application` 和 `open_api` 三类 Service 接入同一访问策略、Runtime 当前路由、月度配额、隐藏调用会话、Assistant Run 和执行器。浏览器只允许调用前两类页面 surface，Open API Key 只允许调用 `open_api`，surface 错配在产生 Run 前失败关闭；不引入 Channel Gateway 或外部写操作。
+- 身份与权限：资源注册表 19 激活 `service.definition.read` 及创建、查询、SSE 三个 Operation，形成 86 项权限、122 个 API、105 个菜单和 115 个绑定。Open API Key 同时支持权限级 Scope 和严格的 `service.definition.read.{32位小写hex}` 服务级 Scope；Scope 只能收窄账号既有权限。API Key Actor 独立承担幂等、读取、审计和 Run 归属，创建账号仍负责服务访问策略与内部 RAG 的 RBAC/ABAC；检索前清除 API Key Scope 和旧授权结论并重新决策，服务 Scope 不能冒充知识或文档权限。
+- 调用事实与恢复：`conversation_kind=service_invocation` 的隐藏会话不进入普通私有会话列表，`requested_by_actor_id` 让两个 API Key 使用相同幂等键仍相互隔离。POST、HTTP 快照和 SSE 都读取同一 Actor 的同一 Run；`Last-Event-ID` 复用阶段 2 PostgreSQL 事件事实和 Valkey 无正文唤醒，重连不创建 Run、不重复执行模型。部门限制策略覆盖后代部门，未分配成员和跨 Actor 读取均稳定拒绝。
+- 配额与限流：问答月度配额在 Run 创建事务内原子消费，超额请求不产生会话或 Run。Valkey Lua 固定窗口按工作空间、Service 和 Actor 的不可逆摘要计数，相同 Actor 与幂等键重放不重复占用；超过窗口返回 `SERVICE_RATE_LIMITED`，限流事实不可用时以 `SERVICE_RATE_LIMIT_UNAVAILABLE` 默认拒绝。
+- 数据库与迁移：Revision `20260816_0050` 为会话增加显式类型，为 Run 增加独立 Actor 归属并回填历史账号身份；数据库 Trigger 拒绝新 Run 缺少完整 Actor、调用后改绑和服务调用会话伪装为普通会话。既有角色获得服务读取权限，当前菜单发布快照原子升级到 Registry 19；存在隐藏调用事实时拒绝降级到旧账号归属模型。
+- 专项验收：P3-10 单元 `14/14`、真实 PostgreSQL/Valkey/HTTP/SSE `5/5`、完整 Migration 往返 `7/7`；P3-07～P3-10 真实服务治理、Runtime、灰度和出口联合 `13/13`，身份、资源注册表、Assistant 与 SSE 相邻回归 `22/22`。覆盖三类 surface、错配拒绝、服务级 Scope、Actor 幂等与读取隔离、隐藏会话、配额、部门后代、Valkey 限流、HTTP/SSE 断点恢复、Actor 防改绑、历史角色和菜单快照升级及不安全降级。
+- 统一门禁：`./scripts/verify` 通过 React `42/42`、Python `649/649`、Ruff format/lint `582` 个文件、mypy strict `582` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、Registry 19、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器验收：使用最终工作树重建 API、Migration、Web 和 Worker 镜像，公共数据库真实升级至 Revision `20260816_0050`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker Lane 和 Scheduler 共 13 项全部通过。本节点没有新增控制台页面，因此不执行真实浏览器页面验收，页面交付进入 `P3-11`。
+- 当前边界：本节点只交付可供页面和客户端消费的统一后端出口，不提前建设 Agent 控制台或 Release 运营监控。真实模型供应商、AI 质量、容量、LLM Grading、多模态图片问答、真实连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 继续保持既定边界。
+- 提交：`0822475`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布供应链门禁继续阻断。
-- 阶段 3 尚未完成服务出口、控制台和 Release 运营监控，不能把当前内部路由能力描述为完整 Agent 发布平台。
+- 阶段 3 尚未完成 Agent 控制台和 Release 运营监控，不能把当前后端服务出口描述为完整可运营的 Agent 发布平台。
 - LLM Grading、多模态图片问答、真实多源连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 均保持后置。
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理、`P3-08` Runtime 隔离路由和 `P3-09` 灰度发布与回滚已通过，当前进入 `P3-10` 服务出口；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理、`P3-08` Runtime 隔离路由、`P3-09` 灰度发布与回滚和 `P3-10` 统一服务出口已通过，当前进入 `P3-11` Agent 控制台；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。

@@ -5,7 +5,7 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 当前阶段 | 阶段 3：Agent 控制面与服务发布 |
-| 当前节点 | `P3-10` 服务出口 |
+| 当前节点 | `P3-11` Agent 控制台 |
 | 整体状态 | 进行中 |
 | 当前架构版本 | V2.8 |
 | 容量认证 | `not_run`，不阻塞阶段 3 本地功能建设，不代表生产容量 |
@@ -124,7 +124,7 @@
 
 ## 6. 阶段 3 节点
 
-阶段 3 的完整节点、依赖和门禁见 [阶段 3 实施计划](./stages/stage-3-plan.md)，验证事实持续写入 [阶段 3 验证报告](./stages/stage-3-report.md)。`P3-01`～`P3-09` 已完成控制面契约、生命周期事实、严格配置校验、自动评估、发布审批、不可变发布快照、服务路由治理、Runtime 隔离和灰度回滚，当前进入 `P3-10`；节点完成后在此追加验收证据和提交 SHA。
+阶段 3 的完整节点、依赖和门禁见 [阶段 3 实施计划](./stages/stage-3-plan.md)，验证事实持续写入 [阶段 3 验证报告](./stages/stage-3-report.md)。`P3-01`～`P3-10` 已完成控制面契约、生命周期事实、严格配置校验、自动评估、发布审批、不可变发布快照、服务路由治理、Runtime 隔离、灰度回滚和统一服务出口，当前进入 `P3-11`；节点完成后在此追加验收证据和提交 SHA。
 
 | 节点 | 交付目标 | 状态 | 验收证据 | Git 提交 |
 | --- | --- | --- | --- | --- |
@@ -137,7 +137,7 @@
 | `P3-07` | 建立 `Service`、`ServiceRoute`、访问策略和服务状态治理 | 已完成 | 2026-08-16：接受 `ADR-007`，独立服务治理模块独占 Service、版本化策略、不可变 Route、当前指针和幂等请求写入；自定义服务原子激活、策略版本、暂停/恢复/归档、跨空间与跨 Agent 防绕过、系统助手双指针兼容和历史 Run 不漂移通过；系统 Route 同步推进 Service 版本保证 Outbox 顺序，Migration 只回填固定 `system_knowledge` 助手并保留其他系统 Agent；专项单元 `4/4`、PostgreSQL `3/3`、Migration `5/5`、联合回归 `60/60`；统一门禁 React `42/42`、Python `605/605`、mypy strict `552` 个源文件、生产构建、Revision `20260816_0047` 和 13 项容器诊断通过 | `2cf0de8` |
 | `P3-08` | 建立只读取已发布快照的 Runtime 路由与控制面故障隔离 | 已完成 | 2026-08-16：接受 `ADR-008`，独立 Runtime 模块只读取 Service、当前或精确 Route、AgentRelease 和 Agent 发布事实，拒绝草稿、候选、审批当前态、失效状态、摘要损坏和 P3-09 前的灰度 Route；当前 Route 使用 300 秒短租期缓存，精确 Run 绑定使用 86400 秒长租期缓存，规范信封摘要、身份错位删除回源、Source 故障续跑和双故障失败关闭通过；新 Run 在数据库、审计和 Outbox 冻结 Service/Route/Route Version/Release 四元绑定，执行前再次复核，暂停服务拒绝新 Run，但在途 Run 可收敛，跨空间、历史 Route 新写入、Release 错配和改绑由数据库拒绝；Revision `20260816_0048` 仅回填唯一可证明的历史 Route，无法证明的历史 Run 保持空绑定且不能重执行，存在绑定时拒绝降级；专项单元 `12/12`、助手执行器 `1/1`、PostgreSQL `2/2`、Migration `6/6`，统一门禁 React `42/42`、Python `620/620`、mypy strict `564` 个源文件、生产构建和 13 项容器诊断通过 | `328bcca` |
 | `P3-09` | 建立灰度、正式切换、一键回滚和并发发布控制 | 已完成 | 2026-08-16：接受 `ADR-009`，以 `SHA-256(service_id + assignment_key) % 100` 建立不保存原始分配键的固定百分位，Runtime 按 `canary` Route 稳定选择主版本或灰度 Release；灰度、晋级和回滚均只追加 Route，并在同一事务切换 publication、推进 Service 版本、保存幂等结果、审计和 Outbox，`expected_generation` 保证并发发布唯一胜者；current 缓存升级为每服务固定 100 桶，发布、服务状态和系统助手 Route 变化在提交后整体失效，在途 Run 继续按冻结 Route/Release 完成；Revision `20260816_0049` 扩展控制操作和 Run Trigger，拒绝跨空间、跨 Agent、失效 Release、非法灰度结构、历史 Route 新绑定和不安全降级；专项单元 `18/18`、P3-09 PostgreSQL `3/3`、相邻 PostgreSQL 与 Migration `11/11`，统一门禁 React `42/42`、Python `625/625`、Ruff 与 mypy strict `568` 个源文件、生产构建、公共数据库升级和 13 项容器诊断通过 | `6aa5a21` |
-| `P3-10` | 交付自定义知识 Agent、场景应用和 Open API 服务出口 | 待开始 | 待验收 | 待提交 |
+| `P3-10` | 交付自定义知识 Agent、场景应用和 Open API 服务出口 | 已完成 | 2026-08-16：接受 `ADR-010`，新增统一 `service_delivery` 调用链，自定义知识 Agent、场景应用和 Open API 复用访问策略、Runtime 路由、固定窗口限流、月度问答配额、隐藏调用会话、Assistant Run、HTTP 快照和可恢复 SSE；浏览器与 API Key surface 严格分离，服务级 Scope 精确收窄到单个 Service，API Key Actor 独立承担幂等、读取和审计归属，内部 RAG 恢复创建账号上下文并重新执行 RBAC/ABAC；Revision `20260816_0050` 回填会话类型和 Run Actor 并拒绝改绑或不安全降级，Registry 19 含 86 权限、122 API、105 菜单和 115 绑定；P3-10 单元 `14/14`、PostgreSQL/Valkey/HTTP/SSE `5/5`、Migration `7/7`，统一门禁 React `42/42`、Python `649/649`、mypy strict `582` 个源文件、生产构建、公共数据库升级和 13 项容器诊断通过 | `0822475` |
 | `P3-11` | 建设 Agent 控制台、测试、审批、服务和发布回滚页面 | 待开始 | 待验收 | 待提交 |
 | `P3-12` | 建立 AgentRelease 级质量、延迟、错误和成本运营视图 | 待开始 | 待验收 | 待提交 |
 | `P3-13` | 完成阶段 3 联合验收、ReleaseManifest、阶段报告、关闭提交与标签 | 待开始 | 待验收 | 待提交 |

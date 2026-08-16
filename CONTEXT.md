@@ -142,8 +142,22 @@ _避免_：固定供应商 SDK、质量评估结论
 身份模块向可信业务模块提供的原子配额接口；业务模块声明计量项、变化量和幂等键，由权益模块在共享事务中完成额度检查、计数、审计与 Outbox，不允许跨模块直接写权益私有表。
 _避免_：直接更新计数器、业务模块自建配额
 
+## Agent 服务调用
+
+**服务调用（ServiceInvocation）**：
+通过自定义知识 Agent、场景应用或 Open API 出口对一个已发布 Service 发起的受控执行；每次调用绑定唯一 Run、Route 和 AgentRelease，且不进入普通私有会话列表。
+_避免_：普通问答会话、外部任务
+
+**调用 Actor（InvocationActor）**：
+拥有服务调用幂等、读取、审计和运行归属的请求身份；浏览器调用时等于账号，Open API 调用时是独立于创建账号的 API Key Actor。
+_避免_：API Key 创建账号、服务账号
+
+**服务级 Scope（ServiceResourceScope）**：
+以 `service.definition.read.{service_id_hex}` 精确收窄 Open API Key 可调用 Service 的凭证范围；它不能授予账号原本没有的 RBAC/ABAC 权限。
+_避免_：服务访问策略、文档权限
+
 ## 当前实施边界
 
-阶段 1 已完成账号、企业治理、复杂组织、RBAC/ABAC、字段投影、菜单注册与发布、动态应用壳层，以及知识上传、解析、OCR、Chunk、Embedding 和索引版本切换（`P1D-04`）。构建期 Chunk 不可见，文档发布、索引重建和撤权均通过 PostgreSQL 原子切换当前索引。
+阶段 1 和阶段 2 已完成个人/企业工作空间、复杂组织、RBAC/ABAC、字段投影、自定义菜单与接口绑定、知识问答、工作流、多级审批、SSE 恢复和本地可靠性底座。阶段 3 已完成 Agent 生命周期、配置、测试、审批、不可变发布、服务治理、Runtime 隔离、灰度回滚及三类统一服务出口（`P3-10`）。
 
-下一节点为 `P1D-05` 模型供应商配置、自定义 `base_url`、加密 Key、能力探测和数据政策。当前仍不扩展 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway 或 Durable Run。
+下一节点为 `P3-11` Agent 控制台，负责把 Agent、测试、审批、服务和发布回滚能力纳入自定义菜单管理。当前仍不扩展 SaaS、Go 运行层、真实多源连接器、LLM Grading、多模态图片问答、Channel Gateway、Durable Run 或 Agent 外部写操作。
