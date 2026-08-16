@@ -162,7 +162,7 @@
 
 ### P4-11 工具任务控制台
 
-- 状态：已完成，完成日期为 2026-08-17，实现提交待本次 Git 收口后回填。
+- 状态：已完成，完成日期为 2026-08-17，实现提交为 `2e771d1`。
 - 交付范围：已接入工具目录、Run 创建与历史详情、确认、驳回、取消和 `Last-Event-ID` 可恢复 SSE；前端已交付工具执行与工具任务页面、Draft 2020-12 参数表单、预算、步骤计划、危险动作确认、失败清空陈旧详情和菜单权限裁剪。API 只返回脱敏投影，不暴露参数正文、结果正文、凭证、Worker 身份或 Trace。
 - 权限与数据库：Revision `20260816_0061` 激活 6 项工具权限、8 个浏览器 API Operation、2 个页面和对应菜单发布快照，并回填现有个人/企业 Owner；降级恢复 Registry 21 原发布指针。Runtime 与 Worker 的 `loadToolExecutionPlan`、`executeToolAttempt` 继续保持内部入口，不注册为浏览器 API。
 - 自动验证：P4-11 HTTP、权限、SSE、PostgreSQL 与 P4-06/P4-09/P4-10 相邻联合回归为 `24/24`；P4-01 激活边界与 P4-11 HTTP 单元为 `20/20`；前端全量为 `58/58`，契约生成与漂移、Registry、架构、注释、UnoCSS、Ruff、mypy strict `673` 个源文件和生产构建均已通过。Codex 审批恢复后，原样 `./scripts/verify` 首次真实访问 PostgreSQL、Valkey、MinIO 和 Tika 并得到 Python `770/772`；两项失败均为历史测试仍断言 Registry 21，而 Revision `0061` 已把当前发布升级到 Registry 22。只修改这两处 head 期望后定向 PostgreSQL 回归 `2/2`、第二次完整统一门禁 Python `772/772`，其余全部检查继续通过。
