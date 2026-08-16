@@ -4,7 +4,7 @@
 
 本目录固定阶段 4 的受控工具执行语义。`tool-execution.v1.schema.json` 定义不可变工具版本、`Run`、`Step`、`Attempt`、`ToolCall`、策略决策、确认/审批、幂等事实、取消事实和安全结果；`tool-execution-baseline.v1.json` 冻结状态机、安全不变量、首批五个内部只读工具以及后续实现使用的权限、菜单、API 和事件标识；场景 Schema 约束版本化全合成验收数据。
 
-预留标识不是已上线能力。只有对应节点完成实现、OpenAPI、资源注册表、菜单发布、Migration 和验收后，权限或接口才能进入运行平台。`P4-01` 不创建活动数据库表、API、菜单、凭证或真实 Adapter；`P4-02` 只落地不可变工具注册和工作空间目录服务；`P4-03` 已落地内部 Run/Step/Attempt/ToolCall 状态事实、租约和唯一写入权；`P4-04` 已落地五个冻结内部只读工具的统一 Adapter、Schema、资源范围和结果安全边界，但仍未激活工具 HTTP API、菜单、模型工具计划、凭证值或真实外部连接器。
+预留标识不是已上线能力。只有对应节点完成实现、OpenAPI、资源注册表、菜单发布、Migration 和验收后，权限或接口才能进入运行平台。`P4-01` 不创建活动数据库表、API、菜单、凭证或真实 Adapter；`P4-02` 只落地不可变工具注册和工作空间目录服务；`P4-03` 已落地内部 Run/Step/Attempt/ToolCall 状态事实、租约和唯一写入权；`P4-04` 已落地五个冻结内部只读工具的统一 Adapter、Schema、资源范围和结果安全边界；`P4-05` 已落地严格候选意图、Release 允许列表、每步预算、当前 PDP 证据和原子只读计划冻结，但仍未激活工具 HTTP API、菜单、确认/审批、凭证值、写工具或真实外部连接器。
 
 ## 2. 核心边界
 
@@ -34,3 +34,5 @@ uv run --locked python scripts/check_contract_compatibility.py HEAD
 `P4-03` 另以 `tests/unit/test_p403_tool_task_state.py` 和 `tests/integration/test_p403_tool_task_state_postgres.py` 验证可信身份、预算和摘要收敛、Run/Step/Attempt/ToolCall 状态转换、`FOR UPDATE SKIP LOCKED` 并发领取、租约代际、取消优先级、迟到结果、跨空间隔离、终态保护和 Migration 往返。
 
 `P4-04` 另以 `tests/unit/test_p404_internal_read_adapters.py` 和 `tests/integration/test_p404_internal_read_adapters_postgres.py` 验证五工具分发、真实目录精确版本、当前套餐/PDP、输入输出 Schema、空资源范围、字段遮罩、结果大小、敏感字段、Prompt Injection 和 Adapter 故障的失败关闭行为。
+
+`P4-05` 另以 `tests/unit/test_p405_tool_planning.py` 和 `tests/integration/test_p405_tool_planning_postgres.py` 验证严格候选信封、Release 快照允许列表、当前套餐/PDP、参数 Schema、Step 预算、策略证据、单事务冻结、数据库防绕过、冲突回滚和 Migration 往返。

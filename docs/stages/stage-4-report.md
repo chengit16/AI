@@ -7,7 +7,7 @@
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-05` 执行计划与逐步策略校验 |
+| 当前节点 | `P4-06` 人工确认与企业审批 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -25,7 +25,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0054` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0055` |
 | 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据、模型与工具 | 只使用版本化合成数据、Mock Provider 和合成内部副作用 Adapter；不包含真实客户系统或凭证 |
 
@@ -86,6 +86,18 @@
 - 运行诊断：`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过，数据库保持 Revision `20260816_0054`。
 - 验收结论：`passed`。当前证明五个冻结内部只读工具具备统一且失败关闭的 Adapter 边界，不代表模型已经能够生成或执行工具计划；执行计划、逐步策略复核、确认/审批、凭证注入、幂等副作用、SSE、页面和联合演练继续由 `P4-05`～`P4-13` 独立验收。
 
+### P4-05 执行计划与逐步策略校验
+
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `a1e608b`。
+- 交付范围：新增严格候选意图解析、`ToolExecutionPlanningService`、不可变 AgentRelease 工具允许列表投影和唯一原子计划写入入口；Revision `20260816_0055` 新增 `tool_policy_decisions`，为 `tool_steps` 冻结超时、尝试次数、结果大小和成本预算，并把工作空间生命周期 Registry 升级为 `v5`。本节点没有开放 HTTP API、菜单、凭证、写工具或真实外部连接器。
+- 候选与 Release 边界：模型信封只允许固定 `tool_calls` 结构、最多 50 步和每步最多 64 KiB 规范参数；每项必须同时匹配工具键、ID、版本和关闭参数对象。计划只读取 Run 精确绑定的活动 Service、活动 Agent 和不可变 Release，复算自定义 Release 快照摘要并严格解析 `read_only_tools`；系统 Release 固定为空允许列表，模型输出不能扩大 Release 权限。
+- 当前权限与预算：每个 Step 重新执行当前套餐、工具状态和 PDP，不复用目录列表旧结论；文档、工作流运行和审批目标使用资源级 PDP，未知权限资源类型或策略不可用均失败关闭。参数按 Draft 2020-12 Schema 校验，Step 超时不得超过 Run，安全只读重试不得超过 Run 上限，结果上限固定为 256 KiB，当前五个内部只读工具成本预算为 0。
+- 原子与数据库约束：全量预检通过后，PostgreSQL 单事务完成 Run `pending → planning → running`、全部 Step `planned → policy_checking → ready` 和允许证据写入；`ready` 必须存在 Step、工具版本、规范参数摘要、权限码和评估时间完全匹配的 PDP 证据。策略事实只保存版本、资源范围摘要和字段遮罩摘要，不保存参数正文、结果正文或明文凭证；任一步冲突会回滚 Run、Step 和策略事实，存在策略事实时拒绝降级到 `0054`。
+- 专项验证：`.venv/bin/pytest -q tests/unit/test_p405_tool_planning.py` 为 `7/7`；真实 PostgreSQL `tests/integration/test_p405_tool_planning_postgres.py` 为 `3/3`；P4-02/P4-03/P4-05/Migration 联合回归为 `11/11`，覆盖正式 Agent 配置、评估、审批、Release、活动 Service 到工具计划闭环，无证据、错误权限码、旧证据复用和第二步冲突均失败关闭。
+- 统一门禁：`./scripts/verify` 通过，React 为 `53/53`，Python 为 `725/725`，mypy strict 检查 `638` 个源文件；OpenAPI、权限资源、ReleaseManifest、契约兼容、架构依赖、前后端注释、UnoCSS、开发级供应链、生产构建和 Secret Scanner 均无漂移。
+- 运行诊断：使用最终工作树重建本地 API、Web、Migration 和 Worker 镜像，公共数据库真实升级到 Revision `20260816_0055`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
+- 验收结论：`passed`。当前证明模型候选意图只能收敛为 Release 允许、当前获授权且预算冻结的只读执行计划，不代表确认/审批、凭证注入、副作用、Worker 实际调用、SSE 或页面已交付；这些能力继续由 `P4-06`～`P4-13` 独立验收。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -96,4 +108,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-04` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-05` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
