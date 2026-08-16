@@ -14,6 +14,9 @@ from ai_platform_api.modules.tool_execution.infrastructure.confirmation_approval
 from ai_platform_api.modules.tool_execution.infrastructure.confirmations_sqlalchemy import (
     SqlAlchemyToolConfirmationStore,
 )
+from ai_platform_api.modules.tool_execution.infrastructure.credentials_sqlalchemy import (
+    SqlAlchemyToolCredentialStore,
+)
 from ai_platform_api.modules.tool_execution.infrastructure.planning_sqlalchemy import (
     SqlAlchemyToolReleasePlanSource,
 )
@@ -32,6 +35,7 @@ __all__ = [
     "SqlAlchemyToolCatalogRepository",
     "SqlAlchemyToolConfirmationStore",
     "SqlAlchemyToolConfirmationSubjectLifecycle",
+    "SqlAlchemyToolCredentialStore",
     "SqlAlchemyToolReleasePlanSource",
     "SqlAlchemyToolTaskStore",
     "WorkflowGetStatusAdapter",

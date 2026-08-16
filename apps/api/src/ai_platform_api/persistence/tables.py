@@ -3066,6 +3066,101 @@ Index(
     tool_confirmation_invalidations.c.occurred_at,
 )
 
+tool_credentials = Table(
+    "tool_credentials",
+    metadata,
+    Column("credential_id", UUID(as_uuid=True), primary_key=True),
+    Column("credential_ref", String(69), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_version", Integer, nullable=False),
+    Column("credential_version", Integer, nullable=False),
+    Column("master_key_version", Integer, nullable=False),
+    Column("encrypted_data_key", LargeBinary, nullable=False),
+    Column("data_key_nonce", LargeBinary, nullable=False),
+    Column("ciphertext", LargeBinary, nullable=False),
+    Column("data_nonce", LargeBinary, nullable=False),
+    Column("last_four", String(4), nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("revoked_by_account_id", UUID(as_uuid=True), nullable=True),
+    Column("revoked_at", DateTime(timezone=True), nullable=True),
+    UniqueConstraint("credential_ref", name="uq_tool_credentials_ref"),
+    UniqueConstraint(
+        "workspace_id",
+        "tool_id",
+        "tool_version",
+        "credential_version",
+        name="uq_tool_credentials_version",
+    ),
+    UniqueConstraint(
+        "credential_ref",
+        "workspace_id",
+        "tool_id",
+        "tool_version",
+        name="uq_tool_credentials_binding",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_tool_credentials_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["tool_id", "tool_version"],
+        [
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_id",
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_version",
+        ],
+        name="fk_tool_credentials_definition",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_tool_credentials_creator",
+    ),
+    ForeignKeyConstraint(
+        ["revoked_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_tool_credentials_revoker",
+    ),
+    CheckConstraint(
+        "credential_ref ~ '^cred_[a-z0-9]{16,64}$'",
+        name="ck_tool_credentials_ref",
+    ),
+    CheckConstraint(
+        "tool_version >= 1 AND credential_version >= 1 AND master_key_version >= 1",
+        name="ck_tool_credentials_versions",
+    ),
+    CheckConstraint(
+        "octet_length(encrypted_data_key) >= 32 AND octet_length(data_key_nonce) = 12 "
+        "AND octet_length(ciphertext) BETWEEN 24 AND 4112 "
+        "AND octet_length(data_nonce) = 12",
+        name="ck_tool_credentials_envelope",
+    ),
+    CheckConstraint("char_length(last_four) = 4", name="ck_tool_credentials_last_four"),
+    CheckConstraint("status IN ('active', 'revoked')", name="ck_tool_credentials_status"),
+    CheckConstraint(
+        "(status = 'active' AND revoked_by_account_id IS NULL AND revoked_at IS NULL) OR "
+        "(status = 'revoked' AND revoked_by_account_id IS NOT NULL "
+        "AND revoked_at IS NOT NULL AND revoked_at >= created_at)",
+        name="ck_tool_credentials_revocation",
+    ),
+)
+Index(
+    "uq_tool_credentials_active",
+    tool_credentials.c.workspace_id,
+    tool_credentials.c.tool_id,
+    tool_credentials.c.tool_version,
+    unique=True,
+    postgresql_where=tool_credentials.c.status == "active",
+)
+Index(
+    "ix_tool_credentials_workspace_time",
+    tool_credentials.c.workspace_id,
+    tool_credentials.c.created_at,
+)
+
 tool_attempts = Table(
     "tool_attempts",
     metadata,
@@ -3172,6 +3267,16 @@ tool_calls = Table(
             f"{SCHEMA_TOKEN}.tool_steps.canonical_arguments_hash",
         ],
         name="fk_tool_calls_step_binding",
+    ),
+    ForeignKeyConstraint(
+        ["credential_ref", "workspace_id", "tool_id", "tool_version"],
+        [
+            f"{SCHEMA_TOKEN}.tool_credentials.credential_ref",
+            f"{SCHEMA_TOKEN}.tool_credentials.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_credentials.tool_id",
+            f"{SCHEMA_TOKEN}.tool_credentials.tool_version",
+        ],
+        name="fk_tool_calls_credential_binding",
     ),
     CheckConstraint("tool_version >= 1", name="ck_tool_calls_tool_version"),
     CheckConstraint(

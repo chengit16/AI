@@ -13,6 +13,10 @@ from ai_platform_api.modules.tool_execution.domain.confirmations import (
     ToolCallBinding,
     ToolConfirmation,
 )
+from ai_platform_api.modules.tool_execution.domain.credentials import (
+    ToolCredential,
+    ToolCredentialBinding,
+)
 from ai_platform_api.modules.tool_execution.domain.planning import (
     CandidateToolIntent,
     FrozenToolPlanStep,
@@ -42,6 +46,8 @@ __all__ = [
     "ToolCallBinding",
     "ToolCatalogRepository",
     "ToolConfirmation",
+    "ToolCredential",
+    "ToolCredentialBinding",
     "ToolDefinition",
     "ToolExecutionPlan",
     "ToolPlanStore",

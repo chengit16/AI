@@ -1,4 +1,4 @@
-"""在单一数据库事务中重包裹全部模型供应商凭据数据密钥。"""
+"""在单一数据库事务中重包裹全部模型供应商和工具凭证数据密钥。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,10 @@ from ai_platform_api.common.security import (
     EnvelopeSecretCipher,
     MasterKeyFile,
 )
-from ai_platform_api.persistence.tables import model_provider_credentials
+from ai_platform_api.modules.tool_execution.domain.credentials import (
+    tool_credential_associated_data,
+)
+from ai_platform_api.persistence.tables import model_provider_credentials, tool_credentials
 from sqlalchemy import Connection, Engine, create_engine, select, update
 
 
@@ -73,6 +76,56 @@ def rewrap_provider_credentials(
     return len(rows)
 
 
+def rewrap_tool_credentials(
+    connection: Connection,
+    *,
+    old_key: MasterKeyFile,
+    new_key: MasterKeyFile,
+) -> int:
+    """重包裹全部工具凭证，保持密文正文与精确工具绑定不变。"""
+
+    rows = connection.execute(select(tool_credentials).with_for_update()).mappings().all()
+    cipher = EnvelopeSecretCipher(old_key)
+    for row in rows:
+        if row["master_key_version"] != old_key.version:
+            raise ValueError("数据库包含与当前主密钥版本不一致的工具凭证")
+        envelope = EncryptedSecret(
+            key_version=row["master_key_version"],
+            encrypted_data_key=bytes(row["encrypted_data_key"]),
+            data_key_nonce=bytes(row["data_key_nonce"]),
+            ciphertext=bytes(row["ciphertext"]),
+            data_nonce=bytes(row["data_nonce"]),
+            last_four=row["last_four"],
+        )
+        rewrapped = cipher.rewrap(
+            envelope,
+            new_master_key=new_key,
+            associated_data=tool_credential_associated_data(
+                workspace_id=row["workspace_id"],
+                tool_id=row["tool_id"],
+                tool_version=row["tool_version"],
+                credential_id=row["credential_id"],
+                credential_ref=row["credential_ref"],
+                credential_version=row["credential_version"],
+            ),
+        )
+        result = connection.execute(
+            update(tool_credentials)
+            .where(
+                tool_credentials.c.credential_id == row["credential_id"],
+                tool_credentials.c.master_key_version == old_key.version,
+            )
+            .values(
+                master_key_version=rewrapped.key_version,
+                encrypted_data_key=rewrapped.encrypted_data_key,
+                data_key_nonce=rewrapped.data_key_nonce,
+            )
+        )
+        if result.rowcount != 1:
+            raise RuntimeError("工具凭证主密钥轮换发生并发冲突")
+    return len(rows)
+
+
 def rotate_database_credentials(
     database_url: str,
     *,
@@ -86,11 +139,17 @@ def rotate_database_credentials(
     engine: Engine = create_engine(database_url)
     try:
         with engine.begin() as connection:
-            return rewrap_provider_credentials(
+            provider_count = rewrap_provider_credentials(
                 connection,
                 old_key=MasterKeyFile(str(old_key_path), old_version),
                 new_key=MasterKeyFile(str(new_key_path), new_version),
             )
+            tool_count = rewrap_tool_credentials(
+                connection,
+                old_key=MasterKeyFile(str(old_key_path), old_version),
+                new_key=MasterKeyFile(str(new_key_path), new_version),
+            )
+            return provider_count + tool_count
     finally:
         engine.dispose()
 
@@ -112,7 +171,7 @@ def _main() -> int:
         new_key_path=arguments.new_key_file,
         new_version=arguments.new_version,
     )
-    print(f"供应商凭据数据密钥重包裹完成: {count}")
+    print(f"应用凭证数据密钥重包裹完成: {count}")
     return 0
 
 

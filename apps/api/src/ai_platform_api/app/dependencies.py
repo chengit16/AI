@@ -188,6 +188,7 @@ from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
 from ai_platform_api.modules.streaming.infrastructure.valkey import ValkeyStreamNotifier
 from ai_platform_api.modules.tool_execution.application.catalog import ToolCatalogService
 from ai_platform_api.modules.tool_execution.application.confirmations import ToolConfirmationService
+from ai_platform_api.modules.tool_execution.application.credentials import ToolCredentialService
 from ai_platform_api.modules.tool_execution.application.planning import (
     ToolExecutionPlanningService,
 )
@@ -197,6 +198,9 @@ from ai_platform_api.modules.tool_execution.infrastructure.confirmation_approval
 )
 from ai_platform_api.modules.tool_execution.infrastructure.confirmations_sqlalchemy import (
     SqlAlchemyToolConfirmationStore,
+)
+from ai_platform_api.modules.tool_execution.infrastructure.credentials_sqlalchemy import (
+    SqlAlchemyToolCredentialStore,
 )
 from ai_platform_api.modules.tool_execution.infrastructure.planning_sqlalchemy import (
     SqlAlchemyToolReleasePlanSource,
@@ -284,6 +288,7 @@ class ApplicationContainer:
     tool_tasks: ToolTaskService | None = None
     tool_planning: ToolExecutionPlanningService | None = None
     tool_confirmations: ToolConfirmationService | None = None
+    tool_credentials: ToolCredentialService | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
@@ -486,6 +491,8 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         tool_catalogs,
         approval_instances,
     )
+    tool_credential_store = SqlAlchemyToolCredentialStore(database.sessions, secret_cipher)
+    tool_credentials = ToolCredentialService(tool_credential_store, tool_credential_store)
     retrieval_planning = BoundedRetrievalPlanningService(
         SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
         policy,
@@ -591,6 +598,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             tool_tasks=tool_tasks,
             tool_planning=tool_planning,
             tool_confirmations=tool_confirmations,
+            tool_credentials=tool_credentials,
             workflow_run_executor=WorkflowRunExecutor(
                 SqlAlchemyWorkflowExecutionStore(database.sessions),
                 policy,

@@ -323,7 +323,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     connection.commit()
 
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0056"
+        "20260816_0057"
     )
     tables = {
         row[0]
@@ -341,6 +341,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
         "tool_policy_decisions",
         "tool_confirmations",
         "tool_confirmation_invalidations",
+        "tool_credentials",
         "tool_attempts",
         "tool_calls",
     } <= tables
@@ -350,7 +351,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     command.upgrade(config, "head")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0056"
+        "20260816_0057"
     )
 
 

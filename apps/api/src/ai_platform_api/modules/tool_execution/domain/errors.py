@@ -51,6 +51,18 @@ class ToolAdapterUnavailableError(PlatformError):
     error_code = "TOOL_ADAPTER_UNAVAILABLE"
 
 
+class ToolCredentialUnavailableError(PlatformError):
+    """工具调用缺少当前活动、精确绑定且可解密的凭证。"""
+
+    error_code = "TOOL_CREDENTIAL_UNAVAILABLE"
+
+
+class ToolCredentialExposureDetectedError(PlatformError):
+    """Adapter 异常携带凭证明文，调用结果必须隔离且不得继续传播。"""
+
+    error_code = "TOOL_CREDENTIAL_EXPOSURE_DETECTED"
+
+
 class ToolResultRejectedError(PlatformError):
     """工具结果未通过结构、大小、敏感字段或 Prompt Injection 检查。"""
 

@@ -3,6 +3,7 @@
 from ai_platform_api.modules.tool_execution.application.adapters import ToolAdapterService
 from ai_platform_api.modules.tool_execution.application.catalog import ToolCatalogService
 from ai_platform_api.modules.tool_execution.application.confirmations import ToolConfirmationService
+from ai_platform_api.modules.tool_execution.application.credentials import ToolCredentialService
 from ai_platform_api.modules.tool_execution.application.definitions import (
     parse_tool_definition,
     verify_tool_definition,
@@ -12,6 +13,8 @@ from ai_platform_api.modules.tool_execution.application.errors import (
     ToolAdapterUnavailableError,
     ToolConfirmationRequiredError,
     ToolConfirmationStaleError,
+    ToolCredentialExposureDetectedError,
+    ToolCredentialUnavailableError,
     ToolDefinitionInvalidError,
     ToolExecutionDeniedError,
     ToolResultRejectedError,
@@ -34,6 +37,9 @@ __all__ = [
     "ToolConfirmationRequiredError",
     "ToolConfirmationService",
     "ToolConfirmationStaleError",
+    "ToolCredentialExposureDetectedError",
+    "ToolCredentialService",
+    "ToolCredentialUnavailableError",
     "ToolDefinitionInvalidError",
     "ToolExecutionDeniedError",
     "ToolExecutionPlanningService",
