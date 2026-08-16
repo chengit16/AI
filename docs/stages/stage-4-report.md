@@ -7,7 +7,7 @@
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-06` 人工确认与企业审批 |
+| 当前节点 | `P4-07` 工具凭证安全注入 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -25,7 +25,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0055` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0056` |
 | 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据、模型与工具 | 只使用版本化合成数据、Mock Provider 和合成内部副作用 Adapter；不包含真实客户系统或凭证 |
 
@@ -98,6 +98,18 @@
 - 运行诊断：使用最终工作树重建本地 API、Web、Migration 和 Worker 镜像，公共数据库真实升级到 Revision `20260816_0055`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
 - 验收结论：`passed`。当前证明模型候选意图只能收敛为 Release 允许、当前获授权且预算冻结的只读执行计划，不代表确认/审批、凭证注入、副作用、Worker 实际调用、SSE 或页面已交付；这些能力继续由 `P4-06`～`P4-13` 独立验收。
 
+### P4-06 人工确认与企业审批
+
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `482a911`。
+- 交付范围：新增唯一 `ToolConfirmationService`、`tool_confirmations`、`tool_confirmation_invalidations` 和 Revision `20260816_0056`；个人空间固定由所有者一级确认，企业空间复用既有版本化审批策略和最多五级审批链。组合根通过资源类型路由同时保留 Agent 发布审批与工具审批，不建立第二套审批引擎。本节点未开放 HTTP API、菜单、凭证、Adapter 执行或真实副作用。
+- 确认绑定：确认冻结 Workspace、Run、Step、工具 ID 与版本、规范参数摘要、申请时 PDP ID、权限码、策略版本、资源范围摘要、字段遮罩摘要、风险、审批主题摘要和有效期，不保存参数正文、策略正文、结果正文或凭证。审批实例、申请时 PDP、确认事实及 Run/Step 等待态在同一审批事务提交，个人进入 `waiting_confirmation`，企业进入 `waiting_approval`。
+- 当前授权门禁：审批通过只形成不可变批准事实，不直接执行工具，也不直接把 Step 改为 `ready`。恢复入口必须重新读取当前套餐与工具版本并重新执行 PDP；新 PDP ID 必须不同于申请时证据，评估时间不得早于批准时间，权限码、策略版本、资源范围摘要和字段遮罩摘要必须保持一致。新 PDP、Step `ready` 与 Run 恢复在同一事务提交，数据库 Trigger 独立复核全部条件。
+- 失效与不可变性：拒绝、撤回和超时不会产生执行权；参数、工具、策略版本、资源范围、字段遮罩、撤权或有效期变化会追加 `tool_confirmation_invalidations`，原批准终态不被覆盖。确认身份和失效事实由数据库拒绝改写或删除，存在确认或同 Step 多条 PDP 证据时拒绝降级到 `0055`；两张新表已进入工作空间导出与业务清除 Registry `v6`。
+- 专项验证：P4-06 与 P4-03/P4-05 相邻 PostgreSQL 回归为 `16/16`；Migration、P4-06、审批生命周期和 Agent 发布回归为 `26/26`。覆盖个人申请及幂等回放、跨空间拒绝、批准后旧 PDP 绕过、新 PDP 恢复、驳回、撤回、超时、参数/策略/字段范围失效、企业两级审批、Agent 与工具审批共存、确认篡改和破坏性降级拒绝。
+- 统一门禁：`./scripts/verify` 通过，React 为 `53/53`，Python 为 `730/730`，mypy strict 检查 `644` 个源文件；Ruff、OpenAPI、权限资源、ReleaseManifest、契约兼容、架构依赖、前后端注释、UnoCSS、开发级供应链、生产构建和 Secret Scanner 均无漂移。为消除本机全量 Vitest 并发资源争用，另以提交 `fa58bb1` 固定两个测试 Worker，未放宽测试超时或断言，默认命令连续通过。
+- 运行诊断：使用最终工作树重建本地 API、Web、Migration 和 Worker 镜像，公共数据库真实升级到 Revision `20260816_0056`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
+- 验收结论：`passed`。当前证明个人确认、企业多级审批、批准后重新授权和陈旧确认失效门禁成立，不代表凭证注入、合成副作用执行、Worker 重试取消、SSE、审计运营事实或页面已交付；这些能力继续由 `P4-07`～`P4-13` 独立验收。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -108,4 +120,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-05` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-06` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
