@@ -7,7 +7,7 @@
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-08` 合成内部副作用 Adapter 与幂等提交协议 |
+| 当前节点 | `P4-09` Worker 租约、超时、有限重试、取消、死信与人工恢复 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -25,7 +25,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0057` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0058` |
 | 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据、模型与工具 | 只使用版本化合成数据、Mock Provider 和合成内部副作用 Adapter；不包含真实客户系统或凭证 |
 
@@ -123,6 +123,19 @@
 - 运行诊断：使用最终工作树重建 API、Web、Migration、Worker、Scheduler 和 Tika 镜像，公共数据库升级到 Revision `20260816_0057`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
 - 验收结论：`passed`。当前证明工具凭证的所有者管理、精确版本绑定、加密存储、调用边缘短时注入和轮换撤销失败关闭成立，不代表合成副作用、Worker 重试取消、SSE、页面或真实连接器已交付；这些能力继续由 `P4-08`～`P4-13` 独立验收。
 
+### P4-08 合成内部副作用与幂等提交协议
+
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `443d22d`。
+- 交付范围：新增 `ToolSideEffectService`、唯一 `ToolSideEffectStore`、`SqlAlchemyToolSideEffectStore`、`SqlAlchemySyntheticSideEffectAdapter`、`tool_idempotency_records`、`synthetic_tool_side_effects` 和 Revision `20260816_0058`；只提供版本化合成内部副作用验证边界，没有开放 HTTP API、菜单、任意 HTTP/SQL/文件系统工具、真实外部连接器或客户凭证。
+- 稳定幂等身份：幂等身份固定绑定 Workspace、Run 和 Step，不包含 Attempt 或 ToolCall，因此队列重复投递和跨 Attempt 恢复始终命中同一事实；请求摘要同时绑定精确工具版本、规范参数摘要和批准确认摘要。同键同请求返回原事实，同键异请求稳定返回 `IDEMPOTENCY_CONFLICT`。
+- 执行前提交：任何合成副作用发生前必须先在独立事务持久化幂等预留；写 ToolCall 没有匹配预留时不得进入 `executing`。数据库 Trigger 在执行边界独立复核最新允许 PDP、有效批准确认、当前租约、活动工具定义和写调用状态，陈旧确认、跨空间拼接、伪造租约或直接数据库绕过均失败关闭。
+- 结果与不确定性：同请求重放只产生一次副作用；提交后响应丢失通过已提交幂等事实返回原结果，不再次写入。Adapter 无法证明提交与否时记录 `outcome_unknown` 并禁止自动重放，只允许查询合成副作用事实对账；对应 Run/Step 人工恢复状态和操作入口由 `P4-09` 接续，不提前扩展冻结状态集合。
+- 原子收口与最小数据：成功时幂等终态、ToolCall、Attempt、Step、Run、审计和 Outbox 在同一事务收口；参数正文、结果正文和凭证明文不进入幂等表、合成副作用、审计或 Outbox。普通事务禁止修改或删除幂等及副作用历史，工作空间 Registry 升级为 `v8`，仅生命周期清除事务可使用受控旁路。
+- 专项验证：真实 PostgreSQL `tests/integration/test_p408_side_effect_idempotency_postgres.py` 为 `9/9`；Migration、工作空间生命周期和 P4-02～P4-08 联合回归为 `45/45`。覆盖并发重复投递、同键异请求、提交后响应丢失、未提交未知结果、陈旧确认、数据库直接绕过、跨空间攻击、生命周期清除和破坏性降级拒绝。
+- 统一门禁：`./scripts/verify` 通过，React 为 `53/53`，Python 为 `748/748`，mypy strict 检查 `654` 个源文件；Ruff、架构、前后端注释、UnoCSS、契约、Registry、供应链和生产构建全部通过。
+- 运行诊断：公共本地数据库升级到 Revision `20260816_0058`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
+- 验收结论：`passed`。当前证明合成副作用执行前预留、跨 Attempt 稳定幂等、重复调用零新增副作用、响应丢失恢复和未知结果禁止自动重放成立，不代表 Worker 超时重试取消、人工恢复、SSE、运营事实或页面已交付；这些能力继续由 `P4-09`～`P4-13` 独立验收。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -133,4 +146,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-07` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-08` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
