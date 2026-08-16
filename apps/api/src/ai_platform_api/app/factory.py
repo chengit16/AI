@@ -36,6 +36,7 @@ from ai_platform_api.modules.model_gateway.api.routes import (
     runtime_router as ai_runtime_router,
 )
 from ai_platform_api.modules.operations.api.routes import router as operations_workbench_router
+from ai_platform_api.modules.service_delivery.api.routes import router as service_delivery_router
 from ai_platform_api.modules.system.api.health import router as health_router
 from ai_platform_api.modules.system.api.observability import router as observability_router
 from ai_platform_api.modules.workflow.api.approval_routes import router as approval_policy_router
@@ -114,6 +115,7 @@ def create_app(
     application.state.model_runtime_service = dependencies.model_runtime
     application.state.assistant_conversation_service = dependencies.assistant_conversations
     application.state.assistant_run_executor = dependencies.assistant_run_executor
+    application.state.service_invocation_service = dependencies.service_invocations
     application.state.assistant_source_service = dependencies.assistant_sources
     application.state.streaming_service = dependencies.streaming
     application.state.retrieval_planning_service = dependencies.retrieval_planning
@@ -142,6 +144,7 @@ def create_app(
     application.include_router(model_provider_router, prefix="/api/v1")
     application.include_router(ai_runtime_router, prefix="/api/v1")
     application.include_router(assistant_router, prefix="/api/v1")
+    application.include_router(service_delivery_router, prefix="/api/v1")
     application.include_router(workflow_router, prefix="/api/v1")
     application.include_router(approval_policy_router, prefix="/api/v1")
     application.include_router(approval_instance_router, prefix="/api/v1")

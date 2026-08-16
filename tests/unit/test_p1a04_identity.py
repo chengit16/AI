@@ -399,6 +399,64 @@ def test_api_key_rejects_empty_or_malformed_scope() -> None:
         )
 
 
+def test_api_key_accepts_service_resource_scope() -> None:
+    _, identity, _, _ = authentication_fixture()
+    api_keys = ApiKeyService(
+        identity,
+        MemoryUnitOfWork(MemoryApiKeyWriter(identity)),
+        Sha256SecretDigester(),
+        MemoryEntitlementAccess(),
+    )
+    context = RequestContext.trusted(
+        actor_id=ACCOUNT_ID,
+        user_id=ACCOUNT_ID,
+        workspace_id=WORKSPACE_ID,
+        trace=TRACE,
+    )
+    service_scope = f"service.definition.read.{'a' * 32}"
+
+    issued = api_keys.issue(
+        context=context,
+        name="synthetic service client",
+        scopes=(service_scope,),
+        expires_at=None,
+    )
+
+    assert issued.scopes == (service_scope,)
+
+
+@pytest.mark.parametrize(
+    "scope",
+    (
+        "service.definition.read.abc",
+        f"service.definition.read.{'A' * 32}",
+        f"service.definition.write.{'a' * 32}",
+    ),
+)
+def test_api_key_rejects_malformed_service_resource_scope(scope: str) -> None:
+    _, identity, _, _ = authentication_fixture()
+    api_keys = ApiKeyService(
+        identity,
+        MemoryUnitOfWork(MemoryApiKeyWriter(identity)),
+        Sha256SecretDigester(),
+        MemoryEntitlementAccess(),
+    )
+    context = RequestContext.trusted(
+        actor_id=ACCOUNT_ID,
+        user_id=ACCOUNT_ID,
+        workspace_id=WORKSPACE_ID,
+        trace=TRACE,
+    )
+
+    with pytest.raises(ApiKeyConfigurationError):
+        api_keys.issue(
+            context=context,
+            name="invalid service client",
+            scopes=(scope,),
+            expires_at=None,
+        )
+
+
 def test_envelope_cipher_requires_secure_master_key_and_detects_tampering(
     tmp_path: Path,
 ) -> None:

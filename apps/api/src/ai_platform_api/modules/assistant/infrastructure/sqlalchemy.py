@@ -37,6 +37,7 @@ from ai_platform_api.modules.assistant.domain.models import (
     MessagePart,
     MessageSubmission,
 )
+from ai_platform_api.modules.identity.domain.entitlements import UsageRepository
 from ai_platform_api.modules.service_governance.domain.models import ServiceRepository
 from ai_platform_api.persistence.tables import (
     agent_publications,
@@ -54,6 +55,7 @@ from ai_platform_api.persistence.tables import (
 )
 
 SessionFactory = Callable[[], Session]
+UsageRepositoryFactory = Callable[[Session], UsageRepository]
 ServiceRepositoryFactory = Callable[[Session], ServiceRepository]
 SYSTEM_AGENT_KEY = "system_knowledge"
 SYSTEM_AGENT_NAME = "系统知识助手"
@@ -217,6 +219,7 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                     conversation_id=conversation.conversation_id,
                     workspace_id=conversation.workspace_id,
                     created_by_account_id=conversation.created_by_account_id,
+                    conversation_kind=conversation.conversation_kind,
                     title=conversation.title,
                     status=conversation.status,
                     created_at=conversation.created_at,
@@ -239,6 +242,7 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
             .where(
                 conversations.c.workspace_id == workspace_id,
                 conversations.c.created_by_account_id == account_id,
+                conversations.c.conversation_kind == "private",
             )
             .order_by(conversations.c.updated_at.desc(), conversations.c.conversation_id)
             .limit(limit)
@@ -257,6 +261,7 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
             conversations.c.workspace_id == workspace_id,
             conversations.c.conversation_id == conversation_id,
             conversations.c.created_by_account_id == account_id,
+            conversations.c.conversation_kind == "private",
         )
         if for_update:
             statement = statement.with_for_update()
@@ -315,7 +320,7 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
             .where(
                 assistant_runs.c.workspace_id == workspace_id,
                 assistant_runs.c.conversation_id == conversation_id,
-                assistant_runs.c.requested_by_account_id == account_id,
+                assistant_runs.c.requested_by_actor_id == account_id,
             )
             .order_by(assistant_runs.c.created_at, assistant_runs.c.run_id)
             .limit(limit)
@@ -325,18 +330,40 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
     def get_submission(
         self,
         workspace_id: UUID,
-        account_id: UUID,
+        actor_id: UUID,
         idempotency_key: str,
     ) -> MessageSubmission | None:
         run_row = self._session.execute(
             select(assistant_runs).where(
                 assistant_runs.c.workspace_id == workspace_id,
-                assistant_runs.c.requested_by_account_id == account_id,
+                assistant_runs.c.requested_by_actor_id == actor_id,
                 assistant_runs.c.idempotency_key == idempotency_key,
             )
         ).one_or_none()
         if run_row is None:
             return None
+        return self._submission(run_row)
+
+    def get_submission_by_run(
+        self,
+        workspace_id: UUID,
+        actor_id: UUID,
+        run_id: UUID,
+    ) -> MessageSubmission | None:
+        """按可信 Actor 读取服务调用结果，API Key 不能读取同账号其他 Key 的 Run。"""
+
+        run_row = self._session.execute(
+            select(assistant_runs).where(
+                assistant_runs.c.workspace_id == workspace_id,
+                assistant_runs.c.requested_by_actor_id == actor_id,
+                assistant_runs.c.run_id == run_id,
+            )
+        ).one_or_none()
+        return self._submission(run_row) if run_row is not None else None
+
+    def _submission(self, run_row: Row[Any]) -> MessageSubmission:
+        """聚合 Run 的输入和助手消息，调用方已完成工作空间与 Actor 过滤。"""
+
         message_row = self._session.execute(
             select(messages).where(messages.c.message_id == run_row.user_message_id)
         ).one()
@@ -358,14 +385,14 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         workspace_id: UUID,
         conversation_id: UUID | None,
         run_id: UUID,
-        account_id: UUID,
+        actor_id: UUID,
         *,
         for_update: bool = False,
     ) -> AssistantRun | None:
         statement = select(assistant_runs).where(
             assistant_runs.c.workspace_id == workspace_id,
             assistant_runs.c.run_id == run_id,
-            assistant_runs.c.requested_by_account_id == account_id,
+            assistant_runs.c.requested_by_actor_id == actor_id,
         )
         if conversation_id is not None:
             statement = statement.where(assistant_runs.c.conversation_id == conversation_id)
@@ -386,7 +413,7 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                 assistant_runs.c.workspace_id == workspace_id,
                 assistant_runs.c.conversation_id == conversation_id,
                 assistant_runs.c.assistant_message_id == message_id,
-                assistant_runs.c.requested_by_account_id == account_id,
+                assistant_runs.c.requested_by_actor_id == account_id,
             )
         ).one_or_none()
         return _run(row) if row is not None else None
@@ -428,6 +455,7 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                     agent_release_id=run.agent_release_id,
                     runtime_config_version_id=run.runtime_config_version_id,
                     requested_by_account_id=run.requested_by_account_id,
+                    requested_by_actor_id=run.requested_by_actor_id,
                     status=run.status,
                     idempotency_key=run.idempotency_key,
                     request_hash=run.request_hash,
@@ -469,7 +497,7 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                 .where(
                     assistant_runs.c.run_id == run.run_id,
                     assistant_runs.c.workspace_id == run.workspace_id,
-                    assistant_runs.c.requested_by_account_id == run.requested_by_account_id,
+                    assistant_runs.c.requested_by_actor_id == run.requested_by_actor_id,
                     assistant_runs.c.status == expected_status,
                 )
                 .values(
@@ -645,14 +673,17 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
         self,
         session_factory: SessionFactory,
         service_repository_factory: ServiceRepositoryFactory,
+        usage_repository_factory: UsageRepositoryFactory | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._service_repository_factory = service_repository_factory
+        self._usage_repository_factory = usage_repository_factory
         self._state: ContextVar[
             tuple[
                 Session,
                 SqlAlchemyAssistantRepository,
                 ServiceRepository,
+                UsageRepository | None,
                 SqlAlchemyAuditWriter,
                 SqlAlchemyOutboxWriter,
             ]
@@ -668,6 +699,11 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
                 session,
                 SqlAlchemyAssistantRepository(session),
                 self._service_repository_factory(session),
+                (
+                    self._usage_repository_factory(session)
+                    if self._usage_repository_factory is not None
+                    else None
+                ),
                 SqlAlchemyAuditWriter(session),
                 SqlAlchemyOutboxWriter(session),
             )
@@ -698,12 +734,21 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
         return self._require_state()[2]
 
     @property
+    def usage(self) -> UsageRepository:
+        """向服务调用用例暴露同事务用量端口，普通助手测试可不装配该能力。"""
+
+        repository = self._require_state()[3]
+        if repository is None:
+            raise RuntimeError("Assistant Unit of Work 未装配用量 Repository")
+        return repository
+
+    @property
     def audit(self) -> SqlAlchemyAuditWriter:
-        return self._require_state()[3]
+        return self._require_state()[4]
 
     @property
     def outbox(self) -> SqlAlchemyOutboxWriter:
-        return self._require_state()[4]
+        return self._require_state()[5]
 
     def commit(self) -> None:
         self._require_state()[0].commit()
@@ -714,6 +759,7 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
         Session,
         SqlAlchemyAssistantRepository,
         ServiceRepository,
+        UsageRepository | None,
         SqlAlchemyAuditWriter,
         SqlAlchemyOutboxWriter,
     ]:
@@ -740,6 +786,7 @@ def _conversation(row: Row[Any]) -> Conversation:
         row.conversation_id,
         row.workspace_id,
         row.created_by_account_id,
+        row.conversation_kind,
         row.title,
         row.status,
         row.created_at,
@@ -761,6 +808,7 @@ def _run(row: Row[Any]) -> AssistantRun:
         row.agent_release_id,
         row.runtime_config_version_id,
         row.requested_by_account_id,
+        row.requested_by_actor_id,
         row.status,
         row.idempotency_key,
         row.request_hash,

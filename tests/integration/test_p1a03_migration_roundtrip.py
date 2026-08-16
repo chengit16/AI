@@ -277,6 +277,90 @@ def seed_runtime_isolation_runs(connection: Connection, schema: str) -> None:
     connection.commit()
 
 
+def seed_service_invocation_upgrade_facts(connection: Connection, schema: str) -> None:
+    """在 0049 结构中建立既有系统角色和当前菜单发布，验证 P3-10 非空升级。"""
+
+    workspace_id = UUID("20000000-0000-4000-8000-000000000307")
+    account_id = UUID("10000000-0000-4000-8000-000000000307")
+    snapshot = {
+        "schema_version": 1,
+        "registry_version": 18,
+        "workspace_id": str(workspace_id),
+        "menu_version": 1,
+        "menus": [
+            {
+                "menu_id": "82000000-0000-4000-8000-000000000167",
+                "menu_key": "navigation.workspace.assistant",
+                "parent_menu_id": "82000000-0000-4000-8000-000000000001",
+                "name": "知识问答",
+                "menu_type": "page",
+                "page_resource_id": "80000000-0000-4000-8000-000000000007",
+                "permission_code": "assistant.page.access",
+                "icon_key": "message-circle",
+                "sort_order": 300,
+                "source": "system",
+                "status": "active",
+                "visible": True,
+            }
+        ],
+        "role_menus": [],
+        "menu_api_bindings": [],
+    }
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".roles (
+              role_id, workspace_id, role_key, name, status, system_managed,
+              created_at, updated_at, version
+            ) VALUES (
+              '70000000-0000-4000-8000-000000000310', :workspace_id,
+              'workspace_owner', '空间所有者', 'active', true,
+              '2026-08-16T00:05:00Z', '2026-08-16T00:05:00Z', 1
+            )
+            """
+        ),
+        {"workspace_id": workspace_id},
+    )
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".menu_releases (
+              release_id, workspace_id, release_number, release_kind, source_release_id,
+              status, snapshot, snapshot_digest, validation_errors, rejection_reason,
+              created_by_account_id, decided_by_account_id, created_at, validated_at,
+              decided_at, published_at, version
+            ) VALUES (
+              '90000000-0000-4000-8000-000000000310', :workspace_id, 1,
+              'standard', NULL, 'published', CAST(:snapshot AS jsonb), :digest,
+              ARRAY[]::varchar[], NULL, :account_id, :account_id,
+              '2026-08-16T00:05:00Z', '2026-08-16T00:05:00Z',
+              '2026-08-16T00:05:00Z', '2026-08-16T00:05:00Z', 1
+            )
+            """
+        ),
+        {
+            "workspace_id": workspace_id,
+            "account_id": account_id,
+            "snapshot": json.dumps(snapshot, ensure_ascii=False),
+            "digest": "9" * 64,
+        },
+    )
+    connection.execute(
+        text(
+            f"""
+            INSERT INTO "{schema}".workspace_menu_publications (
+              workspace_id, current_release_id, published_at
+            ) VALUES (
+              :workspace_id, '90000000-0000-4000-8000-000000000310',
+              '2026-08-16T00:05:00Z'
+            )
+            """
+        ),
+        {"workspace_id": workspace_id},
+    )
+    connection.commit()
+
+
 def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     migration_database: tuple[Config, Connection, str],
 ) -> None:
@@ -286,7 +370,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260816_0049"
+    assert current_revision(connection, schema) == "20260816_0050"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -404,7 +488,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260816_0049"
+    assert current_revision(connection, schema) == "20260816_0050"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -504,6 +588,116 @@ def test_runtime_binding_upgrade_backfills_only_proven_history_and_blocks_downgr
         command.downgrade(config, "20260816_0047")
     connection.rollback()
     assert current_revision(connection, schema) == "20260816_0049"
+
+
+def test_service_invocation_upgrade_preserves_history_and_rejects_unsafe_downgrade(
+    migration_database: tuple[Config, Connection, str],
+) -> None:
+    """0050 回填账号 Actor、复制菜单授权，并拒绝丢失隐藏调用身份的降级。"""
+
+    # 长函数保留原因: 同一临时 Schema 必须连续证明非空升级、数据库约束和安全降级边界。
+    config, connection, schema = migration_database
+    command.upgrade(config, "20260816_0046")
+    connection.commit()
+    seed_existing_system_agent_publication(connection, schema)
+    command.upgrade(config, "20260816_0047")
+    connection.commit()
+    seed_runtime_isolation_runs(connection, schema)
+    command.upgrade(config, "20260816_0049")
+    connection.commit()
+    seed_service_invocation_upgrade_facts(connection, schema)
+
+    # 1. 历史事实保持私有会话语义，Run Actor 精确回填为原请求账号。
+    command.upgrade(config, "20260816_0050")
+    connection.commit()
+    history = connection.execute(
+        text(
+            f"""
+            SELECT run.run_id, run.requested_by_account_id, run.requested_by_actor_id,
+                   conversation.conversation_kind
+              FROM "{schema}".assistant_runs AS run
+              JOIN "{schema}".conversations AS conversation
+                ON conversation.conversation_id = run.conversation_id
+             ORDER BY run.run_id
+            """
+        )
+    ).mappings()
+    assert len(history.all()) == 2
+    actor_preserved = connection.execute(
+        text(
+            f"""
+            SELECT requested_by_account_id = requested_by_actor_id AS actor_preserved
+              FROM "{schema}".assistant_runs
+            """
+        )
+    ).scalars()
+    assert all(actor_preserved)
+    assert (
+        connection.scalar(
+            text(
+                f'SELECT count(*) FROM "{schema}".conversations '
+                "WHERE conversation_kind = 'private'"
+            )
+        )
+        == 2
+    )
+
+    # 2. 既有 Owner 获得服务读取权限，当前菜单复制到注册表 19 且新增三个调用动作。
+    permission_count = connection.scalar(
+        text(
+            f"""
+            SELECT count(*) FROM "{schema}".role_permission_grants
+             WHERE permission_code = 'service.definition.read'
+            """
+        )
+    )
+    current_snapshot = connection.scalar(
+        text(
+            f"""
+            SELECT releases.snapshot
+              FROM "{schema}".workspace_menu_publications AS publications
+              JOIN "{schema}".menu_releases AS releases
+                ON releases.release_id = publications.current_release_id
+            """
+        )
+    )
+    assert permission_count == 1
+    assert current_snapshot["registry_version"] == 19
+    assert {item["menu_id"] for item in current_snapshot["menus"]}.issuperset(
+        {
+            "82000000-0000-4000-8000-000000000198",
+            "82000000-0000-4000-8000-000000000199",
+            "82000000-0000-4000-8000-000000000200",
+        }
+    )
+    assert len(current_snapshot["menu_api_bindings"]) == 3
+
+    # 3. 数据库拒绝 Run Actor 改绑；出现隐藏服务会话后 Migration 不允许破坏性降级。
+    with pytest.raises(DBAPIError):
+        connection.execute(
+            text(
+                f"""
+                UPDATE "{schema}".assistant_runs
+                   SET requested_by_actor_id = '10000000-0000-4000-8000-000000000999'
+                 WHERE run_id = '80000000-0000-4000-8000-000000000308'
+                """
+            )
+        )
+    connection.rollback()
+    connection.execute(
+        text(
+            f"""
+            UPDATE "{schema}".conversations
+               SET conversation_kind = 'service_invocation'
+             WHERE conversation_id = '60000000-0000-4000-8000-000000000308'
+            """
+        )
+    )
+    connection.commit()
+    with pytest.raises(RuntimeError, match="拒绝降级"):
+        command.downgrade(config, "20260816_0049")
+    connection.rollback()
+    assert current_revision(connection, schema) == "20260816_0050"
 
 
 def test_existing_system_publication_is_backfilled_as_current_service_route(

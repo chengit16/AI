@@ -79,7 +79,7 @@ def _maintenance(harness: index_support.IndexHarness) -> IndexMaintenanceProcess
     )
 
 
-def test_owner_receives_workbench_permissions_and_registry_18_menu_snapshot(
+def test_owner_keeps_workbench_permissions_after_registry_19_menu_upgrade(
     operations_database: operations_support.OperationsHarness,
 ) -> None:
     workspace_id = operations_database.historical_workspace_id
@@ -114,7 +114,7 @@ def test_owner_receives_workbench_permissions_and_registry_18_menu_snapshot(
         )
 
     assert owner_permissions == WORKBENCH_PERMISSIONS
-    assert isinstance(snapshot, dict) and snapshot["registry_version"] == 18
+    assert isinstance(snapshot, dict) and snapshot["registry_version"] == 19
     assert {item["menu_id"] for item in snapshot["menus"]}.issuperset(
         {
             "82000000-0000-4000-8000-000000000194",

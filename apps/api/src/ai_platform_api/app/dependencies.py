@@ -152,6 +152,11 @@ from ai_platform_api.modules.retrieval.infrastructure.reranking import (
     DeterministicLexicalReranker,
 )
 from ai_platform_api.modules.retrieval.infrastructure.sqlalchemy import SqlAlchemySearchIndex
+from ai_platform_api.modules.service_delivery.application.service import ServiceInvocationService
+from ai_platform_api.modules.service_delivery.domain.models import InvocationRateLimiter
+from ai_platform_api.modules.service_delivery.infrastructure.valkey import (
+    ValkeyInvocationRateLimiter,
+)
 from ai_platform_api.modules.service_governance.infrastructure.sqlalchemy import (
     SqlAlchemyServiceRepository,
 )
@@ -224,6 +229,8 @@ class ApplicationContainer:
     model_runtime: RuntimeModelGatewayService | None = None
     assistant_conversations: AssistantConversationService | None = None
     assistant_run_executor: AssistantRunExecutor | None = None
+    service_invocations: ServiceInvocationService | None = None
+    invocation_rate_limiter: InvocationRateLimiter | None = None
     runtime_releases: RuntimeReleaseLoader | None = None
     assistant_sources: AssistantSourceService | None = None
     streaming: TransactionalStreamService | None = None
@@ -244,25 +251,29 @@ class ApplicationContainer:
     def close(self) -> None:
         try:
             try:
-                if self.runtime_releases is not None:
-                    self.runtime_releases.close()
+                if self.invocation_rate_limiter is not None:
+                    self.invocation_rate_limiter.close()
             finally:
                 try:
-                    if self.streaming is not None:
-                        self.streaming.close()
+                    if self.runtime_releases is not None:
+                        self.runtime_releases.close()
                 finally:
                     try:
-                        if self.policy_version_gate is not None:
-                            self.policy_version_gate.close()
+                        if self.streaming is not None:
+                            self.streaming.close()
                     finally:
                         try:
-                            if self.lifecycle_cache is not None:
-                                self.lifecycle_cache.close()
+                            if self.policy_version_gate is not None:
+                                self.policy_version_gate.close()
                         finally:
                             try:
-                                self.role_cache.close()
+                                if self.lifecycle_cache is not None:
+                                    self.lifecycle_cache.close()
                             finally:
-                                self.sessions.close()
+                                try:
+                                    self.role_cache.close()
+                                finally:
+                                    self.sessions.close()
         finally:
             self.database.close()
 
@@ -359,10 +370,25 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             timeout_seconds=settings.runtime_cache_timeout_seconds,
         ),
     )
+    assistant_unit_of_work = SqlAlchemyAssistantUnitOfWork(
+        database.sessions,
+        SqlAlchemyServiceRepository,
+        SqlAlchemyEntitlementRepository,
+    )
     assistant_conversations = AssistantConversationService(
-        SqlAlchemyAssistantUnitOfWork(database.sessions, SqlAlchemyServiceRepository),
+        assistant_unit_of_work,
         runtime_bootstrap=runtime_bootstrap,
         current_route_invalidator=runtime_releases,
+    )
+    invocation_rate_limiter = ValkeyInvocationRateLimiter(
+        settings.valkey_url,
+        limit_per_minute=settings.service_invocation_rate_limit_per_minute,
+        timeout_seconds=settings.service_invocation_rate_limit_timeout_seconds,
+    )
+    service_invocations = ServiceInvocationService(
+        assistant_unit_of_work,
+        runtime_releases,
+        invocation_rate_limiter,
     )
     workflows = WorkflowDefinitionService(SqlAlchemyWorkflowUnitOfWork(database.sessions))
     approval_policies = ApprovalPolicyService(SqlAlchemyApprovalPolicyUnitOfWork(database.sessions))
@@ -464,6 +490,8 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             model_runtime=model_runtime,
             assistant_conversations=assistant_conversations,
             assistant_run_executor=assistant_run_executor,
+            service_invocations=service_invocations,
+            invocation_rate_limiter=invocation_rate_limiter,
             runtime_releases=runtime_releases,
             assistant_sources=AssistantSourceService(
                 assistant_conversations,
@@ -534,17 +562,20 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         )
     except Exception:
         try:
-            runtime_releases.close()
+            invocation_rate_limiter.close()
         finally:
             try:
-                streaming.close()
+                runtime_releases.close()
             finally:
                 try:
-                    policy_version_gate.close()
+                    streaming.close()
                 finally:
                     try:
-                        role_cache.close()
+                        policy_version_gate.close()
                     finally:
-                        sessions.close()
-                        database.close()
+                        try:
+                            role_cache.close()
+                        finally:
+                            sessions.close()
+                            database.close()
         raise

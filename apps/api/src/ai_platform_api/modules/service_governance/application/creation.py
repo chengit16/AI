@@ -34,6 +34,7 @@ from ai_platform_api.modules.service_governance.domain.models import (
     ServiceGovernanceUnitOfWork,
     ServiceRoute,
     ServiceRoutePublication,
+    ServiceType,
     ServiceWriteConflictError,
 )
 
@@ -44,6 +45,7 @@ def create_service(
     *,
     name: str,
     release_id: UUID,
+    service_type: ServiceType,
     visibility: str,
     allowed_department_ids: tuple[UUID, ...],
     allowed_account_ids: tuple[UUID, ...],
@@ -55,6 +57,8 @@ def create_service(
     account_id = browser_account(context)
     require_create_scope(context)
     normalized_name = normalize_name(name)
+    if service_type not in {"custom_knowledge_agent", "scenario_application", "open_api"}:
+        raise ServiceValidationError
     normalized_policy = normalize_policy_subjects(
         visibility,
         allowed_department_ids,
@@ -66,6 +70,7 @@ def create_service(
             "operation": CREATE_SERVICE_OPERATION,
             "name": normalized_name,
             "release_id": str(release_id),
+            "service_type": service_type,
             "visibility": normalized_policy[0],
             "allowed_department_ids": [str(value) for value in normalized_policy[1]],
             "allowed_account_ids": [str(value) for value in normalized_policy[2]],
@@ -107,6 +112,7 @@ def create_service(
                 agent_id=release.agent_id,
                 release_id=release.release_id,
                 name=normalized_name,
+                service_type=service_type,
                 visibility=normalized_policy[0],
                 department_ids=normalized_policy[1],
                 account_ids=normalized_policy[2],
@@ -159,6 +165,7 @@ def _new_custom_deployment(
     agent_id: UUID,
     release_id: UUID,
     name: str,
+    service_type: ServiceType,
     visibility: str,
     department_ids: tuple[UUID, ...],
     account_ids: tuple[UUID, ...],
@@ -191,9 +198,9 @@ def _new_custom_deployment(
         service_id=service_id,
         workspace_id=context.workspace_id,
         agent_id=agent_id,
-        service_key=f"custom-{service_id.hex}",
+        service_key=f"{service_type.replace('_', '-')}-{service_id.hex}",
         name=name,
-        service_type="custom_knowledge_agent",
+        service_type=service_type,
         status="active",
         access_policy_version_id=policy_id,
         created_by_account_id=account_id,

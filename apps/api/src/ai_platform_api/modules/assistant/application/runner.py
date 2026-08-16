@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -109,8 +109,9 @@ class AssistantRunExecutor:
             )
             stream_started = True
             self._append_status(run.run_id, run.trace_id, run.traceparent, "retrieval", "running")
-            plan = self._retrieval_planning.retrieve(context, run.run_id)
-            evidence = self._retrieval_evidence.prepare(context, run.run_id)
+            retrieval_context = _retrieval_execution_context(context, run)
+            plan = self._retrieval_planning.retrieve(retrieval_context, run.run_id)
+            evidence = self._retrieval_evidence.prepare(retrieval_context, run.run_id)
             self._append_status(
                 run.run_id,
                 run.trace_id,
@@ -361,3 +362,37 @@ def _final_payload(
 
 def _stable_error_code(error: Exception) -> str:
     return error.error_code if isinstance(error, PlatformError) else "INTERNAL_ERROR"
+
+
+def _retrieval_execution_context(
+    request_context: RequestContext,
+    run: AssistantRun,
+) -> RequestContext:
+    """在已认领服务 Run 内恢复账号数据权限，避免 API Key Scope 被误当作文档权限。"""
+
+    if request_context.authentication_method != "open_api_key":
+        return request_context
+    if (
+        request_context.user_id is None
+        or run.requested_by_actor_id != request_context.actor_id
+        or run.requested_by_account_id != request_context.user_id
+        or run.service_id is None
+    ):
+        raise AgentRuntimeReleaseRequiredError
+    # 服务授权已由入口和冻结 Route 证明；内部检索仍重新执行账号 RBAC/ABAC，且不携带
+    # API Key 的服务级 Scope，防止它错误拒绝知识权限或被误用于扩大账号权限。
+    return replace(
+        request_context,
+        actor_id=request_context.user_id,
+        authentication_method="browser_session",
+        credential_scopes=None,
+        authorized_permission_code=None,
+        authorized_policy_decision_id=None,
+        authorized_policy_version=None,
+        authorized_workspace=False,
+        authorized_department_ids=frozenset(),
+        authorized_account_ids=frozenset(),
+        authorized_resource_ids=frozenset(),
+        authorized_field_mask=frozenset(),
+        authorized_maximum_security_level="PUBLIC",
+    )

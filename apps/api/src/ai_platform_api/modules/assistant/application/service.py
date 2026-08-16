@@ -23,7 +23,6 @@ from ai_platform_api.modules.assistant.application.errors import (
     AssistantValidationError,
 )
 from ai_platform_api.modules.assistant.domain.models import (
-    AgentRelease,
     AssistantRun,
     AssistantUnitOfWork,
     AssistantWriteConflictError,
@@ -111,6 +110,7 @@ class AssistantConversationService:
                 conversation_id=uuid4(),
                 workspace_id=context.workspace_id,
                 created_by_account_id=account_id,
+                conversation_kind="private",
                 title=normalized_title,
                 status="active",
                 created_at=now,
@@ -228,8 +228,8 @@ class AssistantConversationService:
 
         # 1. 先验证稳定输入并计算请求摘要，重试可以在任何会话状态检查之前返回原结果。
         account_id = _browser_account(context)
-        normalized_texts = _normalize_texts(texts)
-        _require_idempotency_key(idempotency_key)
+        normalized_texts = normalize_texts(texts)
+        require_idempotency_key(idempotency_key)
         request_hash = _request_hash(conversation_id, normalized_texts)
         now = datetime.now(UTC)
         try:
@@ -277,21 +277,23 @@ class AssistantConversationService:
                 )
 
                 # 3. 用户消息、不可变 Part、排队 Run、审计和 Outbox 同事务提交。
-                submission = _new_submission(
+                submission = new_submission(
                     context=context,
                     account_id=account_id,
+                    actor_id=context.actor_id,
                     conversation_id=conversation_id,
                     texts=normalized_texts,
                     idempotency_key=idempotency_key,
                     request_hash=request_hash,
-                    release=release,
+                    agent_release_id=release.release_id,
+                    runtime_config_version_id=release.runtime_config_version_id,
                     service_id=route_sync.deployment.service.service_id,
                     service_route_id=route_sync.deployment.route.route_id,
                     service_route_version=route_sync.deployment.route.route_version,
                     now=now,
                 )
                 unit_of_work.assistant.add_submission(submission)
-                _record_run_queued(unit_of_work, context, submission, now)
+                record_run_queued(unit_of_work, context, submission, now)
                 unit_of_work.commit()
             self._invalidate_synced_route(context, route_sync)
             return submission
@@ -482,13 +484,13 @@ class AssistantConversationService:
             raise AssistantFeedbackConflictError from error
 
     def claim_run(self, context: RequestContext, *, run_id: UUID) -> AssistantRun | None:
-        """仅把当前账号的 queued Run 认领一次；重复后台任务直接退出。"""
+        """仅把当前 Actor 的 queued Run 认领一次；重复后台任务直接退出。"""
 
-        account_id = _browser_account(context)
+        account_id, actor_id = _request_principal(context)
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
             _require_active_member(unit_of_work, context.workspace_id, account_id)
-            run = _owned_run(unit_of_work, context, run_id, account_id, for_update=True)
+            run = _owned_run(unit_of_work, context, run_id, actor_id, for_update=True)
             if run.status != "queued":
                 return None
             # 历史排队记录可能尚无助手消息；新请求已在提交事务中创建占位消息。
@@ -514,10 +516,10 @@ class AssistantConversationService:
         normalized_text = text.strip()
         if not normalized_text or len(normalized_text) > 200_000:
             raise AssistantValidationError
-        account_id = _browser_account(context)
+        account_id, actor_id = _request_principal(context)
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
-            run = _owned_run(unit_of_work, context, run_id, account_id, for_update=True)
+            run = _owned_run(unit_of_work, context, run_id, actor_id, for_update=True)
             if run.status != "running" or run.assistant_message_id is None:
                 raise AssistantConversationBusyError
             message = _finished_assistant_message(
@@ -553,10 +555,10 @@ class AssistantConversationService:
 
         if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", error_code):
             raise AssistantValidationError
-        account_id = _browser_account(context)
+        account_id, actor_id = _request_principal(context)
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
-            run = _owned_run(unit_of_work, context, run_id, account_id, for_update=True)
+            run = _owned_run(unit_of_work, context, run_id, actor_id, for_update=True)
             if run.status != "running" or run.assistant_message_id is None:
                 raise AssistantConversationBusyError
             message = _finished_assistant_message(run, account_id, "", now, "failed")
@@ -584,6 +586,19 @@ def _browser_account(context: RequestContext) -> UUID:
     ):
         raise AssistantDeniedError
     return context.user_id
+
+
+def _request_principal(context: RequestContext) -> tuple[UUID, UUID]:
+    """恢复运行所需的人类账号和独立 Actor，拒绝未知认证方式。"""
+
+    if context.user_id is None or context.authentication_method not in {
+        "browser_session",
+        "open_api_key",
+    }:
+        raise AssistantDeniedError
+    if context.authentication_method == "browser_session" and context.user_id != context.actor_id:
+        raise AssistantDeniedError
+    return context.user_id, context.actor_id
 
 
 def _require_active_member(
@@ -677,7 +692,9 @@ def _normalize_title(title: str | None) -> str | None:
     return normalized
 
 
-def _normalize_texts(texts: tuple[str, ...]) -> tuple[str, ...]:
+def normalize_texts(texts: tuple[str, ...]) -> tuple[str, ...]:
+    """规范消息文本并统一执行 Part 数量、单项长度和总长度边界。"""
+
     normalized = tuple(text.strip() for text in texts)
     if not normalized or len(normalized) > 16:
         raise AssistantValidationError
@@ -693,7 +710,9 @@ def _require_limit(limit: int) -> None:
         raise AssistantValidationError
 
 
-def _require_idempotency_key(idempotency_key: str) -> None:
+def require_idempotency_key(idempotency_key: str) -> None:
+    """校验助手与服务出口共享的幂等键格式，拒绝不可稳定持久化的键。"""
+
     if IDEMPOTENCY_PATTERN.fullmatch(idempotency_key) is None:
         raise AssistantValidationError
 
@@ -729,20 +748,24 @@ def _request_hash(conversation_id: UUID, texts: tuple[str, ...]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _new_submission(
+def new_submission(
     *,
     context: RequestContext,
     account_id: UUID,
+    actor_id: UUID,
     conversation_id: UUID,
     texts: tuple[str, ...],
     idempotency_key: str,
     request_hash: str,
-    release: AgentRelease,
+    agent_release_id: UUID,
+    runtime_config_version_id: UUID,
     service_id: UUID,
     service_route_id: UUID,
     service_route_version: int,
     now: datetime,
 ) -> MessageSubmission:
+    """构造冻结服务路由与发布版本的排队 Run；持久化和提交由调用方负责。"""
+
     message_id = uuid4()
     assistant_message_id = uuid4()
     message = Message(
@@ -769,9 +792,10 @@ def _new_submission(
         service_id=service_id,
         service_route_id=service_route_id,
         service_route_version=service_route_version,
-        agent_release_id=release.release_id,
-        runtime_config_version_id=release.runtime_config_version_id,
+        agent_release_id=agent_release_id,
+        runtime_config_version_id=runtime_config_version_id,
         requested_by_account_id=account_id,
+        requested_by_actor_id=actor_id,
         status="queued",
         idempotency_key=idempotency_key,
         request_hash=request_hash,
@@ -894,12 +918,14 @@ def _record_conversation_event(
     )
 
 
-def _record_run_queued(
+def record_run_queued(
     unit_of_work: AssistantUnitOfWork,
     context: RequestContext,
     submission: MessageSubmission,
     occurred_at: datetime,
 ) -> None:
+    """追加不含消息正文的排队审计与 Outbox，并由调用方纳入同一事务提交。"""
+
     run = submission.run
     unit_of_work.audit.add(
         AuditRecord(

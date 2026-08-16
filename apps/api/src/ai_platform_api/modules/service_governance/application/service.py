@@ -29,6 +29,7 @@ from ai_platform_api.modules.service_governance.domain.models import (
     ServiceDeployment,
     ServiceGovernanceUnitOfWork,
     ServiceStatus,
+    ServiceType,
 )
 
 __all__ = [
@@ -59,6 +60,7 @@ class ServiceGovernanceService:
         *,
         name: str,
         release_id: UUID,
+        service_type: ServiceType = "custom_knowledge_agent",
         visibility: str,
         allowed_department_ids: tuple[UUID, ...] = (),
         allowed_account_ids: tuple[UUID, ...] = (),
@@ -71,6 +73,7 @@ class ServiceGovernanceService:
             context,
             name=name,
             release_id=release_id,
+            service_type=service_type,
             visibility=visibility,
             allowed_department_ids=allowed_department_ids,
             allowed_account_ids=allowed_account_ids,

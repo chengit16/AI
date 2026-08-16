@@ -35,6 +35,11 @@ from ai_platform_api.modules.identity.domain.models import (
     SessionStore,
 )
 
+GENERIC_API_SCOPE_PATTERN = re.compile(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}")
+SERVICE_API_SCOPE_PATTERN = re.compile(r"service\.definition\.read\.[0-9a-f]{32}")
+RESOURCE_SCOPE_SUFFIX_PATTERN = re.compile(r"[0-9A-Fa-f]{32}")
+SERVICE_API_SCOPE_PREFIX = "service.definition.read."
+
 
 class AuthenticationService:
     """隐藏多种凭证协议，并只产出服务端重建的可信 RequestContext。"""
@@ -261,10 +266,7 @@ class ApiKeyService:
             not normalized_name
             or len(normalized_name) > 255
             or not normalized_scopes
-            or any(
-                re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}", scope) is None
-                for scope in normalized_scopes
-            )
+            or any(not _valid_api_scope(scope) for scope in normalized_scopes)
             or (expires_at is not None and expires_at <= now)
         ):
             raise ApiKeyConfigurationError
@@ -316,3 +318,16 @@ class ApiKeyService:
         access = self._repository.get_workspace_access(account_id, workspace_id)
         if access is None or not access.active:
             raise WorkspaceContextDeniedError
+
+
+def _valid_api_scope(scope: str) -> bool:
+    """兼容权限级 Scope，并允许 Open API Key 只授权到单个已发布服务。"""
+
+    # 服务级 Scope 采用固定前缀和 UUID hex，不能降级到宽松的通用权限格式。
+    if scope.startswith(SERVICE_API_SCOPE_PREFIX):
+        return SERVICE_API_SCOPE_PATTERN.fullmatch(scope) is not None
+    # 当前只开放服务资源级 Scope，其他权限码携带资源后缀时必须失败关闭。
+    suffix = scope.rsplit(".", maxsplit=1)[-1]
+    if RESOURCE_SCOPE_SUFFIX_PATTERN.fullmatch(suffix) is not None:
+        return False
+    return GENERIC_API_SCOPE_PATTERN.fullmatch(scope) is not None

@@ -662,6 +662,10 @@ class InviteWorkspaceMemberRequest(typing.TypedDict):
     login_name: str
 
 
+class InvokePublishedServiceRequest(typing.TypedDict):
+    parts: list[CreateMessagePartRequest]
+
+
 class KnowledgeBaseListResponse(typing.TypedDict):
     items: list[KnowledgeBaseSummaryResponse]
 
@@ -1041,6 +1045,13 @@ class PreviewApprovalChainRequest(typing.TypedDict):
 
 class PublishWorkflowRequest(typing.TypedDict):
     expected_revision: int
+
+
+class PublishedServiceInvocationResponse(typing.TypedDict):
+    event_stream_path: str
+    input_message: MessageResponse
+    output_message: MessageResponse | None
+    run: AssistantRunResponse
 
 
 class QuotaResponse(typing.TypedDict):

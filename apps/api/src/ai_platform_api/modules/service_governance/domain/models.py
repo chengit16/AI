@@ -166,6 +166,13 @@ class ServiceRepository(Protocol):
         account_ids: tuple[UUID, ...],
     ) -> bool: ...
 
+    def account_can_invoke(
+        self,
+        workspace_id: UUID,
+        service_id: UUID,
+        account_id: UUID,
+    ) -> bool: ...
+
     def get_service(
         self,
         workspace_id: UUID,

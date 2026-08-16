@@ -206,14 +206,16 @@ def test_p301_reserves_menu_and_api_identifiers_without_activating_registry() ->
         "workspace.agent_operations",
     }
 
-    # P3-01 只冻结后续标识，尚未实现的权限和接口不能提前进入活动资源注册表。
+    # P3-10 只激活服务调用所需的读取权限和调用操作，其余控制台标识继续保持预留。
     active_registry = load_object(
         ROOT / "contracts" / "authorization" / "resource-registry.v1.json"
     )
-    assert permission_set.isdisjoint(item["code"] for item in active_registry["permissions"])
-    assert {item["operation_id"] for item in operations}.isdisjoint(
-        item["operation_id"] for item in active_registry["api_resources"]
-    )
+    active_permissions = {item["code"] for item in active_registry["permissions"]}
+    active_operations = {item["operation_id"] for item in active_registry["api_resources"]}
+    assert permission_set & active_permissions == {"service.definition.read"}
+    assert {item["operation_id"] for item in operations} & active_operations == {
+        "invokePublishedService"
+    }
 
 
 def test_p301_personal_and_enterprise_approval_modes_are_explicit() -> None:

@@ -2,7 +2,7 @@
 
 import json
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Annotated
@@ -256,13 +256,17 @@ def stream_run_events(
         conversation_id=conversation_id,
         run_id=run_id,
     )
-    initial_replay = _initial_replay(streams, workspace_id, run, last_event_id)
+    initial_replay = initial_stream_replay(streams, workspace_id, run, last_event_id)
     return StreamingResponse(
-        _stream_frames(
-            conversations,
+        stream_run_frames(
             streams,
             context,
             run,
+            lambda: conversations.get_run_for_stream(
+                context,
+                conversation_id=run.conversation_id,
+                run_id=run.run_id,
+            ),
             last_event_id,
             initial_replay,
             heartbeat_seconds=settings.stream_heartbeat_seconds,
@@ -498,7 +502,7 @@ def _require_workspace_path(context: RequestContext, workspace_id: UUID) -> None
         raise AssistantDeniedError
 
 
-def _initial_replay(
+def initial_stream_replay(
     streams: TransactionalStreamService,
     workspace_id: UUID,
     run: AssistantRun,
@@ -557,11 +561,11 @@ def _close_cancelled_stream(
         pass
 
 
-def _stream_frames(
-    conversations: AssistantConversationService,
+def stream_run_frames(
     streams: TransactionalStreamService,
     context: RequestContext,
     run: AssistantRun,
+    current_run: Callable[[], AssistantRun],
     last_event_id: UUID | None,
     initial_replay: StreamReplay | None,
     *,
@@ -596,11 +600,7 @@ def _stream_frames(
                         ).observe(max(0, time.monotonic() - wakeup_started))
                         wakeup_started = None
                 except StreamRunNotFoundError:
-                    current = conversations.get_run_for_stream(
-                        context,
-                        conversation_id=run.conversation_id,
-                        run_id=run.run_id,
-                    )
+                    current = current_run()
                     if current.status not in {"queued", "running"}:
                         return
 

@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     runtime_current_cache_ttl_seconds: int = 300
     runtime_bound_cache_ttl_seconds: int = 24 * 60 * 60
     runtime_cache_timeout_seconds: float = 0.5
+    service_invocation_rate_limit_per_minute: int = 60
+    service_invocation_rate_limit_timeout_seconds: float = 0.5
     session_ttl_seconds: int = 43_200
     session_cookie_secure: bool = False
     local_mock_bootstrap_enabled: bool = False
@@ -102,6 +104,10 @@ class Settings(BaseSettings):
             raise ValueError("Runtime 精确绑定缓存租期必须位于 1 小时到 7 天之间")
         if not 0.05 <= self.runtime_cache_timeout_seconds <= 5:
             raise ValueError("Runtime 缓存超时必须位于 0.05 到 5 秒之间")
+        if not 1 <= self.service_invocation_rate_limit_per_minute <= 10_000:
+            raise ValueError("服务调用每分钟限制必须位于 1 到 10000 之间")
+        if not 0.05 <= self.service_invocation_rate_limit_timeout_seconds <= 5:
+            raise ValueError("服务调用限流超时必须位于 0.05 到 5 秒之间")
         if not 0.1 <= self.observability_otlp_timeout_seconds <= 10:
             raise ValueError("OTLP 导出超时必须位于 0.1 到 10 秒之间")
         if self.observability_otlp_endpoint is not None:

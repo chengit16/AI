@@ -36,7 +36,9 @@ from ai_platform_api.modules.service_governance.domain.models import (
 from ai_platform_api.persistence.tables import (
     agent_releases,
     agents,
+    department_closure,
     departments,
+    membership_departments,
     service_access_policy_versions,
     service_control_requests,
     service_route_publications,
@@ -133,6 +135,72 @@ class SqlAlchemyServiceRepository(ServiceRepository):
             if int(account_count or 0) != len(account_ids):
                 return False
         return True
+
+    def account_can_invoke(
+        self,
+        workspace_id: UUID,
+        service_id: UUID,
+        account_id: UUID,
+    ) -> bool:
+        """按活动成员和当前策略判断账号是否属于服务受众，部门范围包含其后代。"""
+
+        # 1. 同一查询快照取得活动成员和服务当前策略，避免撤权后沿用旧成员结论。
+        row = self._session.execute(
+            select(
+                workspace_memberships.c.membership_id,
+                service_access_policy_versions.c.visibility,
+                service_access_policy_versions.c.allowed_department_ids,
+                service_access_policy_versions.c.allowed_account_ids,
+            )
+            .select_from(workspace_memberships)
+            .join(
+                services,
+                services.c.workspace_id == workspace_memberships.c.workspace_id,
+            )
+            .join(
+                service_access_policy_versions,
+                (
+                    service_access_policy_versions.c.access_policy_version_id
+                    == services.c.access_policy_version_id
+                )
+                & (service_access_policy_versions.c.workspace_id == services.c.workspace_id),
+            )
+            .where(
+                workspace_memberships.c.workspace_id == workspace_id,
+                workspace_memberships.c.account_id == account_id,
+                workspace_memberships.c.status == "active",
+                services.c.service_id == service_id,
+                services.c.status == "active",
+            )
+        ).one_or_none()
+        if row is None:
+            return False
+        if row.visibility == "workspace" or account_id in row.allowed_account_ids:
+            return True
+        # 2. 限制部门按组织树根生效；成员属于任一后代部门即可进入服务受众。
+        if not row.allowed_department_ids:
+            return False
+        return bool(
+            self._session.scalar(
+                select(func.count())
+                .select_from(membership_departments)
+                .join(
+                    department_closure,
+                    (department_closure.c.workspace_id == membership_departments.c.workspace_id)
+                    & (
+                        department_closure.c.descendant_department_id
+                        == membership_departments.c.department_id
+                    ),
+                )
+                .where(
+                    membership_departments.c.workspace_id == workspace_id,
+                    membership_departments.c.membership_id == row.membership_id,
+                    department_closure.c.ancestor_department_id.in_(
+                        tuple(row.allowed_department_ids)
+                    ),
+                )
+            )
+        )
 
     def get_service(
         self,

@@ -77,6 +77,8 @@
     { "code": "AGENT_RUNTIME_RELEASE_REQUIRED", "http_status": 409, "message": "Agent Runtime 只能执行已发布且校验通过的不可变快照", "retryable": false },
     { "code": "SERVICE_ROUTE_CONFLICT", "http_status": 409, "message": "服务路由版本或当前指针已发生并发变化", "retryable": true },
     { "code": "SERVICE_ROUTE_UNAVAILABLE", "http_status": 503, "message": "服务当前没有可安全执行的发布路由", "retryable": true },
+    { "code": "SERVICE_RATE_LIMITED", "http_status": 429, "message": "服务调用频率超过当前窗口限制", "retryable": true },
+    { "code": "SERVICE_RATE_LIMIT_UNAVAILABLE", "http_status": 503, "message": "服务调用限流暂时不可用，操作已默认拒绝", "retryable": true },
     { "code": "WORKFLOW_GRAPH_INVALID", "http_status": 422, "message": "工作流图存在循环、悬空、不可达或无结果路径等结构问题", "retryable": false },
     { "code": "WORKFLOW_CONFLICT", "http_status": 409, "message": "工作流草稿修订、发布版本或运行状态不允许当前操作", "retryable": true },
     { "code": "WORKFLOW_NODE_CONFIG_INVALID", "http_status": 422, "message": "工作流节点配置不符合受限执行规则", "retryable": false },

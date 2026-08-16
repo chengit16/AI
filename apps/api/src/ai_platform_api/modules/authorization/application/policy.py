@@ -88,9 +88,9 @@ class RbacPolicyDecisionPoint:
         )
         if permission is None or permission.resource_type != request.resource.resource_type:
             return self._denied(request, "permission_not_registered")
-        if (
-            request.context.credential_scopes is not None
-            and request.permission_code not in request.context.credential_scopes
+        if not request.context.credential_allows(
+            request.permission_code,
+            request.resource.resource_id,
         ):
             return self._denied(request, "credential_scope_denied")
 

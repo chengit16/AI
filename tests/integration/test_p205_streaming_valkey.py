@@ -17,10 +17,7 @@ import pytest
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.modules.assistant.api import routes as assistant_routes
-from ai_platform_api.modules.assistant.application.service import (
-    AssistantConversationService,
-    AssistantRun,
-)
+from ai_platform_api.modules.assistant.application.service import AssistantRun
 from ai_platform_api.modules.streaming.application.service import TransactionalStreamService
 from ai_platform_api.modules.streaming.domain.errors import (
     ConversationBusyError,
@@ -196,11 +193,11 @@ def test_lost_notification_falls_back_to_bounded_postgres_polling(
         )
 
     writer = threading.Thread(target=append_after_connection, daemon=True)
-    frames = assistant_routes._stream_frames(
-        cast(AssistantConversationService, object()),
+    frames = assistant_routes.stream_run_frames(
         consumer,
         context,
         assistant_run,
+        lambda: assistant_run,
         None,
         initial,
         heartbeat_seconds=15,

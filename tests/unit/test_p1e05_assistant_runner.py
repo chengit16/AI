@@ -249,6 +249,7 @@ def test_executor_uses_frozen_configuration_and_duplicate_schedule_does_not_gene
         agent_release_id=uuid4(),
         runtime_config_version_id=CONFIG_ID,
         requested_by_account_id=ACCOUNT_ID,
+        requested_by_actor_id=ACCOUNT_ID,
         status="queued",
         idempotency_key="synthetic-idempotency",
         request_hash="a" * 64,

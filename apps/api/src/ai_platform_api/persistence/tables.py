@@ -3742,6 +3742,7 @@ conversations = Table(
     Column("conversation_id", UUID(as_uuid=True), primary_key=True),
     Column("workspace_id", UUID(as_uuid=True), nullable=False),
     Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("conversation_kind", String(32), nullable=False, server_default="private"),
     Column("title", String(200), nullable=True),
     Column("status", String(32), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
@@ -3764,6 +3765,10 @@ conversations = Table(
         name="fk_conversations_creator",
     ),
     CheckConstraint("status IN ('active', 'archived')", name="ck_conversations_status"),
+    CheckConstraint(
+        "conversation_kind IN ('private', 'service_invocation')",
+        name="ck_conversations_kind",
+    ),
     CheckConstraint("version >= 1", name="ck_conversations_version"),
     CheckConstraint(
         "title IS NULL OR char_length(btrim(title)) BETWEEN 1 AND 200",
@@ -3865,6 +3870,7 @@ assistant_runs = Table(
     Column("agent_release_id", UUID(as_uuid=True), nullable=False),
     Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
     Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_actor_id", UUID(as_uuid=True), nullable=False),
     Column("status", String(32), nullable=False),
     Column("idempotency_key", String(128), nullable=False),
     Column("request_hash", String(64), nullable=False),
@@ -3876,7 +3882,7 @@ assistant_runs = Table(
     Column("error_code", String(128), nullable=True),
     UniqueConstraint(
         "workspace_id",
-        "requested_by_account_id",
+        "requested_by_actor_id",
         "idempotency_key",
         name="uq_assistant_runs_idempotency",
     ),

@@ -11,10 +11,12 @@ from uuid import UUID
 from ai_platform_backend.integration.domain import AuditWriter
 
 from ai_platform_api.common.runtime import RuntimeConfigSnapshot
+from ai_platform_api.modules.identity.domain.entitlements import UsageRepository
 from ai_platform_api.modules.integration.domain.events import OutboxWriter
 from ai_platform_api.modules.service_governance.domain.models import ServiceRepository
 
 ConversationStatus = Literal["active", "archived"]
+ConversationKind = Literal["private", "service_invocation"]
 MessageRole = Literal["system", "user", "assistant", "tool"]
 MessageStatus = Literal["streaming", "completed", "failed"]
 AssistantRunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
@@ -62,6 +64,7 @@ class Conversation:
     conversation_id: UUID
     workspace_id: UUID
     created_by_account_id: UUID
+    conversation_kind: ConversationKind
     title: str | None
     status: ConversationStatus
     created_at: datetime
@@ -112,6 +115,7 @@ class AssistantRun:
     agent_release_id: UUID
     runtime_config_version_id: UUID
     requested_by_account_id: UUID
+    requested_by_actor_id: UUID
     status: AssistantRunStatus
     idempotency_key: str
     request_hash: str
@@ -207,8 +211,15 @@ class AssistantRepository(Protocol):
     def get_submission(
         self,
         workspace_id: UUID,
-        account_id: UUID,
+        actor_id: UUID,
         idempotency_key: str,
+    ) -> MessageSubmission | None: ...
+
+    def get_submission_by_run(
+        self,
+        workspace_id: UUID,
+        actor_id: UUID,
+        run_id: UUID,
     ) -> MessageSubmission | None: ...
 
     def get_run(
@@ -216,7 +227,7 @@ class AssistantRepository(Protocol):
         workspace_id: UUID,
         conversation_id: UUID | None,
         run_id: UUID,
-        account_id: UUID,
+        actor_id: UUID,
         *,
         for_update: bool = False,
     ) -> AssistantRun | None: ...
@@ -264,6 +275,9 @@ class AssistantUnitOfWork(Protocol):
 
     @property
     def services(self) -> ServiceRepository: ...
+
+    @property
+    def usage(self) -> UsageRepository: ...
 
     @property
     def audit(self) -> AuditWriter: ...

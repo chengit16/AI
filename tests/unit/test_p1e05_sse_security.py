@@ -14,10 +14,7 @@ from ai_platform_api.app.errors import ErrorCatalog
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.modules.assistant.api import routes as assistant_routes
-from ai_platform_api.modules.assistant.application.service import (
-    AssistantConversationService,
-    AssistantRun,
-)
+from ai_platform_api.modules.assistant.application.service import AssistantRun
 from ai_platform_api.modules.streaming.application.service import (
     StreamService,
     TransactionalStreamService,
@@ -164,11 +161,11 @@ def test_active_http_stream_emits_heartbeat_without_persisting_an_event(
     ticks = iter((0.0, 2.0))
     monkeypatch.setattr(time, "monotonic", lambda: next(ticks))
 
-    frames = assistant_routes._stream_frames(
-        cast(AssistantConversationService, object()),
+    frames = assistant_routes.stream_run_frames(
         cast(TransactionalStreamService, SimpleNamespace(subscribe=lambda _: None)),
         context,
         run,
+        lambda: run,
         None,
         StreamReplay((), active, False),
         heartbeat_seconds=1,

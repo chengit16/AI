@@ -35,6 +35,15 @@ class RequestContext:
     authorized_field_mask: frozenset[str] = frozenset()
     authorized_maximum_security_level: SecurityLevel = "PUBLIC"
 
+    def credential_allows(self, permission_code: str, resource_id: UUID) -> bool:
+        """判断凭证 Scope 是否覆盖权限或指定资源，浏览器身份不附加收窄。"""
+
+        if self.credential_scopes is None:
+            return True
+        return permission_code in self.credential_scopes or (
+            f"{permission_code}.{resource_id.hex}" in self.credential_scopes
+        )
+
     @property
     def audit_authorization(self) -> AuditAuthorization | None:
         """仅在权限码、决策标识和策略版本完整时生成可追溯授权事实。"""
