@@ -7,11 +7,11 @@
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-12` AgentRelease 运营视图 |
+| 当前节点 | `P3-13` 联合验收与阶段关闭 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离、灰度回滚、统一服务出口与控制台已通过 |
+| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离、灰度回滚、统一服务出口、控制台与运营监控已通过 |
 | 服务发布与回滚 | `passed`，自定义知识 Agent、场景应用和 Open API 三类出口已接入同一发布路由与安全门禁 |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -26,7 +26,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0051` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0052` |
 | 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实供应商或 AI 质量 |
 
@@ -175,14 +175,27 @@
 - 当前边界：本节点不建设 AgentRelease 质量、时延、错误和成本运营视图或异常自动阻断，该能力由 `P3-12` 实施；真实模型供应商、AI 质量、容量、LLM Grading、多模态图片问答、真实连接器、外部写工具、SaaS、Go、Channel Gateway 和 Durable Run 继续保持既定边界。
 - 提交：`a5e205b`。
 
+### P3-12 AgentRelease 运营监控与晋级门禁
+
+- 状态：已完成，提交 `6ca4c51`。
+- 运营读模型：新增独立 `agent_operations` 模块和只读 `GET /api/v1/workspaces/{workspace_id}/agent-release-operations`。PostgreSQL 在同一只读快照中按工作空间、Service、当前 Route、Release 和 1～168 小时窗口聚合 Run 终态、成功/失败、模型降级、P95 延迟、总成本、平均/最高单次成本、人工反馈与离线评估；成本只通过同一工作空间和 Trace 归属 Run，不返回 Prompt、消息正文、Run、Actor、Trace 或其他高基数主体标识。
+- 版本对比与样本语义：当前正式 Release 始终作为主版本；存在灰度时比较灰度 Release，否则比较上一 Route 的 Release。终态最少样本为 5，反馈最少样本为 3；无样本比例保持空值并显示“尚未测量”，不使用 0 冒充已测结果。AI 质量保持 `not_configured`，在线 LLM Grading 固定关闭，人工反馈不足不冒充质量已测。
+- 阈值与晋级：固定策略 `agent-operations-v1` 使用错误率不高于 10%、降级率不高于 20%、P95 不高于 10 秒、有帮助率不低于 70%、单次成本不超过 Release 冻结预算，以及相对主版本错误率最多回归 5 个百分点、降级率最多回归 10 个百分点、P95 和平均成本最多为 1.5 倍。样本不足、Route/主版本/候选身份漂移、任一阻断阈值异常或门禁实现缺失均失败关闭；晋级审计与 Outbox 只保存策略版本和 SHA-256 证据摘要。
+- 权限与菜单：Registry 21 新增 `agent.operations.read`、`AgentOperationsPage`、页面/动作菜单和查询 API 绑定，当前注册表共 104 项权限、139 个 API、125 个菜单和 132 个绑定。默认只向 `workspace_owner` 授权，企业空间可通过既有自定义角色显式授予；页面隐藏仍不构成安全边界。Revision `20260816_0052` 幂等回填个人/企业所有者、原子升级现有菜单发布快照并新增 `model_invocations(workspace_id, trace_id)` 聚合索引，存在新授权或升级快照时拒绝不安全降级。
+- 运营页面：React 19、TanStack Query、Ant Design 6 和 UnoCSS 新增 `/workspace/agent-operations`，服务和 24/48/168 小时窗口进入 URL；页面展示晋级结论、样本门槛、正式/灰度或上一版本同口径指标、结构化阈值告警、策略版本和可复制证据摘要。服务或报告查询失败后不保留旧 Route，宽表格只在局部容器滚动。
+- 自动验收：P3-12 单元、API 和 Registry 专项 `11/11`，真实 PostgreSQL 聚合 `1/1`，P2-10/P3-11/P3-12 联合回归 `5/5`；`./scripts/verify` 通过 React `53/53`、Python `658/658`、Ruff format/lint、mypy strict `605` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、Registry 21、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器与浏览器验收：最终工作树重建 API、Migration、Web、Tika 和 Worker 镜像，公共数据库真实升级至 Revision `20260816_0052`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker Lane 和 Scheduler 共 13 项全部通过。真实全合成 P3-11 个人空间可见运营菜单和历史版本对比；`1440×900` 的 document/body 均保持 1440px，`390×844` 的 document/body/main 均保持 390px，无页面级横向溢出；两张表以 750px 和 850px 内容宽度局部滚动，48 小时切换同步更新 URL 与报告窗口，浏览器控制台无错误。
+- 当前边界：真实模型供应商、真实 AI 质量、容量、LLM Grading、多模态图片问答、真实连接器、外部写工具、SaaS、Go、Channel Gateway 和 Durable Run 继续保持既定边界。运营指标和告警已经形成确定性闭环，但不能据此宣称真实模型质量或生产容量已通过。
+- 提交：`6ca4c51`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布供应链门禁继续阻断。
-- 阶段 3 尚未完成 AgentRelease 运营监控，不能把当前控制台描述为具备质量、延迟、错误和成本闭环的完整可运营平台。
+- AgentRelease 运营指标和确定性晋级门禁已完成，但真实模型供应商和 `ai_quality` 仍为 `not_configured`，不能宣称真实模型质量已通过。
 - LLM Grading、多模态图片问答、真实多源连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 均保持后置。
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理、`P3-08` Runtime 隔离路由、`P3-09` 灰度发布与回滚、`P3-10` 统一服务出口和 `P3-11` Agent 控制台已通过，当前进入 `P3-12` AgentRelease 运营视图；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理、`P3-08` Runtime 隔离路由、`P3-09` 灰度发布与回滚、`P3-10` 统一服务出口、`P3-11` Agent 控制台和 `P3-12` AgentRelease 运营监控已通过，当前进入 `P3-13` 联合验收与阶段关闭；在核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
