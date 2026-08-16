@@ -19,6 +19,11 @@ from ai_platform_api.modules.tool_execution.domain.errors import (
     ToolRunConflictError,
     ToolRunTerminalError,
 )
+from ai_platform_api.modules.tool_execution.domain.planning import (
+    FrozenToolPlanStep,
+    ToolExecutionPlan,
+    ToolPolicyDecisionRecord,
+)
 from ai_platform_api.modules.tool_execution.domain.tasks import (
     AttemptResult,
     ClaimedToolAttempt,
@@ -27,12 +32,14 @@ from ai_platform_api.modules.tool_execution.domain.tasks import (
     ToolRunBudget,
     ToolRunState,
     ToolStep,
+    ToolStepBudget,
     ToolStepState,
 )
 from ai_platform_api.persistence.tables import (
     agent_tool_definitions,
     tool_attempts,
     tool_calls,
+    tool_policy_decisions,
     tool_runs,
     tool_steps,
 )
@@ -170,6 +177,60 @@ class SqlAlchemyToolTaskStore:
             )
         return _run(row) if row is not None else None
 
+    def freeze_read_plan(
+        self,
+        *,
+        workspace_id: UUID,
+        run_id: UUID,
+        steps: tuple[FrozenToolPlanStep, ...],
+        frozen_at: datetime,
+    ) -> ToolExecutionPlan:
+        """在一次事务中冻结全部只读 Step、预算、策略证据和 Run 状态。"""
+
+        try:
+            with self._session_factory() as session, session.begin():
+                # 1. 锁定 Run 并复核全部聚合预算，计划预检后的并发推进必须失败关闭。
+                run = _locked_run(session, workspace_id, run_id)
+                _require_frozen_plan(run, steps, frozen_at)
+                planning = _advance_run(
+                    session,
+                    run,
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    target_state="planning",
+                    occurred_at=frozen_at,
+                )
+
+                # 2. 每个 Step 先进入策略检查，再写入匹配证据；数据库 Trigger 才允许 ready。
+                persisted_steps = tuple(
+                    _freeze_step(
+                        session,
+                        run,
+                        frozen,
+                        workspace_id=workspace_id,
+                        run_id=run_id,
+                        frozen_at=frozen_at,
+                    )
+                    for frozen in steps
+                )
+
+                # 3. 全部 Step 可执行后再发布 Run；任何异常由事务回滚到原始 pending 状态。
+                running = _advance_run(
+                    session,
+                    planning,
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    target_state="running",
+                    occurred_at=frozen_at,
+                )
+                return ToolExecutionPlan(
+                    run=_run(running),
+                    steps=persisted_steps,
+                    policies=tuple(item.policy for item in steps),
+                )
+        except IntegrityError as error:
+            raise ToolRunConflictError from error
+
     def transition_run(
         self,
         workspace_id: UUID,
@@ -254,6 +315,13 @@ class SqlAlchemyToolTaskStore:
                             tool_id=tool_id,
                             tool_version=tool_version,
                             canonical_arguments_hash=canonical_arguments_hash,
+                            timeout_seconds=min(
+                                30,
+                                cast(int, run["max_execution_seconds"]),
+                            ),
+                            max_attempts=cast(int, run["max_attempts_per_step"]),
+                            max_result_bytes=262_144,
+                            max_cost_microunits=0,
                             state="planned",
                             current_attempt_no=None,
                             created_at=created_at,
@@ -483,7 +551,6 @@ def _select_claimable_step(session: Session, now: datetime) -> Row[Any] | None:
     return session.execute(
         select(
             tool_steps,
-            tool_runs.c.max_attempts_per_step,
             agent_tool_definitions.c.access_mode,
             agent_tool_definitions.c.risk_level,
         )
@@ -502,7 +569,7 @@ def _select_claimable_step(session: Session, now: datetime) -> Row[Any] | None:
             tool_runs.c.deadline_at > now,
             or_(
                 tool_steps.c.current_attempt_no.is_(None),
-                tool_steps.c.current_attempt_no < tool_runs.c.max_attempts_per_step,
+                tool_steps.c.current_attempt_no < tool_steps.c.max_attempts,
             ),
             ~exists(
                 select(1).where(
@@ -906,6 +973,172 @@ def _locked_run(session: Session, workspace_id: UUID, run_id: UUID) -> RowMappin
     return row
 
 
+def _require_frozen_plan(
+    run: RowMapping,
+    steps: tuple[FrozenToolPlanStep, ...],
+    frozen_at: datetime,
+) -> None:
+    """复核原子写入边界，避免绕过 Application 后写入超预算或错位证据。"""
+
+    state = cast(str, run["state"])
+    if state != "pending":
+        _raise_for_closed_state(state)
+    if (
+        frozen_at >= cast(datetime, run["deadline_at"])
+        or not steps
+        or len(steps) > cast(int, run["max_steps"])
+        or sum(item.budget.max_cost_microunits for item in steps)
+        > cast(int, run["max_cost_microunits"])
+    ):
+        raise ToolRunBudgetExceededError
+    for expected_sequence, step in enumerate(steps, start=1):
+        budget = step.budget
+        policy = step.policy
+        if (
+            step.sequence_no != expected_sequence
+            or budget.timeout_seconds < 1
+            or budget.timeout_seconds > cast(int, run["max_execution_seconds"])
+            or not 1 <= budget.max_attempts <= cast(int, run["max_attempts_per_step"])
+            or not 1 <= budget.max_result_bytes <= 262_144
+            or budget.max_cost_microunits < 0
+            or policy.workspace_id != run["workspace_id"]
+            or policy.run_id != run["run_id"]
+            or policy.step_id != step.step_id
+            or policy.tool_id != step.tool_id
+            or policy.tool_version != step.tool_version
+            or policy.canonical_arguments_hash != step.canonical_arguments_hash
+            or policy.policy_version < 1
+        ):
+            raise ToolRunConflictError
+
+
+def _advance_run(
+    session: Session,
+    row: RowMapping,
+    *,
+    workspace_id: UUID,
+    run_id: UUID,
+    target_state: ToolRunState,
+    occurred_at: datetime,
+) -> RowMapping:
+    """使用旧版本条件推进已锁定 Run，并返回后续写入使用的新版本事实。"""
+
+    updated = (
+        session.execute(
+            update(tool_runs)
+            .where(
+                tool_runs.c.run_id == run_id,
+                tool_runs.c.workspace_id == workspace_id,
+                tool_runs.c.version == row["version"],
+            )
+            .values(
+                state=target_state,
+                updated_at=occurred_at,
+                version=cast(int, row["version"]) + 1,
+            )
+            .returning(tool_runs)
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if updated is None:
+        raise ToolRunConflictError
+    return updated
+
+
+def _freeze_step(
+    session: Session,
+    run: RowMapping,
+    frozen: FrozenToolPlanStep,
+    *,
+    workspace_id: UUID,
+    run_id: UUID,
+    frozen_at: datetime,
+) -> ToolStep:
+    """保存一个 Step 及其当前允许决策，状态转换顺序由数据库重复验证。"""
+
+    budget = frozen.budget
+    try:
+        # 1. 先保存不可变身份和预算，再进入 policy_checking，禁止直接插入 ready 状态。
+        planned = (
+            session.execute(
+                insert(tool_steps)
+                .values(
+                    step_id=frozen.step_id,
+                    run_id=run_id,
+                    workspace_id=workspace_id,
+                    sequence_no=frozen.sequence_no,
+                    tool_id=frozen.tool_id,
+                    tool_version=frozen.tool_version,
+                    canonical_arguments_hash=frozen.canonical_arguments_hash,
+                    timeout_seconds=budget.timeout_seconds,
+                    max_attempts=budget.max_attempts,
+                    max_result_bytes=budget.max_result_bytes,
+                    max_cost_microunits=budget.max_cost_microunits,
+                    state="planned",
+                    current_attempt_no=None,
+                    created_at=frozen_at,
+                    updated_at=frozen_at,
+                    version=1,
+                )
+                .returning(tool_steps)
+            )
+            .mappings()
+            .one()
+        )
+        checking = (
+            session.execute(
+                update(tool_steps)
+                .where(tool_steps.c.step_id == frozen.step_id, tool_steps.c.version == 1)
+                .values(state="policy_checking", updated_at=frozen_at, version=2)
+                .returning(tool_steps)
+            )
+            .mappings()
+            .one()
+        )
+        # 2. 策略最小证据先于 ready 写入，Trigger 会再次核对身份、权限和评估时点。
+        _insert_policy_decision(session, frozen.policy)
+        ready = (
+            session.execute(
+                update(tool_steps)
+                .where(tool_steps.c.step_id == frozen.step_id, tool_steps.c.version == 2)
+                .values(state="ready", updated_at=frozen_at, version=3)
+                .returning(tool_steps)
+            )
+            .mappings()
+            .one()
+        )
+    except IntegrityError as error:
+        raise ToolRunConflictError from error
+    if planned["run_id"] != run["run_id"] or checking["state"] != "policy_checking":
+        raise ToolRunConflictError
+    return _step(ready)
+
+
+def _insert_policy_decision(
+    session: Session,
+    policy: ToolPolicyDecisionRecord,
+) -> None:
+    """只保存授权最小证据，资源 ID、字段名和完整策略正文不进入工具事实。"""
+
+    session.execute(
+        insert(tool_policy_decisions).values(
+            decision_id=policy.decision_id,
+            workspace_id=policy.workspace_id,
+            run_id=policy.run_id,
+            step_id=policy.step_id,
+            tool_id=policy.tool_id,
+            tool_version=policy.tool_version,
+            canonical_arguments_hash=policy.canonical_arguments_hash,
+            permission_code=policy.permission_code,
+            policy_version=policy.policy_version,
+            resource_scope_hash=policy.resource_scope_hash,
+            field_mask_hash=policy.field_mask_hash,
+            evaluated_at=policy.evaluated_at,
+        )
+    )
+
+
 def _require_run_has_steps(session: Session, run_id: UUID) -> None:
     count = session.scalar(
         select(func.count()).select_from(tool_steps).where(tool_steps.c.run_id == run_id)
@@ -989,6 +1222,12 @@ def _step(row: RowMapping) -> ToolStep:
         tool_id=cast(UUID, row["tool_id"]),
         tool_version=cast(int, row["tool_version"]),
         canonical_arguments_hash=cast(str, row["canonical_arguments_hash"]),
+        budget=ToolStepBudget(
+            timeout_seconds=cast(int, row["timeout_seconds"]),
+            max_attempts=cast(int, row["max_attempts"]),
+            max_result_bytes=cast(int, row["max_result_bytes"]),
+            max_cost_microunits=cast(int, row["max_cost_microunits"]),
+        ),
         state=cast(ToolStepState, row["state"]),
         current_attempt_no=cast(int | None, row["current_attempt_no"]),
         created_at=cast(datetime, row["created_at"]),

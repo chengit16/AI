@@ -44,6 +44,7 @@ from ai_platform_api.persistence.tables import (
     services,
     tool_attempts,
     tool_calls,
+    tool_policy_decisions,
     tool_runs,
     tool_steps,
 )
@@ -253,12 +254,13 @@ def _ready_run(database: P403Database, key: str, *, now: datetime = NOW) -> tupl
         created_at=now,
     )
     database.service.transition_run(database.context, run.run_id, "planning", occurred_at=now)
+    arguments_hash = hashlib.sha256(key.encode()).hexdigest()
     step = database.service.append_step(
         database.context,
         run.run_id,
         tool_id=TOOL_ID,
         tool_version=1,
-        canonical_arguments_hash=hashlib.sha256(key.encode()).hexdigest(),
+        canonical_arguments_hash=arguments_hash,
         created_at=now,
     )
     database.service.transition_step(
@@ -267,6 +269,24 @@ def _ready_run(database: P403Database, key: str, *, now: datetime = NOW) -> tupl
         "policy_checking",
         occurred_at=now,
     )
+    # P4-05 起数据库要求 ready 前存在精确允许证据；本测试仍只验证底层状态机。
+    with database.sessions.begin() as session:
+        session.execute(
+            insert(tool_policy_decisions).values(
+                decision_id=uuid4(),
+                workspace_id=database.context.workspace_id,
+                run_id=run.run_id,
+                step_id=step.step_id,
+                tool_id=TOOL_ID,
+                tool_version=1,
+                canonical_arguments_hash=arguments_hash,
+                permission_code="knowledge.document.read",
+                policy_version=1,
+                resource_scope_hash="a" * 64,
+                field_mask_hash="b" * 64,
+                evaluated_at=now,
+            )
+        )
     step = database.service.transition_step(
         database.context,
         step.step_id,
@@ -303,7 +323,7 @@ def test_migration_empty_roundtrip_creates_four_state_tables(
     connection.commit()
 
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0054"
+        "20260816_0055"
     )
     tables = {
         row[0]
@@ -315,14 +335,20 @@ def test_migration_empty_roundtrip_creates_four_state_tables(
             {"schema": schema},
         )
     }
-    assert {"tool_runs", "tool_steps", "tool_attempts", "tool_calls"} <= tables
+    assert {
+        "tool_runs",
+        "tool_steps",
+        "tool_policy_decisions",
+        "tool_attempts",
+        "tool_calls",
+    } <= tables
 
     command.downgrade(config, "20260816_0053")
     connection.commit()
     command.upgrade(config, "head")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0054"
+        "20260816_0055"
     )
 
 

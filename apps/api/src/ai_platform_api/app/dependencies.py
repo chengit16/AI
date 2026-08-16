@@ -187,7 +187,13 @@ from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
 )
 from ai_platform_api.modules.streaming.infrastructure.valkey import ValkeyStreamNotifier
 from ai_platform_api.modules.tool_execution.application.catalog import ToolCatalogService
+from ai_platform_api.modules.tool_execution.application.planning import (
+    ToolExecutionPlanningService,
+)
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
+from ai_platform_api.modules.tool_execution.infrastructure.planning_sqlalchemy import (
+    SqlAlchemyToolReleasePlanSource,
+)
 from ai_platform_api.modules.tool_execution.infrastructure.sqlalchemy import (
     SqlAlchemyToolCatalogRepository,
 )
@@ -268,6 +274,7 @@ class ApplicationContainer:
     approval_instances: ApprovalInstanceService | None = None
     tool_catalogs: ToolCatalogService | None = None
     tool_tasks: ToolTaskService | None = None
+    tool_planning: ToolExecutionPlanningService | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
@@ -452,7 +459,14 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         entitlement_access,
         policy,
     )
-    tool_tasks = ToolTaskService(SqlAlchemyToolTaskStore(database.sessions))
+    tool_task_store = SqlAlchemyToolTaskStore(database.sessions)
+    tool_tasks = ToolTaskService(tool_task_store)
+    tool_planning = ToolExecutionPlanningService(
+        tool_tasks,
+        tool_task_store,
+        tool_catalogs,
+        SqlAlchemyToolReleasePlanSource(database.sessions),
+    )
     retrieval_planning = BoundedRetrievalPlanningService(
         SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
         policy,
@@ -556,6 +570,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             approval_instances=approval_instances,
             tool_catalogs=tool_catalogs,
             tool_tasks=tool_tasks,
+            tool_planning=tool_planning,
             workflow_run_executor=WorkflowRunExecutor(
                 SqlAlchemyWorkflowExecutionStore(database.sessions),
                 policy,

@@ -2568,6 +2568,12 @@ agent_tool_definitions = Table(
         "tool_version",
         name="uq_agent_tool_definitions_key_version",
     ),
+    UniqueConstraint(
+        "tool_id",
+        "tool_version",
+        "permission_code",
+        name="uq_agent_tool_definitions_policy_binding",
+    ),
     CheckConstraint("tool_version >= 1", name="ck_agent_tool_definitions_version"),
     CheckConstraint(
         "access_mode IN ('read', 'write')",
@@ -2764,6 +2770,10 @@ tool_steps = Table(
     Column("tool_id", UUID(as_uuid=True), nullable=False),
     Column("tool_version", Integer, nullable=False),
     Column("canonical_arguments_hash", String(64), nullable=False),
+    Column("timeout_seconds", Integer, nullable=False),
+    Column("max_attempts", Integer, nullable=False),
+    Column("max_result_bytes", Integer, nullable=False),
+    Column("max_cost_microunits", BigInteger, nullable=False),
     Column("state", String(32), nullable=False),
     Column("current_attempt_no", Integer, nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
@@ -2806,6 +2816,11 @@ tool_steps = Table(
         name="ck_tool_steps_arguments_hash",
     ),
     CheckConstraint(
+        "timeout_seconds BETWEEN 1 AND 1800 AND max_attempts BETWEEN 1 AND 5 "
+        "AND max_result_bytes BETWEEN 1 AND 262144 AND max_cost_microunits >= 0",
+        name="ck_tool_steps_budget",
+    ),
+    CheckConstraint(
         "state IN ('planned', 'policy_checking', 'waiting_confirmation', "
         "'waiting_approval', 'ready', 'running', 'completed', 'failed', "
         "'cancelled', 'timed_out')",
@@ -2822,6 +2837,70 @@ tool_steps = Table(
     CheckConstraint("version >= 1", name="ck_tool_steps_version"),
 )
 Index("ix_tool_steps_claim", tool_steps.c.state, tool_steps.c.created_at)
+
+tool_policy_decisions = Table(
+    "tool_policy_decisions",
+    metadata,
+    Column("decision_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_version", Integer, nullable=False),
+    Column("canonical_arguments_hash", String(64), nullable=False),
+    Column("permission_code", String(160), nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("resource_scope_hash", String(64), nullable=False),
+    Column("field_mask_hash", String(64), nullable=False),
+    Column("evaluated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("step_id", name="uq_tool_policy_decisions_step"),
+    ForeignKeyConstraint(
+        [
+            "step_id",
+            "run_id",
+            "workspace_id",
+            "tool_id",
+            "tool_version",
+            "canonical_arguments_hash",
+        ],
+        [
+            f"{SCHEMA_TOKEN}.tool_steps.step_id",
+            f"{SCHEMA_TOKEN}.tool_steps.run_id",
+            f"{SCHEMA_TOKEN}.tool_steps.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_steps.tool_id",
+            f"{SCHEMA_TOKEN}.tool_steps.tool_version",
+            f"{SCHEMA_TOKEN}.tool_steps.canonical_arguments_hash",
+        ],
+        name="fk_tool_policy_decisions_step",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["tool_id", "tool_version", "permission_code"],
+        [
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_id",
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_version",
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.permission_code",
+        ],
+        name="fk_tool_policy_decisions_definition",
+    ),
+    CheckConstraint("tool_version >= 1", name="ck_tool_policy_decisions_tool_version"),
+    CheckConstraint(
+        "canonical_arguments_hash ~ '^[0-9a-f]{64}$' "
+        "AND resource_scope_hash ~ '^[0-9a-f]{64}$' "
+        "AND field_mask_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_tool_policy_decisions_hashes",
+    ),
+    CheckConstraint(
+        "permission_code ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$'",
+        name="ck_tool_policy_decisions_permission",
+    ),
+    CheckConstraint("policy_version >= 1", name="ck_tool_policy_decisions_version"),
+)
+Index(
+    "ix_tool_policy_decisions_workspace_time",
+    tool_policy_decisions.c.workspace_id,
+    tool_policy_decisions.c.evaluated_at,
+)
 
 tool_attempts = Table(
     "tool_attempts",

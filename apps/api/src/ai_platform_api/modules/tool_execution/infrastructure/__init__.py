@@ -8,6 +8,9 @@ from ai_platform_api.modules.tool_execution.infrastructure.adapters import (
     WorkflowGetStatusAdapter,
     build_internal_read_adapters,
 )
+from ai_platform_api.modules.tool_execution.infrastructure.planning_sqlalchemy import (
+    SqlAlchemyToolReleasePlanSource,
+)
 from ai_platform_api.modules.tool_execution.infrastructure.sqlalchemy import (
     SqlAlchemyToolCatalogRepository,
 )
@@ -21,6 +24,7 @@ __all__ = [
     "KnowledgeSearchAdapter",
     "QuotaGetUsageAdapter",
     "SqlAlchemyToolCatalogRepository",
+    "SqlAlchemyToolReleasePlanSource",
     "SqlAlchemyToolTaskStore",
     "WorkflowGetStatusAdapter",
     "build_internal_read_adapters",

@@ -5,7 +5,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.authorization.application.policy import (
+    AuthorizationPolicyUnavailableError,
+)
 from ai_platform_api.modules.authorization.domain.policy import (
+    PolicyDecision,
     PolicyDecisionPoint,
     PolicyRequest,
     ResourceReference,
@@ -72,6 +76,25 @@ class ToolCatalogService:
     ) -> ToolDefinition:
         """解析一个精确版本，并证明套餐与当前权限都没有收窄该版本。"""
 
+        definition, _ = self.authorize_available_tool(
+            context,
+            workspace_id=workspace_id,
+            tool_id=tool_id,
+            tool_version=tool_version,
+        )
+        return definition
+
+    def authorize_available_tool(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        tool_id: UUID,
+        tool_version: int,
+        resource_id: UUID | None = None,
+    ) -> tuple[ToolDefinition, PolicyDecision]:
+        """返回精确版本及当前 PDP 证据，计划层不能复用目录列表时的旧结论。"""
+
         plan_code = self._require_active_plan(context, workspace_id)
         definition = self._repository.get_definition(tool_id, tool_version)
         if definition is None:
@@ -83,9 +106,17 @@ class ToolCatalogService:
             plan_code,
         ):
             raise ToolVersionNotAvailableError
-        if not self._is_currently_allowed(context, workspace_id, definition):
+        decision = self._current_decision(
+            context,
+            workspace_id,
+            definition,
+            resource_id=resource_id,
+        )
+        if decision.reason == "policy_unavailable":
+            raise AuthorizationPolicyUnavailableError
+        if not decision.allowed:
             raise ToolExecutionDeniedError
-        return definition
+        return definition, decision
 
     def _require_active_plan(self, context: RequestContext, workspace_id: UUID) -> str:
         """套餐事实缺失、停用或跨空间时统一失败，不能退化为全平台目录。"""
@@ -109,20 +140,31 @@ class ToolCatalogService:
     ) -> bool:
         """逐工具执行 PDP，拒绝未知权限到资源类型的隐式推导。"""
 
+        return self._current_decision(context, workspace_id, definition).allowed
+
+    def _current_decision(
+        self,
+        context: RequestContext,
+        workspace_id: UUID,
+        definition: ToolDefinition,
+        *,
+        resource_id: UUID | None = None,
+    ) -> PolicyDecision:
+        """按目标资源获取一次不可缓存的当前策略决策。"""
+
         resource_type = PERMISSION_RESOURCE_TYPES.get(definition.permission_code)
         if resource_type is None:
             raise ToolDefinitionInvalidError("工具权限没有登记稳定资源类型")
-        decision = self._policy.decide(
+        return self._policy.decide(
             PolicyRequest(
                 context=context,
                 permission_code=definition.permission_code,
                 resource=ResourceReference(
                     resource_type=resource_type,
-                    resource_id=workspace_id,
+                    resource_id=resource_id or workspace_id,
                     workspace_id=workspace_id,
                     attributes={"risk_level": definition.risk_level},
                 ),
                 surface="api",
             )
         )
-        return decision.allowed

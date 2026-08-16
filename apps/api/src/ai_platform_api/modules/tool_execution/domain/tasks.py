@@ -64,6 +64,16 @@ class ToolRunBudget:
 
 
 @dataclass(frozen=True)
+class ToolStepBudget:
+    """冻结单步超时、尝试、结果大小和成本上限。"""
+
+    timeout_seconds: int
+    max_attempts: int
+    max_result_bytes: int
+    max_cost_microunits: int
+
+
+@dataclass(frozen=True)
 class ToolRun:
     """保存与可信主体、Service 和不可变 AgentRelease 绑定的普通工具任务。"""
 
@@ -94,6 +104,7 @@ class ToolStep:
     tool_id: UUID
     tool_version: int
     canonical_arguments_hash: str
+    budget: ToolStepBudget
     state: ToolStepState
     current_attempt_no: int | None
     created_at: datetime

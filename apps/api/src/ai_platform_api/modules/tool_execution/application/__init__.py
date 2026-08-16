@@ -17,6 +17,10 @@ from ai_platform_api.modules.tool_execution.application.errors import (
     ToolRunTerminalError,
     ToolVersionNotAvailableError,
 )
+from ai_platform_api.modules.tool_execution.application.planning import (
+    ToolExecutionPlanningService,
+    parse_candidate_tool_intents,
+)
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
 
 __all__ = [
@@ -26,12 +30,14 @@ __all__ = [
     "ToolCatalogService",
     "ToolDefinitionInvalidError",
     "ToolExecutionDeniedError",
+    "ToolExecutionPlanningService",
     "ToolResultRejectedError",
     "ToolRunBudgetExceededError",
     "ToolRunConflictError",
     "ToolRunTerminalError",
     "ToolTaskService",
     "ToolVersionNotAvailableError",
+    "parse_candidate_tool_intents",
     "parse_tool_definition",
     "verify_tool_definition",
 ]
