@@ -332,6 +332,26 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/agent-release-operations": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Agent Release Operations
+     * @description 按服务和时间窗口返回主版本与灰度或上一版本的脱敏对比。
+     */
+    readonly get: operations["getAgentReleaseOperations"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/agents": {
     readonly parameters: {
       readonly query?: never;
@@ -2601,6 +2621,58 @@ export type components = {
     readonly AgentListResponse: {
       /** Items */
       readonly items: readonly components["schemas"]["AgentDetailResponse"][];
+    };
+    /**
+     * AgentOperationsReportResponse
+     * @description 返回一个服务当前 Route 的主版本和比较版本运营报告。
+     */
+    readonly AgentOperationsReportResponse: {
+      /**
+       * Ai Quality Status
+       * @constant
+       */
+      readonly ai_quality_status: "not_configured";
+      /** Alerts */
+      readonly alerts: readonly components["schemas"]["OperationsAlertResponse"][];
+      /** Canary Percent */
+      readonly canary_percent: number;
+      readonly comparison: components["schemas"]["ReleaseOperationsMetricsResponse"] | null;
+      /** Minimum Feedback Samples */
+      readonly minimum_feedback_samples: number;
+      /** Minimum Terminal Samples */
+      readonly minimum_terminal_samples: number;
+      /** Online Llm Grading */
+      readonly online_llm_grading: boolean;
+      readonly primary: components["schemas"]["ReleaseOperationsMetricsResponse"];
+      readonly promotion: components["schemas"]["PromotionDecisionResponse"];
+      /**
+       * Route Id
+       * Format: uuid
+       */
+      readonly route_id: string;
+      /** Route Mode */
+      readonly route_mode: string;
+      /** Route Version */
+      readonly route_version: number;
+      /**
+       * Service Id
+       * Format: uuid
+       */
+      readonly service_id: string;
+      /** Service Name */
+      readonly service_name: string;
+      /** Service Status */
+      readonly service_status: string;
+      /**
+       * Window Ended At
+       * Format: date-time
+       */
+      readonly window_ended_at: string;
+      /**
+       * Window Started At
+       * Format: date-time
+       */
+      readonly window_started_at: string;
     };
     /**
      * AgentReleaseListResponse
@@ -5201,6 +5273,32 @@ export type components = {
       readonly enabled: boolean;
     };
     /**
+     * OperationsAlertResponse
+     * @description 返回稳定告警码和阈值，禁止携带动态正文或主体标识。
+     */
+    readonly OperationsAlertResponse: {
+      /** Blocks Promotion */
+      readonly blocks_promotion: boolean;
+      /** Code */
+      readonly code: string;
+      /** Metric */
+      readonly metric: string;
+      /** Observed Value */
+      readonly observed_value: number;
+      /**
+       * Release Role
+       * @enum {string}
+       */
+      readonly release_role: "primary" | "canary" | "previous";
+      /**
+       * Severity
+       * @enum {string}
+       */
+      readonly severity: "warning" | "critical";
+      /** Threshold Value */
+      readonly threshold_value: number;
+    };
+    /**
      * OperationsIngestionJobListResponse
      * @description 返回当前工作空间最近的入库任务。
      */
@@ -5510,6 +5608,25 @@ export type components = {
       readonly release_id: string;
     };
     /**
+     * PromotionDecisionResponse
+     * @description 返回当前 Route 在固定策略下的晋级结论和证据摘要。
+     */
+    readonly PromotionDecisionResponse: {
+      /** Allowed */
+      readonly allowed: boolean;
+      /** Evidence Hash */
+      readonly evidence_hash: string;
+      /** Policy Version */
+      readonly policy_version: string;
+      /** Reason Codes */
+      readonly reason_codes: readonly string[];
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "passed" | "blocked" | "insufficient_data" | "not_applicable";
+    };
+    /**
      * PublishedServiceInvocationResponse
      * @description 返回同一 Run 的 HTTP 快照和可恢复 SSE 地址。
      */
@@ -5578,6 +5695,61 @@ export type components = {
        * Format: uuid
        */
       readonly personal_workspace_id: string;
+    };
+    /**
+     * ReleaseOperationsMetricsResponse
+     * @description 返回单个 Release 的运行、质量和成本聚合，不包含 Run 身份。
+     */
+    readonly ReleaseOperationsMetricsResponse: {
+      /** Average Cost Microunits */
+      readonly average_cost_microunits: number | null;
+      /** Completed Count */
+      readonly completed_count: number;
+      /** Degradation Rate Bps */
+      readonly degradation_rate_bps: number | null;
+      /** Error Rate Bps */
+      readonly error_rate_bps: number | null;
+      /** Failed Count */
+      readonly failed_count: number;
+      /** Feedback Count */
+      readonly feedback_count: number;
+      /**
+       * Feedback Quality Status
+       * @enum {string}
+       */
+      readonly feedback_quality_status: "measured" | "not_run";
+      /** Helpful Rate Bps */
+      readonly helpful_rate_bps: number | null;
+      /** Latency P95 Ms */
+      readonly latency_p95_ms: number | null;
+      /** Max Cost Budget Microunits */
+      readonly max_cost_budget_microunits: number;
+      /** Max Run Cost Microunits */
+      readonly max_run_cost_microunits: number;
+      /** Offline Evaluation Score Bps */
+      readonly offline_evaluation_score_bps: number;
+      /** Offline Evaluation Status */
+      readonly offline_evaluation_status: string;
+      /**
+       * Release Id
+       * Format: uuid
+       */
+      readonly release_id: string;
+      /** Release Version */
+      readonly release_version: number;
+      /**
+       * Role
+       * @enum {string}
+       */
+      readonly role: "primary" | "canary" | "previous";
+      /** Run Count */
+      readonly run_count: number;
+      /** Success Rate Bps */
+      readonly success_rate_bps: number | null;
+      /** Terminal Count */
+      readonly terminal_count: number;
+      /** Total Cost Microunits */
+      readonly total_cost_microunits: number;
     };
     /**
      * ReplaceRoleMenuVisibilityRequest
@@ -8094,6 +8266,98 @@ export interface operations {
       };
       /** @description 请求未获授权 */
       readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getAgentReleaseOperations: {
+    readonly parameters: {
+      readonly query: {
+        readonly service_id: string;
+        readonly window_hours?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentOperationsReportResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
         headers: {
           readonly [name: string]: unknown;
         };

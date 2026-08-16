@@ -17328,6 +17328,180 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/agent-release-operations": {
+      "get": {
+        "tags": [
+          "Agent Release 运营"
+        ],
+        "summary": "Get Agent Release Operations",
+        "description": "按服务和时间窗口返回主版本与灰度或上一版本的脱敏对比。",
+        "operationId": "getAgentReleaseOperations",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Service Id"
+            }
+          },
+          {
+            "name": "window_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 168,
+              "minimum": 1,
+              "default": 24,
+              "title": "Window Hours"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOperationsReportResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/services": {
       "get": {
         "tags": [
@@ -23136,6 +23310,113 @@
         ],
         "title": "AgentListResponse",
         "description": "返回当前工作空间的 Agent 列表。"
+      },
+      "AgentOperationsReportResponse": {
+        "properties": {
+          "service_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Service Id"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "service_status": {
+            "type": "string",
+            "title": "Service Status"
+          },
+          "route_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Route Id"
+          },
+          "route_version": {
+            "type": "integer",
+            "title": "Route Version"
+          },
+          "route_mode": {
+            "type": "string",
+            "title": "Route Mode"
+          },
+          "canary_percent": {
+            "type": "integer",
+            "title": "Canary Percent"
+          },
+          "window_started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Started At"
+          },
+          "window_ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Ended At"
+          },
+          "minimum_terminal_samples": {
+            "type": "integer",
+            "title": "Minimum Terminal Samples"
+          },
+          "minimum_feedback_samples": {
+            "type": "integer",
+            "title": "Minimum Feedback Samples"
+          },
+          "primary": {
+            "$ref": "#/components/schemas/ReleaseOperationsMetricsResponse"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseOperationsMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/OperationsAlertResponse"
+            },
+            "type": "array",
+            "title": "Alerts"
+          },
+          "promotion": {
+            "$ref": "#/components/schemas/PromotionDecisionResponse"
+          },
+          "ai_quality_status": {
+            "type": "string",
+            "const": "not_configured",
+            "title": "Ai Quality Status"
+          },
+          "online_llm_grading": {
+            "type": "boolean",
+            "title": "Online Llm Grading"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service_id",
+          "service_name",
+          "service_status",
+          "route_id",
+          "route_version",
+          "route_mode",
+          "canary_percent",
+          "window_started_at",
+          "window_ended_at",
+          "minimum_terminal_samples",
+          "minimum_feedback_samples",
+          "primary",
+          "comparison",
+          "alerts",
+          "promotion",
+          "ai_quality_status",
+          "online_llm_grading"
+        ],
+        "title": "AgentOperationsReportResponse",
+        "description": "返回一个服务当前 Route 的主版本和比较版本运营报告。"
       },
       "AgentReleaseListResponse": {
         "properties": {
@@ -29148,6 +29429,60 @@
         "title": "OpenApiFeatureRequest",
         "description": "定义开放API功能操作的请求字段与协议校验边界。"
       },
+      "OperationsAlertResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "warning",
+              "critical"
+            ],
+            "title": "Severity"
+          },
+          "release_role": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "canary",
+              "previous"
+            ],
+            "title": "Release Role"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "observed_value": {
+            "type": "integer",
+            "title": "Observed Value"
+          },
+          "threshold_value": {
+            "type": "integer",
+            "title": "Threshold Value"
+          },
+          "blocks_promotion": {
+            "type": "boolean",
+            "title": "Blocks Promotion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "release_role",
+          "metric",
+          "observed_value",
+          "threshold_value",
+          "blocks_promotion"
+        ],
+        "title": "OperationsAlertResponse",
+        "description": "返回稳定告警码和阈值，禁止携带动态正文或主体标识。"
+      },
       "OperationsIngestionJobListResponse": {
         "properties": {
           "items": {
@@ -29823,6 +30158,50 @@
         "title": "PromoteServiceRouteRequest",
         "description": "把指定 Release 晋级为唯一正式版本。"
       },
+      "PromotionDecisionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "blocked",
+              "insufficient_data",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reason Codes"
+          },
+          "evidence_hash": {
+            "type": "string",
+            "title": "Evidence Hash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "allowed",
+          "policy_version",
+          "reason_codes",
+          "evidence_hash"
+        ],
+        "title": "PromotionDecisionResponse",
+        "description": "返回当前 Route 在固定策略下的晋级结论和证据摘要。"
+      },
       "PublishWorkflowRequest": {
         "properties": {
           "expected_revision": {
@@ -29968,6 +30347,168 @@
         ],
         "title": "RegistrationResponse",
         "description": "定义注册操作的稳定响应结构。"
+      },
+      "ReleaseOperationsMetricsResponse": {
+        "properties": {
+          "release_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Release Id"
+          },
+          "release_version": {
+            "type": "integer",
+            "title": "Release Version"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "canary",
+              "previous"
+            ],
+            "title": "Role"
+          },
+          "run_count": {
+            "type": "integer",
+            "title": "Run Count"
+          },
+          "terminal_count": {
+            "type": "integer",
+            "title": "Terminal Count"
+          },
+          "completed_count": {
+            "type": "integer",
+            "title": "Completed Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count"
+          },
+          "success_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success Rate Bps"
+          },
+          "error_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate Bps"
+          },
+          "degradation_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degradation Rate Bps"
+          },
+          "latency_p95_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P95 Ms"
+          },
+          "total_cost_microunits": {
+            "type": "integer",
+            "title": "Total Cost Microunits"
+          },
+          "average_cost_microunits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Cost Microunits"
+          },
+          "max_run_cost_microunits": {
+            "type": "integer",
+            "title": "Max Run Cost Microunits"
+          },
+          "max_cost_budget_microunits": {
+            "type": "integer",
+            "title": "Max Cost Budget Microunits"
+          },
+          "feedback_count": {
+            "type": "integer",
+            "title": "Feedback Count"
+          },
+          "helpful_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Helpful Rate Bps"
+          },
+          "feedback_quality_status": {
+            "type": "string",
+            "enum": [
+              "measured",
+              "not_run"
+            ],
+            "title": "Feedback Quality Status"
+          },
+          "offline_evaluation_status": {
+            "type": "string",
+            "title": "Offline Evaluation Status"
+          },
+          "offline_evaluation_score_bps": {
+            "type": "integer",
+            "title": "Offline Evaluation Score Bps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "release_id",
+          "release_version",
+          "role",
+          "run_count",
+          "terminal_count",
+          "completed_count",
+          "failed_count",
+          "success_rate_bps",
+          "error_rate_bps",
+          "degradation_rate_bps",
+          "latency_p95_ms",
+          "total_cost_microunits",
+          "average_cost_microunits",
+          "max_run_cost_microunits",
+          "max_cost_budget_microunits",
+          "feedback_count",
+          "helpful_rate_bps",
+          "feedback_quality_status",
+          "offline_evaluation_status",
+          "offline_evaluation_score_bps"
+        ],
+        "title": "ReleaseOperationsMetricsResponse",
+        "description": "返回单个 Release 的运行、质量和成本聚合，不包含 Run 身份。"
       },
       "ReplaceRoleMenuVisibilityRequest": {
         "properties": {

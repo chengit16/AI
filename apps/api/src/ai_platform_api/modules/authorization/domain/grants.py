@@ -18,6 +18,7 @@ OWNER_PERMISSION_CODES = (
     "agent.definition.create",
     "agent.definition.read",
     "agent.definition.update",
+    "agent.operations.read",
     "agent.page.access",
     "agent.release.approve",
     "agent.release.publish",

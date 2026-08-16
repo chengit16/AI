@@ -185,7 +185,7 @@ def test_p301_baseline_freezes_invariants_and_deferred_boundaries() -> None:
     assert evaluation["multimodal_image_qa"] is False
 
 
-def test_p301_reserves_menu_and_api_identifiers_without_activating_registry() -> None:
+def test_p301_reserved_menu_and_api_identifiers_follow_stage_activation() -> None:
     baseline = load_object(BASELINE_PATH)
     permissions = cast(list[str], baseline["reserved_permissions"])
     menus = cast(list[dict[str, Any]], baseline["reserved_menus"])
@@ -206,15 +206,14 @@ def test_p301_reserves_menu_and_api_identifiers_without_activating_registry() ->
         "workspace.agent_operations",
     }
 
-    # P3-11 激活控制台标识；运营页与 Runtime 内部装载仍分别保留给 P3-12 和内部边界。
+    # P3-12 已激活全部页面权限和运营查询；Runtime 快照装载仍保持内部边界，不注册公开 API。
     active_registry = load_object(
         ROOT / "contracts" / "authorization" / "resource-registry.v1.json"
     )
     active_permissions = {item["code"] for item in active_registry["permissions"]}
     active_operations = {item["operation_id"] for item in active_registry["api_resources"]}
-    assert permission_set - active_permissions == {"agent.operations.read"}
+    assert permission_set - active_permissions == set()
     assert {item["operation_id"] for item in operations} - active_operations == {
-        "getAgentReleaseOperations",
         "loadAgentReleaseSnapshot",
     }
 

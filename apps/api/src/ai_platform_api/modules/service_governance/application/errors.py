@@ -33,6 +33,12 @@ class ServiceRouteUnavailableError(PlatformError):
     error_code = "SERVICE_ROUTE_UNAVAILABLE"
 
 
+class ServicePromotionBlockedError(PlatformError):
+    """表示灰度样本不足或运行指标越过晋级阈值。"""
+
+    error_code = "SERVICE_PROMOTION_BLOCKED"
+
+
 class ServiceIdempotencyConflictError(PlatformError):
     """表示相同幂等键已经绑定不同服务管理请求。"""
 

@@ -37,6 +37,32 @@ class CurrentRouteInvalidator(Protocol):
 
 
 @dataclass(frozen=True)
+class ServicePromotionEvidence:
+    """保存晋级门禁的低基数结论和可复算证据摘要。"""
+
+    allowed: bool
+    policy_version: str
+    evidence_hash: str
+    reason_codes: tuple[str, ...]
+
+
+class ServicePromotionGate(Protocol):
+    """在 Route 事务锁定当前态后评估候选 Release 的运营证据。"""
+
+    def evaluate_promotion(
+        self,
+        *,
+        workspace_id: UUID,
+        service_id: UUID,
+        route_id: UUID,
+        primary_release_id: UUID,
+        candidate_release_id: UUID,
+        route_started_at: datetime,
+        evaluated_at: datetime,
+    ) -> ServicePromotionEvidence: ...
+
+
+@dataclass(frozen=True)
 class RoutableAgentRelease:
     """保存判断 Release 是否可进入服务路由所需的最小可信事实。"""
 

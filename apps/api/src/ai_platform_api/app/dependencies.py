@@ -23,6 +23,10 @@ from ai_platform_api.modules.agent_control.infrastructure.deterministic_evaluati
 from ai_platform_api.modules.agent_control.infrastructure.sqlalchemy import (
     SqlAlchemyAgentControlUnitOfWork,
 )
+from ai_platform_api.modules.agent_operations.application.service import AgentOperationsService
+from ai_platform_api.modules.agent_operations.infrastructure.sqlalchemy import (
+    SqlAlchemyAgentOperationsUnitOfWork,
+)
 from ai_platform_api.modules.assistant.application.runner import AssistantRunExecutor
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
 from ai_platform_api.modules.assistant.application.sources import AssistantSourceService
@@ -241,6 +245,7 @@ class ApplicationContainer:
     assistant_conversations: AssistantConversationService | None = None
     assistant_run_executor: AssistantRunExecutor | None = None
     agent_controls: AgentControlService | None = None
+    agent_operations: AgentOperationsService | None = None
     service_governance: ServiceGovernanceService | None = None
     service_invocations: ServiceInvocationService | None = None
     invocation_rate_limiter: InvocationRateLimiter | None = None
@@ -418,9 +423,13 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         approval_instances,
         runtime_bootstrap.ensure if runtime_bootstrap is not None else None,
     )
+    agent_operations = AgentOperationsService(
+        SqlAlchemyAgentOperationsUnitOfWork(database.sessions)
+    )
     service_governance = ServiceGovernanceService(
         SqlAlchemyServiceGovernanceUnitOfWork(database.sessions),
         runtime_releases,
+        agent_operations,
     )
     policy = RbacPolicyDecisionPoint(
         resource_registry,
@@ -514,6 +523,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             assistant_conversations=assistant_conversations,
             assistant_run_executor=assistant_run_executor,
             agent_controls=agent_controls,
+            agent_operations=agent_operations,
             service_governance=service_governance,
             service_invocations=service_invocations,
             invocation_rate_limiter=invocation_rate_limiter,

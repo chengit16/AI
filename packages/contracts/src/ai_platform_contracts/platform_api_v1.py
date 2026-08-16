@@ -77,6 +77,26 @@ class AgentListResponse(typing.TypedDict):
     items: list[AgentDetailResponse]
 
 
+class AgentOperationsReportResponse(typing.TypedDict):
+    ai_quality_status: str
+    alerts: list[OperationsAlertResponse]
+    canary_percent: int
+    comparison: ReleaseOperationsMetricsResponse | None
+    minimum_feedback_samples: int
+    minimum_terminal_samples: int
+    online_llm_grading: bool
+    primary: ReleaseOperationsMetricsResponse
+    promotion: PromotionDecisionResponse
+    route_id: str
+    route_mode: str
+    route_version: int
+    service_id: str
+    service_name: str
+    service_status: str
+    window_ended_at: str
+    window_started_at: str
+
+
 class AgentReleaseListResponse(typing.TypedDict):
     items: list[AgentReleaseResponse]
 
@@ -1056,6 +1076,16 @@ class OpenApiFeatureRequest(typing.TypedDict):
     enabled: bool
 
 
+class OperationsAlertResponse(typing.TypedDict):
+    blocks_promotion: bool
+    code: str
+    metric: str
+    observed_value: int
+    release_role: typing.Literal["primary", "canary", "previous"]
+    severity: typing.Literal["warning", "critical"]
+    threshold_value: int
+
+
 class OperationsIngestionJobListResponse(typing.TypedDict):
     items: list[OperationsIngestionJobResponse]
 
@@ -1169,6 +1199,14 @@ class PromoteServiceRouteRequest(typing.TypedDict):
     release_id: str
 
 
+class PromotionDecisionResponse(typing.TypedDict):
+    allowed: bool
+    evidence_hash: str
+    policy_version: str
+    reason_codes: list[str]
+    status: typing.Literal["passed", "blocked", "insufficient_data", "not_applicable"]
+
+
 class PublishWorkflowRequest(typing.TypedDict):
     expected_revision: int
 
@@ -1199,6 +1237,29 @@ class RegistrationRequest(typing.TypedDict):
 class RegistrationResponse(typing.TypedDict):
     account_id: str
     personal_workspace_id: str
+
+
+class ReleaseOperationsMetricsResponse(typing.TypedDict):
+    average_cost_microunits: int | None
+    completed_count: int
+    degradation_rate_bps: int | None
+    error_rate_bps: int | None
+    failed_count: int
+    feedback_count: int
+    feedback_quality_status: typing.Literal["measured", "not_run"]
+    helpful_rate_bps: int | None
+    latency_p95_ms: int | None
+    max_cost_budget_microunits: int
+    max_run_cost_microunits: int
+    offline_evaluation_score_bps: int
+    offline_evaluation_status: str
+    release_id: str
+    release_version: int
+    role: typing.Literal["primary", "canary", "previous"]
+    run_count: int
+    success_rate_bps: int | None
+    terminal_count: int
+    total_cost_microunits: int
 
 
 class ReplaceRoleMenuVisibilityRequest(typing.TypedDict):

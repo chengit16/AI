@@ -10,6 +10,7 @@ from ai_platform_api.modules.service_governance.application.errors import (
     ServiceDeniedError,
     ServiceIdempotencyConflictError,
     ServiceNotFoundError,
+    ServicePromotionBlockedError,
     ServiceRouteConflictError,
     ServiceRouteUnavailableError,
     ServiceValidationError,
@@ -28,6 +29,7 @@ from ai_platform_api.modules.service_governance.domain.models import (
     CurrentRouteInvalidator,
     ServiceDeployment,
     ServiceGovernanceUnitOfWork,
+    ServicePromotionGate,
     ServiceStatus,
     ServiceType,
 )
@@ -38,6 +40,7 @@ __all__ = [
     "ServiceGovernanceService",
     "ServiceIdempotencyConflictError",
     "ServiceNotFoundError",
+    "ServicePromotionBlockedError",
     "ServiceRouteConflictError",
     "ServiceRouteUnavailableError",
     "ServiceValidationError",
@@ -51,9 +54,11 @@ class ServiceGovernanceService:
         self,
         unit_of_work: ServiceGovernanceUnitOfWork,
         current_route_invalidator: CurrentRouteInvalidator | None = None,
+        promotion_gate: ServicePromotionGate | None = None,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._current_route_invalidator = current_route_invalidator
+        self._promotion_gate = promotion_gate
 
     def create_service(
         self,
@@ -167,6 +172,7 @@ class ServiceGovernanceService:
         return promote_route(
             self._unit_of_work,
             self._current_route_invalidator,
+            self._promotion_gate,
             context,
             service_id=service_id,
             release_id=release_id,

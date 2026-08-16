@@ -133,7 +133,7 @@ def test_runtime_files_fix_shared_paths_and_health_checks() -> None:
     assert 'CMD ["uv", "run", "--no-sync", "celery"' in worker_dockerfile
     assert '"--beat"' not in worker_dockerfile
     assert "SELECT version_num FROM public.alembic_version" in platform_script
-    assert 'database_revision" == "20260816_0051"' in platform_script
+    assert 'database_revision" == "20260816_0052"' in platform_script
     assert "AI_PLATFORM_MIN_FREE_DISK_GB:-50" in platform_script
     assert "worker-control worker-parsing worker-ocr worker-embedding worker-indexing" in (
         platform_script

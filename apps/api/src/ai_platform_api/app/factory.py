@@ -15,6 +15,7 @@ from ai_platform_api.app.trace_middleware import TraceContextMiddleware
 from ai_platform_api.common.api_errors import ErrorResponse
 from ai_platform_api.config import Settings, get_settings
 from ai_platform_api.modules.agent_control.api.routes import router as agent_control_router
+from ai_platform_api.modules.agent_operations.api.routes import router as agent_operations_router
 from ai_platform_api.modules.assistant.api.routes import router as assistant_router
 from ai_platform_api.modules.authorization.api.routes import (
     menu_router,
@@ -120,6 +121,7 @@ def create_app(
     application.state.assistant_conversation_service = dependencies.assistant_conversations
     application.state.assistant_run_executor = dependencies.assistant_run_executor
     application.state.agent_control_service = dependencies.agent_controls
+    application.state.agent_operations_service = dependencies.agent_operations
     application.state.service_governance_service = dependencies.service_governance
     application.state.service_invocation_service = dependencies.service_invocations
     application.state.assistant_source_service = dependencies.assistant_sources
@@ -151,6 +153,7 @@ def create_app(
     application.include_router(ai_runtime_router, prefix="/api/v1")
     application.include_router(assistant_router, prefix="/api/v1")
     application.include_router(agent_control_router, prefix="/api/v1")
+    application.include_router(agent_operations_router, prefix="/api/v1")
     application.include_router(service_governance_router, prefix="/api/v1")
     application.include_router(service_delivery_router, prefix="/api/v1")
     application.include_router(workflow_router, prefix="/api/v1")

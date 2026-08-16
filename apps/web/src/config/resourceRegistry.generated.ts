@@ -1,7 +1,7 @@
 // 由 scripts/generate_resource_registry.py 自动生成, 请勿手工修改。
 export const resourceRegistry = {
   schema_version: 1,
-  registry_version: 20,
+  registry_version: 21,
   permissions: [
     {
       code: "workspace.overview.access",
@@ -724,6 +724,13 @@ export const resourceRegistry = {
       scope: "resource",
       status: "active",
     },
+    {
+      code: "agent.operations.read",
+      resource_type: "agent_operations",
+      action: "read",
+      scope: "workspace",
+      status: "active",
+    },
   ],
   page_resources: [
     {
@@ -844,6 +851,17 @@ export const resourceRegistry = {
       layout_key: "layout.workspace",
       access_level: "authorized",
       permission_code: "service.page.access",
+      resource_version: 1,
+      status: "active",
+    },
+    {
+      page_resource_id: "80000000-0000-4000-8000-000000000012",
+      page_key: "agent.operations",
+      route: "/workspace/agent-operations",
+      component_key: "AgentOperationsPage",
+      layout_key: "layout.workspace",
+      access_level: "authorized",
+      permission_code: "agent.operations.read",
       resource_version: 1,
       status: "active",
     },
@@ -2397,6 +2415,17 @@ export const resourceRegistry = {
       risk_level: "critical",
       status: "active",
     },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000139",
+      api_key: "agent.operations.report",
+      operation_id: "getAgentReleaseOperations",
+      method: "GET",
+      path_pattern: "/api/v1/workspaces/{workspace_id}/agent-release-operations",
+      access_level: "authorized",
+      permission_code: "agent.operations.read",
+      risk_level: "high",
+      status: "active",
+    },
   ],
   menus: [
     {
@@ -3856,6 +3885,32 @@ export const resourceRegistry = {
       status: "active",
     },
     {
+      menu_id: "82000000-0000-4000-8000-000000000219",
+      menu_key: "workspace.agent_operations",
+      parent_menu_key: "navigation.workspace",
+      name: "Release 运营",
+      menu_type: "page",
+      page_resource_id: "80000000-0000-4000-8000-000000000012",
+      permission_code: "agent.operations.read",
+      icon_key: "activity",
+      sort_order: 380,
+      source: "system",
+      status: "active",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000220",
+      menu_key: "workspace.agent_operations.read",
+      parent_menu_key: "workspace.agent_operations",
+      name: "查看 Release 运营",
+      menu_type: "action",
+      page_resource_id: null,
+      permission_code: "agent.operations.read",
+      icon_key: null,
+      sort_order: 100,
+      source: "system",
+      status: "active",
+    },
+    {
       menu_id: "82000000-0000-4000-8000-000000000152",
       menu_key: "navigation.platform.models.provider_query",
       parent_menu_key: "navigation.platform.models",
@@ -4654,6 +4709,11 @@ export const resourceRegistry = {
       menu_id: "82000000-0000-4000-8000-000000000214",
       api_resource_id: "81000000-0000-4000-8000-000000000138",
       action_type: "publish",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000220",
+      api_resource_id: "81000000-0000-4000-8000-000000000139",
+      action_type: "query",
     },
   ],
 } as const;

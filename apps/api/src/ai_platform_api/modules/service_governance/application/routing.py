@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.service_governance.application.errors import (
+    ServicePromotionBlockedError,
     ServiceRouteConflictError,
     ServiceRouteUnavailableError,
     ServiceValidationError,
@@ -35,6 +36,8 @@ from ai_platform_api.modules.service_governance.domain.models import (
     ServiceControlOperation,
     ServiceDeployment,
     ServiceGovernanceUnitOfWork,
+    ServicePromotionEvidence,
+    ServicePromotionGate,
     ServiceRepository,
     ServiceRoute,
     ServiceRouteMode,
@@ -89,6 +92,7 @@ def start_canary(
 def promote_route(
     unit_of_work_factory: ServiceGovernanceUnitOfWork,
     invalidator: CurrentRouteInvalidator | None,
+    promotion_gate: ServicePromotionGate | None,
     context: RequestContext,
     *,
     service_id: UUID,
@@ -111,6 +115,7 @@ def promote_route(
             release_id,
             None,
         ),
+        promotion_gate=promotion_gate,
     )
 
 
@@ -150,6 +155,7 @@ def _change_route(
     expected_generation: int,
     idempotency_key: str,
     intent: RouteChangeIntent,
+    promotion_gate: ServicePromotionGate | None = None,
 ) -> ServiceDeployment:
     """冻结请求并在提交后主动清除所有 Runtime current 分桶。"""
 
@@ -180,6 +186,7 @@ def _change_route(
             idempotency_key=idempotency_key,
             request_hash=request_hash,
             intent=intent,
+            promotion_gate=promotion_gate,
         )
     except ServiceWriteConflictError as error:
         replayed = _recover_route_change(
@@ -207,6 +214,7 @@ def _write_route_change(
     idempotency_key: str,
     request_hash: str,
     intent: RouteChangeIntent,
+    promotion_gate: ServicePromotionGate | None,
 ) -> ServiceDeployment:
     """在一个事务内完成重放、锁定、Route 追加、指针切换和事件写入。"""
 
@@ -235,6 +243,12 @@ def _write_route_change(
             or current.publication.generation != expected_generation
         ):
             raise ServiceRouteConflictError
+        promotion_evidence = _require_promotion_evidence(
+            promotion_gate,
+            current,
+            intent,
+            evaluated_at=now,
+        )
         route = _next_route(
             unit_of_work.services,
             current,
@@ -301,11 +315,47 @@ def _write_route_change(
                 ),
                 "canary_percent": route.canary_percent,
                 "publication_generation": publication.generation,
+                **(
+                    {
+                        "promotion_gate_policy_version": promotion_evidence.policy_version,
+                        "promotion_gate_evidence_hash": promotion_evidence.evidence_hash,
+                    }
+                    if promotion_evidence is not None
+                    else {}
+                ),
             },
             event_type=event_type,
         )
         unit_of_work.commit()
         return deployment
+
+
+def _require_promotion_evidence(
+    promotion_gate: ServicePromotionGate | None,
+    current: ServiceDeployment,
+    intent: RouteChangeIntent,
+    *,
+    evaluated_at: datetime,
+) -> ServicePromotionEvidence | None:
+    """只对灰度晋级执行门禁；缺少实现、身份漂移或异常指标一律失败关闭。"""
+
+    if intent.kind != "promote":
+        return None
+    candidate_release_id = intent.target_release_id
+    if promotion_gate is None or candidate_release_id is None:
+        raise ServicePromotionBlockedError
+    evidence = promotion_gate.evaluate_promotion(
+        workspace_id=current.service.workspace_id,
+        service_id=current.service.service_id,
+        route_id=current.route.route_id,
+        primary_release_id=current.route.primary_release_id,
+        candidate_release_id=candidate_release_id,
+        route_started_at=current.route.created_at,
+        evaluated_at=evaluated_at,
+    )
+    if not evidence.allowed:
+        raise ServicePromotionBlockedError
+    return evidence
 
 
 def _next_route(

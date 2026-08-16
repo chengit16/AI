@@ -46,6 +46,7 @@ describe("平台路由与运行状态", () => {
       ["Agent 控制台", "/workspace/agents", "agent.page.access"],
       ["工作流", "/workspace/workflows", "workflow.page.access"],
       ["服务发布", "/workspace/services", "service.page.access"],
+      ["Release 运营", "/workspace/agent-operations", "agent.operations.read"],
       ["运行状态", "/status", "system.runtime.access"],
     ]);
   });

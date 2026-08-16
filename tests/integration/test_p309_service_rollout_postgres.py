@@ -18,7 +18,10 @@ from ai_platform_api.modules.service_governance.application.service import (
     ServiceGovernanceService,
     ServiceRouteConflictError,
 )
-from ai_platform_api.modules.service_governance.domain.models import ServiceDeployment
+from ai_platform_api.modules.service_governance.domain.models import (
+    ServiceDeployment,
+    ServicePromotionEvidence,
+)
 from ai_platform_api.modules.service_governance.infrastructure.sqlalchemy import (
     SqlAlchemyServiceGovernanceUnitOfWork,
     SqlAlchemyServiceRepository,
@@ -53,6 +56,13 @@ class RecordingInvalidator:
         self.service_ids.append((workspace_id, service_id))
 
 
+class PassingPromotionGate:
+    """让 P3-09 隔离验证路由原子性，真实运营规则由 P3-12 专项覆盖。"""
+
+    def evaluate_promotion(self, **_: object) -> ServicePromotionEvidence:
+        return ServicePromotionEvidence(True, "synthetic-p309", "a" * 64, ())
+
+
 def governance(
     harness: AssistantHarness,
     invalidator: RecordingInvalidator | None = None,
@@ -60,6 +70,7 @@ def governance(
     return ServiceGovernanceService(
         SqlAlchemyServiceGovernanceUnitOfWork(harness.sessions),
         invalidator,
+        PassingPromotionGate(),
     )
 
 

@@ -449,6 +449,11 @@ Index(
     model_invocations.c.started_at,
 )
 Index(
+    "ix_model_invocations_workspace_trace",
+    model_invocations.c.workspace_id,
+    model_invocations.c.trace_id,
+)
+Index(
     "ix_model_invocations_runtime_config",
     model_invocations.c.runtime_config_version_id,
     model_invocations.c.started_at,

@@ -404,7 +404,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260816_0051"
+    assert current_revision(connection, schema) == "20260816_0052"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -522,7 +522,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260816_0051"
+    assert current_revision(connection, schema) == "20260816_0052"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -871,7 +871,7 @@ def test_agent_console_upgrade_restores_roles_bindings_and_menu_publication(
     # 3. 同一非空事实再次升级仍只生成一个确定性控制台发布。
     command.upgrade(config, "head")
     connection.commit()
-    assert current_revision(connection, schema) == "20260816_0051"
+    assert current_revision(connection, schema) == "20260816_0052"
     assert (
         connection.scalar(
             text(
@@ -882,6 +882,57 @@ def test_agent_console_upgrade_restores_roles_bindings_and_menu_publication(
             """
             ),
             {"source_release_id": source_release["release_id"]},
+        )
+        == 1
+    )
+    upgraded = (
+        connection.execute(
+            text(
+                f"""
+                SELECT releases.snapshot
+                FROM "{schema}".workspace_menu_publications AS publications
+                JOIN "{schema}".menu_releases AS releases
+                  ON releases.workspace_id = publications.workspace_id
+                 AND releases.release_id = publications.current_release_id
+                """
+            )
+        )
+        .mappings()
+        .one()["snapshot"]
+    )
+    assert upgraded["registry_version"] == 21
+    assert {item["menu_id"] for item in upgraded["menus"]} >= {
+        "82000000-0000-4000-8000-000000000219",
+        "82000000-0000-4000-8000-000000000220",
+    }
+    assert any(
+        item["api_resource_id"] == "81000000-0000-4000-8000-000000000139"
+        for item in upgraded["menu_api_bindings"]
+    )
+    assert (
+        connection.scalar(
+            text(
+                f"""
+            SELECT count(*)
+            FROM "{schema}".role_permission_grants AS grants
+            JOIN "{schema}".roles AS roles
+              ON roles.workspace_id = grants.workspace_id AND roles.role_id = grants.role_id
+            WHERE roles.role_key = 'workspace_owner'
+              AND grants.permission_code = 'agent.operations.read'
+            """
+            )
+        )
+        == 1
+    )
+    assert (
+        connection.scalar(
+            text(
+                f"""
+            SELECT count(*) FROM pg_indexes
+            WHERE schemaname = '{schema}'
+              AND indexname = 'ix_model_invocations_workspace_trace'
+            """
+            )
         )
         == 1
     )

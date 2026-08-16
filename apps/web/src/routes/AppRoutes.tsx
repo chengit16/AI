@@ -23,6 +23,7 @@ const AssistantConversationsPage = lazy(() => import("@/pages/workspace/assistan
 const WorkflowDesignPage = lazy(() => import("@/pages/workspace/workflows"));
 const AgentControlPage = lazy(() => import("@/pages/workspace/agents"));
 const ServiceManagementPage = lazy(() => import("@/pages/workspace/services"));
+const AgentOperationsPage = lazy(() => import("@/pages/workspace/agentOperations"));
 const PlatformModelsPage = lazy(() => import("@/pages/platform/models"));
 
 function RequireSession() {
@@ -157,6 +158,14 @@ export function AppRoutes() {
               element={
                 <RequireMenuRoute>
                   <ServiceManagementPage />
+                </RequireMenuRoute>
+              }
+            />
+            <Route
+              path={pageRoutes.AgentOperationsPage}
+              element={
+                <RequireMenuRoute>
+                  <AgentOperationsPage />
                 </RequireMenuRoute>
               }
             />

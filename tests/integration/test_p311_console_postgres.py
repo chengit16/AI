@@ -20,6 +20,7 @@ from ai_platform_api.modules.service_governance.api.routes import router as serv
 from ai_platform_api.modules.service_governance.application.service import (
     ServiceGovernanceService,
 )
+from ai_platform_api.modules.service_governance.domain.models import ServicePromotionEvidence
 from ai_platform_api.modules.service_governance.infrastructure.sqlalchemy import (
     SqlAlchemyServiceGovernanceUnitOfWork,
 )
@@ -54,6 +55,13 @@ def _agent_service(harness: ApprovalHarness) -> AgentControlService:
         LocalDeterministicEvaluationExecutor(),
         harness.approvals,
     )
+
+
+class PassingPromotionGate:
+    """让 P3-11 隔离验证控制台路由操作，真实运营规则由 P3-12 专项覆盖。"""
+
+    def evaluate_promotion(self, **_: object) -> ServicePromotionEvidence:
+        return ServicePromotionEvidence(True, "synthetic-p311", "a" * 64, ())
 
 
 def _publish_release(
@@ -142,7 +150,8 @@ def test_agent_and_service_console_http_release_flow(
     owner_context = context(owner)
     agents = _agent_service(console_database)
     services = ServiceGovernanceService(
-        SqlAlchemyServiceGovernanceUnitOfWork(console_database.sessions)
+        SqlAlchemyServiceGovernanceUnitOfWork(console_database.sessions),
+        promotion_gate=PassingPromotionGate(),
     )
     ensure_runtime_configuration(console_database.sessions, owner.account_id)
     application = FastAPI()

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 20,
+  "registry_version": 21,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -105,6 +105,7 @@
     ,{ "code": "service.route.canary", "resource_type": "service_route", "action": "canary", "scope": "resource", "status": "active" }
     ,{ "code": "service.route.promote", "resource_type": "service_route", "action": "promote", "scope": "resource", "status": "active" }
     ,{ "code": "service.route.rollback", "resource_type": "service_route", "action": "rollback", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.operations.read", "resource_type": "agent_operations", "action": "read", "scope": "workspace", "status": "active" }
   ],
   "page_resources": [
     {
@@ -225,6 +226,17 @@
       "layout_key": "layout.workspace",
       "access_level": "authorized",
       "permission_code": "service.page.access",
+      "resource_version": 1,
+      "status": "active"
+    },
+    {
+      "page_resource_id": "80000000-0000-4000-8000-000000000012",
+      "page_key": "agent.operations",
+      "route": "/workspace/agent-operations",
+      "component_key": "AgentOperationsPage",
+      "layout_key": "layout.workspace",
+      "access_level": "authorized",
+      "permission_code": "agent.operations.read",
       "resource_version": 1,
       "status": "active"
     }
@@ -367,7 +379,8 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000135", "api_key": "service.definition.update", "operation_id": "updateService", "method": "PUT", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}", "access_level": "authorized", "permission_code": "service.definition.update", "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000136", "api_key": "service.route.canary", "operation_id": "startServiceCanary", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/canary", "access_level": "authorized", "permission_code": "service.route.canary", "risk_level": "critical", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000137", "api_key": "service.route.promote", "operation_id": "promoteServiceRoute", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/promote", "access_level": "authorized", "permission_code": "service.route.promote", "risk_level": "critical", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000138", "api_key": "service.route.rollback", "operation_id": "rollbackServiceRoute", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/rollback", "access_level": "authorized", "permission_code": "service.route.rollback", "risk_level": "critical", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000138", "api_key": "service.route.rollback", "operation_id": "rollbackServiceRoute", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/rollback", "access_level": "authorized", "permission_code": "service.route.rollback", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000139", "api_key": "agent.operations.report", "operation_id": "getAgentReleaseOperations", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/agent-release-operations", "access_level": "authorized", "permission_code": "agent.operations.read", "risk_level": "high", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -482,6 +495,8 @@
     { "menu_id": "82000000-0000-4000-8000-000000000216", "menu_key": "workspace.agents.test_read", "parent_menu_key": "workspace.agents", "name": "查看 Agent 测试", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.test.read", "icon_key": null, "sort_order": 180, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000217", "menu_key": "workspace.agents.release_read", "parent_menu_key": "workspace.agents", "name": "查看 Agent Release", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.release.read", "icon_key": null, "sort_order": 190, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000218", "menu_key": "workspace.services.read", "parent_menu_key": "workspace.services", "name": "查看服务", "menu_type": "action", "page_resource_id": null, "permission_code": "service.definition.read", "icon_key": null, "sort_order": 150, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000219", "menu_key": "workspace.agent_operations", "parent_menu_key": "navigation.workspace", "name": "Release 运营", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000012", "permission_code": "agent.operations.read", "icon_key": "activity", "sort_order": 380, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000220", "menu_key": "workspace.agent_operations.read", "parent_menu_key": "workspace.agent_operations", "name": "查看 Release 运营", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.operations.read", "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000152", "menu_key": "navigation.platform.models.provider_query", "parent_menu_key": "navigation.platform.models", "name": "查看模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000153", "menu_key": "navigation.platform.models.provider_create", "parent_menu_key": "navigation.platform.models", "name": "创建模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000154", "menu_key": "navigation.platform.models.credential_rotate", "parent_menu_key": "navigation.platform.models", "name": "轮换模型凭证", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
@@ -625,6 +640,7 @@
     { "menu_id": "82000000-0000-4000-8000-000000000211", "api_resource_id": "81000000-0000-4000-8000-000000000135", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000212", "api_resource_id": "81000000-0000-4000-8000-000000000136", "action_type": "publish" },
     { "menu_id": "82000000-0000-4000-8000-000000000213", "api_resource_id": "81000000-0000-4000-8000-000000000137", "action_type": "publish" },
-    { "menu_id": "82000000-0000-4000-8000-000000000214", "api_resource_id": "81000000-0000-4000-8000-000000000138", "action_type": "publish" }
+    { "menu_id": "82000000-0000-4000-8000-000000000214", "api_resource_id": "81000000-0000-4000-8000-000000000138", "action_type": "publish" },
+    { "menu_id": "82000000-0000-4000-8000-000000000220", "api_resource_id": "81000000-0000-4000-8000-000000000139", "action_type": "query" }
   ]
 }

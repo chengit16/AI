@@ -33,12 +33,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 20
-    assert len(resource_registry.permissions) == 103
-    assert len(resource_registry.page_resources) == 11
-    assert len(resource_registry.api_resources) == 138
-    assert len(resource_registry.menus) == 123
-    assert len(resource_registry.menu_api_bindings) == 131
+    assert resource_registry.registry_version == 21
+    assert len(resource_registry.permissions) == 104
+    assert len(resource_registry.page_resources) == 12
+    assert len(resource_registry.api_resources) == 139
+    assert len(resource_registry.menus) == 125
+    assert len(resource_registry.menu_api_bindings) == 132
     assert registry_openapi_violations() == ()
 
 
@@ -56,6 +56,8 @@ def test_new_workspace_owner_gets_operations_permissions_but_member_does_not() -
     assert "operations.outbox.replay" not in MEMBER_PERMISSION_CODES
     assert "service.definition.read" in OWNER_PERMISSION_CODES
     assert "service.definition.read" in MEMBER_PERMISSION_CODES
+    assert "agent.operations.read" in OWNER_PERMISSION_CODES
+    assert "agent.operations.read" not in MEMBER_PERMISSION_CODES
 
 
 def test_registry_rejects_duplicate_dangling_and_unbound_resources() -> None:
