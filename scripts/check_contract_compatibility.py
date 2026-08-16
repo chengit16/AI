@@ -20,6 +20,7 @@ CONTRACT_DIRS = (
     "errors",
     "release",
     "agent-control",
+    "tool-execution",
 )
 
 

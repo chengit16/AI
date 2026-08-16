@@ -78,6 +78,20 @@ def test_agent_control_baseline_contract() -> None:
     )
 
 
+def test_tool_execution_contract_fixture() -> None:
+    assert_valid(
+        "tool-execution/tool-execution.v1.schema.json",
+        "fixtures/tool-execution.v1.valid.json",
+    )
+
+
+def test_tool_execution_baseline_contract() -> None:
+    assert_valid(
+        "tool-execution/tool-execution-baseline.v1.schema.json",
+        "tool-execution/tool-execution-baseline.v1.json",
+    )
+
+
 def test_policy_contract_fixture() -> None:
     assert_valid(
         "policy/decision.v1.schema.json",
@@ -203,6 +217,21 @@ def test_error_codes_are_unique_and_stable() -> None:
         "AGENT_RUNTIME_RELEASE_REQUIRED",
         "SERVICE_ROUTE_CONFLICT",
         "SERVICE_ROUTE_UNAVAILABLE",
+        "TOOL_DEFINITION_INVALID",
+        "TOOL_VERSION_NOT_AVAILABLE",
+        "TOOL_EXECUTION_DENIED",
+        "TOOL_CONFIRMATION_REQUIRED",
+        "TOOL_CONFIRMATION_STALE",
+        "TOOL_RUN_CONFLICT",
+        "TOOL_RUN_TERMINAL",
+        "TOOL_RUN_BUDGET_EXCEEDED",
+        "TOOL_RETRY_NOT_ALLOWED",
+        "TOOL_ADAPTER_NOT_ALLOWED",
+        "TOOL_ADAPTER_UNAVAILABLE",
+        "TOOL_CREDENTIAL_UNAVAILABLE",
+        "TOOL_CREDENTIAL_EXPOSURE_DETECTED",
+        "TOOL_RESULT_REJECTED",
+        "TOOL_OUTCOME_UNKNOWN",
         "SSE_EVENT_EXPIRED",
         "ORGANIZATION_CONFLICT",
         "ROLE_CONFLICT",

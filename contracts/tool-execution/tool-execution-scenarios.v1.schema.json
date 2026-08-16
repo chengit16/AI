@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/tool-execution/tool-execution-scenarios.v1.schema.json",
+  "title": "工具执行合成验收场景 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_version",
+    "baseline_ref",
+    "synthetic",
+    "description",
+    "categories",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "dataset_version": { "const": "p4-01-v1" },
+    "baseline_ref": { "const": "contracts/tool-execution/tool-execution-baseline.v1.json" },
+    "synthetic": { "const": true },
+    "description": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "categories": {
+      "type": "array",
+      "minItems": 16,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/category" }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 24,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "category": {
+      "enum": [
+        "personal_read",
+        "enterprise_read",
+        "release_boundary",
+        "registry_version",
+        "workspace_isolation",
+        "authorization_revocation",
+        "confirmation",
+        "approval",
+        "idempotency",
+        "cancellation",
+        "late_result",
+        "credential_boundary",
+        "result_security",
+        "adapter_boundary",
+        "retry_boundary",
+        "menu_authorization"
+      ]
+    },
+    "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "text_list": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/text" }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "operation", "tool_key", "access_mode"],
+      "properties": {
+        "surface": { "enum": ["browser", "runtime", "worker"] },
+        "operation": { "$ref": "#/$defs/text" },
+        "tool_key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "access_mode": { "enum": ["read", "write"] }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "run_state",
+        "step_state",
+        "confirmation_state",
+        "error_code",
+        "retryable",
+        "adapter_invocations",
+        "committed_side_effects",
+        "duplicate_side_effects",
+        "cross_workspace_exposure",
+        "credential_exposure",
+        "model_context_eligible",
+        "late_result_overwrite",
+        "verified_invariants",
+        "evidence_sources"
+      ],
+      "properties": {
+        "outcome": { "enum": ["allowed", "denied", "replayed", "cancelled", "manual_recovery", "quarantined"] },
+        "run_state": { "enum": ["completed", "failed", "cancelled", "timed_out", "unchanged", "manual_recovery"] },
+        "step_state": { "enum": ["completed", "failed", "cancelled", "timed_out", "not_created", "unchanged", "manual_recovery"] },
+        "confirmation_state": { "enum": ["not_required", "pending", "approved", "rejected", "expired", "withdrawn", "not_created"] },
+        "error_code": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" }
+          ]
+        },
+        "retryable": { "type": "boolean" },
+        "adapter_invocations": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "committed_side_effects": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "duplicate_side_effects": { "const": 0 },
+        "cross_workspace_exposure": { "const": false },
+        "credential_exposure": { "const": false },
+        "model_context_eligible": { "type": "boolean" },
+        "late_result_overwrite": { "const": false },
+        "verified_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^p4_[a-z0-9_]+$" }
+        },
+        "evidence_sources": { "$ref": "#/$defs/text_list" }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "category",
+        "workspace_type",
+        "synthetic",
+        "preconditions",
+        "action",
+        "expected",
+        "cleanup"
+      ],
+      "properties": {
+        "case_id": { "type": "string", "pattern": "^p401-[a-z0-9-]+-[0-9]{3}$" },
+        "category": { "$ref": "#/$defs/category" },
+        "workspace_type": { "enum": ["personal", "enterprise"] },
+        "synthetic": { "const": true },
+        "preconditions": { "$ref": "#/$defs/text_list" },
+        "action": { "$ref": "#/$defs/action" },
+        "expected": { "$ref": "#/$defs/expected" },
+        "cleanup": { "$ref": "#/$defs/text_list" }
+      }
+    }
+  }
+}

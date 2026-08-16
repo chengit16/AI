@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/tool-execution/tool-execution-baseline.v1.schema.json",
+  "title": "工具执行阶段基线 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "status",
+    "state_machines",
+    "invariants",
+    "initial_tool_catalog",
+    "allowed_adapter_kinds",
+    "confirmation_policy",
+    "idempotency_policy",
+    "cancellation_policy",
+    "result_security_policy",
+    "reserved_permissions",
+    "reserved_menus",
+    "planned_api_operations",
+    "integration_event_types",
+    "deferred_capabilities"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "baseline_id": { "const": "p4-01-v1" },
+    "status": { "const": "frozen" },
+    "state_machines": {
+      "type": "array",
+      "minItems": 5,
+      "items": { "$ref": "#/$defs/state_machine" }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 12,
+      "items": { "$ref": "#/$defs/invariant" }
+    },
+    "initial_tool_catalog": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/initial_tool" }
+    },
+    "allowed_adapter_kinds": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": { "enum": ["internal_read", "synthetic_internal_write"] }
+    },
+    "confirmation_policy": { "$ref": "#/$defs/confirmation_policy" },
+    "idempotency_policy": { "$ref": "#/$defs/idempotency_policy" },
+    "cancellation_policy": { "$ref": "#/$defs/cancellation_policy" },
+    "result_security_policy": { "$ref": "#/$defs/result_security_policy" },
+    "reserved_permissions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/permission_code" }
+    },
+    "reserved_menus": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/menu_reservation" }
+    },
+    "planned_api_operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/api_operation" }
+    },
+    "integration_event_types": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/event_type" }
+    },
+    "deferred_capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "saas",
+          "go_runtime",
+          "real_data_source_connectors",
+          "llm_grading",
+          "multimodal_image_qa",
+          "channel_gateway",
+          "durable_run",
+          "arbitrary_http",
+          "arbitrary_sql",
+          "filesystem_access",
+          "real_external_tools",
+          "payment_send_delete_tools"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "registry_key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "permission_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+    },
+    "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "text_list": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/text" }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "guard"],
+      "properties": {
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "guard": { "$ref": "#/$defs/text" }
+      }
+    },
+    "state_machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "initial_state", "terminal_states", "states", "transitions"],
+      "properties": {
+        "entity": { "enum": ["run", "step", "attempt", "tool_call", "confirmation"] },
+        "initial_state": { "type": "string", "minLength": 1 },
+        "terminal_states": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "states": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "transitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/transition" }
+        }
+      }
+    },
+    "invariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invariant_id", "statement", "enforcement_layers", "evidence_sources", "failure_result"],
+      "properties": {
+        "invariant_id": { "type": "string", "pattern": "^p4_[a-z0-9_]+$" },
+        "statement": { "$ref": "#/$defs/text" },
+        "enforcement_layers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["contract", "application", "database", "policy", "runtime", "adapter", "integration_test"] }
+        },
+        "evidence_sources": { "$ref": "#/$defs/text_list" },
+        "failure_result": { "enum": ["fail_closed", "manual_recovery", "release_blocked"] }
+      }
+    },
+    "initial_tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_key",
+        "version",
+        "access_mode",
+        "risk_level",
+        "adapter_kind",
+        "permission_code",
+        "credential_requirement",
+        "timeout_seconds",
+        "retry_mode"
+      ],
+      "properties": {
+        "tool_key": {
+          "enum": [
+            "knowledge.search",
+            "document.read_authorized_range",
+            "workflow.get_status",
+            "approval.get_status",
+            "quota.get_usage"
+          ]
+        },
+        "version": { "const": 1 },
+        "access_mode": { "const": "read" },
+        "risk_level": { "enum": ["low", "medium"] },
+        "adapter_kind": { "const": "internal_read" },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "credential_requirement": { "const": "none" },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 30 },
+        "retry_mode": { "const": "safe_read" }
+      }
+    },
+    "confirmation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "read_behavior",
+        "write_behavior",
+        "personal_mode",
+        "enterprise_mode",
+        "maximum_enterprise_levels",
+        "default_expiry_seconds",
+        "binding_fields",
+        "invalidation_triggers"
+      ],
+      "properties": {
+        "read_behavior": { "const": "not_required_after_policy_allow" },
+        "write_behavior": { "const": "required_before_adapter_call" },
+        "personal_mode": { "const": "workspace_owner_confirmation" },
+        "enterprise_mode": { "const": "versioned_multilevel_approval" },
+        "maximum_enterprise_levels": { "const": 5 },
+        "default_expiry_seconds": { "type": "integer", "minimum": 60, "maximum": 259200 },
+        "binding_fields": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["workspace_id", "run_id", "step_id", "tool_id", "tool_version", "canonical_arguments_hash", "policy_version"]
+          }
+        },
+        "invalidation_triggers": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["arguments_changed", "tool_version_changed", "policy_changed", "permission_revoked", "expired", "withdrawn"]
+          }
+        }
+      }
+    },
+    "idempotency_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hash_algorithm",
+        "reservation_order",
+        "same_key_same_request",
+        "same_key_different_request",
+        "unknown_outcome_behavior",
+        "request_identity_fields"
+      ],
+      "properties": {
+        "hash_algorithm": { "const": "sha256" },
+        "reservation_order": { "const": "persist_before_side_effect" },
+        "same_key_same_request": { "const": "return_recorded_result" },
+        "same_key_different_request": { "const": "reject_with_idempotency_conflict" },
+        "unknown_outcome_behavior": { "const": "manual_recovery_without_automatic_replay" },
+        "request_identity_fields": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["workspace_id", "run_id", "step_id", "tool_id", "tool_version", "canonical_arguments_hash", "confirmation_hash"]
+          }
+        }
+      }
+    },
+    "cancellation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["new_attempts_after_cancel", "adapter_propagation", "late_result_behavior", "terminal_states_immutable"],
+      "properties": {
+        "new_attempts_after_cancel": { "const": "forbidden" },
+        "adapter_propagation": { "const": "best_effort" },
+        "late_result_behavior": { "const": "audit_only_never_overwrite_terminal_state" },
+        "terminal_states_immutable": { "const": true }
+      }
+    },
+    "result_security_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_checks", "maximum_result_bytes", "failed_check_behavior", "credential_exposure_behavior"],
+      "properties": {
+        "required_checks": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["schema", "size", "sensitive_fields", "prompt_injection"] }
+        },
+        "maximum_result_bytes": { "type": "integer", "minimum": 1024, "maximum": 1048576 },
+        "failed_check_behavior": { "const": "reject_before_model_context" },
+        "credential_exposure_behavior": { "const": "fail_closed_and_security_audit" }
+      }
+    },
+    "menu_reservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["menu_key", "menu_type", "permission_code", "workspace_types"],
+      "properties": {
+        "menu_key": { "$ref": "#/$defs/registry_key" },
+        "menu_type": { "enum": ["page", "button"] },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "workspace_types": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["personal", "enterprise"] }
+        }
+      }
+    },
+    "api_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "permission_code", "menu_key", "surface"],
+      "properties": {
+        "operation_id": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]+$" },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "menu_key": { "$ref": "#/$defs/registry_key" },
+        "surface": { "enum": ["browser", "runtime_internal", "worker_internal"] }
+      }
+    }
+  }
+}

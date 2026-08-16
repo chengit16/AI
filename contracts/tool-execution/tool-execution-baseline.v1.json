@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "baseline_id": "p4-01-v1",
+  "status": "frozen",
+  "state_machines": [
+    {
+      "entity": "run",
+      "initial_state": "pending",
+      "terminal_states": ["completed", "failed", "cancelled", "timed_out"],
+      "states": ["pending", "planning", "running", "waiting_confirmation", "waiting_approval", "cancellation_requested", "completed", "failed", "cancelled", "timed_out"],
+      "transitions": [
+        { "from": "pending", "to": "planning", "guard": "已冻结可信主体、工作空间、AgentRelease 和运行预算。" },
+        { "from": "planning", "to": "running", "guard": "至少一个候选步骤通过 Release 允许列表、Schema 和当前策略校验。" },
+        { "from": "running", "to": "waiting_confirmation", "guard": "个人空间副作用步骤需要所有者确认。" },
+        { "from": "running", "to": "waiting_approval", "guard": "企业空间副作用步骤命中版本化多级审批策略。" },
+        { "from": "waiting_confirmation", "to": "running", "guard": "所有者确认仍有效且调用摘要未变化。" },
+        { "from": "waiting_approval", "to": "running", "guard": "全部必需审批层级通过且调用摘要未变化。" },
+        { "from": "running", "to": "completed", "guard": "全部步骤以安全结果完成且不存在未决 Attempt。" },
+        { "from": "running", "to": "failed", "guard": "不可重试失败已提交并保留最小证据。" },
+        { "from": "pending", "to": "cancellation_requested", "guard": "获授权主体请求取消且 Run 尚未终止。" },
+        { "from": "running", "to": "cancellation_requested", "guard": "获授权主体请求取消且不再允许创建新 Attempt。" },
+        { "from": "cancellation_requested", "to": "cancelled", "guard": "活动 Attempt 已停止或进入只记录迟到结果的隔离状态。" },
+        { "from": "running", "to": "timed_out", "guard": "运行总时限已达到且终态以原子条件写入。" }
+      ]
+    },
+    {
+      "entity": "step",
+      "initial_state": "planned",
+      "terminal_states": ["completed", "failed", "cancelled", "timed_out"],
+      "states": ["planned", "policy_checking", "waiting_confirmation", "waiting_approval", "ready", "running", "completed", "failed", "cancelled", "timed_out"],
+      "transitions": [
+        { "from": "planned", "to": "policy_checking", "guard": "工具版本、规范参数摘要和步骤预算已经冻结。" },
+        { "from": "policy_checking", "to": "ready", "guard": "只读步骤通过当前策略且不需要确认。" },
+        { "from": "policy_checking", "to": "waiting_confirmation", "guard": "个人空间写步骤需要绑定摘要的所有者确认。" },
+        { "from": "policy_checking", "to": "waiting_approval", "guard": "企业空间写步骤需要绑定摘要的多级审批。" },
+        { "from": "waiting_confirmation", "to": "ready", "guard": "确认有效且执行前策略复核仍允许。" },
+        { "from": "waiting_approval", "to": "ready", "guard": "审批有效且执行前策略复核仍允许。" },
+        { "from": "ready", "to": "running", "guard": "Worker 获得有效租约并创建唯一当前 Attempt。" },
+        { "from": "running", "to": "completed", "guard": "结果通过全部安全检查并提交。" },
+        { "from": "running", "to": "failed", "guard": "重试预算耗尽或发生不可重试失败。" },
+        { "from": "planned", "to": "cancelled", "guard": "Run 已取消且步骤从未开始。" },
+        { "from": "running", "to": "timed_out", "guard": "步骤时限达到且迟到结果不得覆盖终态。" }
+      ]
+    },
+    {
+      "entity": "attempt",
+      "initial_state": "leased",
+      "terminal_states": ["succeeded", "failed", "cancelled", "timed_out", "ignored_late_result"],
+      "states": ["leased", "executing", "succeeded", "failed", "cancelled", "timed_out", "ignored_late_result"],
+      "transitions": [
+        { "from": "leased", "to": "executing", "guard": "租约代际仍为当前值且 Run 未取消或超时。" },
+        { "from": "executing", "to": "succeeded", "guard": "Adapter 返回且结果通过安全检查。" },
+        { "from": "executing", "to": "failed", "guard": "失败分类、重试资格和最小错误证据已提交。" },
+        { "from": "leased", "to": "cancelled", "guard": "执行前观察到 Run 取消事实。" },
+        { "from": "executing", "to": "timed_out", "guard": "Attempt 时限到达并停止后续状态提交。" },
+        { "from": "executing", "to": "ignored_late_result", "guard": "父级已终止，迟到结果只进入审计证据。" }
+      ]
+    },
+    {
+      "entity": "tool_call",
+      "initial_state": "proposed",
+      "terminal_states": ["succeeded", "failed", "cancelled", "timed_out"],
+      "states": ["proposed", "authorized", "confirmed", "executing", "succeeded", "failed", "cancelled", "timed_out"],
+      "transitions": [
+        { "from": "proposed", "to": "authorized", "guard": "Release 允许列表、工具版本、参数 Schema、权益和当前策略全部通过。" },
+        { "from": "authorized", "to": "confirmed", "guard": "只读调用无需确认，或副作用调用已绑定有效确认/审批。" },
+        { "from": "confirmed", "to": "executing", "guard": "副作用幂等身份已先持久化且调用边缘凭证校验通过。" },
+        { "from": "executing", "to": "succeeded", "guard": "结果通过安全检查并与幂等事实原子关联。" },
+        { "from": "executing", "to": "failed", "guard": "稳定失败已记录且不允许不安全重放。" },
+        { "from": "authorized", "to": "cancelled", "guard": "执行前观察到有效取消事实。" },
+        { "from": "executing", "to": "timed_out", "guard": "调用超时且迟到结果不能覆盖终态。" }
+      ]
+    },
+    {
+      "entity": "confirmation",
+      "initial_state": "pending",
+      "terminal_states": ["approved", "rejected", "expired", "withdrawn"],
+      "states": ["pending", "approved", "rejected", "expired", "withdrawn"],
+      "transitions": [
+        { "from": "pending", "to": "approved", "guard": "获授权确认人或全部必需审批层级接受同一调用摘要。" },
+        { "from": "pending", "to": "rejected", "guard": "获授权确认人拒绝且副作用为零。" },
+        { "from": "pending", "to": "expired", "guard": "有效期已过且不能通过延长时间复活原事实。" },
+        { "from": "pending", "to": "withdrawn", "guard": "申请人撤回、权限撤销或调用摘要变化。" }
+      ]
+    }
+  ],
+  "invariants": [
+    {
+      "invariant_id": "p4_release_tool_allowlist",
+      "statement": "只有不可变 AgentRelease 允许列表中冻结且当前仍获授权的工具版本可以执行，草稿、模型和客户端不能扩大列表。",
+      "enforcement_layers": ["contract", "application", "policy", "runtime", "integration_test"],
+      "evidence_sources": ["AgentRelease 工具引用", "当前策略决策", "未允许工具拒绝测试"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p4_deterministic_execution_boundary",
+      "statement": "模型只能提出结构化候选意图，参数、策略、确认、凭证和 Adapter 调用由确定性 Runtime 控制。",
+      "enforcement_layers": ["contract", "application", "runtime", "adapter", "integration_test"],
+      "evidence_sources": ["候选意图", "冻结 Step", "Adapter 调用记录"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p4_tool_version_immutable",
+      "statement": "已被 Release 或 Run 引用的工具版本不能原地修改或删除，Schema、风险和重试变化必须创建新版本。",
+      "enforcement_layers": ["contract", "application", "database", "integration_test"],
+      "evidence_sources": ["工具版本摘要", "Release 引用", "更新删除拒绝测试"],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "p4_current_policy_recheck",
+      "statement": "每个 Step 和 ToolCall 执行前使用可信上下文重新执行当前策略，撤权、权益收窄或策略不可用时默认拒绝。",
+      "enforcement_layers": ["application", "policy", "runtime", "integration_test"],
+      "evidence_sources": ["可信 RequestContext", "策略版本", "撤权竞态测试"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p4_read_write_permission_separation",
+      "statement": "读取、写入和管理权限相互独立，只读权限与菜单可见性不能推导写入或管理授权。",
+      "enforcement_layers": ["contract", "application", "policy", "integration_test"],
+      "evidence_sources": ["权限注册表", "API 绑定", "菜单旁路测试"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p4_confirmation_digest_binding",
+      "statement": "副作用确认绑定工作空间、Run、Step、工具版本、规范参数摘要和策略版本，拒绝、过期、撤回或变化后不得执行。",
+      "enforcement_layers": ["contract", "application", "policy", "database", "integration_test"],
+      "evidence_sources": ["确认摘要", "审批实例", "陈旧确认拒绝测试"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p4_idempotency_before_side_effect",
+      "statement": "副作用发生前必须持久化稳定幂等身份，同键同请求只返回原结果，同键异请求拒绝，未知结果不得自动重放。",
+      "enforcement_layers": ["contract", "application", "database", "adapter", "integration_test"],
+      "evidence_sources": ["幂等记录", "请求摘要", "副作用计数"],
+      "failure_result": "manual_recovery"
+    },
+    {
+      "invariant_id": "p4_credential_call_edge_only",
+      "statement": "工具凭证只以引用持久化并在 Adapter 调用边缘短时注入，不进入 Prompt、模型、日志、事件、审计正文、SSE、异常或响应。",
+      "enforcement_layers": ["contract", "application", "adapter", "integration_test"],
+      "evidence_sources": ["credential_ref", "泄漏扫描", "调用边缘测试"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p4_bounded_retry_and_terminal_precedence",
+      "statement": "只重试明确安全的操作且次数与时限有界，取消、超时或租约失效后不创建新 Attempt，迟到结果不能覆盖终态。",
+      "enforcement_layers": ["application", "database", "runtime", "adapter", "integration_test"],
+      "evidence_sources": ["Attempt 历史", "租约代际", "取消与迟到结果测试"],
+      "failure_result": "manual_recovery"
+    },
+    {
+      "invariant_id": "p4_transactional_fact_consistency",
+      "statement": "Run、Step、Attempt、ToolCall、确认、审计和 Outbox 按明确事务边界一致提交，至少一次投递不能产生重复事实或副作用。",
+      "enforcement_layers": ["application", "database", "runtime", "integration_test"],
+      "evidence_sources": ["数据库事务", "审计与 Outbox", "重复投递测试"],
+      "failure_result": "release_blocked"
+    },
+    {
+      "invariant_id": "p4_untrusted_result_quarantine",
+      "statement": "工具结果通过结构、大小、敏感字段和 Prompt Injection 检查后才能进入模型上下文，失败结果必须隔离并最小化记录。",
+      "enforcement_layers": ["contract", "application", "runtime", "integration_test"],
+      "evidence_sources": ["结果安全检查", "上下文资格标记", "恶意结果测试"],
+      "failure_result": "fail_closed"
+    },
+    {
+      "invariant_id": "p4_restricted_adapter_surface",
+      "statement": "阶段四只允许冻结内部只读 Adapter 和合成内部写 Adapter，不开放任意 HTTP、SQL、文件系统或真实外部工具。",
+      "enforcement_layers": ["contract", "application", "adapter", "integration_test"],
+      "evidence_sources": ["Adapter 类型允许列表", "工具目录", "任意执行入口拒绝测试"],
+      "failure_result": "release_blocked"
+    }
+  ],
+  "initial_tool_catalog": [
+    { "tool_key": "knowledge.search", "version": 1, "access_mode": "read", "risk_level": "medium", "adapter_kind": "internal_read", "permission_code": "knowledge.document.read", "credential_requirement": "none", "timeout_seconds": 15, "retry_mode": "safe_read" },
+    { "tool_key": "document.read_authorized_range", "version": 1, "access_mode": "read", "risk_level": "medium", "adapter_kind": "internal_read", "permission_code": "knowledge.document.read", "credential_requirement": "none", "timeout_seconds": 10, "retry_mode": "safe_read" },
+    { "tool_key": "workflow.get_status", "version": 1, "access_mode": "read", "risk_level": "low", "adapter_kind": "internal_read", "permission_code": "workflow.run.read", "credential_requirement": "none", "timeout_seconds": 5, "retry_mode": "safe_read" },
+    { "tool_key": "approval.get_status", "version": 1, "access_mode": "read", "risk_level": "low", "adapter_kind": "internal_read", "permission_code": "approval.instance.read", "credential_requirement": "none", "timeout_seconds": 5, "retry_mode": "safe_read" },
+    { "tool_key": "quota.get_usage", "version": 1, "access_mode": "read", "risk_level": "low", "adapter_kind": "internal_read", "permission_code": "workspace.entitlement.read", "credential_requirement": "none", "timeout_seconds": 5, "retry_mode": "safe_read" }
+  ],
+  "allowed_adapter_kinds": ["internal_read", "synthetic_internal_write"],
+  "confirmation_policy": {
+    "read_behavior": "not_required_after_policy_allow",
+    "write_behavior": "required_before_adapter_call",
+    "personal_mode": "workspace_owner_confirmation",
+    "enterprise_mode": "versioned_multilevel_approval",
+    "maximum_enterprise_levels": 5,
+    "default_expiry_seconds": 259200,
+    "binding_fields": ["workspace_id", "run_id", "step_id", "tool_id", "tool_version", "canonical_arguments_hash", "policy_version"],
+    "invalidation_triggers": ["arguments_changed", "tool_version_changed", "policy_changed", "permission_revoked", "expired", "withdrawn"]
+  },
+  "idempotency_policy": {
+    "hash_algorithm": "sha256",
+    "reservation_order": "persist_before_side_effect",
+    "same_key_same_request": "return_recorded_result",
+    "same_key_different_request": "reject_with_idempotency_conflict",
+    "unknown_outcome_behavior": "manual_recovery_without_automatic_replay",
+    "request_identity_fields": ["workspace_id", "run_id", "step_id", "tool_id", "tool_version", "canonical_arguments_hash", "confirmation_hash"]
+  },
+  "cancellation_policy": {
+    "new_attempts_after_cancel": "forbidden",
+    "adapter_propagation": "best_effort",
+    "late_result_behavior": "audit_only_never_overwrite_terminal_state",
+    "terminal_states_immutable": true
+  },
+  "result_security_policy": {
+    "required_checks": ["schema", "size", "sensitive_fields", "prompt_injection"],
+    "maximum_result_bytes": 262144,
+    "failed_check_behavior": "reject_before_model_context",
+    "credential_exposure_behavior": "fail_closed_and_security_audit"
+  },
+  "reserved_permissions": [
+    "tool.page.access",
+    "tool.catalog.read",
+    "tool.run.create",
+    "tool.run.read",
+    "tool.run.cancel",
+    "tool.confirmation.respond"
+  ],
+  "reserved_menus": [
+    { "menu_key": "workspace.tools", "menu_type": "page", "permission_code": "tool.page.access", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.tools.execute", "menu_type": "button", "permission_code": "tool.run.create", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.tool_runs", "menu_type": "page", "permission_code": "tool.run.read", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.tool_runs.confirm", "menu_type": "button", "permission_code": "tool.confirmation.respond", "workspace_types": ["personal", "enterprise"] },
+    { "menu_key": "workspace.tool_runs.cancel", "menu_type": "button", "permission_code": "tool.run.cancel", "workspace_types": ["personal", "enterprise"] }
+  ],
+  "planned_api_operations": [
+    { "operation_id": "listAvailableTools", "permission_code": "tool.catalog.read", "menu_key": "workspace.tools", "surface": "browser" },
+    { "operation_id": "createToolRun", "permission_code": "tool.run.create", "menu_key": "workspace.tools.execute", "surface": "browser" },
+    { "operation_id": "listToolRuns", "permission_code": "tool.run.read", "menu_key": "workspace.tool_runs", "surface": "browser" },
+    { "operation_id": "getToolRun", "permission_code": "tool.run.read", "menu_key": "workspace.tool_runs", "surface": "browser" },
+    { "operation_id": "streamToolRun", "permission_code": "tool.run.read", "menu_key": "workspace.tool_runs", "surface": "browser" },
+    { "operation_id": "confirmToolCall", "permission_code": "tool.confirmation.respond", "menu_key": "workspace.tool_runs.confirm", "surface": "browser" },
+    { "operation_id": "rejectToolCall", "permission_code": "tool.confirmation.respond", "menu_key": "workspace.tool_runs.confirm", "surface": "browser" },
+    { "operation_id": "cancelToolRun", "permission_code": "tool.run.cancel", "menu_key": "workspace.tool_runs.cancel", "surface": "browser" },
+    { "operation_id": "loadToolExecutionPlan", "permission_code": "tool.run.create", "menu_key": "workspace.tools.execute", "surface": "runtime_internal" },
+    { "operation_id": "executeToolAttempt", "permission_code": "tool.run.create", "menu_key": "workspace.tools.execute", "surface": "worker_internal" }
+  ],
+  "integration_event_types": [
+    "tool.run.created",
+    "tool.run.state_changed",
+    "tool.step.state_changed",
+    "tool.call.confirmation_requested",
+    "tool.call.confirmation_resolved",
+    "tool.call.started",
+    "tool.call.completed",
+    "tool.call.failed",
+    "tool.run.cancellation_requested",
+    "tool.run.cancelled"
+  ],
+  "deferred_capabilities": [
+    "saas",
+    "go_runtime",
+    "real_data_source_connectors",
+    "llm_grading",
+    "multimodal_image_qa",
+    "channel_gateway",
+    "durable_run",
+    "arbitrary_http",
+    "arbitrary_sql",
+    "filesystem_access",
+    "real_external_tools",
+    "payment_send_delete_tools"
+  ]
+}

@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/tool-execution/tool-execution.v1.schema.json",
+  "title": "工具执行核心事实契约 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool_version",
+    "run",
+    "step",
+    "attempt",
+    "tool_call",
+    "policy_decision",
+    "confirmation",
+    "idempotency_record",
+    "cancellation",
+    "result"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool_version": { "$ref": "#/$defs/tool_version" },
+    "run": { "$ref": "#/$defs/run" },
+    "step": { "$ref": "#/$defs/step" },
+    "attempt": { "$ref": "#/$defs/attempt" },
+    "tool_call": { "$ref": "#/$defs/tool_call" },
+    "policy_decision": { "$ref": "#/$defs/policy_decision" },
+    "confirmation": { "$ref": "#/$defs/confirmation" },
+    "idempotency_record": { "$ref": "#/$defs/idempotency_record" },
+    "cancellation": { "$ref": "#/$defs/cancellation" },
+    "result": { "$ref": "#/$defs/result" }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "nullable_timestamp": {
+      "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }]
+    },
+    "tool_key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "permission_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+    },
+    "tool_version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_id",
+        "tool_key",
+        "version",
+        "display_name",
+        "access_mode",
+        "risk_level",
+        "adapter_kind",
+        "input_schema_hash",
+        "output_schema_hash",
+        "permission_code",
+        "credential_requirement",
+        "timeout_seconds",
+        "retry_mode",
+        "immutable",
+        "synthetic"
+      ],
+      "properties": {
+        "tool_id": { "$ref": "#/$defs/uuid" },
+        "tool_key": { "$ref": "#/$defs/tool_key" },
+        "version": { "type": "integer", "minimum": 1 },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "access_mode": { "enum": ["read", "write"] },
+        "risk_level": { "enum": ["low", "medium", "high", "critical"] },
+        "adapter_kind": { "enum": ["internal_read", "synthetic_internal_write"] },
+        "input_schema_hash": { "$ref": "#/$defs/sha256" },
+        "output_schema_hash": { "$ref": "#/$defs/sha256" },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "credential_requirement": { "enum": ["none", "credential_ref"] },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 120 },
+        "retry_mode": { "enum": ["none", "safe_read", "idempotent_write"] },
+        "immutable": { "const": true },
+        "synthetic": { "type": "boolean" }
+      }
+    },
+    "run_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_steps", "max_attempts_per_step", "max_execution_seconds", "max_cost_microunits"],
+      "properties": {
+        "max_steps": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "max_attempts_per_step": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "max_execution_seconds": { "type": "integer", "minimum": 1, "maximum": 1800 },
+        "max_cost_microunits": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "workspace_id",
+        "requested_by_actor_id",
+        "requested_by_account_id",
+        "service_id",
+        "agent_release_id",
+        "state",
+        "budget",
+        "cancel_requested_at",
+        "created_at",
+        "updated_at",
+        "version"
+      ],
+      "properties": {
+        "run_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "requested_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "requested_by_account_id": { "$ref": "#/$defs/uuid" },
+        "service_id": { "$ref": "#/$defs/uuid" },
+        "agent_release_id": { "$ref": "#/$defs/uuid" },
+        "state": {
+          "enum": [
+            "pending",
+            "planning",
+            "running",
+            "waiting_confirmation",
+            "waiting_approval",
+            "cancellation_requested",
+            "completed",
+            "failed",
+            "cancelled",
+            "timed_out"
+          ]
+        },
+        "budget": { "$ref": "#/$defs/run_budget" },
+        "cancel_requested_at": { "$ref": "#/$defs/nullable_timestamp" },
+        "created_at": { "$ref": "#/$defs/timestamp" },
+        "updated_at": { "$ref": "#/$defs/timestamp" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_id",
+        "run_id",
+        "workspace_id",
+        "sequence_no",
+        "tool_id",
+        "tool_version",
+        "canonical_arguments_hash",
+        "state",
+        "current_attempt_no",
+        "created_at",
+        "updated_at",
+        "version"
+      ],
+      "properties": {
+        "step_id": { "$ref": "#/$defs/uuid" },
+        "run_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "sequence_no": { "type": "integer", "minimum": 1 },
+        "tool_id": { "$ref": "#/$defs/uuid" },
+        "tool_version": { "type": "integer", "minimum": 1 },
+        "canonical_arguments_hash": { "$ref": "#/$defs/sha256" },
+        "state": {
+          "enum": [
+            "planned",
+            "policy_checking",
+            "waiting_confirmation",
+            "waiting_approval",
+            "ready",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "timed_out"
+          ]
+        },
+        "current_attempt_no": { "type": ["integer", "null"], "minimum": 1 },
+        "created_at": { "$ref": "#/$defs/timestamp" },
+        "updated_at": { "$ref": "#/$defs/timestamp" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "run_id",
+        "step_id",
+        "workspace_id",
+        "attempt_no",
+        "lease_generation",
+        "state",
+        "started_at",
+        "completed_at"
+      ],
+      "properties": {
+        "attempt_id": { "$ref": "#/$defs/uuid" },
+        "run_id": { "$ref": "#/$defs/uuid" },
+        "step_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "attempt_no": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "lease_generation": { "type": "integer", "minimum": 1 },
+        "state": {
+          "enum": [
+            "leased",
+            "executing",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "timed_out",
+            "ignored_late_result"
+          ]
+        },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "completed_at": { "$ref": "#/$defs/nullable_timestamp" }
+      }
+    },
+    "tool_call": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_call_id",
+        "run_id",
+        "step_id",
+        "attempt_id",
+        "workspace_id",
+        "tool_id",
+        "tool_version",
+        "canonical_arguments_hash",
+        "access_mode",
+        "risk_level",
+        "credential_ref",
+        "state",
+        "created_at"
+      ],
+      "properties": {
+        "tool_call_id": { "$ref": "#/$defs/uuid" },
+        "run_id": { "$ref": "#/$defs/uuid" },
+        "step_id": { "$ref": "#/$defs/uuid" },
+        "attempt_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "tool_id": { "$ref": "#/$defs/uuid" },
+        "tool_version": { "type": "integer", "minimum": 1 },
+        "canonical_arguments_hash": { "$ref": "#/$defs/sha256" },
+        "access_mode": { "enum": ["read", "write"] },
+        "risk_level": { "enum": ["low", "medium", "high", "critical"] },
+        "credential_ref": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^cred_[a-z0-9]{16,64}$" }
+          ]
+        },
+        "state": {
+          "enum": ["proposed", "authorized", "confirmed", "executing", "succeeded", "failed", "cancelled", "timed_out"]
+        },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "policy_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "tool_call_id",
+        "workspace_id",
+        "policy_version",
+        "permission_code",
+        "decision",
+        "resource_scope_hash",
+        "field_mask_hash",
+        "evaluated_at"
+      ],
+      "properties": {
+        "decision_id": { "$ref": "#/$defs/uuid" },
+        "tool_call_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "policy_version": { "type": "integer", "minimum": 1 },
+        "permission_code": { "$ref": "#/$defs/permission_code" },
+        "decision": { "enum": ["allow", "deny"] },
+        "resource_scope_hash": { "$ref": "#/$defs/sha256" },
+        "field_mask_hash": { "$ref": "#/$defs/sha256" },
+        "evaluated_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confirmation_id",
+        "tool_call_id",
+        "workspace_id",
+        "mode",
+        "approval_instance_id",
+        "confirmation_hash",
+        "policy_version",
+        "state",
+        "confirmed_by_actor_id",
+        "expires_at",
+        "resolved_at"
+      ],
+      "properties": {
+        "confirmation_id": { "$ref": "#/$defs/uuid" },
+        "tool_call_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "mode": { "enum": ["not_required", "personal_owner", "enterprise_approval"] },
+        "approval_instance_id": {
+          "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "confirmation_hash": { "$ref": "#/$defs/sha256" },
+        "policy_version": { "type": "integer", "minimum": 1 },
+        "state": { "enum": ["not_required", "pending", "approved", "rejected", "expired", "withdrawn"] },
+        "confirmed_by_actor_id": {
+          "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "expires_at": { "$ref": "#/$defs/nullable_timestamp" },
+        "resolved_at": { "$ref": "#/$defs/nullable_timestamp" }
+      }
+    },
+    "idempotency_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idempotency_record_id",
+        "workspace_id",
+        "tool_call_id",
+        "idempotency_key_hash",
+        "request_hash",
+        "state",
+        "result_hash",
+        "reserved_at",
+        "completed_at"
+      ],
+      "properties": {
+        "idempotency_record_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "tool_call_id": { "$ref": "#/$defs/uuid" },
+        "idempotency_key_hash": { "$ref": "#/$defs/sha256" },
+        "request_hash": { "$ref": "#/$defs/sha256" },
+        "state": { "enum": ["reserved", "succeeded", "failed", "outcome_unknown"] },
+        "result_hash": {
+          "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+        },
+        "reserved_at": { "$ref": "#/$defs/timestamp" },
+        "completed_at": { "$ref": "#/$defs/nullable_timestamp" }
+      }
+    },
+    "cancellation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cancellation_id",
+        "run_id",
+        "workspace_id",
+        "requested_by_actor_id",
+        "reason_code",
+        "state",
+        "requested_at",
+        "effective_at"
+      ],
+      "properties": {
+        "cancellation_id": { "$ref": "#/$defs/uuid" },
+        "run_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "requested_by_actor_id": { "$ref": "#/$defs/uuid" },
+        "reason_code": { "enum": ["not_requested", "user_requested", "policy_revoked", "budget_exceeded", "timeout"] },
+        "state": { "enum": ["not_requested", "requested", "effective", "too_late"] },
+        "requested_at": { "$ref": "#/$defs/nullable_timestamp" },
+        "effective_at": { "$ref": "#/$defs/nullable_timestamp" }
+      }
+    },
+    "safety_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_code", "status"],
+      "properties": {
+        "check_code": { "enum": ["schema", "size", "sensitive_fields", "prompt_injection"] },
+        "status": { "enum": ["passed", "failed"] }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_id",
+        "tool_call_id",
+        "workspace_id",
+        "output_schema_hash",
+        "content_hash",
+        "status",
+        "safety_checks",
+        "eligible_for_model_context",
+        "credential_exposure_detected",
+        "recorded_at"
+      ],
+      "properties": {
+        "result_id": { "$ref": "#/$defs/uuid" },
+        "tool_call_id": { "$ref": "#/$defs/uuid" },
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "output_schema_hash": { "$ref": "#/$defs/sha256" },
+        "content_hash": { "$ref": "#/$defs/sha256" },
+        "status": { "enum": ["accepted", "rejected"] },
+        "safety_checks": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/safety_check" }
+        },
+        "eligible_for_model_context": { "type": "boolean" },
+        "credential_exposure_detected": { "const": false },
+        "recorded_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}

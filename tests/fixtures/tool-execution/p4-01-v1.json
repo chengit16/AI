@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "dataset_version": "p4-01-v1",
+  "baseline_ref": "contracts/tool-execution/tool-execution-baseline.v1.json",
+  "synthetic": true,
+  "description": "阶段四工具执行全合成验收基线，不包含真实客户、参数正文、结果正文、Prompt、凭证或外部系统数据。",
+  "categories": [
+    "personal_read",
+    "enterprise_read",
+    "release_boundary",
+    "registry_version",
+    "workspace_isolation",
+    "authorization_revocation",
+    "confirmation",
+    "approval",
+    "idempotency",
+    "cancellation",
+    "late_result",
+    "credential_boundary",
+    "result_security",
+    "adapter_boundary",
+    "retry_boundary",
+    "menu_authorization"
+  ],
+  "cases": [
+    {
+      "case_id": "p401-personal-read-allowed-001",
+      "category": "personal_read",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["个人所有者的不可变 Release 允许 knowledge.search V1。", "当前知识检索权限和字段策略允许合成范围。"],
+      "action": { "surface": "runtime", "operation": "执行已冻结的个人空间知识检索步骤", "tool_key": "knowledge.search", "access_mode": "read" },
+      "expected": {
+        "outcome": "allowed", "run_state": "completed", "step_state": "completed", "confirmation_state": "not_required", "error_code": null, "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": true, "late_result_overwrite": false,
+        "verified_invariants": ["p4_release_tool_allowlist", "p4_current_policy_recheck", "p4_untrusted_result_quarantine"],
+        "evidence_sources": ["Release 工具引用", "当前策略决策", "安全结果摘要"]
+      },
+      "cleanup": ["删除合成 Run，保留契约测试输出。"]
+    },
+    {
+      "case_id": "p401-enterprise-read-allowed-002",
+      "category": "enterprise_read",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["企业 Release 允许 workflow.get_status V1。", "合成成员只能读取本企业工作流状态。"],
+      "action": { "surface": "runtime", "operation": "执行企业空间工作流状态查询", "tool_key": "workflow.get_status", "access_mode": "read" },
+      "expected": {
+        "outcome": "allowed", "run_state": "completed", "step_state": "completed", "confirmation_state": "not_required", "error_code": null, "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": true, "late_result_overwrite": false,
+        "verified_invariants": ["p4_release_tool_allowlist", "p4_current_policy_recheck", "p4_read_write_permission_separation"],
+        "evidence_sources": ["企业成员上下文", "工作流资源范围", "工具结果摘要"]
+      },
+      "cleanup": ["清理合成企业运行记录。"]
+    },
+    {
+      "case_id": "p401-draft-tool-denied-003",
+      "category": "release_boundary",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["AgentDraft 新增 quota.get_usage，但当前 Release 未包含该引用。"],
+      "action": { "surface": "runtime", "operation": "尝试从草稿配置扩大当前运行工具", "tool_key": "quota.get_usage", "access_mode": "read" },
+      "expected": {
+        "outcome": "denied", "run_state": "unchanged", "step_state": "not_created", "confirmation_state": "not_created", "error_code": "AGENT_RUNTIME_RELEASE_REQUIRED", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_release_tool_allowlist", "p4_deterministic_execution_boundary"],
+        "evidence_sources": ["Runtime Release 装载", "不存在新增 Step", "拒绝审计"]
+      },
+      "cleanup": ["丢弃合成草稿变化。"]
+    },
+    {
+      "case_id": "p401-release-allowlist-denied-004",
+      "category": "release_boundary",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["模型提出 approval.get_status。", "当前 Release 允许列表没有该工具。"],
+      "action": { "surface": "runtime", "operation": "将模型候选意图提交计划校验", "tool_key": "approval.get_status", "access_mode": "read" },
+      "expected": {
+        "outcome": "denied", "run_state": "failed", "step_state": "not_created", "confirmation_state": "not_created", "error_code": "TOOL_EXECUTION_DENIED", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_release_tool_allowlist", "p4_deterministic_execution_boundary"],
+        "evidence_sources": ["候选意图", "Release 允许列表差异", "零 Adapter 调用"]
+      },
+      "cleanup": ["清理失败的合成计划。"]
+    },
+    {
+      "case_id": "p401-unregistered-version-denied-005",
+      "category": "registry_version",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["Release 引用 knowledge.search V2。", "注册表只有不可变 V1。"],
+      "action": { "surface": "runtime", "operation": "解析不存在的工具版本", "tool_key": "knowledge.search", "access_mode": "read" },
+      "expected": {
+        "outcome": "denied", "run_state": "failed", "step_state": "not_created", "confirmation_state": "not_created", "error_code": "TOOL_VERSION_NOT_AVAILABLE", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_tool_version_immutable", "p4_release_tool_allowlist"],
+        "evidence_sources": ["工具版本注册表", "Release 引用", "版本拒绝审计"]
+      },
+      "cleanup": ["移除无效合成 Release 引用。"]
+    },
+    {
+      "case_id": "p401-cross-workspace-denied-006",
+      "category": "workspace_isolation",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["请求主体属于企业空间 A。", "目标文档属于企业空间 B。"],
+      "action": { "surface": "runtime", "operation": "读取另一企业的授权文档区间", "tool_key": "document.read_authorized_range", "access_mode": "read" },
+      "expected": {
+        "outcome": "denied", "run_state": "failed", "step_state": "failed", "confirmation_state": "not_required", "error_code": "POLICY_DENIED", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_current_policy_recheck", "p4_read_write_permission_separation"],
+        "evidence_sources": ["可信 RequestContext", "资源工作空间", "策略拒绝"]
+      },
+      "cleanup": ["删除两个合成空间的临时主体绑定。"]
+    },
+    {
+      "case_id": "p401-permission-revoked-denied-007",
+      "category": "authorization_revocation",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["计划生成后撤销 approval.instance.read。", "Step 尚未执行。"],
+      "action": { "surface": "worker", "operation": "Worker 在执行前重新校验当前权限", "tool_key": "approval.get_status", "access_mode": "read" },
+      "expected": {
+        "outcome": "denied", "run_state": "failed", "step_state": "failed", "confirmation_state": "not_required", "error_code": "POLICY_DENIED", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_current_policy_recheck", "p4_transactional_fact_consistency"],
+        "evidence_sources": ["计划时策略版本", "执行时策略版本", "零 Adapter 调用"]
+      },
+      "cleanup": ["恢复合成成员默认权限。"]
+    },
+    {
+      "case_id": "p401-policy-unavailable-denied-008",
+      "category": "authorization_revocation",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["策略中心在执行前返回不可验证响应。"],
+      "action": { "surface": "worker", "operation": "在策略不可用时尝试执行只读工具", "tool_key": "quota.get_usage", "access_mode": "read" },
+      "expected": {
+        "outcome": "denied", "run_state": "failed", "step_state": "failed", "confirmation_state": "not_required", "error_code": "POLICY_UNAVAILABLE", "retryable": true,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_current_policy_recheck", "p4_deterministic_execution_boundary"],
+        "evidence_sources": ["策略故障注入", "默认拒绝结果", "零 Adapter 调用"]
+      },
+      "cleanup": ["恢复合成策略 Adapter。"]
+    },
+    {
+      "case_id": "p401-personal-confirmation-required-009",
+      "category": "confirmation",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["合成写工具已通过当前策略。", "个人所有者尚未确认。"],
+      "action": { "surface": "worker", "operation": "绕过所有者确认触发合成写 Adapter", "tool_key": "synthetic.record_status", "access_mode": "write" },
+      "expected": {
+        "outcome": "denied", "run_state": "unchanged", "step_state": "unchanged", "confirmation_state": "pending", "error_code": "TOOL_CONFIRMATION_REQUIRED", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_confirmation_digest_binding", "p4_idempotency_before_side_effect"],
+        "evidence_sources": ["待确认事实", "不存在幂等执行提交", "副作用计数"]
+      },
+      "cleanup": ["撤回待确认合成调用。"]
+    },
+    {
+      "case_id": "p401-stale-confirmation-denied-010",
+      "category": "confirmation",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["个人所有者已确认旧规范参数摘要。", "执行前参数摘要发生变化。"],
+      "action": { "surface": "worker", "operation": "使用旧确认执行新参数", "tool_key": "synthetic.record_status", "access_mode": "write" },
+      "expected": {
+        "outcome": "denied", "run_state": "unchanged", "step_state": "unchanged", "confirmation_state": "withdrawn", "error_code": "TOOL_CONFIRMATION_STALE", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_confirmation_digest_binding", "p4_deterministic_execution_boundary"],
+        "evidence_sources": ["旧确认摘要", "新规范参数摘要", "失效记录"]
+      },
+      "cleanup": ["清理变化后的合成调用。"]
+    },
+    {
+      "case_id": "p401-expired-confirmation-denied-011",
+      "category": "confirmation",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["个人确认已经超过冻结有效期。"],
+      "action": { "surface": "worker", "operation": "尝试复用过期确认", "tool_key": "synthetic.record_status", "access_mode": "write" },
+      "expected": {
+        "outcome": "denied", "run_state": "unchanged", "step_state": "unchanged", "confirmation_state": "expired", "error_code": "TOOL_CONFIRMATION_STALE", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_confirmation_digest_binding", "p4_idempotency_before_side_effect"],
+        "evidence_sources": ["确认到期时间", "执行时间", "零副作用"]
+      },
+      "cleanup": ["关闭过期合成确认。"]
+    },
+    {
+      "case_id": "p401-enterprise-approval-pending-012",
+      "category": "approval",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["企业策略需要两个顺序审批层级。", "只有第一级已经通过。"],
+      "action": { "surface": "worker", "operation": "在多级审批未完成时执行合成写工具", "tool_key": "synthetic.record_status", "access_mode": "write" },
+      "expected": {
+        "outcome": "denied", "run_state": "unchanged", "step_state": "unchanged", "confirmation_state": "pending", "error_code": "TOOL_CONFIRMATION_REQUIRED", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_confirmation_digest_binding", "p4_transactional_fact_consistency"],
+        "evidence_sources": ["冻结审批策略", "活动审批层级", "零副作用"]
+      },
+      "cleanup": ["撤回合成企业审批实例。"]
+    },
+    {
+      "case_id": "p401-enterprise-write-approved-013",
+      "category": "approval",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["两个企业审批层级均批准同一调用摘要。", "幂等身份可在副作用前持久化。"],
+      "action": { "surface": "worker", "operation": "执行经过完整审批的合成内部写操作", "tool_key": "synthetic.record_status", "access_mode": "write" },
+      "expected": {
+        "outcome": "allowed", "run_state": "completed", "step_state": "completed", "confirmation_state": "approved", "error_code": null, "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 1, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": true, "late_result_overwrite": false,
+        "verified_invariants": ["p4_confirmation_digest_binding", "p4_idempotency_before_side_effect", "p4_transactional_fact_consistency"],
+        "evidence_sources": ["两级审批动作", "幂等预留", "唯一合成副作用"]
+      },
+      "cleanup": ["删除可清理的合成状态记录，保留最小幂等证据。"]
+    },
+    {
+      "case_id": "p401-idempotent-replay-014",
+      "category": "idempotency",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["相同幂等键与请求摘要已有成功结果。"],
+      "action": { "surface": "worker", "operation": "重复投递完全相同的合成写调用", "tool_key": "synthetic.record_status", "access_mode": "write" },
+      "expected": {
+        "outcome": "replayed", "run_state": "completed", "step_state": "completed", "confirmation_state": "approved", "error_code": null, "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 1, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": true, "late_result_overwrite": false,
+        "verified_invariants": ["p4_idempotency_before_side_effect", "p4_transactional_fact_consistency"],
+        "evidence_sources": ["既有幂等记录", "既有结果摘要", "Adapter 调用计数不变"]
+      },
+      "cleanup": ["保留既有幂等证据，清理重复任务信封。"]
+    },
+    {
+      "case_id": "p401-idempotency-conflict-015",
+      "category": "idempotency",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["幂等键已经绑定旧请求摘要。", "新调用使用不同规范参数摘要。"],
+      "action": { "surface": "worker", "operation": "使用相同幂等键提交不同请求", "tool_key": "synthetic.record_status", "access_mode": "write" },
+      "expected": {
+        "outcome": "denied", "run_state": "failed", "step_state": "failed", "confirmation_state": "approved", "error_code": "IDEMPOTENCY_CONFLICT", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_idempotency_before_side_effect", "p4_confirmation_digest_binding"],
+        "evidence_sources": ["既有请求摘要", "冲突请求摘要", "零 Adapter 调用"]
+      },
+      "cleanup": ["丢弃冲突合成请求。"]
+    },
+    {
+      "case_id": "p401-outcome-unknown-manual-016",
+      "category": "idempotency",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["Adapter 已接收调用，但响应在提交结果前丢失。", "无法证明副作用是否完成。"],
+      "action": { "surface": "worker", "operation": "处理结果未知的合成写调用", "tool_key": "synthetic.record_status", "access_mode": "write" },
+      "expected": {
+        "outcome": "manual_recovery", "run_state": "manual_recovery", "step_state": "manual_recovery", "confirmation_state": "approved", "error_code": "TOOL_OUTCOME_UNKNOWN", "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_idempotency_before_side_effect", "p4_bounded_retry_and_terminal_precedence"],
+        "evidence_sources": ["结果未知幂等状态", "Adapter 接收证据", "禁止自动重放记录"]
+      },
+      "cleanup": ["通过合成对账端口关闭未知结果，不自动重放。"]
+    },
+    {
+      "case_id": "p401-cancel-before-attempt-017",
+      "category": "cancellation",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["Run 已计划但尚未创建 Attempt。", "请求主体具有取消权限。"],
+      "action": { "surface": "browser", "operation": "在执行前取消工具 Run", "tool_key": "knowledge.search", "access_mode": "read" },
+      "expected": {
+        "outcome": "cancelled", "run_state": "cancelled", "step_state": "cancelled", "confirmation_state": "not_required", "error_code": null, "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_bounded_retry_and_terminal_precedence", "p4_transactional_fact_consistency"],
+        "evidence_sources": ["取消事实", "Attempt 计数为零", "终态审计"]
+      },
+      "cleanup": ["保留最小取消证据。"]
+    },
+    {
+      "case_id": "p401-cancel-running-attempt-018",
+      "category": "cancellation",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["只读 Adapter 正在执行。", "取消事实以更高代际提交。"],
+      "action": { "surface": "browser", "operation": "取消正在运行的企业工具 Run", "tool_key": "knowledge.search", "access_mode": "read" },
+      "expected": {
+        "outcome": "cancelled", "run_state": "cancelled", "step_state": "cancelled", "confirmation_state": "not_required", "error_code": null, "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_bounded_retry_and_terminal_precedence", "p4_transactional_fact_consistency"],
+        "evidence_sources": ["活动 Attempt", "取消传播记录", "无新 Attempt"]
+      },
+      "cleanup": ["停止合成 Adapter 并清理运行资源。"]
+    },
+    {
+      "case_id": "p401-late-success-ignored-019",
+      "category": "late_result",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["Run 已提交 cancelled 终态。", "旧租约 Adapter 随后返回成功。"],
+      "action": { "surface": "worker", "operation": "提交取消后的迟到成功结果", "tool_key": "knowledge.search", "access_mode": "read" },
+      "expected": {
+        "outcome": "cancelled", "run_state": "cancelled", "step_state": "cancelled", "confirmation_state": "not_required", "error_code": "TOOL_RUN_TERMINAL", "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_bounded_retry_and_terminal_precedence", "p4_transactional_fact_consistency"],
+        "evidence_sources": ["Run 终态版本", "旧租约代际", "迟到结果审计"]
+      },
+      "cleanup": ["保留最小迟到结果摘要。"]
+    },
+    {
+      "case_id": "p401-credential-result-leak-020",
+      "category": "credential_boundary",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["合成 Adapter 返回包含凭证哨兵字段的结果。"],
+      "action": { "surface": "worker", "operation": "对工具结果执行凭证泄漏检查", "tool_key": "synthetic.credential_probe", "access_mode": "write" },
+      "expected": {
+        "outcome": "quarantined", "run_state": "failed", "step_state": "failed", "confirmation_state": "approved", "error_code": "TOOL_CREDENTIAL_EXPOSURE_DETECTED", "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_credential_call_edge_only", "p4_untrusted_result_quarantine"],
+        "evidence_sources": ["安全检查失败码", "最小结果摘要", "上下文资格为否"]
+      },
+      "cleanup": ["销毁合成调用边缘内存并删除结果正文。"]
+    },
+    {
+      "case_id": "p401-prompt-injection-result-021",
+      "category": "result_security",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["合成只读工具返回命中 Prompt Injection 规则的内容。"],
+      "action": { "surface": "worker", "operation": "在进入模型上下文前检查恶意工具结果", "tool_key": "knowledge.search", "access_mode": "read" },
+      "expected": {
+        "outcome": "quarantined", "run_state": "failed", "step_state": "failed", "confirmation_state": "not_required", "error_code": "TOOL_RESULT_REJECTED", "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_untrusted_result_quarantine", "p4_deterministic_execution_boundary"],
+        "evidence_sources": ["Prompt Injection 检查", "结果隔离状态", "模型调用计数为零"]
+      },
+      "cleanup": ["删除合成恶意结果正文，保留分类码。"]
+    },
+    {
+      "case_id": "p401-arbitrary-http-denied-022",
+      "category": "adapter_boundary",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["模型提出未登记的任意 HTTP 工具。"],
+      "action": { "surface": "runtime", "operation": "尝试创建任意网络访问步骤", "tool_key": "http.request", "access_mode": "write" },
+      "expected": {
+        "outcome": "denied", "run_state": "failed", "step_state": "not_created", "confirmation_state": "not_created", "error_code": "TOOL_ADAPTER_NOT_ALLOWED", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_restricted_adapter_surface", "p4_release_tool_allowlist"],
+        "evidence_sources": ["Adapter 类型允许列表", "未登记工具意图", "零网络调用"]
+      },
+      "cleanup": ["丢弃未登记工具意图。"]
+    },
+    {
+      "case_id": "p401-unsafe-write-retry-denied-023",
+      "category": "retry_boundary",
+      "workspace_type": "personal",
+      "synthetic": true,
+      "preconditions": ["写工具声明 retry_mode=none。", "首次调用返回可重试网络类故障。"],
+      "action": { "surface": "worker", "operation": "尝试自动重试不可安全重放的写工具", "tool_key": "synthetic.non_idempotent_write", "access_mode": "write" },
+      "expected": {
+        "outcome": "denied", "run_state": "failed", "step_state": "failed", "confirmation_state": "approved", "error_code": "TOOL_RETRY_NOT_ALLOWED", "retryable": false,
+        "adapter_invocations": 1, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_bounded_retry_and_terminal_precedence", "p4_idempotency_before_side_effect"],
+        "evidence_sources": ["工具重试模式", "Attempt 计数为一", "自动重试拒绝"]
+      },
+      "cleanup": ["清理失败的合成 Attempt。"]
+    },
+    {
+      "case_id": "p401-hidden-menu-api-denied-024",
+      "category": "menu_authorization",
+      "workspace_type": "enterprise",
+      "synthetic": true,
+      "preconditions": ["菜单快照不包含工具执行按钮。", "主体同时缺少 tool.run.create。"],
+      "action": { "surface": "browser", "operation": "绕过隐藏菜单直接创建工具 Run", "tool_key": "quota.get_usage", "access_mode": "read" },
+      "expected": {
+        "outcome": "denied", "run_state": "unchanged", "step_state": "not_created", "confirmation_state": "not_created", "error_code": "POLICY_DENIED", "retryable": false,
+        "adapter_invocations": 0, "committed_side_effects": 0, "duplicate_side_effects": 0, "cross_workspace_exposure": false, "credential_exposure": false, "model_context_eligible": false, "late_result_overwrite": false,
+        "verified_invariants": ["p4_read_write_permission_separation", "p4_current_policy_recheck"],
+        "evidence_sources": ["菜单权限快照", "后端策略拒绝", "不存在 Run"]
+      },
+      "cleanup": ["恢复合成企业角色默认权限。"]
+    }
+  ]
+}

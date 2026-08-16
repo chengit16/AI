@@ -14,6 +14,7 @@
 | `release/`       | `ReleaseManifest`、兼容矩阵及运行组合规则                    |
 | `reliability/`   | 可靠性不变量、SLO、保留期、传播时限和故障场景契约            |
 | `agent-control/` | Agent 草稿、发布快照、服务路由、运行绑定和阶段安全基线       |
+| `tool-execution/` | 工具定义、任务状态、确认、幂等、取消和阶段安全基线          |
 | `fixtures/`      | Python 和未来 Go 实现共用的 Golden Fixtures                  |
 
 ## 2. 版本规则
@@ -33,6 +34,7 @@
 - SSE 和集成事件的 `event_id` 用于幂等，业务顺序分别由 `sequence_no` 和 `aggregate_version` 表达。
 - 内部任务信封必须在生产者签名、消费者验签后才能恢复可信主体和 Trace；Broker 中的普通载荷不构成身份事实。
 - Agent Runtime 只能装载不可变 `AgentRelease`；草稿、候选、测试结果或当前配置不能通过旁路成为运行输入。
+- 工具 Runtime 只能执行 Release 允许列表与当前策略共同允许的不可变工具版本；模型输出、客户端参数和菜单可见性均不能扩大权限。
 
 ## 4. 验证
 

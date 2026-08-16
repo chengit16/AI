@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "tool_version": {
+    "tool_id": "40000000-0000-4000-8000-000000000001",
+    "tool_key": "synthetic.record_status",
+    "version": 1,
+    "display_name": "合成状态记录工具",
+    "access_mode": "write",
+    "risk_level": "high",
+    "adapter_kind": "synthetic_internal_write",
+    "input_schema_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "output_schema_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "permission_code": "tool.synthetic.execute",
+    "credential_requirement": "none",
+    "timeout_seconds": 10,
+    "retry_mode": "idempotent_write",
+    "immutable": true,
+    "synthetic": true
+  },
+  "run": {
+    "run_id": "40000000-0000-4000-8000-000000000010",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "requested_by_actor_id": "40000000-0000-4000-8000-000000000012",
+    "requested_by_account_id": "40000000-0000-4000-8000-000000000013",
+    "service_id": "40000000-0000-4000-8000-000000000014",
+    "agent_release_id": "40000000-0000-4000-8000-000000000015",
+    "state": "completed",
+    "budget": {
+      "max_steps": 5,
+      "max_attempts_per_step": 2,
+      "max_execution_seconds": 120,
+      "max_cost_microunits": 50000
+    },
+    "cancel_requested_at": null,
+    "created_at": "2026-08-16T03:00:00Z",
+    "updated_at": "2026-08-16T03:00:03Z",
+    "version": 5
+  },
+  "step": {
+    "step_id": "40000000-0000-4000-8000-000000000020",
+    "run_id": "40000000-0000-4000-8000-000000000010",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "sequence_no": 1,
+    "tool_id": "40000000-0000-4000-8000-000000000001",
+    "tool_version": 1,
+    "canonical_arguments_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "state": "completed",
+    "current_attempt_no": 1,
+    "created_at": "2026-08-16T03:00:00Z",
+    "updated_at": "2026-08-16T03:00:03Z",
+    "version": 6
+  },
+  "attempt": {
+    "attempt_id": "40000000-0000-4000-8000-000000000030",
+    "run_id": "40000000-0000-4000-8000-000000000010",
+    "step_id": "40000000-0000-4000-8000-000000000020",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "attempt_no": 1,
+    "lease_generation": 1,
+    "state": "succeeded",
+    "started_at": "2026-08-16T03:00:02Z",
+    "completed_at": "2026-08-16T03:00:03Z"
+  },
+  "tool_call": {
+    "tool_call_id": "40000000-0000-4000-8000-000000000040",
+    "run_id": "40000000-0000-4000-8000-000000000010",
+    "step_id": "40000000-0000-4000-8000-000000000020",
+    "attempt_id": "40000000-0000-4000-8000-000000000030",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "tool_id": "40000000-0000-4000-8000-000000000001",
+    "tool_version": 1,
+    "canonical_arguments_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "access_mode": "write",
+    "risk_level": "high",
+    "credential_ref": null,
+    "state": "succeeded",
+    "created_at": "2026-08-16T03:00:02Z"
+  },
+  "policy_decision": {
+    "decision_id": "40000000-0000-4000-8000-000000000050",
+    "tool_call_id": "40000000-0000-4000-8000-000000000040",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "policy_version": 9,
+    "permission_code": "tool.synthetic.execute",
+    "decision": "allow",
+    "resource_scope_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "field_mask_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "evaluated_at": "2026-08-16T03:00:01Z"
+  },
+  "confirmation": {
+    "confirmation_id": "40000000-0000-4000-8000-000000000060",
+    "tool_call_id": "40000000-0000-4000-8000-000000000040",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "mode": "enterprise_approval",
+    "approval_instance_id": "40000000-0000-4000-8000-000000000061",
+    "confirmation_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+    "policy_version": 9,
+    "state": "approved",
+    "confirmed_by_actor_id": "40000000-0000-4000-8000-000000000062",
+    "expires_at": "2026-08-19T03:00:00Z",
+    "resolved_at": "2026-08-16T03:00:01Z"
+  },
+  "idempotency_record": {
+    "idempotency_record_id": "40000000-0000-4000-8000-000000000070",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "tool_call_id": "40000000-0000-4000-8000-000000000040",
+    "idempotency_key_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+    "request_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+    "state": "succeeded",
+    "result_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+    "reserved_at": "2026-08-16T03:00:02Z",
+    "completed_at": "2026-08-16T03:00:03Z"
+  },
+  "cancellation": {
+    "cancellation_id": "40000000-0000-4000-8000-000000000080",
+    "run_id": "40000000-0000-4000-8000-000000000010",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "requested_by_actor_id": "40000000-0000-4000-8000-000000000012",
+    "reason_code": "not_requested",
+    "state": "not_requested",
+    "requested_at": null,
+    "effective_at": null
+  },
+  "result": {
+    "result_id": "40000000-0000-4000-8000-000000000090",
+    "tool_call_id": "40000000-0000-4000-8000-000000000040",
+    "workspace_id": "40000000-0000-4000-8000-000000000011",
+    "output_schema_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "status": "accepted",
+    "safety_checks": [
+      { "check_code": "schema", "status": "passed" },
+      { "check_code": "size", "status": "passed" },
+      { "check_code": "sensitive_fields", "status": "passed" },
+      { "check_code": "prompt_injection", "status": "passed" }
+    ],
+    "eligible_for_model_context": true,
+    "credential_exposure_detected": false,
+    "recorded_at": "2026-08-16T03:00:03Z"
+  }
+}
