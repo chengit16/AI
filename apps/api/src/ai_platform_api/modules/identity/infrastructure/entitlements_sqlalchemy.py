@@ -34,6 +34,7 @@ from ai_platform_api.modules.identity.domain.entitlements import (
     UsageRecordPage,
     WorkspaceEntitlement,
     WorkspaceFeatureSettings,
+    WorkspacePlanEntitlement,
 )
 from ai_platform_api.modules.identity.domain.models import (
     MembershipStatus,
@@ -75,6 +76,33 @@ class SqlAlchemyEntitlementAccessReader:
         if row is None:
             return None
         return OpenApiEntitlement(row.open_api_allowed, row.open_api_enabled)
+
+    def get_workspace_plan_entitlement(
+        self,
+        workspace_id: UUID,
+    ) -> WorkspacePlanEntitlement | None:
+        """读取套餐与空间状态，避免工具模块直接依赖身份模块私有 Repository。"""
+
+        with self._session_factory() as session:
+            row = session.execute(
+                select(
+                    workspace_entitlements.c.workspace_id,
+                    workspace_entitlements.c.plan_code,
+                    workspaces.c.status,
+                )
+                .join(
+                    workspaces,
+                    workspaces.c.workspace_id == workspace_entitlements.c.workspace_id,
+                )
+                .where(workspace_entitlements.c.workspace_id == workspace_id)
+            ).one_or_none()
+        if row is None:
+            return None
+        return WorkspacePlanEntitlement(
+            row.workspace_id,
+            row.plan_code,
+            cast("WorkspaceStatus", row.status),
+        )
 
 
 class SqlAlchemyEntitlementRepository:

@@ -78,7 +78,11 @@ class AgentSafetyPolicyVersion:
 
 @dataclass(frozen=True)
 class AgentToolDefinition:
-    """登记只读工具的稳定身份；本事实不包含参数 Schema 或执行器。"""
+    """投影 Agent 配置校验所需的最小工具身份。
+
+    完整 Schema、风险和 Adapter 治理由 ``tool_execution`` 模块拥有；Agent 控制面
+    只验证 Release 草稿引用的稳定 ID、版本、读写类型与权限，避免复制工具事实源。
+    """
 
     tool_id: UUID
     tool_version: int

@@ -2546,8 +2546,23 @@ agent_tool_definitions = Table(
     Column("tool_id", UUID(as_uuid=True), primary_key=True),
     Column("tool_version", Integer, primary_key=True),
     Column("tool_key", String(120), nullable=False),
+    Column("display_name", String(120), nullable=False),
+    Column("description", String(500), nullable=False),
     Column("access_mode", String(16), nullable=False),
+    Column("risk_level", String(16), nullable=False),
+    Column("adapter_kind", String(32), nullable=False),
+    Column("input_schema_document", JSONB, nullable=False),
+    Column("input_schema_hash", String(64), nullable=False),
+    Column("output_schema_document", JSONB, nullable=False),
+    Column("output_schema_hash", String(64), nullable=False),
     Column("permission_code", String(160), nullable=False),
+    Column("credential_requirement", String(32), nullable=False),
+    Column("timeout_seconds", Integer, nullable=False),
+    Column("retry_mode", String(32), nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("definition_hash", String(64), nullable=False),
+    Column("synthetic", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint(
         "tool_key",
         "tool_version",
@@ -2561,6 +2576,91 @@ agent_tool_definitions = Table(
     CheckConstraint(
         "permission_code ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$'",
         name="ck_agent_tool_definitions_permission",
+    ),
+    CheckConstraint(
+        "char_length(btrim(display_name)) BETWEEN 1 AND 120",
+        name="ck_agent_tool_definitions_display_name",
+    ),
+    CheckConstraint(
+        "char_length(btrim(description)) BETWEEN 1 AND 500",
+        name="ck_agent_tool_definitions_description",
+    ),
+    CheckConstraint(
+        "risk_level IN ('low', 'medium', 'high', 'critical')",
+        name="ck_agent_tool_definitions_risk",
+    ),
+    CheckConstraint(
+        "adapter_kind IN ('internal_read', 'synthetic_internal_write')",
+        name="ck_agent_tool_definitions_adapter",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(input_schema_document) = 'object' "
+        "AND input_schema_document ->> '$schema' = "
+        "'https://json-schema.org/draft/2020-12/schema' "
+        "AND input_schema_document ->> 'type' = 'object' "
+        "AND input_schema_document -> 'additionalProperties' = 'false'::jsonb "
+        "AND pg_column_size(input_schema_document) <= 32768",
+        name="ck_agent_tool_definitions_input_schema",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(output_schema_document) = 'object' "
+        "AND output_schema_document ->> '$schema' = "
+        "'https://json-schema.org/draft/2020-12/schema' "
+        "AND output_schema_document ->> 'type' = 'object' "
+        "AND output_schema_document -> 'additionalProperties' = 'false'::jsonb "
+        "AND pg_column_size(output_schema_document) <= 32768",
+        name="ck_agent_tool_definitions_output_schema",
+    ),
+    CheckConstraint(
+        "input_schema_hash ~ '^[0-9a-f]{64}$' "
+        "AND output_schema_hash ~ '^[0-9a-f]{64}$' "
+        "AND definition_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_agent_tool_definitions_hashes",
+    ),
+    CheckConstraint(
+        "credential_requirement IN ('none', 'credential_ref')",
+        name="ck_agent_tool_definitions_credential",
+    ),
+    CheckConstraint(
+        "timeout_seconds BETWEEN 1 AND 120",
+        name="ck_agent_tool_definitions_timeout",
+    ),
+    CheckConstraint(
+        "retry_mode IN ('none', 'safe_read', 'idempotent_write')",
+        name="ck_agent_tool_definitions_retry",
+    ),
+    CheckConstraint(
+        "status IN ('active', 'retired')",
+        name="ck_agent_tool_definitions_status",
+    ),
+    CheckConstraint(
+        "(adapter_kind = 'internal_read' AND access_mode = 'read' "
+        "AND synthetic = false AND retry_mode IN ('none', 'safe_read')) OR "
+        "(adapter_kind = 'synthetic_internal_write' AND access_mode = 'write' "
+        "AND synthetic = true AND risk_level IN ('high', 'critical') "
+        "AND retry_mode IN ('none', 'idempotent_write'))",
+        name="ck_agent_tool_definitions_governance",
+    ),
+)
+
+tool_plan_availability = Table(
+    "tool_plan_availability",
+    metadata,
+    Column("tool_id", UUID(as_uuid=True), primary_key=True),
+    Column("tool_version", Integer, primary_key=True),
+    Column("plan_code", String(64), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["tool_id", "tool_version"],
+        [
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_id",
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_version",
+        ],
+        name="fk_tool_plan_availability_definition",
+    ),
+    CheckConstraint(
+        "plan_code ~ '^[a-z][a-z0-9_]{2,63}$'",
+        name="ck_tool_plan_availability_plan_code",
     ),
 )
 

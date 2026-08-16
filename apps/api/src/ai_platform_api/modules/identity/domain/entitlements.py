@@ -150,6 +150,24 @@ class OpenApiEntitlement:
         return self.allowed and self.enabled
 
 
+@dataclass(frozen=True)
+class WorkspacePlanEntitlement:
+    """向工具等跨模块消费者公开最小套餐与空间状态事实。"""
+
+    workspace_id: UUID
+    plan_code: str
+    workspace_status: Literal["active", "suspended", "archived"]
+
+
+class WorkspacePlanEntitlementReader(Protocol):
+    """读取当前套餐身份；消费者只能据此收窄自身平台能力目录。"""
+
+    def get_workspace_plan_entitlement(
+        self,
+        workspace_id: UUID,
+    ) -> WorkspacePlanEntitlement | None: ...
+
+
 class EntitlementAccessReader(Protocol):
     """向其他业务模块暴露最小化的 OpenAPI 权益查询端口。"""
 
