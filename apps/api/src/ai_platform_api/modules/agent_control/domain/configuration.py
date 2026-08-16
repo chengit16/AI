@@ -158,6 +158,13 @@ class AgentConfigurationRepository(Protocol):
         for_share: bool = False,
     ) -> AgentSafetyPolicyVersion | None: ...
 
+    def get_active_safety_policy_version(
+        self,
+        implementation_version: str,
+        *,
+        for_share: bool = False,
+    ) -> AgentSafetyPolicyVersion | None: ...
+
     def get_tool_definition(
         self,
         tool_id: UUID,
@@ -169,6 +176,12 @@ class AgentConfigurationRepository(Protocol):
     def get_current_runtime_configuration(
         self,
         runtime_config_version_id: UUID,
+        *,
+        for_share: bool = False,
+    ) -> RuntimeConfigurationReference | None: ...
+
+    def get_published_runtime_configuration(
+        self,
         *,
         for_share: bool = False,
     ) -> RuntimeConfigurationReference | None: ...

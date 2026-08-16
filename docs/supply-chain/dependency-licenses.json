@@ -427,6 +427,18 @@
     },
     {
       "direct": false,
+      "license": "Apache Software",
+      "name": "arrow",
+      "version": "1.4.0"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "attrs",
+      "version": "26.1.0"
+    },
+    {
+      "direct": false,
       "license": "BSD",
       "name": "billiard",
       "version": "4.2.4"
@@ -493,6 +505,12 @@
     },
     {
       "direct": false,
+      "license": "MPL 2.0",
+      "name": "fqdn",
+      "version": "1.5.1"
+    },
+    {
+      "direct": false,
       "license": "Apache 2.0",
       "name": "googleapis-common-protos",
       "version": "1.75.1"
@@ -520,6 +538,30 @@
       "license": "Apache-2.0",
       "name": "importlib_metadata",
       "version": "8.7.1"
+    },
+    {
+      "direct": false,
+      "license": "ISC (ISCL)",
+      "name": "isoduration",
+      "version": "20.11.0"
+    },
+    {
+      "direct": false,
+      "license": "Modified BSD",
+      "name": "jsonpointer",
+      "version": "3.1.1"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "jsonschema",
+      "version": "4.25.1"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "jsonschema-specifications",
+      "version": "2025.9.1"
     },
     {
       "direct": false,
@@ -715,9 +757,33 @@
     },
     {
       "direct": false,
+      "license": "MIT",
+      "name": "referencing",
+      "version": "0.37.0"
+    },
+    {
+      "direct": false,
       "license": "Apache-2.0",
       "name": "requests",
       "version": "2.34.2"
+    },
+    {
+      "direct": false,
+      "license": "MIT license",
+      "name": "rfc3339-validator",
+      "version": "0.1.4"
+    },
+    {
+      "direct": false,
+      "license": "GNU GPLv3+",
+      "name": "rfc3987",
+      "version": "1.3.8"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
+      "name": "rpds-py",
+      "version": "2026.6.3"
     },
     {
       "direct": false,
@@ -758,6 +824,12 @@
     {
       "direct": false,
       "license": "MIT",
+      "name": "uri-template",
+      "version": "1.3.0"
+    },
+    {
+      "direct": false,
+      "license": "MIT",
       "name": "urllib3",
       "version": "2.7.0"
     },
@@ -794,6 +866,12 @@
     {
       "direct": false,
       "license": "BSD-3-Clause",
+      "name": "webcolors",
+      "version": "25.10.0"
+    },
+    {
+      "direct": false,
+      "license": "BSD-3-Clause",
       "name": "websockets",
       "version": "17.0.1"
     },
@@ -810,7 +888,7 @@
   },
   "summary": {
     "node_packages": 76,
-    "python_packages": 70,
+    "python_packages": 83,
     "unknown_python_licenses": []
   }
 }

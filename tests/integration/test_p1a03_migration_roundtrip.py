@@ -16,6 +16,36 @@ ROOT = Path(__file__).parents[2]
 DEFAULT_DATABASE_URL = (
     "postgresql+psycopg://ai_platform:local-development-only@127.0.0.1:5432/ai_platform"
 )
+P311_OWNER_PERMISSIONS = frozenset(
+    {
+        "agent.definition.archive",
+        "agent.definition.create",
+        "agent.definition.read",
+        "agent.definition.update",
+        "agent.page.access",
+        "agent.release.approve",
+        "agent.release.publish",
+        "agent.release.read",
+        "agent.release.request",
+        "agent.test.execute",
+        "agent.test.read",
+        "service.definition.create",
+        "service.definition.update",
+        "service.page.access",
+        "service.route.canary",
+        "service.route.promote",
+        "service.route.rollback",
+    }
+)
+P311_MEMBER_PERMISSIONS = frozenset(
+    {
+        "agent.definition.read",
+        "agent.page.access",
+        "agent.release.read",
+        "agent.test.read",
+        "service.page.access",
+    }
+)
 
 
 @pytest.fixture
@@ -316,6 +346,10 @@ def seed_service_invocation_upgrade_facts(connection: Connection, schema: str) -
               '70000000-0000-4000-8000-000000000310', :workspace_id,
               'workspace_owner', '空间所有者', 'active', true,
               '2026-08-16T00:05:00Z', '2026-08-16T00:05:00Z', 1
+            ), (
+              '70000000-0000-4000-8000-000000000311', :workspace_id,
+              'workspace_member', '空间成员', 'active', true,
+              '2026-08-16T00:05:00Z', '2026-08-16T00:05:00Z', 1
             )
             """
         ),
@@ -370,7 +404,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260816_0050"
+    assert current_revision(connection, schema) == "20260816_0051"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -488,7 +522,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260816_0050"
+    assert current_revision(connection, schema) == "20260816_0051"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -661,7 +695,7 @@ def test_service_invocation_upgrade_preserves_history_and_rejects_unsafe_downgra
             """
         )
     )
-    assert permission_count == 1
+    assert permission_count == 2
     assert current_snapshot["registry_version"] == 19
     assert {item["menu_id"] for item in current_snapshot["menus"]}.issuperset(
         {
@@ -698,6 +732,159 @@ def test_service_invocation_upgrade_preserves_history_and_rejects_unsafe_downgra
         command.downgrade(config, "20260816_0049")
     connection.rollback()
     assert current_revision(connection, schema) == "20260816_0050"
+
+
+def test_agent_console_upgrade_restores_roles_bindings_and_menu_publication(
+    migration_database: tuple[Config, Connection, str],
+) -> None:
+    """0051 只追加控制台事实，降级后可恢复 0050 菜单并再次升级。"""
+
+    config, connection, schema = migration_database
+    command.upgrade(config, "20260816_0046")
+    connection.commit()
+    seed_existing_system_agent_publication(connection, schema)
+    command.upgrade(config, "20260816_0047")
+    connection.commit()
+    seed_runtime_isolation_runs(connection, schema)
+    command.upgrade(config, "20260816_0049")
+    connection.commit()
+    seed_service_invocation_upgrade_facts(connection, schema)
+    command.upgrade(config, "20260816_0050")
+    connection.commit()
+    source_release = (
+        connection.execute(
+            text(
+                f"""
+            SELECT releases.release_id, releases.snapshot, releases.snapshot_digest
+              FROM "{schema}".workspace_menu_publications AS publications
+              JOIN "{schema}".menu_releases AS releases
+                ON releases.workspace_id = publications.workspace_id
+               AND releases.release_id = publications.current_release_id
+            """
+            )
+        )
+        .mappings()
+        .one()
+    )
+
+    # 1. 非空升级为系统角色补齐最小权限，并追加 Registry 20 菜单和接口绑定。
+    command.upgrade(config, "20260816_0051")
+    connection.commit()
+    grants = connection.execute(
+        text(
+            f"""
+            SELECT roles.role_key, grants.permission_code
+              FROM "{schema}".role_permission_grants AS grants
+              JOIN "{schema}".roles AS roles
+                ON roles.workspace_id = grants.workspace_id
+               AND roles.role_id = grants.role_id
+             WHERE roles.role_key IN ('workspace_owner', 'workspace_member')
+            """
+        )
+    ).all()
+    permissions_by_role = {
+        role_key: {permission for key, permission in grants if key == role_key}
+        for role_key in ("workspace_owner", "workspace_member")
+    }
+    current_release = (
+        connection.execute(
+            text(
+                f"""
+            SELECT releases.release_id, releases.source_release_id, releases.snapshot
+              FROM "{schema}".workspace_menu_publications AS publications
+              JOIN "{schema}".menu_releases AS releases
+                ON releases.workspace_id = publications.workspace_id
+               AND releases.release_id = publications.current_release_id
+            """
+            )
+        )
+        .mappings()
+        .one()
+    )
+    snapshot = current_release["snapshot"]
+    assert current_revision(connection, schema) == "20260816_0051"
+    assert permissions_by_role["workspace_owner"] >= P311_OWNER_PERMISSIONS
+    assert permissions_by_role["workspace_member"] >= P311_MEMBER_PERMISSIONS
+    assert "service.definition.read" in permissions_by_role["workspace_member"]
+    assert current_release["source_release_id"] == source_release["release_id"]
+    assert snapshot["registry_version"] == 20
+    assert {
+        item["menu_id"]
+        for item in snapshot["menus"]
+        if item["menu_id"].endswith(tuple(f"{number:012d}" for number in range(201, 219)))
+    } == {f"82000000-0000-4000-8000-{number:012d}" for number in range(201, 219)}
+    assert {
+        item["api_resource_id"]
+        for item in snapshot["menu_api_bindings"]
+        if item["api_resource_id"].endswith(tuple(f"{number:012d}" for number in range(123, 139)))
+    } == {f"81000000-0000-4000-8000-{number:012d}" for number in range(123, 139)}
+
+    # 2. 降级恢复原发布且不改原快照，只回收系统角色和本节点绑定。
+    command.downgrade(config, "20260816_0050")
+    connection.commit()
+    restored_release = (
+        connection.execute(
+            text(
+                f"""
+            SELECT releases.release_id, releases.snapshot, releases.snapshot_digest
+              FROM "{schema}".workspace_menu_publications AS publications
+              JOIN "{schema}".menu_releases AS releases
+                ON releases.workspace_id = publications.workspace_id
+               AND releases.release_id = publications.current_release_id
+            """
+            )
+        )
+        .mappings()
+        .one()
+    )
+    remaining_member_permissions = set(
+        connection.execute(
+            text(
+                f"""
+                SELECT grants.permission_code
+                  FROM "{schema}".role_permission_grants AS grants
+                  JOIN "{schema}".roles AS roles
+                    ON roles.workspace_id = grants.workspace_id
+                   AND roles.role_id = grants.role_id
+                 WHERE roles.role_key = 'workspace_member'
+                """
+            )
+        ).scalars()
+    )
+    assert current_revision(connection, schema) == "20260816_0050"
+    assert dict(restored_release) == dict(source_release)
+    assert remaining_member_permissions.isdisjoint(P311_MEMBER_PERMISSIONS)
+    assert "service.definition.read" in remaining_member_permissions
+    assert (
+        connection.scalar(
+            text(
+                f"""
+            SELECT count(*) FROM "{schema}".registered_menu_api_bindings
+             WHERE api_resource_id::text >= '81000000-0000-4000-8000-000000000123'
+               AND api_resource_id::text <= '81000000-0000-4000-8000-000000000138'
+            """
+            )
+        )
+        == 0
+    )
+
+    # 3. 同一非空事实再次升级仍只生成一个确定性控制台发布。
+    command.upgrade(config, "head")
+    connection.commit()
+    assert current_revision(connection, schema) == "20260816_0051"
+    assert (
+        connection.scalar(
+            text(
+                f"""
+            SELECT count(*) FROM "{schema}".menu_releases
+             WHERE source_release_id = :source_release_id
+               AND snapshot ->> 'registry_version' = '20'
+            """
+            ),
+            {"source_release_id": source_release["release_id"]},
+        )
+        == 1
+    )
 
 
 def test_existing_system_publication_is_backfilled_as_current_service_route(

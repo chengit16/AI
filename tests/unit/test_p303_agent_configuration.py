@@ -225,6 +225,15 @@ class StubConfigurationRepository:
         del for_share
         return self.safety if safety_policy_version_id == SAFETY_POLICY_ID else None
 
+    def get_active_safety_policy_version(
+        self,
+        implementation_version: str,
+        *,
+        for_share: bool = False,
+    ) -> AgentSafetyPolicyVersion | None:
+        del for_share
+        return self.safety if implementation_version == self.safety.implementation_version else None
+
     def get_tool_definition(
         self,
         tool_id: UUID,
@@ -248,6 +257,14 @@ class StubConfigurationRepository:
         ):
             return self.runtime
         return None
+
+    def get_published_runtime_configuration(
+        self,
+        *,
+        for_share: bool = False,
+    ) -> RuntimeConfigurationReference | None:
+        del for_share
+        return self.runtime
 
     def get_current_workflow_release(
         self,

@@ -12,6 +12,7 @@ dependencies = [
     { name = "celery" },
     { name = "cryptography" },
     { name = "fastapi" },
+    { name = "jsonschema", extra = ["format"] },
     { name = "minio" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
@@ -36,7 +37,6 @@ ai-validation = [
 dev = [
     { name = "httpx" },
     { name = "httpx2" },
-    { name = "jsonschema", extra = ["format"] },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -50,6 +50,7 @@ requires-dist = [
     { name = "celery", specifier = "==5.5.3" },
     { name = "cryptography", specifier = "==50.0.0" },
     { name = "fastapi", specifier = "==0.141.1" },
+    { name = "jsonschema", extras = ["format"], specifier = "==4.25.1" },
     { name = "minio", specifier = "==7.2.15" },
     { name = "opentelemetry-api", specifier = "==1.38.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = "==1.38.0" },
@@ -74,7 +75,6 @@ ai-validation = [
 dev = [
     { name = "httpx", specifier = "==0.28.1" },
     { name = "httpx2", specifier = "==2.10.0" },
-    { name = "jsonschema", extras = ["format"], specifier = "==4.25.1" },
     { name = "mypy", specifier = "==1.18.2" },
     { name = "pytest", specifier = "==8.4.2" },
     { name = "ruff", specifier = "==0.13.3" },

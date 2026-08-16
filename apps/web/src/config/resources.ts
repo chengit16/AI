@@ -4,11 +4,13 @@
  */
 import {
   Activity,
+  Bot,
   Cpu,
   LibraryBig,
   LayoutDashboard,
   MessageSquareText,
   Network,
+  Route,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -22,10 +24,12 @@ export const pageById = new Map(
 /** 服务端菜单可引用的图标白名单，禁止快照加载任意组件。 */
 export const iconByKey = {
   activity: Activity,
+  bot: Bot,
   cpu: Cpu,
   "library-big": LibraryBig,
   "layout-dashboard": LayoutDashboard,
   network: Network,
+  route: Route,
   "message-square-text": MessageSquareText,
   "users-round": UsersRound,
 } satisfies Record<string, LucideIcon>;

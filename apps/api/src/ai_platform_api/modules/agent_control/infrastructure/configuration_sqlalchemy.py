@@ -236,6 +236,36 @@ class SqlAlchemyAgentConfigurationRepository(AgentConfigurationRepository):
             row.status,
         )
 
+    def get_active_safety_policy_version(
+        self,
+        implementation_version: str,
+        *,
+        for_share: bool = False,
+    ) -> AgentSafetyPolicyVersion | None:
+        """返回与当前代码实现匹配的最高活动安全策略版本。"""
+
+        statement = (
+            select(agent_safety_policy_versions)
+            .where(
+                agent_safety_policy_versions.c.policy_key == "rag-safety",
+                agent_safety_policy_versions.c.implementation_version == implementation_version,
+                agent_safety_policy_versions.c.status == "active",
+            )
+            .order_by(agent_safety_policy_versions.c.version_number.desc())
+            .limit(1)
+        )
+        row = self._session.execute(_share(statement, for_share)).one_or_none()
+        if row is None:
+            return None
+        return AgentSafetyPolicyVersion(
+            row.safety_policy_version_id,
+            row.policy_key,
+            row.version_number,
+            row.implementation_version,
+            row.policy_hash,
+            row.status,
+        )
+
     def get_tool_definition(
         self,
         tool_id: UUID,
@@ -282,6 +312,41 @@ class SqlAlchemyAgentConfigurationRepository(AgentConfigurationRepository):
                 ai_runtime_config_publication.c.publication_key == "current",
                 ai_runtime_config_versions.c.runtime_config_version_id == runtime_config_version_id,
             )
+        )
+        row = self._session.execute(_share(statement, for_share)).one_or_none()
+        if row is None:
+            return None
+        return RuntimeConfigurationReference(
+            row.runtime_config_version_id,
+            row.generation,
+            row.max_prompt_characters,
+            row.max_output_tokens,
+            row.total_timeout_ms,
+            row.max_estimated_cost_microunits,
+        )
+
+    def get_published_runtime_configuration(
+        self,
+        *,
+        for_share: bool = False,
+    ) -> RuntimeConfigurationReference | None:
+        """读取唯一的当前 Runtime 发布指针及其 Agent 预算上限。"""
+
+        statement = (
+            select(
+                ai_runtime_config_versions.c.runtime_config_version_id,
+                ai_runtime_config_publication.c.generation,
+                ai_runtime_config_versions.c.max_prompt_characters,
+                ai_runtime_config_versions.c.max_output_tokens,
+                ai_runtime_config_versions.c.total_timeout_ms,
+                ai_runtime_config_versions.c.max_estimated_cost_microunits,
+            )
+            .join(
+                ai_runtime_config_publication,
+                ai_runtime_config_publication.c.runtime_config_version_id
+                == ai_runtime_config_versions.c.runtime_config_version_id,
+            )
+            .where(ai_runtime_config_publication.c.publication_key == "current")
         )
         row = self._session.execute(_share(statement, for_share)).one_or_none()
         if row is None:

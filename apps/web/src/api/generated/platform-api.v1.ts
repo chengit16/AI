@@ -332,6 +332,174 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/agents": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Agents
+     * @description 列出当前空间的自定义 Agent 与当前草稿。
+     */
+    readonly get: operations["listAgents"];
+    readonly put?: never;
+    /**
+     * Create Agent
+     * @description 原子创建 Agent 和首个草稿，配置引用由服务端完整复核。
+     */
+    readonly post: operations["createAgent"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/archive": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Archive Agent
+     * @description 归档自定义 Agent，既有 Release 与服务历史保持可追溯。
+     */
+    readonly post: operations["archiveAgent"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/draft": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /**
+     * Update Agent Draft
+     * @description 按 revision 写入新草稿，旧候选和审批资格由应用层同步失效。
+     */
+    readonly put: operations["updateAgentDraft"];
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Agent Evaluations
+     * @description 列出候选、最近评估与审批摘要，刷新不会丢失失败状态。
+     */
+    readonly get: operations["listAgentEvaluations"];
+    readonly put?: never;
+    /**
+     * Request Agent Release
+     * @description 冻结当前草稿为候选，但不伪造测试、审批或发布结论。
+     */
+    readonly post: operations["requestAgentRelease"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests/{candidate_id}/approval": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Approve Agent Release
+     * @description 发起个人所有者确认或企业多级审批，实际决策仍由通用审批接口执行。
+     */
+    readonly post: operations["approveAgentRelease"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests/{candidate_id}/evaluations": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Run Agent Evaluation
+     * @description 运行平台固定五类规则，浏览器不能提交或篡改执行观测。
+     */
+    readonly post: operations["runAgentEvaluation"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests/{candidate_id}/publish": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Publish Agent Release
+     * @description 发布已通过测试和审批的候选，返回不可变 Release 摘要。
+     */
+    readonly post: operations["publishAgentRelease"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/releases": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Agent Releases
+     * @description 列出已校验 Release，不暴露 Prompt 或完整快照正文。
+     */
+    readonly get: operations["listAgentReleases"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/approval-instances": {
     readonly parameters: {
       readonly query?: never;
@@ -1872,6 +2040,50 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/services": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Services
+     * @description 列出当前主体可管理的服务及当前路由。
+     */
+    readonly get: operations["listServices"];
+    readonly put?: never;
+    /**
+     * Create Service
+     * @description 从有效自定义 Release 原子创建服务、策略、首个 Route 和当前指针。
+     */
+    readonly post: operations["createService"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/services/{service_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /**
+     * Update Service
+     * @description 更新服务定义或访问策略，旧策略和历史 Route 保持不可变。
+     */
+    readonly put: operations["updateService"];
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/services/{service_id}/invocations": {
     readonly parameters: {
       readonly query?: never;
@@ -1926,6 +2138,66 @@ export type paths = {
     readonly get: operations["streamPublishedServiceInvocationEvents"];
     readonly put?: never;
     readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/canary": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Start Service Canary
+     * @description 追加稳定百分比灰度 Route，不修改任何既有 Release。
+     */
+    readonly post: operations["startServiceCanary"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/promote": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Promote Service Route
+     * @description 把指定 Release 原子晋级为唯一正式路由。
+     */
+    readonly post: operations["promoteServiceRoute"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/rollback": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Rollback Service Route
+     * @description 追加回滚 Route 并恢复最近稳定版本，当前 generation 竞争时失败关闭。
+     */
+    readonly post: operations["rollbackServiceRoute"];
     readonly delete?: never;
     readonly options?: never;
     readonly head?: never;
@@ -2144,6 +2416,280 @@ export type paths = {
 export type webhooks = Record<string, never>;
 export type components = {
   schemas: {
+    /**
+     * AgentApprovalResponse
+     * @description 投影候选当前审批身份与终态，不返回策略条件正文。
+     */
+    readonly AgentApprovalResponse: {
+      /**
+       * Approval Instance Id
+       * Format: uuid
+       */
+      readonly approval_instance_id: string;
+      /** Completed At */
+      readonly completed_at: string | null;
+      /** Personal Owner Confirmation */
+      readonly personal_owner_confirmation: boolean;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "pending" | "approved" | "rejected" | "withdrawn";
+    };
+    /**
+     * AgentCandidateControlResponse
+     * @description 组合候选、最近测试和审批结论，供刷新后恢复控制台。
+     */
+    readonly AgentCandidateControlResponse: {
+      readonly approval: components["schemas"]["AgentApprovalResponse"] | null;
+      readonly candidate: components["schemas"]["AgentCandidateResponse"];
+      readonly evaluation: components["schemas"]["AgentEvaluationResponse"] | null;
+    };
+    /**
+     * AgentCandidateListResponse
+     * @description 返回 Agent 最近候选流水。
+     */
+    readonly AgentCandidateListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["AgentCandidateControlResponse"][];
+    };
+    /**
+     * AgentCandidateResponse
+     * @description 表示一次冻结草稿 revision 的发布候选。
+     */
+    readonly AgentCandidateResponse: {
+      /**
+       * Agent Id
+       * Format: uuid
+       */
+      readonly agent_id: string;
+      /** Candidate Hash */
+      readonly candidate_hash: string;
+      /**
+       * Candidate Id
+       * Format: uuid
+       */
+      readonly candidate_id: string;
+      /** Config Hash */
+      readonly config_hash: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Draft Revision */
+      readonly draft_revision: number;
+      /** Status */
+      readonly status: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+    };
+    /**
+     * AgentDetailResponse
+     * @description 组合 Agent 定义与当前草稿。
+     */
+    readonly AgentDetailResponse: {
+      readonly agent: components["schemas"]["AgentResponse"];
+      readonly draft: components["schemas"]["AgentDraftResponse"];
+    };
+    /**
+     * AgentDraftResponse
+     * @description 表示当前可编辑草稿；Runtime 永远不能消费本响应。
+     */
+    readonly AgentDraftResponse: {
+      /**
+       * Agent Id
+       * Format: uuid
+       */
+      readonly agent_id: string;
+      /** Config Hash */
+      readonly config_hash: string;
+      /** Configuration */
+      readonly configuration: {
+        readonly [key: string]: unknown;
+      };
+      /**
+       * Draft Id
+       * Format: uuid
+       */
+      readonly draft_id: string;
+      /** Revision */
+      readonly revision: number;
+      /** Status */
+      readonly status: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+    };
+    /**
+     * AgentEvaluationCheckResponse
+     * @description 返回单类测试门禁的聚合结论，不暴露测试输入与回答正文。
+     */
+    readonly AgentEvaluationCheckResponse: {
+      /** Case Count */
+      readonly case_count: number;
+      /** Check Code */
+      readonly check_code: string;
+      /** Passed Count */
+      readonly passed_count: number;
+      /** Score Bps */
+      readonly score_bps: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "passed" | "failed";
+    };
+    /**
+     * AgentEvaluationResponse
+     * @description 表示候选最近一次不可变确定性评估。
+     */
+    readonly AgentEvaluationResponse: {
+      /**
+       * Candidate Id
+       * Format: uuid
+       */
+      readonly candidate_id: string;
+      /** Checks */
+      readonly checks: readonly components["schemas"]["AgentEvaluationCheckResponse"][];
+      /**
+       * Completed At
+       * Format: date-time
+       */
+      readonly completed_at: string;
+      /**
+       * Evaluation Run Id
+       * Format: uuid
+       */
+      readonly evaluation_run_id: string;
+      /** Evaluator Version */
+      readonly evaluator_version: string;
+      /**
+       * Evidence Level
+       * @constant
+       */
+      readonly evidence_level: "core_functional";
+      /** Failed Cases */
+      readonly failed_cases: number;
+      /** Passed Cases */
+      readonly passed_cases: number;
+      /** Result Hash */
+      readonly result_hash: string;
+      /** Skipped Cases */
+      readonly skipped_cases: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "passed" | "failed";
+      /** Timeout Cases */
+      readonly timeout_cases: number;
+      /** Total Cases */
+      readonly total_cases: number;
+    };
+    /**
+     * AgentListResponse
+     * @description 返回当前工作空间的 Agent 列表。
+     */
+    readonly AgentListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["AgentDetailResponse"][];
+    };
+    /**
+     * AgentReleaseListResponse
+     * @description 返回 Agent 已发布版本。
+     */
+    readonly AgentReleaseListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["AgentReleaseResponse"][];
+    };
+    /**
+     * AgentReleaseResponse
+     * @description 表示已校验的不可变 Agent Release 摘要。
+     */
+    readonly AgentReleaseResponse: {
+      /**
+       * Agent Id
+       * Format: uuid
+       */
+      readonly agent_id: string;
+      /** Candidate Id */
+      readonly candidate_id: string | null;
+      /** Config Hash */
+      readonly config_hash: string;
+      /**
+       * Release Id
+       * Format: uuid
+       */
+      readonly release_id: string;
+      /**
+       * Released At
+       * Format: date-time
+       */
+      readonly released_at: string;
+      /**
+       * Released By Account Id
+       * Format: uuid
+       */
+      readonly released_by_account_id: string;
+      /** Snapshot Hash */
+      readonly snapshot_hash: string | null;
+      /** Source Draft Revision */
+      readonly source_draft_revision: number | null;
+      /** Version */
+      readonly version: number;
+    };
+    /**
+     * AgentResponse
+     * @description 表示控制台可见的自定义 Agent 定义。
+     */
+    readonly AgentResponse: {
+      /**
+       * Agent Id
+       * Format: uuid
+       */
+      readonly agent_id: string;
+      /** Agent Key */
+      readonly agent_key: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Created By Account Id
+       * Format: uuid
+       */
+      readonly created_by_account_id: string;
+      /** Description */
+      readonly description: string | null;
+      /** Name */
+      readonly name: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "archived";
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
     /**
      * AiRuntimeConfigListResponse
      * @description 定义AI运行时配置列表操作的稳定响应结构。
@@ -2598,6 +3144,14 @@ export type components = {
       readonly workspace_id: string;
     };
     /**
+     * ArchiveAgentRequest
+     * @description 按定义版本归档 Agent，历史发布事实不删除。
+     */
+    readonly ArchiveAgentRequest: {
+      /** Expected Version */
+      readonly expected_version: number;
+    };
+    /**
      * AssignMemberOrganizationRequest
      * @description 定义分配成员组织操作的请求字段与协议校验边界。
      */
@@ -2901,6 +3455,25 @@ export type components = {
       readonly workspace_id: string;
     };
     /**
+     * CreateAgentRequest
+     * @description 创建 Agent 所需的定义与完整版本引用配置。
+     */
+    readonly CreateAgentRequest: {
+      /** Configuration */
+      readonly configuration?: {
+        readonly [key: string]: unknown;
+      } | null;
+      /** Description */
+      readonly description?: string | null;
+      /** Name */
+      readonly name: string;
+      /**
+       * Use Starter Configuration
+       * @default false
+       */
+      readonly use_starter_configuration: boolean;
+    };
+    /**
      * CreateAiRuntimeConfigRequest
      * @description 定义创建AI运行时配置操作的请求字段与协议校验边界。
      */
@@ -3127,6 +3700,39 @@ export type components = {
       readonly name: string;
       /** Role Key */
       readonly role_key: string;
+    };
+    /**
+     * CreateServiceRequest
+     * @description 从一个有效 Agent Release 创建稳定服务身份。
+     */
+    readonly CreateServiceRequest: {
+      /**
+       * Allowed Account Ids
+       * @default []
+       */
+      readonly allowed_account_ids: readonly string[];
+      /**
+       * Allowed Department Ids
+       * @default []
+       */
+      readonly allowed_department_ids: readonly string[];
+      /** Name */
+      readonly name: string;
+      /**
+       * Release Id
+       * Format: uuid
+       */
+      readonly release_id: string;
+      /**
+       * Service Type
+       * @enum {string}
+       */
+      readonly service_type: "custom_knowledge_agent" | "scenario_application" | "open_api";
+      /**
+       * Visibility
+       * @enum {string}
+       */
+      readonly visibility: "workspace" | "restricted";
     };
     /**
      * CreateUserMessageRequest
@@ -4891,6 +5497,19 @@ export type components = {
       readonly security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
     };
     /**
+     * PromoteServiceRouteRequest
+     * @description 把指定 Release 晋级为唯一正式版本。
+     */
+    readonly PromoteServiceRouteRequest: {
+      /** Expected Generation */
+      readonly expected_generation: number;
+      /**
+       * Release Id
+       * Format: uuid
+       */
+      readonly release_id: string;
+    };
+    /**
      * PublishedServiceInvocationResponse
      * @description 返回同一 Run 的 HTTP 快照和可恢复 SSE 地址。
      */
@@ -4983,6 +5602,14 @@ export type components = {
     readonly ReplaceWorkspaceMenuConfigurationRequest: {
       /** Items */
       readonly items: readonly components["schemas"]["WorkspaceMenuOverrideEntry"][];
+    };
+    /**
+     * RequestAgentReleaseRequest
+     * @description 冻结当前草稿 revision 为发布候选。
+     */
+    readonly RequestAgentReleaseRequest: {
+      /** Expected Revision */
+      readonly expected_revision: number;
     };
     /**
      * ResolvedApprovalLevelResponse
@@ -5206,6 +5833,14 @@ export type components = {
       readonly active: boolean;
     };
     /**
+     * RollbackServiceRouteRequest
+     * @description 按当前 generation 回滚到最近稳定版本。
+     */
+    readonly RollbackServiceRouteRequest: {
+      /** Expected Generation */
+      readonly expected_generation: number;
+    };
+    /**
      * RotateModelProviderCredentialRequest
      * @description 定义轮换模型供应商凭据操作的请求字段与协议校验边界。
      */
@@ -5306,6 +5941,133 @@ export type components = {
       readonly route_id: string;
     };
     /**
+     * ServiceAccessPolicyResponse
+     * @description 表示当前不可变访问策略版本。
+     */
+    readonly ServiceAccessPolicyResponse: {
+      /**
+       * Access Policy Version Id
+       * Format: uuid
+       */
+      readonly access_policy_version_id: string;
+      /** Allowed Account Ids */
+      readonly allowed_account_ids: readonly string[];
+      /** Allowed Department Ids */
+      readonly allowed_department_ids: readonly string[];
+      /** Policy Hash */
+      readonly policy_hash: string;
+      /** Version */
+      readonly version: number;
+      /**
+       * Visibility
+       * @enum {string}
+       */
+      readonly visibility: "workspace" | "restricted";
+    };
+    /**
+     * ServiceDeploymentResponse
+     * @description 组合服务、当前策略、Route 和发布指针。
+     */
+    readonly ServiceDeploymentResponse: {
+      readonly access_policy: components["schemas"]["ServiceAccessPolicyResponse"];
+      readonly publication: components["schemas"]["ServicePublicationResponse"];
+      readonly route: components["schemas"]["ServiceRouteResponse"];
+      readonly service: components["schemas"]["ServiceResponse"];
+    };
+    /**
+     * ServiceListResponse
+     * @description 返回当前空间可管理的服务。
+     */
+    readonly ServiceListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["ServiceDeploymentResponse"][];
+    };
+    /**
+     * ServicePublicationResponse
+     * @description 表示当前路由指针及并发控制 generation。
+     */
+    readonly ServicePublicationResponse: {
+      /** Generation */
+      readonly generation: number;
+      /**
+       * Published At
+       * Format: date-time
+       */
+      readonly published_at: string;
+      /**
+       * Route Id
+       * Format: uuid
+       */
+      readonly route_id: string;
+    };
+    /**
+     * ServiceResponse
+     * @description 表示工作空间内的稳定服务定义。
+     */
+    readonly ServiceResponse: {
+      /**
+       * Agent Id
+       * Format: uuid
+       */
+      readonly agent_id: string;
+      /** Name */
+      readonly name: string;
+      /**
+       * Service Id
+       * Format: uuid
+       */
+      readonly service_id: string;
+      /** Service Key */
+      readonly service_key: string;
+      /** Service Type */
+      readonly service_type: string;
+      /** Status */
+      readonly status: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+    };
+    /**
+     * ServiceRouteResponse
+     * @description 表示当前不可变路由与灰度分配。
+     */
+    readonly ServiceRouteResponse: {
+      /** Canary Percent */
+      readonly canary_percent: number;
+      /** Canary Release Id */
+      readonly canary_release_id: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Previous Route Id */
+      readonly previous_route_id: string | null;
+      /**
+       * Primary Release Id
+       * Format: uuid
+       */
+      readonly primary_release_id: string;
+      /** Route Hash */
+      readonly route_hash: string;
+      /**
+       * Route Id
+       * Format: uuid
+       */
+      readonly route_id: string;
+      /**
+       * Route Mode
+       * @enum {string}
+       */
+      readonly route_mode: "active" | "canary" | "rollback";
+      /** Route Version */
+      readonly route_version: number;
+    };
+    /**
      * StartApprovalInstanceRequest
      * @description 提供独立审批实例所需的可信主题和客户端幂等键。
      */
@@ -5334,6 +6096,21 @@ export type components = {
        * @enum {string}
        */
       readonly security_level: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+    };
+    /**
+     * StartServiceCanaryRequest
+     * @description 为当前服务追加稳定百分比灰度 Route。
+     */
+    readonly StartServiceCanaryRequest: {
+      /** Canary Percent */
+      readonly canary_percent: number;
+      /** Expected Generation */
+      readonly expected_generation: number;
+      /**
+       * Release Id
+       * Format: uuid
+       */
+      readonly release_id: string;
     };
     /**
      * StatusCountResponse
@@ -5376,6 +6153,42 @@ export type components = {
        * Format: uuid
        */
       readonly target_account_id: string;
+    };
+    /**
+     * UpdateAgentDraftRequest
+     * @description 按乐观锁替换当前草稿配置。
+     */
+    readonly UpdateAgentDraftRequest: {
+      /** Configuration */
+      readonly configuration: {
+        readonly [key: string]: unknown;
+      };
+      /** Expected Revision */
+      readonly expected_revision: number;
+    };
+    /**
+     * UpdateServiceRequest
+     * @description 按服务版本更新名称、状态或受众策略。
+     */
+    readonly UpdateServiceRequest: {
+      /**
+       * Allowed Account Ids
+       * @default []
+       */
+      readonly allowed_account_ids: readonly string[];
+      /**
+       * Allowed Department Ids
+       * @default []
+       */
+      readonly allowed_department_ids: readonly string[];
+      /** Expected Version */
+      readonly expected_version: number;
+      /** Name */
+      readonly name?: string | null;
+      /** Target Status */
+      readonly target_status?: ("active" | "suspended" | "archived") | null;
+      /** Visibility */
+      readonly visibility?: ("workspace" | "restricted") | null;
     };
     /**
      * UpdateWorkflowDraftRequest
@@ -7281,6 +8094,980 @@ export interface operations {
       };
       /** @description 请求未获授权 */
       readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listAgents: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createAgent: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateAgentRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentDetailResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly archiveAgent: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly agent_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["ArchiveAgentRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly updateAgentDraft: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly agent_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["UpdateAgentDraftRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentDraftResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listAgentEvaluations: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly agent_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentCandidateListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly requestAgentRelease: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly agent_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["RequestAgentReleaseRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentCandidateResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly approveAgentRelease: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly agent_id: string;
+        readonly candidate_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentApprovalResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly runAgentEvaluation: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly agent_id: string;
+        readonly candidate_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentEvaluationResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly publishAgentRelease: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly agent_id: string;
+        readonly candidate_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentReleaseResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly listAgentReleases: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly agent_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["AgentReleaseListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -15869,6 +17656,295 @@ export interface operations {
       };
     };
   };
+  readonly listServices: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ServiceListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly createService: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateServiceRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ServiceDeploymentResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly updateService: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly service_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["UpdateServiceRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ServiceDeploymentResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   readonly invokePublishedService: {
     readonly parameters: {
       readonly query?: never;
@@ -16147,6 +18223,318 @@ export interface operations {
       };
       /** @description 请求的恢复事实已过期 */
       readonly 410: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly startServiceCanary: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly service_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["StartServiceCanaryRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ServiceDeploymentResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly promoteServiceRoute: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly service_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["PromoteServiceRouteRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ServiceDeploymentResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly rollbackServiceRoute: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly service_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["RollbackServiceRouteRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ServiceDeploymentResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
         headers: {
           readonly [name: string]: unknown;
         };

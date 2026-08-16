@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
@@ -40,9 +41,17 @@ from ai_platform_api.modules.agent_control.application.evaluation import (
     run_agent_evaluation,
 )
 from ai_platform_api.modules.agent_control.application.lifecycle import archive_agent
-from ai_platform_api.modules.agent_control.application.queries import get_agent, get_release
+from ai_platform_api.modules.agent_control.application.queries import (
+    AgentCandidateControlView,
+    get_agent,
+    get_release,
+    list_agents,
+    list_candidate_controls,
+    list_releases,
+)
 from ai_platform_api.modules.agent_control.application.releases import publish_agent_release
 from ai_platform_api.modules.agent_control.application.support import configuration_digest
+from ai_platform_api.modules.agent_control.domain.approval import AgentApprovalDecision
 from ai_platform_api.modules.agent_control.domain.configuration import (
     AgentKnowledgeScopeVersion,
     AgentOutputSchemaVersion,
@@ -64,13 +73,20 @@ from ai_platform_api.modules.agent_control.domain.models import (
 from ai_platform_api.modules.workflow.application.approval_runtime import ApprovalInstanceService
 
 __all__ = [
+    "Agent",
+    "AgentApprovalDecision",
+    "AgentCandidateControlView",
     "AgentConfigurationInvalidError",
     "AgentControlService",
     "AgentDeniedError",
+    "AgentDraft",
+    "AgentEvaluationReport",
     "AgentIdempotencyConflictError",
     "AgentLifecycleConflictError",
     "AgentNotFoundError",
+    "AgentRelease",
     "AgentReleaseApprovalRequiredError",
+    "AgentReleaseCandidate",
     "AgentTestGateFailedError",
     "AgentValidationError",
     "configuration_digest",
@@ -85,10 +101,12 @@ class AgentControlService:
         unit_of_work: AgentControlUnitOfWork,
         evaluation_executor: AgentEvaluationExecutor | None = None,
         approval_instances: ApprovalInstanceService | None = None,
+        runtime_bootstrap: Callable[[UUID], object] | None = None,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._evaluation_executor = evaluation_executor
         self._approval_instances = approval_instances
+        self._runtime_bootstrap = runtime_bootstrap
 
     def create_prompt_version(
         self,
@@ -144,7 +162,8 @@ class AgentControlService:
         *,
         name: str,
         description: str | None,
-        configuration: dict[str, object],
+        configuration: dict[str, object] | None,
+        use_starter_configuration: bool = False,
         idempotency_key: str,
     ) -> tuple[Agent, AgentDraft]:
         """原子创建自定义 Agent、首个草稿修订及可靠变更事件。"""
@@ -155,8 +174,20 @@ class AgentControlService:
             name=name,
             description=description,
             configuration=configuration,
+            use_starter_configuration=use_starter_configuration,
+            runtime_bootstrap=self._runtime_bootstrap,
             idempotency_key=idempotency_key,
         )
+
+    def list_agents(
+        self,
+        context: RequestContext,
+        *,
+        limit: int = 100,
+    ) -> tuple[tuple[Agent, AgentDraft], ...]:
+        """列出当前空间可管理的自定义 Agent 及其当前草稿。"""
+
+        return list_agents(self._unit_of_work, context, limit=limit)
 
     def get_agent(
         self,
@@ -222,6 +253,22 @@ class AgentControlService:
             idempotency_key=idempotency_key,
         )
 
+    def list_candidate_controls(
+        self,
+        context: RequestContext,
+        *,
+        agent_id: UUID,
+        limit: int = 50,
+    ) -> tuple[AgentCandidateControlView, ...]:
+        """列出候选、最近确定性测试和审批状态，供页面刷新恢复。"""
+
+        return list_candidate_controls(
+            self._unit_of_work,
+            context,
+            agent_id=agent_id,
+            limit=limit,
+        )
+
     def create_evaluation_dataset(
         self,
         context: RequestContext,
@@ -257,6 +304,26 @@ class AgentControlService:
             context,
             candidate_id=candidate_id,
             dataset_version_id=dataset_version_id,
+        )
+
+    def run_release_gate_evaluation(
+        self,
+        context: RequestContext,
+        *,
+        candidate_id: UUID,
+    ) -> AgentEvaluationReport:
+        """运行平台固定的五类合成门禁，不接受浏览器上传测试观测。"""
+
+        dataset = self.create_evaluation_dataset(
+            context,
+            name="Agent 发布固定门禁",
+            dataset_version="p304-console-release-gate-v1",
+            cases=_release_gate_cases(),
+        )
+        return self.run_evaluation(
+            context,
+            candidate_id=candidate_id,
+            dataset_version_id=dataset.dataset_version_id,
         )
 
     def get_evaluation_report(
@@ -359,6 +426,22 @@ class AgentControlService:
             idempotency_key=idempotency_key,
         )
 
+    def list_releases(
+        self,
+        context: RequestContext,
+        *,
+        agent_id: UUID,
+        limit: int = 50,
+    ) -> tuple[AgentRelease, ...]:
+        """列出已校验的不可变 Release，控制台不能从草稿拼装发布快照。"""
+
+        return list_releases(
+            self._unit_of_work,
+            context,
+            agent_id=agent_id,
+            limit=limit,
+        )
+
     def get_release(
         self,
         context: RequestContext,
@@ -374,3 +457,26 @@ class AgentControlService:
             agent_id=agent_id,
             release_id=release_id,
         )
+
+
+def _release_gate_cases() -> tuple[dict[str, object], ...]:
+    """返回覆盖功能、越权、注入、引用和输出契约的最小全合成测试集。"""
+
+    check_codes = (
+        "functional",
+        "authorization",
+        "prompt_injection",
+        "citation",
+        "output_contract",
+    )
+    return tuple(
+        {
+            "case_key": f"console.synthetic.{check_code}",
+            "check_code": check_code,
+            "input_fixture": {"fixture": f"SYNTHETIC_{check_code.upper()}"},
+            "expected_fixture": {"decision": "allow"},
+            "timeout_ms": 2_000,
+            "minimum_score_bps": 8_000 if check_code == "functional" else 10_000,
+        }
+        for check_code in check_codes
+    )

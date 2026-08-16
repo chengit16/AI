@@ -19,7 +19,10 @@ const requireFromWeb = createRequire(
 const ts = requireFromWeb("typescript");
 const utilityPrefix =
   "(?:bg|text|border|rounded|grid-cols|gap|space-[xy]|[pm][trblxy]?|w|h|min-[wh]|max-[wh]|z|opacity|translate-[xy])";
-const dynamicUtilityPattern = new RegExp(`${utilityPrefix}-[^\\s\\x60]*\\$\\{`);
+// Utility 必须从模板或空白分隔处开始，避免把 `publish-${id}` 中的 `h-` 误判为高度类。
+const dynamicUtilityPattern = new RegExp(
+  `(?:^|[\\s\\x60'\"])${utilityPrefix}-[^\\s\\x60]*\\$\\{`,
+);
 
 function walk(directory) {
   if (!fs.existsSync(directory)) return [];

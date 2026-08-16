@@ -111,6 +111,20 @@ class SqlAlchemyAgentRepository(AgentRepository):
         row = self._session.execute(statement).one_or_none()
         return _agent(row) if row is not None else None
 
+    def list_agents(self, workspace_id: UUID, *, limit: int) -> tuple[Agent, ...]:
+        """只列出当前工作空间的自定义 Agent，系统助手继续由独立路径管理。"""
+
+        rows = self._session.execute(
+            select(agents)
+            .where(
+                agents.c.workspace_id == workspace_id,
+                agents.c.agent_kind == "custom",
+            )
+            .order_by(agents.c.updated_at.desc(), agents.c.agent_id)
+            .limit(limit)
+        )
+        return tuple(_agent(row) for row in rows)
+
     def save_agent(self, agent: Agent, *, expected_version: int) -> bool:
         """用 version 条件更新定义，防止归档与其他写操作丢失更新。"""
 
@@ -271,6 +285,29 @@ class SqlAlchemyAgentRepository(AgentRepository):
         row = self._session.execute(statement).one_or_none()
         return _candidate(row) if row is not None else None
 
+    def list_candidates(
+        self,
+        workspace_id: UUID,
+        agent_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[AgentReleaseCandidate, ...]:
+        """按创建时间倒序返回 Agent 候选，供控制台恢复测试与审批状态。"""
+
+        rows = self._session.execute(
+            select(agent_release_candidates)
+            .where(
+                agent_release_candidates.c.workspace_id == workspace_id,
+                agent_release_candidates.c.agent_id == agent_id,
+            )
+            .order_by(
+                agent_release_candidates.c.created_at.desc(),
+                agent_release_candidates.c.candidate_id,
+            )
+            .limit(limit)
+        )
+        return tuple(_candidate(row) for row in rows)
+
     def save_candidate(
         self,
         candidate: AgentReleaseCandidate,
@@ -338,6 +375,27 @@ class SqlAlchemyAgentRepository(AgentRepository):
             )
         ).one_or_none()
         return _release(row) if row is not None else None
+
+    def list_releases(
+        self,
+        workspace_id: UUID,
+        agent_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[AgentRelease, ...]:
+        """按版本倒序返回不可变自定义 Release，不读取或拼接当前草稿。"""
+
+        rows = self._session.execute(
+            select(agent_releases)
+            .where(
+                agent_releases.c.workspace_id == workspace_id,
+                agent_releases.c.agent_id == agent_id,
+                agent_releases.c.release_kind == "custom",
+            )
+            .order_by(agent_releases.c.version.desc(), agent_releases.c.release_id)
+            .limit(limit)
+        )
+        return tuple(_release(row) for row in rows)
 
     def get_release_by_candidate(
         self,

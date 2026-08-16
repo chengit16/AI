@@ -105,6 +105,19 @@ test("拒绝运行时拼接 Utility", () => {
   );
 });
 
+test("允许包含 Utility 后缀字母的普通业务模板", () => {
+  withProject(
+    {
+      ...validFiles,
+      "apps/web/src/api.ts":
+        "const idempotencyKey = `agent-publish-${crypto.randomUUID()}`;\nvoid idempotencyKey;",
+    },
+    (root) => {
+      assert.deepEqual(collectStyleViolations(root), []);
+    },
+  );
+});
+
 test("拒绝启用 Attributify 或图标预设", () => {
   withProject(
     {

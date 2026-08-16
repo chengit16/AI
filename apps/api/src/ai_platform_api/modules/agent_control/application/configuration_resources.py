@@ -6,12 +6,15 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid5
 
 from ai_platform_backend.integration.domain import AuditRecord
+from ai_platform_backend.safety import RAG_SAFETY_VERSION
 from jsonschema import Draft202012Validator, SchemaError
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.agent_control.application.configuration import (
+    AgentConfigurationDocument,
     document_digest,
     knowledge_base_is_accessible,
+    parse_agent_configuration,
     reject_credentials,
     scope_digest,
     text_digest,
@@ -28,6 +31,13 @@ from ai_platform_api.modules.agent_control.domain.configuration import (
 from ai_platform_api.modules.agent_control.domain.models import AgentControlUnitOfWork
 
 CONFIGURATION_NAMESPACE = UUID("ac000000-0000-4000-8000-000000000303")
+STARTER_PROMPT_NAME = "Agent 基础回答 Prompt"
+STARTER_KNOWLEDGE_SCOPE_NAME = "Agent 基础空知识范围"
+STARTER_OUTPUT_SCHEMA_NAME = "Agent 基础回答 Schema"
+STARTER_PROMPT_TEMPLATE = (
+    "你是工作空间中的基础 Agent。只使用当前配置明确授权的知识和工具回答问题。"
+    "无法依据已授权信息确认时必须明确说明无法确认。输出必须符合已绑定的 JSON Schema。"
+)
 
 
 def create_prompt_version(
@@ -185,6 +195,149 @@ def create_output_schema_version(
         if existing is None:
             raise AgentConfigurationInvalidError
         return existing
+
+
+def create_starter_configuration(
+    unit_of_work: AgentControlUnitOfWork,
+    context: RequestContext,
+) -> tuple[AgentConfigurationDocument, dict[str, object], str]:
+    """在 Agent 创建事务中生成可直接编辑、仍满足完整约束的基础配置。"""
+
+    # 1. 基础配置只能绑定当前发布 Runtime 和当前实现匹配的安全策略，缺失时失败关闭。
+    account_id = _configuration_account(context)
+    runtime = unit_of_work.configuration.get_published_runtime_configuration(for_share=True)
+    safety = unit_of_work.configuration.get_active_safety_policy_version(
+        RAG_SAFETY_VERSION,
+        for_share=True,
+    )
+    if runtime is None or safety is None or runtime.total_timeout_ms < 1_000:
+        raise AgentConfigurationInvalidError
+
+    # 2. 三类资源按内容寻址写入；重复请求复用原版本，且不在审计中保存正文或 Schema。
+    now = datetime.now(UTC)
+    prompt_hash = text_digest(STARTER_PROMPT_TEMPLATE)
+    prompt = AgentPromptVersion(
+        prompt_version_id=_version_id(
+            "prompt",
+            context.workspace_id,
+            STARTER_PROMPT_NAME,
+            prompt_hash,
+        ),
+        workspace_id=context.workspace_id,
+        name=STARTER_PROMPT_NAME,
+        template=STARTER_PROMPT_TEMPLATE,
+        prompt_hash=prompt_hash,
+        created_by_account_id=account_id,
+        created_at=now,
+    )
+    scope_hash = scope_digest(())
+    scope = AgentKnowledgeScopeVersion(
+        knowledge_scope_version_id=_version_id(
+            "knowledge-scope",
+            context.workspace_id,
+            STARTER_KNOWLEDGE_SCOPE_NAME,
+            scope_hash,
+        ),
+        workspace_id=context.workspace_id,
+        name=STARTER_KNOWLEDGE_SCOPE_NAME,
+        knowledge_base_ids=(),
+        scope_hash=scope_hash,
+        created_by_account_id=account_id,
+        created_at=now,
+    )
+    schema_document = _starter_output_schema()
+    schema_hash = document_digest(schema_document)
+    output_schema = AgentOutputSchemaVersion(
+        output_schema_version_id=_version_id(
+            "output-schema",
+            context.workspace_id,
+            STARTER_OUTPUT_SCHEMA_NAME,
+            schema_hash,
+        ),
+        workspace_id=context.workspace_id,
+        name=STARTER_OUTPUT_SCHEMA_NAME,
+        schema_document=schema_document,
+        schema_hash=schema_hash,
+        created_by_account_id=account_id,
+        created_at=now,
+    )
+    _add_starter_resource_versions(unit_of_work, context, prompt, scope, output_schema, now)
+
+    # 3. 最终草稿保存普通完整配置，不保留 starter 标记，也不绕过 P3-03 的严格解析。
+    configuration: dict[str, object] = {
+        "prompt_version_id": str(prompt.prompt_version_id),
+        "runtime_config_version_id": str(runtime.runtime_config_version_id),
+        "knowledge_scope_version_ids": [str(scope.knowledge_scope_version_id)],
+        "workflow_release_id": None,
+        "read_only_tools": [],
+        "output_schema_version_id": str(output_schema.output_schema_version_id),
+        "safety_policy_version_id": str(safety.safety_policy_version_id),
+        "limits": {
+            "max_input_tokens": max(1, min(8_192, runtime.max_prompt_characters)),
+            "max_output_tokens": min(1_024, runtime.max_output_tokens),
+            "max_execution_seconds": min(60, runtime.total_timeout_ms // 1_000),
+            "max_cost_microunits": min(500_000, runtime.max_estimated_cost_microunits),
+        },
+    }
+    return parse_agent_configuration(configuration)
+
+
+def _add_starter_resource_versions(
+    unit_of_work: AgentControlUnitOfWork,
+    context: RequestContext,
+    prompt: AgentPromptVersion,
+    scope: AgentKnowledgeScopeVersion,
+    output_schema: AgentOutputSchemaVersion,
+    occurred_at: datetime,
+) -> None:
+    """幂等写入基础资源，并仅为本事务首次插入的事实记录审计。"""
+
+    resources = (
+        (
+            unit_of_work.configuration.add_prompt_version(prompt),
+            "agent.prompt_version.created",
+            "agent_prompt_version",
+            prompt.prompt_version_id,
+            prompt.prompt_hash,
+        ),
+        (
+            unit_of_work.configuration.add_knowledge_scope_version(scope),
+            "agent.knowledge_scope_version.created",
+            "agent_knowledge_scope_version",
+            scope.knowledge_scope_version_id,
+            scope.scope_hash,
+        ),
+        (
+            unit_of_work.configuration.add_output_schema_version(output_schema),
+            "agent.output_schema_version.created",
+            "agent_output_schema_version",
+            output_schema.output_schema_version_id,
+            output_schema.schema_hash,
+        ),
+    )
+    for inserted, action, resource_type, resource_id, content_hash in resources:
+        if inserted:
+            _record_configuration_version(
+                unit_of_work,
+                context,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                content_hash=content_hash,
+                occurred_at=occurred_at,
+            )
+
+
+def _starter_output_schema() -> dict[str, object]:
+    """返回允许基础 Agent 输出答案文本的最小 Draft 2020-12 Schema。"""
+
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["answer"],
+        "properties": {"answer": {"type": "string"}},
+    }
 
 
 def _configuration_account(context: RequestContext) -> UUID:

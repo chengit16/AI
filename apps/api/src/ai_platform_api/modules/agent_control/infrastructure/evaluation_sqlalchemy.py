@@ -197,6 +197,24 @@ class SqlAlchemyAgentEvaluationRepository:
         ).one_or_none()
         return self._report(row) if row is not None else None
 
+    def get_latest_report(
+        self,
+        workspace_id: UUID,
+        candidate_id: UUID,
+    ) -> AgentEvaluationReport | None:
+        """读取候选最近一次确定性报告，失败结果同样保留给控制台解释门禁。"""
+
+        row = self._session.execute(
+            select(agent_evaluation_runs)
+            .where(
+                agent_evaluation_runs.c.workspace_id == workspace_id,
+                agent_evaluation_runs.c.candidate_id == candidate_id,
+            )
+            .order_by(agent_evaluation_runs.c.completed_at.desc())
+            .limit(1)
+        ).one_or_none()
+        return self._report(row) if row is not None else None
+
     def add_report(self, report: AgentEvaluationReport) -> None:
         """一次写入运行、检查和用例结果；任何唯一键竞争都回滚整份报告。"""
 

@@ -14,6 +14,7 @@ from ai_platform_api.app.errors import register_error_handlers
 from ai_platform_api.app.trace_middleware import TraceContextMiddleware
 from ai_platform_api.common.api_errors import ErrorResponse
 from ai_platform_api.config import Settings, get_settings
+from ai_platform_api.modules.agent_control.api.routes import router as agent_control_router
 from ai_platform_api.modules.assistant.api.routes import router as assistant_router
 from ai_platform_api.modules.authorization.api.routes import (
     menu_router,
@@ -37,6 +38,9 @@ from ai_platform_api.modules.model_gateway.api.routes import (
 )
 from ai_platform_api.modules.operations.api.routes import router as operations_workbench_router
 from ai_platform_api.modules.service_delivery.api.routes import router as service_delivery_router
+from ai_platform_api.modules.service_governance.api.routes import (
+    router as service_governance_router,
+)
 from ai_platform_api.modules.system.api.health import router as health_router
 from ai_platform_api.modules.system.api.observability import router as observability_router
 from ai_platform_api.modules.workflow.api.approval_routes import router as approval_policy_router
@@ -115,6 +119,8 @@ def create_app(
     application.state.model_runtime_service = dependencies.model_runtime
     application.state.assistant_conversation_service = dependencies.assistant_conversations
     application.state.assistant_run_executor = dependencies.assistant_run_executor
+    application.state.agent_control_service = dependencies.agent_controls
+    application.state.service_governance_service = dependencies.service_governance
     application.state.service_invocation_service = dependencies.service_invocations
     application.state.assistant_source_service = dependencies.assistant_sources
     application.state.streaming_service = dependencies.streaming
@@ -144,6 +150,8 @@ def create_app(
     application.include_router(model_provider_router, prefix="/api/v1")
     application.include_router(ai_runtime_router, prefix="/api/v1")
     application.include_router(assistant_router, prefix="/api/v1")
+    application.include_router(agent_control_router, prefix="/api/v1")
+    application.include_router(service_governance_router, prefix="/api/v1")
     application.include_router(service_delivery_router, prefix="/api/v1")
     application.include_router(workflow_router, prefix="/api/v1")
     application.include_router(approval_policy_router, prefix="/api/v1")

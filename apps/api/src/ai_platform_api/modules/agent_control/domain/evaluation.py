@@ -244,6 +244,12 @@ class AgentEvaluationRepository(Protocol):
         candidate_id: UUID,
     ) -> AgentEvaluationReport | None: ...
 
+    def get_latest_report(
+        self,
+        workspace_id: UUID,
+        candidate_id: UUID,
+    ) -> AgentEvaluationReport | None: ...
+
     def add_report(self, report: AgentEvaluationReport) -> None: ...
 
     def transition_candidate_after_evaluation(

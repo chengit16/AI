@@ -93,6 +93,16 @@ class MemoryAgentRepository(AgentRepository):
         agent = self.agents.get(agent_id)
         return agent if agent is not None and agent.workspace_id == workspace_id else None
 
+    def list_agents(self, workspace_id: UUID, *, limit: int) -> tuple[Agent, ...]:
+        """按更新时间稳定返回当前空间的自定义 Agent。"""
+
+        values = [
+            agent
+            for agent in self.agents.values()
+            if agent.workspace_id == workspace_id and agent.agent_kind == "custom"
+        ]
+        return tuple(sorted(values, key=lambda item: item.updated_at, reverse=True)[:limit])
+
     def save_agent(self, agent: Agent, *, expected_version: int) -> bool:
         current = self.agents.get(agent.agent_id)
         if current is None or current.version != expected_version:
@@ -158,6 +168,22 @@ class MemoryAgentRepository(AgentRepository):
         value = self.candidates.get(candidate_id)
         return value if value is not None and value.workspace_id == workspace_id else None
 
+    def list_candidates(
+        self,
+        workspace_id: UUID,
+        agent_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[AgentReleaseCandidate, ...]:
+        """返回指定 Agent 的候选流水，供查询用例测试刷新恢复。"""
+
+        values = [
+            candidate
+            for candidate in self.candidates.values()
+            if candidate.workspace_id == workspace_id and candidate.agent_id == agent_id
+        ]
+        return tuple(sorted(values, key=lambda item: item.created_at, reverse=True)[:limit])
+
     def save_candidate(
         self,
         candidate: AgentReleaseCandidate,
@@ -204,6 +230,22 @@ class MemoryAgentRepository(AgentRepository):
     def get_release(self, workspace_id: UUID, release_id: UUID) -> AgentRelease | None:
         value = self.releases.get(release_id)
         return value if value is not None and value.workspace_id == workspace_id else None
+
+    def list_releases(
+        self,
+        workspace_id: UUID,
+        agent_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[AgentRelease, ...]:
+        """按版本倒序返回不可变 Release。"""
+
+        values = [
+            release
+            for release in self.releases.values()
+            if release.workspace_id == workspace_id and release.agent_id == agent_id
+        ]
+        return tuple(sorted(values, key=lambda item: item.version, reverse=True)[:limit])
 
     def get_release_by_candidate(
         self,
@@ -335,6 +377,15 @@ class MemoryConfigurationRepository:
             else None
         )
 
+    def get_active_safety_policy_version(
+        self,
+        implementation_version: str,
+        *,
+        for_share: bool = False,
+    ) -> AgentSafetyPolicyVersion | None:
+        del for_share
+        return self.safety if implementation_version == self.safety.implementation_version else None
+
     def get_tool_definition(
         self,
         tool_id: UUID,
@@ -362,6 +413,14 @@ class MemoryConfigurationRepository:
             120_000,
             1_000_000,
         )
+
+    def get_published_runtime_configuration(
+        self,
+        *,
+        for_share: bool = False,
+    ) -> RuntimeConfigurationReference | None:
+        del for_share
+        return self.get_current_runtime_configuration(RUNTIME_CONFIG_ID)
 
     def get_current_workflow_release(
         self,
@@ -548,6 +607,38 @@ def test_idempotent_writes_do_not_duplicate_facts_and_conflicting_payload_is_rej
             configuration=configuration(unit_of_work, "合成幂等 Prompt"),
             idempotency_key="synthetic-agent-idempotent-0302",
         )
+
+
+def test_starter_configuration_creates_complete_editable_draft_and_replays_by_intent() -> None:
+    """基础模式必须生成完整版本引用，并按原始创建意图重放幂等结果。"""
+
+    unit_of_work = MemoryAgentUnitOfWork()
+    service = AgentControlService(unit_of_work)
+    first = service.create_agent(
+        context(),
+        name="合成基础 Agent",
+        description="验证新空间首个 Agent",
+        configuration=None,
+        use_starter_configuration=True,
+        idempotency_key="synthetic-agent-starter-0302",
+    )
+    repeated = service.create_agent(
+        context(),
+        name="合成基础 Agent",
+        description="验证新空间首个 Agent",
+        configuration=None,
+        use_starter_configuration=True,
+        idempotency_key="synthetic-agent-starter-0302",
+    )
+
+    assert repeated == first
+    assert first[1].configuration["runtime_config_version_id"] == str(RUNTIME_CONFIG_ID)
+    assert first[1].configuration["safety_policy_version_id"] == str(SAFETY_POLICY_ID)
+    assert len(cast(list[str], first[1].configuration["knowledge_scope_version_ids"])) == 1
+    assert len(unit_of_work.configuration.prompts) == 1
+    assert len(unit_of_work.configuration.scopes) == 1
+    assert len(unit_of_work.configuration.output_schemas) == 1
+    assert len(unit_of_work.agents.agents) == 1
 
 
 def test_candidate_freezes_revision_and_archiving_supersedes_current_draft() -> None:

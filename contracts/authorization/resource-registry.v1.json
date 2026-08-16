@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 19,
+  "registry_version": 20,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -88,6 +88,23 @@
     ,{ "code": "operations.index.rebuild", "resource_type": "index_maintenance", "action": "rebuild", "scope": "workspace", "status": "active" }
     ,{ "code": "operations.index.cleanup", "resource_type": "index_maintenance", "action": "cleanup", "scope": "workspace", "status": "active" }
     ,{ "code": "service.definition.read", "resource_type": "service_definition", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.page.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" }
+    ,{ "code": "agent.definition.create", "resource_type": "agent_definition", "action": "create", "scope": "workspace", "status": "active" }
+    ,{ "code": "agent.definition.read", "resource_type": "agent_definition", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.definition.update", "resource_type": "agent_definition", "action": "update", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.definition.archive", "resource_type": "agent_definition", "action": "archive", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.test.execute", "resource_type": "agent_release_candidate", "action": "execute_test", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.test.read", "resource_type": "agent_release_candidate", "action": "read_test", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.release.request", "resource_type": "agent_release_candidate", "action": "request", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.release.read", "resource_type": "agent_release", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.release.approve", "resource_type": "agent_release_candidate", "action": "approve", "scope": "resource", "status": "active" }
+    ,{ "code": "agent.release.publish", "resource_type": "agent_release", "action": "publish", "scope": "resource", "status": "active" }
+    ,{ "code": "service.page.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" }
+    ,{ "code": "service.definition.create", "resource_type": "service_definition", "action": "create", "scope": "workspace", "status": "active" }
+    ,{ "code": "service.definition.update", "resource_type": "service_definition", "action": "update", "scope": "resource", "status": "active" }
+    ,{ "code": "service.route.canary", "resource_type": "service_route", "action": "canary", "scope": "resource", "status": "active" }
+    ,{ "code": "service.route.promote", "resource_type": "service_route", "action": "promote", "scope": "resource", "status": "active" }
+    ,{ "code": "service.route.rollback", "resource_type": "service_route", "action": "rollback", "scope": "resource", "status": "active" }
   ],
   "page_resources": [
     {
@@ -186,6 +203,28 @@
       "layout_key": "layout.workspace",
       "access_level": "authorized",
       "permission_code": "workflow.page.access",
+      "resource_version": 1,
+      "status": "active"
+    },
+    {
+      "page_resource_id": "80000000-0000-4000-8000-000000000010",
+      "page_key": "agent.control",
+      "route": "/workspace/agents",
+      "component_key": "AgentControlPage",
+      "layout_key": "layout.workspace",
+      "access_level": "authorized",
+      "permission_code": "agent.page.access",
+      "resource_version": 1,
+      "status": "active"
+    },
+    {
+      "page_resource_id": "80000000-0000-4000-8000-000000000011",
+      "page_key": "service.management",
+      "route": "/workspace/services",
+      "component_key": "ServiceManagementPage",
+      "layout_key": "layout.workspace",
+      "access_level": "authorized",
+      "permission_code": "service.page.access",
       "resource_version": 1,
       "status": "active"
     }
@@ -312,7 +351,23 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000119", "api_key": "operations.index.cleanup", "operation_id": "requestOperationsIndexCleanup", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/operations/workbench/index-maintenance/cleanups", "access_level": "authorized", "permission_code": "operations.index.cleanup", "risk_level": "critical", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000120", "api_key": "service.invocation.create", "operation_id": "invokePublishedService", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/invocations", "access_level": "authorized", "permission_code": "service.definition.read", "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000121", "api_key": "service.invocation.read", "operation_id": "getPublishedServiceInvocation", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/invocations/{run_id}", "access_level": "authorized", "permission_code": "service.definition.read", "risk_level": "high", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000122", "api_key": "service.invocation.stream", "operation_id": "streamPublishedServiceInvocationEvents", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/invocations/{run_id}/events", "access_level": "authorized", "permission_code": "service.definition.read", "risk_level": "high", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000122", "api_key": "service.invocation.stream", "operation_id": "streamPublishedServiceInvocationEvents", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/invocations/{run_id}/events", "access_level": "authorized", "permission_code": "service.definition.read", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000123", "api_key": "agent.definition.list", "operation_id": "listAgents", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents", "access_level": "authorized", "permission_code": "agent.definition.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000124", "api_key": "agent.definition.create", "operation_id": "createAgent", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents", "access_level": "authorized", "permission_code": "agent.definition.create", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000125", "api_key": "agent.definition.update", "operation_id": "updateAgentDraft", "method": "PUT", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/draft", "access_level": "authorized", "permission_code": "agent.definition.update", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000126", "api_key": "agent.definition.archive", "operation_id": "archiveAgent", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/archive", "access_level": "authorized", "permission_code": "agent.definition.archive", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000127", "api_key": "agent.test.execute", "operation_id": "runAgentEvaluation", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests/{candidate_id}/evaluations", "access_level": "authorized", "permission_code": "agent.test.execute", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000128", "api_key": "agent.test.list", "operation_id": "listAgentEvaluations", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests", "access_level": "authorized", "permission_code": "agent.test.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000129", "api_key": "agent.release.request", "operation_id": "requestAgentRelease", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests", "access_level": "authorized", "permission_code": "agent.release.request", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000130", "api_key": "agent.release.list", "operation_id": "listAgentReleases", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/releases", "access_level": "authorized", "permission_code": "agent.release.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000131", "api_key": "agent.release.approve", "operation_id": "approveAgentRelease", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests/{candidate_id}/approval", "access_level": "authorized", "permission_code": "agent.release.approve", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000132", "api_key": "agent.release.publish", "operation_id": "publishAgentRelease", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/agents/{agent_id}/release-requests/{candidate_id}/publish", "access_level": "authorized", "permission_code": "agent.release.publish", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000133", "api_key": "service.definition.list", "operation_id": "listServices", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/services", "access_level": "authorized", "permission_code": "service.definition.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000134", "api_key": "service.definition.create", "operation_id": "createService", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services", "access_level": "authorized", "permission_code": "service.definition.create", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000135", "api_key": "service.definition.update", "operation_id": "updateService", "method": "PUT", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}", "access_level": "authorized", "permission_code": "service.definition.update", "risk_level": "high", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000136", "api_key": "service.route.canary", "operation_id": "startServiceCanary", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/canary", "access_level": "authorized", "permission_code": "service.route.canary", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000137", "api_key": "service.route.promote", "operation_id": "promoteServiceRoute", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/promote", "access_level": "authorized", "permission_code": "service.route.promote", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000138", "api_key": "service.route.rollback", "operation_id": "rollbackServiceRoute", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/services/{service_id}/routes/rollback", "access_level": "authorized", "permission_code": "service.route.rollback", "risk_level": "critical", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -409,6 +464,24 @@
     { "menu_id": "82000000-0000-4000-8000-000000000198", "menu_key": "navigation.workspace.assistant.invoke", "parent_menu_key": "navigation.workspace.assistant", "name": "调用已发布服务", "menu_type": "action", "page_resource_id": null, "permission_code": "service.definition.read", "icon_key": null, "sort_order": 280, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000199", "menu_key": "navigation.workspace.assistant.invocation_read", "parent_menu_key": "navigation.workspace.assistant", "name": "查看服务调用", "menu_type": "action", "page_resource_id": null, "permission_code": "service.definition.read", "icon_key": null, "sort_order": 290, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000200", "menu_key": "navigation.workspace.assistant.invocation_stream", "parent_menu_key": "navigation.workspace.assistant", "name": "订阅服务调用事件", "menu_type": "action", "page_resource_id": null, "permission_code": "service.definition.read", "icon_key": null, "sort_order": 300, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000201", "menu_key": "workspace.agents", "parent_menu_key": "navigation.workspace", "name": "Agent 控制台", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000010", "permission_code": "agent.page.access", "icon_key": "bot", "sort_order": 360, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000202", "menu_key": "workspace.agents.create", "parent_menu_key": "workspace.agents", "name": "创建 Agent", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.definition.create", "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000203", "menu_key": "workspace.agents.update", "parent_menu_key": "workspace.agents", "name": "编辑 Agent 草稿", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.definition.update", "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000204", "menu_key": "workspace.agents.archive", "parent_menu_key": "workspace.agents", "name": "归档 Agent", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.definition.archive", "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000205", "menu_key": "workspace.agents.test", "parent_menu_key": "workspace.agents", "name": "执行 Agent 测试", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.test.execute", "icon_key": null, "sort_order": 130, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000206", "menu_key": "workspace.agents.release_request", "parent_menu_key": "workspace.agents", "name": "申请 Agent 发布", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.release.request", "icon_key": null, "sort_order": 140, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000207", "menu_key": "workspace.agents.release_approve", "parent_menu_key": "workspace.agents", "name": "发起 Agent 审批", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.release.approve", "icon_key": null, "sort_order": 150, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000208", "menu_key": "workspace.agents.release_publish", "parent_menu_key": "workspace.agents", "name": "发布 Agent Release", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.release.publish", "icon_key": null, "sort_order": 160, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000209", "menu_key": "workspace.services", "parent_menu_key": "navigation.workspace", "name": "服务发布", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000011", "permission_code": "service.page.access", "icon_key": "route", "sort_order": 370, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000210", "menu_key": "workspace.services.create", "parent_menu_key": "workspace.services", "name": "创建服务", "menu_type": "action", "page_resource_id": null, "permission_code": "service.definition.create", "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000211", "menu_key": "workspace.services.update", "parent_menu_key": "workspace.services", "name": "更新服务", "menu_type": "action", "page_resource_id": null, "permission_code": "service.definition.update", "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000212", "menu_key": "workspace.services.canary", "parent_menu_key": "workspace.services", "name": "启动灰度", "menu_type": "action", "page_resource_id": null, "permission_code": "service.route.canary", "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000213", "menu_key": "workspace.services.promote", "parent_menu_key": "workspace.services", "name": "晋级正式版本", "menu_type": "action", "page_resource_id": null, "permission_code": "service.route.promote", "icon_key": null, "sort_order": 130, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000214", "menu_key": "workspace.services.rollback", "parent_menu_key": "workspace.services", "name": "回滚服务版本", "menu_type": "action", "page_resource_id": null, "permission_code": "service.route.rollback", "icon_key": null, "sort_order": 140, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000215", "menu_key": "workspace.agents.read", "parent_menu_key": "workspace.agents", "name": "查看 Agent", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.definition.read", "icon_key": null, "sort_order": 170, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000216", "menu_key": "workspace.agents.test_read", "parent_menu_key": "workspace.agents", "name": "查看 Agent 测试", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.test.read", "icon_key": null, "sort_order": 180, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000217", "menu_key": "workspace.agents.release_read", "parent_menu_key": "workspace.agents", "name": "查看 Agent Release", "menu_type": "action", "page_resource_id": null, "permission_code": "agent.release.read", "icon_key": null, "sort_order": 190, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000218", "menu_key": "workspace.services.read", "parent_menu_key": "workspace.services", "name": "查看服务", "menu_type": "action", "page_resource_id": null, "permission_code": "service.definition.read", "icon_key": null, "sort_order": 150, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000152", "menu_key": "navigation.platform.models.provider_query", "parent_menu_key": "navigation.platform.models", "name": "查看模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000153", "menu_key": "navigation.platform.models.provider_create", "parent_menu_key": "navigation.platform.models", "name": "创建模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000154", "menu_key": "navigation.platform.models.credential_rotate", "parent_menu_key": "navigation.platform.models", "name": "轮换模型凭证", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
@@ -536,6 +609,22 @@
     { "menu_id": "82000000-0000-4000-8000-000000000197", "api_resource_id": "81000000-0000-4000-8000-000000000119", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000198", "api_resource_id": "81000000-0000-4000-8000-000000000120", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000199", "api_resource_id": "81000000-0000-4000-8000-000000000121", "action_type": "query" },
-    { "menu_id": "82000000-0000-4000-8000-000000000200", "api_resource_id": "81000000-0000-4000-8000-000000000122", "action_type": "query" }
+    { "menu_id": "82000000-0000-4000-8000-000000000200", "api_resource_id": "81000000-0000-4000-8000-000000000122", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000215", "api_resource_id": "81000000-0000-4000-8000-000000000123", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000202", "api_resource_id": "81000000-0000-4000-8000-000000000124", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000203", "api_resource_id": "81000000-0000-4000-8000-000000000125", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000204", "api_resource_id": "81000000-0000-4000-8000-000000000126", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000205", "api_resource_id": "81000000-0000-4000-8000-000000000127", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000216", "api_resource_id": "81000000-0000-4000-8000-000000000128", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000206", "api_resource_id": "81000000-0000-4000-8000-000000000129", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000217", "api_resource_id": "81000000-0000-4000-8000-000000000130", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000207", "api_resource_id": "81000000-0000-4000-8000-000000000131", "action_type": "approve" },
+    { "menu_id": "82000000-0000-4000-8000-000000000208", "api_resource_id": "81000000-0000-4000-8000-000000000132", "action_type": "publish" },
+    { "menu_id": "82000000-0000-4000-8000-000000000218", "api_resource_id": "81000000-0000-4000-8000-000000000133", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000210", "api_resource_id": "81000000-0000-4000-8000-000000000134", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000211", "api_resource_id": "81000000-0000-4000-8000-000000000135", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000212", "api_resource_id": "81000000-0000-4000-8000-000000000136", "action_type": "publish" },
+    { "menu_id": "82000000-0000-4000-8000-000000000213", "api_resource_id": "81000000-0000-4000-8000-000000000137", "action_type": "publish" },
+    { "menu_id": "82000000-0000-4000-8000-000000000214", "api_resource_id": "81000000-0000-4000-8000-000000000138", "action_type": "publish" }
   ]
 }

@@ -34,6 +34,7 @@ from ai_platform_api.modules.service_governance.domain.models import (
 
 __all__ = [
     "ServiceDeniedError",
+    "ServiceDeployment",
     "ServiceGovernanceService",
     "ServiceIdempotencyConflictError",
     "ServiceNotFoundError",

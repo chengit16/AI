@@ -206,15 +206,16 @@ def test_p301_reserves_menu_and_api_identifiers_without_activating_registry() ->
         "workspace.agent_operations",
     }
 
-    # P3-10 只激活服务调用所需的读取权限和调用操作，其余控制台标识继续保持预留。
+    # P3-11 激活控制台标识；运营页与 Runtime 内部装载仍分别保留给 P3-12 和内部边界。
     active_registry = load_object(
         ROOT / "contracts" / "authorization" / "resource-registry.v1.json"
     )
     active_permissions = {item["code"] for item in active_registry["permissions"]}
     active_operations = {item["operation_id"] for item in active_registry["api_resources"]}
-    assert permission_set & active_permissions == {"service.definition.read"}
-    assert {item["operation_id"] for item in operations} & active_operations == {
-        "invokePublishedService"
+    assert permission_set - active_permissions == {"agent.operations.read"}
+    assert {item["operation_id"] for item in operations} - active_operations == {
+        "getAgentReleaseOperations",
+        "loadAgentReleaseSnapshot",
     }
 
 

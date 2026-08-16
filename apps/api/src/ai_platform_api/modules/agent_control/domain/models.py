@@ -179,6 +179,13 @@ class AgentRepository(Protocol):
         for_update: bool = False,
     ) -> Agent | None: ...
 
+    def list_agents(
+        self,
+        workspace_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[Agent, ...]: ...
+
     def save_agent(self, agent: Agent, *, expected_version: int) -> bool: ...
 
     def get_draft(
@@ -218,6 +225,14 @@ class AgentRepository(Protocol):
         for_update: bool = False,
     ) -> AgentReleaseCandidate | None: ...
 
+    def list_candidates(
+        self,
+        workspace_id: UUID,
+        agent_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[AgentReleaseCandidate, ...]: ...
+
     def save_candidate(
         self,
         candidate: AgentReleaseCandidate,
@@ -235,6 +250,14 @@ class AgentRepository(Protocol):
     ) -> int: ...
 
     def get_release(self, workspace_id: UUID, release_id: UUID) -> AgentRelease | None: ...
+
+    def list_releases(
+        self,
+        workspace_id: UUID,
+        agent_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[AgentRelease, ...]: ...
 
     def get_release_by_candidate(
         self,

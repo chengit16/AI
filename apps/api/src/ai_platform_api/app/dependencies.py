@@ -13,8 +13,15 @@ from ai_platform_api.app.local_mock import (
     LocalMockRuntimeBootstrap,
 )
 from ai_platform_api.config import Settings
+from ai_platform_api.modules.agent_control.application.service import AgentControlService
 from ai_platform_api.modules.agent_control.infrastructure.approval_sqlalchemy import (
     SqlAlchemyAgentApprovalSubjectLifecycle,
+)
+from ai_platform_api.modules.agent_control.infrastructure.deterministic_evaluation import (
+    LocalDeterministicEvaluationExecutor,
+)
+from ai_platform_api.modules.agent_control.infrastructure.sqlalchemy import (
+    SqlAlchemyAgentControlUnitOfWork,
 )
 from ai_platform_api.modules.assistant.application.runner import AssistantRunExecutor
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
@@ -157,7 +164,11 @@ from ai_platform_api.modules.service_delivery.domain.models import InvocationRat
 from ai_platform_api.modules.service_delivery.infrastructure.valkey import (
     ValkeyInvocationRateLimiter,
 )
+from ai_platform_api.modules.service_governance.application.service import (
+    ServiceGovernanceService,
+)
 from ai_platform_api.modules.service_governance.infrastructure.sqlalchemy import (
+    SqlAlchemyServiceGovernanceUnitOfWork,
     SqlAlchemyServiceRepository,
 )
 from ai_platform_api.modules.service_runtime.application import RuntimeReleaseLoader
@@ -229,6 +240,8 @@ class ApplicationContainer:
     model_runtime: RuntimeModelGatewayService | None = None
     assistant_conversations: AssistantConversationService | None = None
     assistant_run_executor: AssistantRunExecutor | None = None
+    agent_controls: AgentControlService | None = None
+    service_governance: ServiceGovernanceService | None = None
     service_invocations: ServiceInvocationService | None = None
     invocation_rate_limiter: InvocationRateLimiter | None = None
     runtime_releases: RuntimeReleaseLoader | None = None
@@ -399,6 +412,16 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         ),
         approval_policies,
     )
+    agent_controls = AgentControlService(
+        SqlAlchemyAgentControlUnitOfWork(database.sessions),
+        LocalDeterministicEvaluationExecutor(),
+        approval_instances,
+        runtime_bootstrap.ensure if runtime_bootstrap is not None else None,
+    )
+    service_governance = ServiceGovernanceService(
+        SqlAlchemyServiceGovernanceUnitOfWork(database.sessions),
+        runtime_releases,
+    )
     policy = RbacPolicyDecisionPoint(
         resource_registry,
         policy_reader,
@@ -490,6 +513,8 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             model_runtime=model_runtime,
             assistant_conversations=assistant_conversations,
             assistant_run_executor=assistant_run_executor,
+            agent_controls=agent_controls,
+            service_governance=service_governance,
             service_invocations=service_invocations,
             invocation_rate_limiter=invocation_rate_limiter,
             runtime_releases=runtime_releases,

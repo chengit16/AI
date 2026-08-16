@@ -5,6 +5,107 @@ from __future__ import annotations
 import typing
 
 
+class AgentApprovalResponse(typing.TypedDict):
+    approval_instance_id: str
+    completed_at: str | None
+    personal_owner_confirmation: bool
+    status: typing.Literal["pending", "approved", "rejected", "withdrawn"]
+
+
+class AgentCandidateControlResponse(typing.TypedDict):
+    approval: AgentApprovalResponse | None
+    candidate: AgentCandidateResponse
+    evaluation: AgentEvaluationResponse | None
+
+
+class AgentCandidateListResponse(typing.TypedDict):
+    items: list[AgentCandidateControlResponse]
+
+
+class AgentCandidateResponse(typing.TypedDict):
+    agent_id: str
+    candidate_hash: str
+    candidate_id: str
+    config_hash: str
+    created_at: str
+    draft_revision: int
+    status: str
+    updated_at: str
+    version: int
+
+
+class AgentDetailResponse(typing.TypedDict):
+    agent: AgentResponse
+    draft: AgentDraftResponse
+
+
+class AgentDraftResponse(typing.TypedDict):
+    agent_id: str
+    config_hash: str
+    configuration: dict[str, object]
+    draft_id: str
+    revision: int
+    status: str
+    updated_at: str
+
+
+class AgentEvaluationCheckResponse(typing.TypedDict):
+    case_count: int
+    check_code: str
+    passed_count: int
+    score_bps: int
+    status: typing.Literal["passed", "failed"]
+
+
+class AgentEvaluationResponse(typing.TypedDict):
+    candidate_id: str
+    checks: list[AgentEvaluationCheckResponse]
+    completed_at: str
+    evaluation_run_id: str
+    evaluator_version: str
+    evidence_level: str
+    failed_cases: int
+    passed_cases: int
+    result_hash: str
+    skipped_cases: int
+    status: typing.Literal["passed", "failed"]
+    timeout_cases: int
+    total_cases: int
+
+
+class AgentListResponse(typing.TypedDict):
+    items: list[AgentDetailResponse]
+
+
+class AgentReleaseListResponse(typing.TypedDict):
+    items: list[AgentReleaseResponse]
+
+
+class AgentReleaseResponse(typing.TypedDict):
+    agent_id: str
+    candidate_id: str | None
+    config_hash: str
+    release_id: str
+    released_at: str
+    released_by_account_id: str
+    snapshot_hash: str | None
+    source_draft_revision: int | None
+    version: int
+
+
+class AgentResponse(typing.TypedDict):
+    agent_id: str
+    agent_key: str
+    created_at: str
+    created_by_account_id: str
+    description: str | None
+    name: str
+    status: typing.Literal["active", "archived"]
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
 class AiRuntimeConfigListResponse(typing.TypedDict):
     items: list[AiRuntimeConfigResponse]
 
@@ -174,6 +275,10 @@ class ApprovalPolicyVersionResponse(typing.TypedDict):
     workspace_id: str
 
 
+class ArchiveAgentRequest(typing.TypedDict):
+    expected_version: int
+
+
 class AssignMemberOrganizationRequest(typing.TypedDict):
     department_ids: list[str]
     position_ids: list[str]
@@ -283,6 +388,13 @@ class ConversationResponse(typing.TypedDict):
     workspace_id: str
 
 
+class CreateAgentRequest(typing.TypedDict):
+    configuration: typing.NotRequired[dict[str, object] | None]
+    description: typing.NotRequired[str | None]
+    name: str
+    use_starter_configuration: typing.NotRequired[bool]
+
+
 class CreateAiRuntimeConfigRequest(typing.TypedDict):
     components: RuntimeComponentVersionsSchema
     display_name: str
@@ -379,6 +491,15 @@ class CreateRoleBindingRequest(typing.TypedDict):
 class CreateRoleRequest(typing.TypedDict):
     name: str
     role_key: str
+
+
+class CreateServiceRequest(typing.TypedDict):
+    allowed_account_ids: typing.NotRequired[list[str]]
+    allowed_department_ids: typing.NotRequired[list[str]]
+    name: str
+    release_id: str
+    service_type: typing.Literal["custom_knowledge_agent", "scenario_application", "open_api"]
+    visibility: typing.Literal["workspace", "restricted"]
 
 
 class CreateUserMessageRequest(typing.TypedDict):
@@ -1043,6 +1164,11 @@ class PreviewApprovalChainRequest(typing.TypedDict):
     security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
 
 
+class PromoteServiceRouteRequest(typing.TypedDict):
+    expected_generation: int
+    release_id: str
+
+
 class PublishWorkflowRequest(typing.TypedDict):
     expected_revision: int
 
@@ -1085,6 +1211,10 @@ class ReplaceRolePermissionsRequest(typing.TypedDict):
 
 class ReplaceWorkspaceMenuConfigurationRequest(typing.TypedDict):
     items: list[WorkspaceMenuOverrideEntry]
+
+
+class RequestAgentReleaseRequest(typing.TypedDict):
+    expected_revision: int
 
 
 class ResolvedApprovalLevelResponse(typing.TypedDict):
@@ -1175,6 +1305,10 @@ class RoleStatusRequest(typing.TypedDict):
     active: bool
 
 
+class RollbackServiceRouteRequest(typing.TypedDict):
+    expected_generation: int
+
+
 class RotateModelProviderCredentialRequest(typing.TypedDict):
     api_key: str
 
@@ -1214,6 +1348,55 @@ class RuntimeRouteResponse(typing.TypedDict):
     route_id: str
 
 
+class ServiceAccessPolicyResponse(typing.TypedDict):
+    access_policy_version_id: str
+    allowed_account_ids: list[str]
+    allowed_department_ids: list[str]
+    policy_hash: str
+    version: int
+    visibility: typing.Literal["workspace", "restricted"]
+
+
+class ServiceDeploymentResponse(typing.TypedDict):
+    access_policy: ServiceAccessPolicyResponse
+    publication: ServicePublicationResponse
+    route: ServiceRouteResponse
+    service: ServiceResponse
+
+
+class ServiceListResponse(typing.TypedDict):
+    items: list[ServiceDeploymentResponse]
+
+
+class ServicePublicationResponse(typing.TypedDict):
+    generation: int
+    published_at: str
+    route_id: str
+
+
+class ServiceResponse(typing.TypedDict):
+    agent_id: str
+    name: str
+    service_id: str
+    service_key: str
+    service_type: str
+    status: str
+    updated_at: str
+    version: int
+
+
+class ServiceRouteResponse(typing.TypedDict):
+    canary_percent: int
+    canary_release_id: str | None
+    created_at: str
+    previous_route_id: str | None
+    primary_release_id: str
+    route_hash: str
+    route_id: str
+    route_mode: typing.Literal["active", "canary", "rollback"]
+    route_version: int
+
+
 class StartApprovalInstanceRequest(typing.TypedDict):
     department_ids: typing.NotRequired[list[str]]
     fields: typing.NotRequired[dict[str, object]]
@@ -1223,6 +1406,12 @@ class StartApprovalInstanceRequest(typing.TypedDict):
     resource_type: str
     risk_level: typing.Literal["normal", "high", "critical"]
     security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+
+
+class StartServiceCanaryRequest(typing.TypedDict):
+    canary_percent: int
+    expected_generation: int
+    release_id: str
 
 
 class StatusCountResponse(typing.TypedDict):
@@ -1242,6 +1431,20 @@ class TransferApprovalRequest(typing.TypedDict):
     idempotency_key: str
     reason_code: typing.NotRequired[str | None]
     target_account_id: str
+
+
+class UpdateAgentDraftRequest(typing.TypedDict):
+    configuration: dict[str, object]
+    expected_revision: int
+
+
+class UpdateServiceRequest(typing.TypedDict):
+    allowed_account_ids: typing.NotRequired[list[str]]
+    allowed_department_ids: typing.NotRequired[list[str]]
+    expected_version: int
+    name: typing.NotRequired[str | None]
+    target_status: typing.NotRequired[typing.Literal["active", "suspended", "archived"] | None]
+    visibility: typing.NotRequired[typing.Literal["workspace", "restricted"] | None]
 
 
 class UpdateWorkflowDraftRequest(typing.TypedDict):
