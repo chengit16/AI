@@ -7,11 +7,11 @@
 | 阶段 | 阶段 3：Agent 控制面与服务发布 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P3-11` Agent 控制台 |
+| 当前节点 | `P3-12` AgentRelease 运营视图 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | Agent 控制面契约基线 | `passed` |
-| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离、灰度回滚与统一服务出口已通过 |
+| Agent 控制面 | `in_progress`，生命周期、配置校验、自动评估、审批、不可变 Release、服务治理、Runtime 隔离、灰度回滚、统一服务出口与控制台已通过 |
 | 服务发布与回滚 | `passed`，自定义知识 Agent、场景应用和 Open API 三类出口已接入同一发布路由与安全门禁 |
 | `provider_integration` | `not_configured` |
 | `ai_quality` | `not_configured` |
@@ -26,7 +26,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0050` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0051` |
 | 阶段 2 发布 | 本地可靠性版本 `0.2.0`，ReleaseManifest 摘要 `17ae80ee…7b245d` |
 | 数据与模型 | 只使用版本化合成数据；默认 Mock Provider，不代表真实供应商或 AI 质量 |
 
@@ -161,14 +161,28 @@
 - 当前边界：本节点只交付可供页面和客户端消费的统一后端出口，不提前建设 Agent 控制台或 Release 运营监控。真实模型供应商、AI 质量、容量、LLM Grading、多模态图片问答、真实连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 继续保持既定边界。
 - 提交：`0822475`。
 
+### P3-11 Agent 与服务发布控制台
+
+- 状态：已完成，提交 `a5e205b`。
+- 控制台与授权：Agent 和服务页面使用 React 19、TanStack Query、Ant Design 6 与 UnoCSS 接入现有工作空间壳层，所有页面继续由菜单、页面权限和 API 权限统一控制；前端隐藏不构成安全边界。Registry 20 激活 17 项所有者权限、5 项成员只读权限和 16 个控制台 API 绑定，并原子升级个人与企业空间的菜单发布快照；当前注册表共 103 项权限、138 个 API、123 个菜单和 131 个绑定。
+- Agent 发布流程：页面支持 Agent 创建、草稿乐观锁保存、历史 revision、候选申请、固定五类测试、个人所有者或企业多级审批、发布及不可变 Release 查询。测试执行和审批状态继续复用 P3-04/P3-05 领域服务，页面不能绕过候选摘要、硬门禁、审批绑定或 Release 不可变约束。
+- 首个 Agent 基础配置：创建请求必须在完整 `configuration` 与显式 `use_starter_configuration` 之间二选一。基础模式在同一事务生成内容寻址 Prompt、空知识范围、基础 Answer JSON Schema，引用当前已发布 Runtime、匹配的活动安全策略、空只读工具和保守预算，最终草稿只保存规范化完整配置；基础资源、Agent、首个草稿、审计和 Outbox 原子提交。本地 Mock 环境缺少 Runtime 时允许显式自举，非本地环境继续失败关闭；高级用户仍可切换完整 JSON 模式。
+- 服务发布流程：页面支持自定义知识服务创建、工作空间或限制范围策略编辑、暂停、恢复、归档、10%～90% 灰度、晋级和一键回滚；所有写操作携带幂等键、预期版本或 generation，由后端重新执行工作空间授权、Release 归属、Route 状态机和并发控制，页面不缓存或伪造发布事实。
+- 数据库与契约：Revision `20260816_0051` 激活控制台授权绑定与菜单快照，存在本节点授权或升级快照时拒绝不安全降级；OpenAPI、Python 契约和 React 类型由同一冻结契约生成。`jsonschema[format]` 移入生产依赖，保证容器内确定性测试执行器具备与开发环境一致的 Schema 校验能力。
+- 专项验收：Agent 控制台真实 PostgreSQL HTTP 全链路 `1/1`，共享契约 `38/38`；覆盖新个人空间基础配置创建首个 Agent、完整草稿持久化、两次 revision、两次候选、五类测试、所有者审批、两版 Release、服务创建、10% 灰度、晋级、回滚、暂停和恢复。合成验收结果为 Agent `cbbf97db-5799-4e61-92d2-23796bcbd68b`、Service `fe606036-f266-42fa-8bf9-599a1cf56ea3` 和最终 Route generation 4，不包含真实个人或企业资料。
+- 统一门禁：`./scripts/verify` 通过 React `50/50`、Python `652/652`、Ruff format/lint、mypy strict `591` 个源文件、前后端架构、中文注释、UnoCSS、OpenAPI/生成契约、Registry 20、Secret Scanner、SBOM、许可证、ReleaseManifest、开发供应链和生产构建。
+- 容器与浏览器验收：使用最终工作树重建 API、Migration、Web 和 Worker 镜像，公共数据库真实升级至 Revision `20260816_0051`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、五个 Worker Lane 和 Scheduler 共 13 项全部通过。`1440×900` 下 Agent 与服务页面无页面级横向溢出，Release 宽表格仅在局部容器滚动；`390×844` 下两页宽度均保持 390px，完整 JSON 创建弹窗为 `374×693` 且完整位于视口内。
+- 当前边界：本节点不建设 AgentRelease 质量、时延、错误和成本运营视图或异常自动阻断，该能力由 `P3-12` 实施；真实模型供应商、AI 质量、容量、LLM Grading、多模态图片问答、真实连接器、外部写工具、SaaS、Go、Channel Gateway 和 Durable Run 继续保持既定边界。
+- 提交：`a5e205b`。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、真实成本或数据政策结论。
 - 当前没有独立 Linux 或容量压测机，不能给出 Linux 宿主机和生产容量结论。
 - 镜像扫描为 `not_configured`，正式发布供应链门禁继续阻断。
-- 阶段 3 尚未完成 Agent 控制台和 Release 运营监控，不能把当前后端服务出口描述为完整可运营的 Agent 发布平台。
+- 阶段 3 尚未完成 AgentRelease 运营监控，不能把当前控制台描述为具备质量、延迟、错误和成本闭环的完整可运营平台。
 - LLM Grading、多模态图片问答、真实多源连接器、Agent 外部写操作、SaaS、Go、Channel Gateway 和 Durable Run 均保持后置。
 
 ## 5. 阶段结论
 
-`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理、`P3-08` Runtime 隔离路由、`P3-09` 灰度发布与回滚和 `P3-10` 统一服务出口已通过，当前进入 `P3-11` Agent 控制台；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
+`not_run`。`P3-01` 契约与安全基线、`P3-02` 生命周期事实、`P3-03` 草稿配置校验、`P3-04` 测试集与自动评估、`P3-05` 发布审批门禁、`P3-06` 不可变发布快照、`P3-07` 服务与路由治理、`P3-08` Runtime 隔离路由、`P3-09` 灰度发布与回滚、`P3-10` 统一服务出口和 `P3-11` Agent 控制台已通过，当前进入 `P3-12` AgentRelease 运营视图；在 `P3-01`～`P3-13` 全部完成、核心六项门禁和最终端到端验收通过、阶段报告与 ReleaseManifest 同步并创建 `stage-3-complete` 标签前，不给出阶段通过结论。
