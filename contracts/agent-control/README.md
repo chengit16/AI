@@ -2,7 +2,7 @@
 
 ## 1. 目录职责
 
-本目录固定阶段 3 的 Agent 控制面和服务发布语义。`agent-control.v1.schema.json` 定义 `Agent`、`AgentDraft`、发布候选、不可变 `AgentRelease`、`Service`、版本化 `ServiceRoute` 和 Run 发布绑定；`agent-control-baseline.v1.json` 冻结状态机、安全不变量以及后续实现使用的权限、菜单、API 和事件标识；场景 Schema 约束全合成验收数据。
+本目录固定阶段 3 的 Agent 控制面和服务发布语义。`agent-control.v1.schema.json` 定义 `Agent`、`AgentDraft`、发布候选、不可变 `AgentRelease`、`Service`、版本化 `ServiceRoute` 和 Run 发布绑定；`agent-control-baseline.v1.json` 冻结状态机、安全不变量以及后续实现使用的权限、菜单、API 和事件标识；场景 Schema 约束全合成验收数据。`stage-3-acceptance.v1.schema.json` 与证据 Schema 固定阶段关闭时的联合验收覆盖和最小化本地证据。
 
 预留标识不是已上线能力。只有对应节点完成实现、OpenAPI、资源注册表、菜单发布、Migration 和验收后，权限或接口才能进入运行平台。
 
@@ -24,4 +24,5 @@
 ```bash
 uv run --locked pytest tests/test_p301_agent_control_contracts.py tests/contract/test_contracts.py
 uv run --locked python scripts/check_contract_compatibility.py HEAD
+./platform accept-stage-3
 ```

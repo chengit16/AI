@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "p3-13-v1",
+  "status": "frozen",
+  "baseline_ref": "contracts/agent-control/agent-control-baseline.v1.json",
+  "source_scenarios_ref": "tests/fixtures/agent-control/p3-01-v1.json",
+  "synthetic": true,
+  "description": "在同一次本地联合验收中复用阶段 3 已通过的真实测试，验证个人与企业发布、Runtime 隔离、版本绑定、灰度回滚、统一服务出口、控制台和运营晋级门禁。",
+  "execution_policy": {
+    "preflight_command": "./platform doctor",
+    "recovery_command": "./platform doctor",
+    "stop_scenarios_on_preflight_failure": true,
+    "always_run_recovery_check": true,
+    "failure_mode": "fail_closed",
+    "evidence_path": ".ai-platform/evidence/p3-13-latest.json"
+  },
+  "required_invariants": [
+    "p3_runtime_release_only",
+    "p3_release_immutable",
+    "p3_run_release_binding_unique",
+    "p3_snapshot_evidence_complete",
+    "p3_control_plane_runtime_isolation",
+    "p3_publish_fail_closed",
+    "p3_route_change_only",
+    "p3_workspace_authorization",
+    "p3_read_only_tools_only",
+    "p3_offline_deterministic_evaluation"
+  ],
+  "required_capabilities": [
+    "personal_approval",
+    "enterprise_approval",
+    "evaluation_gate",
+    "workspace_isolation",
+    "release_immutability",
+    "tool_boundary",
+    "runtime_boundary",
+    "control_plane_isolation",
+    "run_binding",
+    "inflight_completion",
+    "rollout_rollback",
+    "concurrent_promotion",
+    "service_delivery",
+    "console_workflow",
+    "promotion_gate"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "p313-personal-approval-001",
+      "title": "个人空间所有者审批与冻结证据",
+      "capability": "personal_approval",
+      "source_case_refs": ["p301-personal-owner-release-001"],
+      "pytest_node": "tests/integration/test_p305_agent_approval_postgres.py::test_personal_owner_can_approve_once_with_frozen_evidence",
+      "verified_invariants": ["p3_snapshot_evidence_complete", "p3_publish_fail_closed", "p3_workspace_authorization"],
+      "success_criteria": "个人空间所有者只能形成一次绑定固定测试结果和策略版本的有效审批事实。"
+    },
+    {
+      "scenario_id": "p313-enterprise-approval-002",
+      "title": "企业两级审批与自审限制",
+      "capability": "enterprise_approval",
+      "source_case_refs": ["p301-enterprise-multilevel-release-002"],
+      "pytest_node": "tests/integration/test_p305_agent_approval_postgres.py::test_enterprise_two_level_policy_blocks_self_approval_and_freezes_version",
+      "verified_invariants": ["p3_snapshot_evidence_complete", "p3_publish_fail_closed", "p3_workspace_authorization"],
+      "success_criteria": "企业候选按冻结的两级策略顺序通过，所有者自审越权必须失败关闭。"
+    },
+    {
+      "scenario_id": "p313-evaluation-gate-003",
+      "title": "失败与跳过测试阻断发布",
+      "capability": "evaluation_gate",
+      "source_case_refs": ["p301-functional-test-failed-004", "p301-security-test-skipped-005"],
+      "pytest_node": "tests/integration/test_p304_agent_evaluation_postgres.py::test_failed_and_skipped_checks_block_the_release_gate",
+      "verified_invariants": ["p3_publish_fail_closed", "p3_offline_deterministic_evaluation"],
+      "success_criteria": "失败、超时或跳过的必需测试均进入确定性结论，不能生成可审批候选。"
+    },
+    {
+      "scenario_id": "p313-workspace-isolation-004",
+      "title": "缺失审批与跨空间发布拒绝",
+      "capability": "workspace_isolation",
+      "source_case_refs": ["p301-approval-missing-006", "p301-cross-workspace-publish-008"],
+      "pytest_node": "tests/integration/test_p306_agent_release_postgres.py::test_release_rejects_missing_approval_and_cross_workspace_access",
+      "verified_invariants": ["p3_snapshot_evidence_complete", "p3_publish_fail_closed", "p3_workspace_authorization"],
+      "success_criteria": "未审批候选与跨空间主体都不能生成 Release，且响应不泄漏候选身份。"
+    },
+    {
+      "scenario_id": "p313-release-immutable-005",
+      "title": "伪造与篡改 Release 的数据库防线",
+      "capability": "release_immutability",
+      "source_case_refs": ["p301-release-mutation-denied-009"],
+      "pytest_node": "tests/integration/test_p306_agent_release_postgres.py::test_database_rejects_forged_release_and_snapshot_mutation",
+      "verified_invariants": ["p3_release_immutable"],
+      "success_criteria": "数据库拒绝空快照伪造、候选状态绕过和已发布快照更新或删除。"
+    },
+    {
+      "scenario_id": "p313-tool-boundary-006",
+      "title": "写工具与失效引用失败关闭",
+      "capability": "tool_boundary",
+      "source_case_refs": ["p301-write-tool-denied-015"],
+      "pytest_node": "tests/integration/test_p303_agent_configuration_postgres.py::test_invalid_update_and_stale_candidate_do_not_advance_facts",
+      "verified_invariants": ["p3_read_only_tools_only", "p3_publish_fail_closed"],
+      "success_criteria": "写工具和失效知识引用不能推进草稿 revision 或生成发布候选。"
+    },
+    {
+      "scenario_id": "p313-runtime-boundary-007",
+      "title": "无有效发布事实时拒绝草稿降级",
+      "capability": "runtime_boundary",
+      "source_case_refs": ["p301-draft-runtime-denied-003"],
+      "pytest_node": "tests/unit/test_p308_runtime_isolation.py::test_invalid_or_unavailable_release_fails_closed_without_draft_fallback",
+      "verified_invariants": ["p3_runtime_release_only", "p3_publish_fail_closed"],
+      "success_criteria": "无效或不可用 Release 只能失败关闭，Runtime 不得尝试读取草稿作为降级。"
+    },
+    {
+      "scenario_id": "p313-control-plane-outage-008",
+      "title": "控制面查询故障下的已发布快照运行",
+      "capability": "control_plane_isolation",
+      "source_case_refs": ["p301-control-plane-outage-010"],
+      "pytest_node": "tests/unit/test_p308_runtime_isolation.py::test_current_route_refreshes_cache_and_survives_control_plane_query_failure",
+      "verified_invariants": ["p3_control_plane_runtime_isolation", "p3_runtime_release_only", "p3_run_release_binding_unique"],
+      "success_criteria": "控制面查询不可用时，已缓存的不可变发布快照继续服务且身份不漂移。"
+    },
+    {
+      "scenario_id": "p313-run-binding-009",
+      "title": "Run 精确发布绑定与数据库防改绑",
+      "capability": "run_binding",
+      "source_case_refs": ["p301-run-binding-rewrite-016", "p301-cross-workspace-publish-008"],
+      "pytest_node": "tests/integration/test_p308_runtime_isolation_postgres.py::test_runtime_source_and_database_preserve_exact_run_binding",
+      "verified_invariants": ["p3_run_release_binding_unique", "p3_release_immutable", "p3_workspace_authorization"],
+      "success_criteria": "每个 Run、审计和 Outbox 绑定同一服务、Route 和 Release，数据库拒绝改绑与跨空间伪造。"
+    },
+    {
+      "scenario_id": "p313-inflight-completion-010",
+      "title": "服务暂停后的在途 Run 收敛",
+      "capability": "inflight_completion",
+      "source_case_refs": ["p301-stable-canary-route-011"],
+      "pytest_node": "tests/integration/test_p308_runtime_isolation_postgres.py::test_suspended_service_rejects_new_run_but_inflight_run_can_finish",
+      "verified_invariants": ["p3_run_release_binding_unique"],
+      "success_criteria": "服务暂停后拒绝新 Run，已经冻结版本的在途 Run 仍能按原绑定完成。"
+    },
+    {
+      "scenario_id": "p313-rollout-rollback-011",
+      "title": "灰度、晋级、回滚与在途绑定",
+      "capability": "rollout_rollback",
+      "source_case_refs": ["p301-stable-canary-route-011", "p301-one-click-rollback-012"],
+      "pytest_node": "tests/integration/test_p309_service_rollout_postgres.py::test_canary_promote_rollback_preserve_stable_selection_and_inflight_binding",
+      "verified_invariants": ["p3_route_change_only", "p3_release_immutable", "p3_run_release_binding_unique"],
+      "success_criteria": "固定分配稳定，晋级与回滚只追加 Route，历史 Release 和在途 Run 绑定不变。"
+    },
+    {
+      "scenario_id": "p313-concurrent-promotion-012",
+      "title": "同 generation 并发晋级唯一胜者",
+      "capability": "concurrent_promotion",
+      "source_case_refs": ["p301-concurrent-route-promote-013"],
+      "pytest_node": "tests/integration/test_p309_service_rollout_postgres.py::test_same_generation_concurrent_promotions_have_one_winner",
+      "verified_invariants": ["p3_route_change_only", "p3_run_release_binding_unique"],
+      "success_criteria": "相同 generation 的不同晋级请求只有一个胜者，失败事务不遗留 Route、审计或事件副作用。"
+    },
+    {
+      "scenario_id": "p313-service-delivery-013",
+      "title": "三类服务出口共享稳定路由",
+      "capability": "service_delivery",
+      "source_case_refs": ["p301-open-api-scope-denied-017", "p301-stable-canary-route-011"],
+      "pytest_node": "tests/integration/test_p310_service_delivery_postgres.py::test_three_surfaces_share_postgres_route_policy_and_quota_chain",
+      "verified_invariants": ["p3_run_release_binding_unique", "p3_workspace_authorization"],
+      "success_criteria": "知识 Agent、场景应用和 Open API 均以 service_id 进入同一冻结路由、策略和用量链。"
+    },
+    {
+      "scenario_id": "p313-console-workflow-014",
+      "title": "控制台发布与服务治理全链路",
+      "capability": "console_workflow",
+      "source_case_refs": ["p301-personal-owner-release-001", "p301-one-click-rollback-012"],
+      "pytest_node": "tests/integration/test_p311_console_postgres.py::test_agent_and_service_console_http_release_flow",
+      "verified_invariants": ["p3_snapshot_evidence_complete", "p3_publish_fail_closed", "p3_route_change_only", "p3_workspace_authorization"],
+      "success_criteria": "HTTP 控制台链路可完成草稿、测试、审批、两版 Release、灰度、晋级、回滚、暂停和恢复。"
+    },
+    {
+      "scenario_id": "p313-promotion-gate-015",
+      "title": "版本指标回归阻断晋级",
+      "capability": "promotion_gate",
+      "source_case_refs": ["p301-stable-canary-route-011", "p301-one-click-rollback-012"],
+      "pytest_node": "tests/unit/test_p312_agent_operations.py::test_report_compares_canary_and_blocks_regressed_metrics",
+      "verified_invariants": ["p3_route_change_only", "p3_run_release_binding_unique"],
+      "success_criteria": "候选版本错误、降级、延迟或成本回归时，确定性运营门禁阻断晋级并保留可复算证据。"
+    }
+  ]
+}

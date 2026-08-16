@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/agent-control/stage-3-acceptance.v1.schema.json",
+  "title": "阶段 3 联合验收清单 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "acceptance_id",
+    "status",
+    "baseline_ref",
+    "source_scenarios_ref",
+    "synthetic",
+    "description",
+    "execution_policy",
+    "required_invariants",
+    "required_capabilities",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "acceptance_id": { "const": "p3-13-v1" },
+    "status": { "const": "frozen" },
+    "baseline_ref": {
+      "const": "contracts/agent-control/agent-control-baseline.v1.json"
+    },
+    "source_scenarios_ref": {
+      "const": "tests/fixtures/agent-control/p3-01-v1.json"
+    },
+    "synthetic": { "const": true },
+    "description": { "$ref": "#/$defs/text" },
+    "execution_policy": { "$ref": "#/$defs/execution_policy" },
+    "required_invariants": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "required_capabilities": {
+      "type": "array",
+      "minItems": 15,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 15,
+      "items": { "$ref": "#/$defs/scenario" }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{2,95}$"
+    },
+    "capability": {
+      "enum": [
+        "personal_approval",
+        "enterprise_approval",
+        "evaluation_gate",
+        "workspace_isolation",
+        "release_immutability",
+        "tool_boundary",
+        "runtime_boundary",
+        "control_plane_isolation",
+        "run_binding",
+        "inflight_completion",
+        "rollout_rollback",
+        "concurrent_promotion",
+        "service_delivery",
+        "console_workflow",
+        "promotion_gate"
+      ]
+    },
+    "execution_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preflight_command",
+        "recovery_command",
+        "stop_scenarios_on_preflight_failure",
+        "always_run_recovery_check",
+        "failure_mode",
+        "evidence_path"
+      ],
+      "properties": {
+        "preflight_command": { "const": "./platform doctor" },
+        "recovery_command": { "const": "./platform doctor" },
+        "stop_scenarios_on_preflight_failure": { "const": true },
+        "always_run_recovery_check": { "const": true },
+        "failure_mode": { "const": "fail_closed" },
+        "evidence_path": {
+          "const": ".ai-platform/evidence/p3-13-latest.json"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "title",
+        "capability",
+        "source_case_refs",
+        "pytest_node",
+        "verified_invariants",
+        "success_criteria"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^p313-[a-z0-9-]+-[0-9]{3}$"
+        },
+        "title": { "$ref": "#/$defs/text" },
+        "capability": { "$ref": "#/$defs/capability" },
+        "source_case_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^p301-[a-z0-9-]+-[0-9]{3}$"
+          }
+        },
+        "pytest_node": {
+          "type": "string",
+          "pattern": "^tests/(?:integration|unit)/test_[a-z0-9_]+\\.py::test_[a-z0-9_]+$"
+        },
+        "verified_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "success_criteria": { "$ref": "#/$defs/text" }
+      }
+    }
+  }
+}
