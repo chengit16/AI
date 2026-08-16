@@ -4,7 +4,7 @@
 
 本目录固定阶段 4 的受控工具执行语义。`tool-execution.v1.schema.json` 定义不可变工具版本、`Run`、`Step`、`Attempt`、`ToolCall`、策略决策、确认/审批、幂等事实、取消事实和安全结果；`tool-execution-baseline.v1.json` 冻结状态机、安全不变量、首批五个内部只读工具以及后续实现使用的权限、菜单、API 和事件标识；场景 Schema 约束版本化全合成验收数据。
 
-预留标识不是已上线能力。只有对应节点完成实现、OpenAPI、资源注册表、菜单发布、Migration 和验收后，权限或接口才能进入运行平台。`P4-01` 不创建活动数据库表、API、菜单、凭证或真实 Adapter；`P4-02` 只落地不可变工具注册和工作空间目录服务，仍未激活工具 HTTP API、菜单、执行状态、凭证值或真实 Adapter。
+预留标识不是已上线能力。只有对应节点完成实现、OpenAPI、资源注册表、菜单发布、Migration 和验收后，权限或接口才能进入运行平台。`P4-01` 不创建活动数据库表、API、菜单、凭证或真实 Adapter；`P4-02` 只落地不可变工具注册和工作空间目录服务；`P4-03` 已落地内部 Run/Step/Attempt/ToolCall 状态事实、租约和唯一写入权，但仍未激活工具 HTTP API、菜单、真实 Adapter 或凭证值。
 
 ## 2. 核心边界
 
@@ -30,3 +30,5 @@ uv run --locked python scripts/check_contract_compatibility.py HEAD
 ```
 
 `P4-02` 另以 `tests/unit/test_p402_tool_catalog.py` 和 `tests/integration/test_p402_tool_catalog_postgres.py` 验证定义摘要、Schema、套餐与权限交集、精确历史版本校验、数据库不可变约束和 Migration 往返。
+
+`P4-03` 另以 `tests/unit/test_p403_tool_task_state.py` 和 `tests/integration/test_p403_tool_task_state_postgres.py` 验证可信身份、预算和摘要收敛、Run/Step/Attempt/ToolCall 状态转换、`FOR UPDATE SKIP LOCKED` 并发领取、租约代际、取消优先级、迟到结果、跨空间隔离、终态保护和 Migration 往返。

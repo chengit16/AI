@@ -7,7 +7,7 @@
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-02` 已完成，下一节点为 `P4-03` 任务状态事实 |
+| 当前节点 | `P4-04` 五个内部只读工具 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -25,7 +25,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0053` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0054` |
 | 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据、模型与工具 | 只使用版本化合成数据、Mock Provider 和合成内部副作用 Adapter；不包含真实客户系统或凭证 |
 
@@ -45,7 +45,7 @@
 - 专项验证：`.venv/bin/pytest -q tests/test_p401_tool_execution_contracts.py tests/contract/test_contracts.py tests/test_engineering_guardrails.py` 为 `58/58`；Ruff、Python 注释门禁、契约兼容检查和当前工作树 Secret Scanner 均通过。
 - 统一门禁：`./scripts/verify` 在允许访问本地依赖的验收环境中通过，React 为 `53/53`，Python 为 `685/685`，mypy strict 检查 `608` 个源文件；OpenAPI/类型/Registry/ReleaseManifest/SBOM 均无漂移，架构、注释、UnoCSS、供应链和生产构建通过。受限沙箱中的第一次执行因禁止访问 `127.0.0.1` 而不计为功能失败，切换到既有本地依赖验收环境后所有 PostgreSQL、Valkey、MinIO、Tika 与 OCR 集成测试通过。
 - 运行诊断：`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker、Scheduler 共 13 项全部通过，数据库保持 Revision `20260816_0052`。
-- 验收结论：`passed`。当前只证明契约、安全基线和可重复场景完整，不代表工具注册、任务表、真实执行、页面或外部系统已交付；这些能力继续由 `P4-02`～`P4-13` 独立验收。
+- 验收结论：`passed`。当前只证明契约、安全基线和可重复场景完整，不代表任务状态事实、真实执行、页面或外部系统已交付；这些能力继续由 `P4-03`～`P4-13` 独立验收。
 
 ### P4-02 工具注册与版本治理
 
@@ -60,6 +60,20 @@
 - 运行诊断：公共本地数据库已从 Revision `20260816_0052` 升级到 `20260816_0053`；重新构建启动后，`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
 - 验收结论：`passed`。当前只证明工具定义注册、不可变版本和工作空间目录治理成立；普通任务状态事实、工具 Adapter、执行策略、确认审批、凭证注入、幂等副作用、SSE 和页面继续由 `P4-03`～`P4-13` 独立验收。
 
+### P4-03 Run、Step、Attempt、ToolCall 状态事实与租约
+
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `89a5b3a`。
+- 交付范围：新增 `tool_runs`、`tool_steps`、`tool_attempts`、`tool_calls` 四张工作空间业务事实表、Revision `20260816_0054`、唯一 `ToolTaskService`/`ToolTaskStore` 状态入口和 PostgreSQL Adapter；没有开放 HTTP API、菜单、真实 Adapter、凭证值或外部工具。
+- Run 与 Step：Run 固定可信工作空间、Actor/账号、Service、AgentRelease、预算、幂等键、请求摘要和 Trace；Step 固定顺序号、工具 ID/版本及规范参数摘要，参数正文不进入数据库；复合外键阻断跨空间或跨版本拼接。
+- Attempt 与 ToolCall：Attempt 以追加式尝试序号和租约代际保存 Worker 领取事实，ToolCall 绑定当前 Attempt、Step 和工具定义版本；`FOR UPDATE SKIP LOCKED` 保证并发领取只有一个胜者，写回必须匹配完整租约身份，迟到结果只能形成 `ignored_late_result`。
+- 状态与终态：应用层和 PostgreSQL Trigger/Check Constraint 同时校验状态边、当前 Attempt、顺序、终态时间、取消事实、版本和唯一写入权；取消或超时后不创建新 Attempt，迟到成功不能覆盖已提交终态。
+- 生命周期：四张业务表已纳入工作空间导出、业务清除和 Registry `v4` 精确覆盖；生命周期导出/清除回归证明新增事实不会静默遗漏，工具参数正文仍不落库。
+- 安全边界：跨空间读取、取消和伪造租约均失败关闭；同一幂等键同一请求复用既有 Run，同键异请求拒绝；预算、Worker 标识、租约时长和摘要格式在应用入口收敛。
+- 专项验证：`.venv/bin/pytest -q tests/unit/test_p403_tool_task_state.py` 为 `8/8`；`tests/integration/test_p403_tool_task_state_postgres.py` 为 `4/4`；P4-01/P4-02/Migration 联合回归为 `50/50`。
+- 统一门禁：`./scripts/verify` 通过，React 为 `53/53`，Python 为 `709/709`，mypy strict 检查 `627` 个源文件；OpenAPI、权限资源、ReleaseManifest、契约兼容、架构依赖、注释、UnoCSS、生产构建和 Secret Scanner 均无漂移。
+- 运行诊断：公共本地实例按统一启动流程升级到 Revision `20260816_0054`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
+- 验收结论：`passed`。当前只证明普通工具任务的状态事实、租约和唯一写入权成立；五个内部只读工具 Adapter、执行计划、确认/审批、凭证注入、幂等副作用、SSE、页面和联合演练继续由 `P4-04`～`P4-13` 独立验收。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -70,4 +84,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01` 契约与安全基线已经通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-03` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
