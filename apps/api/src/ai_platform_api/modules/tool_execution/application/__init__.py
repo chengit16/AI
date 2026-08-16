@@ -17,6 +17,8 @@ from ai_platform_api.modules.tool_execution.application.errors import (
     ToolCredentialUnavailableError,
     ToolDefinitionInvalidError,
     ToolExecutionDeniedError,
+    ToolIdempotencyConflictError,
+    ToolOutcomeUnknownError,
     ToolResultRejectedError,
     ToolRunBudgetExceededError,
     ToolRunConflictError,
@@ -27,6 +29,7 @@ from ai_platform_api.modules.tool_execution.application.planning import (
     ToolExecutionPlanningService,
     parse_candidate_tool_intents,
 )
+from ai_platform_api.modules.tool_execution.application.side_effects import ToolSideEffectService
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
 
 __all__ = [
@@ -43,10 +46,13 @@ __all__ = [
     "ToolDefinitionInvalidError",
     "ToolExecutionDeniedError",
     "ToolExecutionPlanningService",
+    "ToolIdempotencyConflictError",
+    "ToolOutcomeUnknownError",
     "ToolResultRejectedError",
     "ToolRunBudgetExceededError",
     "ToolRunConflictError",
     "ToolRunTerminalError",
+    "ToolSideEffectService",
     "ToolTaskService",
     "ToolVersionNotAvailableError",
     "parse_candidate_tool_intents",

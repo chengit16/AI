@@ -37,6 +37,9 @@ from ai_platform_api.modules.tool_execution.infrastructure.confirmations_sqlalch
 from ai_platform_api.modules.tool_execution.infrastructure.credentials_sqlalchemy import (
     SqlAlchemyToolCredentialStore,
 )
+from ai_platform_api.modules.tool_execution.infrastructure.side_effects_sqlalchemy import (
+    SqlAlchemyToolSideEffectStore,
+)
 from ai_platform_api.modules.tool_execution.infrastructure.tasks_sqlalchemy import (
     SqlAlchemyToolTaskStore,
 )
@@ -248,7 +251,11 @@ def _advance_to_executing(
 ) -> None:
     database.service.authorize_call(claim)
     assert tasks.transition_call(claim, "confirmed", occurred_at=datetime.now(UTC))
-    assert tasks.transition_call(claim, "executing", occurred_at=datetime.now(UTC))
+    reservation = SqlAlchemyToolSideEffectStore(database.harness.sessions).reserve(
+        claim,
+        reserved_at=datetime.now(UTC),
+    )
+    assert reservation.created is True
 
 
 def test_personal_and_enterprise_owner_manage_credentials_but_member_cannot(
@@ -387,7 +394,11 @@ def test_call_binds_exact_version_once_and_injects_only_inside_callback(
         session.rollback()
 
     assert tasks.transition_call(claim, "confirmed", occurred_at=datetime.now(UTC))
-    assert tasks.transition_call(claim, "executing", occurred_at=datetime.now(UTC))
+    reservation = SqlAlchemyToolSideEffectStore(credential_database.harness.sessions).reserve(
+        claim,
+        reserved_at=datetime.now(UTC),
+    )
+    assert reservation.created is True
     seen: list[str] = []
 
     def adapter(secret: str) -> dict[str, object]:

@@ -28,7 +28,7 @@ def test_registry_classifies_credentials_and_dependent_facts() -> None:
     dependent = {item.table: item for item in registry.dependent_tables}
 
     assert registry.schema_version == 1
-    assert registry.registry_version == 7
+    assert registry.registry_version == 8
     assert policies["workspaces"].classification == "governance"
     assert policies["workspaces"].purge is False
     assert policies["workspace_resources"].classification == "business"
@@ -45,6 +45,10 @@ def test_registry_classifies_credentials_and_dependent_facts() -> None:
     assert policies["tool_credentials"].excluded_columns == frozenset(
         {"encrypted_data_key", "data_key_nonce", "ciphertext", "data_nonce", "last_four"}
     )
+    assert policies["tool_idempotency_records"].classification == "business"
+    assert policies["tool_idempotency_records"].purge is True
+    assert policies["synthetic_tool_side_effects"].classification == "business"
+    assert policies["synthetic_tool_side_effects"].purge is True
     assert dependent["consumer_receipts"].parent_table == "outbox_events"
     assert dependent["retrieval_query_variants"].parent_table == "retrieval_plans"
     assert dependent["retrieval_candidate_snapshots"].parent_table == "retrieval_plans"

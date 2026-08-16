@@ -192,6 +192,7 @@ from ai_platform_api.modules.tool_execution.application.credentials import ToolC
 from ai_platform_api.modules.tool_execution.application.planning import (
     ToolExecutionPlanningService,
 )
+from ai_platform_api.modules.tool_execution.application.side_effects import ToolSideEffectService
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
 from ai_platform_api.modules.tool_execution.infrastructure.confirmation_approval_sqlalchemy import (
     SqlAlchemyToolConfirmationSubjectLifecycle,
@@ -204,6 +205,10 @@ from ai_platform_api.modules.tool_execution.infrastructure.credentials_sqlalchem
 )
 from ai_platform_api.modules.tool_execution.infrastructure.planning_sqlalchemy import (
     SqlAlchemyToolReleasePlanSource,
+)
+from ai_platform_api.modules.tool_execution.infrastructure.side_effects_sqlalchemy import (
+    SqlAlchemySyntheticSideEffectAdapter,
+    SqlAlchemyToolSideEffectStore,
 )
 from ai_platform_api.modules.tool_execution.infrastructure.sqlalchemy import (
     SqlAlchemyToolCatalogRepository,
@@ -289,6 +294,7 @@ class ApplicationContainer:
     tool_planning: ToolExecutionPlanningService | None = None
     tool_confirmations: ToolConfirmationService | None = None
     tool_credentials: ToolCredentialService | None = None
+    tool_side_effects: ToolSideEffectService | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
@@ -493,6 +499,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     )
     tool_credential_store = SqlAlchemyToolCredentialStore(database.sessions, secret_cipher)
     tool_credentials = ToolCredentialService(tool_credential_store, tool_credential_store)
+    tool_side_effects = ToolSideEffectService(
+        SqlAlchemyToolSideEffectStore(database.sessions),
+        SqlAlchemySyntheticSideEffectAdapter(database.sessions),
+    )
     retrieval_planning = BoundedRetrievalPlanningService(
         SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
         policy,
@@ -599,6 +609,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             tool_planning=tool_planning,
             tool_confirmations=tool_confirmations,
             tool_credentials=tool_credentials,
+            tool_side_effects=tool_side_effects,
             workflow_run_executor=WorkflowRunExecutor(
                 SqlAlchemyWorkflowExecutionStore(database.sessions),
                 policy,

@@ -27,6 +27,12 @@ from ai_platform_api.modules.tool_execution.domain.planning import (
     ToolReleasePlan,
     ToolReleasePlanSource,
 )
+from ai_platform_api.modules.tool_execution.domain.side_effects import (
+    SyntheticSideEffectCommand,
+    SyntheticSideEffectReceipt,
+    ToolIdempotencyRecord,
+    ToolSideEffectExecutionResult,
+)
 from ai_platform_api.modules.tool_execution.domain.tasks import (
     ClaimedToolAttempt,
     ToolRun,
@@ -41,6 +47,8 @@ __all__ = [
     "FrozenToolPlanStep",
     "InternalReadAdapter",
     "ReleaseToolReference",
+    "SyntheticSideEffectCommand",
+    "SyntheticSideEffectReceipt",
     "ToolAdapterRequest",
     "ToolAdapterResult",
     "ToolCallBinding",
@@ -50,12 +58,14 @@ __all__ = [
     "ToolCredentialBinding",
     "ToolDefinition",
     "ToolExecutionPlan",
+    "ToolIdempotencyRecord",
     "ToolPlanStore",
     "ToolPolicyDecisionRecord",
     "ToolReleasePlan",
     "ToolReleasePlanSource",
     "ToolRun",
     "ToolRunBudget",
+    "ToolSideEffectExecutionResult",
     "ToolStep",
     "ToolStepBudget",
 ]

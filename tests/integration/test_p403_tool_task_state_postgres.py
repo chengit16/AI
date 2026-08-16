@@ -323,14 +323,15 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     connection.commit()
 
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0057"
+        "20260816_0058"
     )
     tables = {
         row[0]
         for row in connection.execute(
             text(
                 "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = :schema AND table_name LIKE 'tool_%'"
+                "WHERE table_schema = :schema "
+                "AND (table_name LIKE 'tool_%' OR table_name = 'synthetic_tool_side_effects')"
             ),
             {"schema": schema},
         )
@@ -344,6 +345,8 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
         "tool_credentials",
         "tool_attempts",
         "tool_calls",
+        "tool_idempotency_records",
+        "synthetic_tool_side_effects",
     } <= tables
 
     command.downgrade(config, "20260816_0053")
@@ -351,7 +354,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     command.upgrade(config, "head")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0057"
+        "20260816_0058"
     )
 
 

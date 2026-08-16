@@ -63,6 +63,18 @@ class ToolCredentialExposureDetectedError(PlatformError):
     error_code = "TOOL_CREDENTIAL_EXPOSURE_DETECTED"
 
 
+class ToolIdempotencyConflictError(PlatformError):
+    """稳定幂等键已经绑定不同的副作用请求摘要。"""
+
+    error_code = "IDEMPOTENCY_CONFLICT"
+
+
+class ToolOutcomeUnknownError(PlatformError):
+    """Adapter 可能已接收副作用，必须人工对账且禁止自动重放。"""
+
+    error_code = "TOOL_OUTCOME_UNKNOWN"
+
+
 class ToolResultRejectedError(PlatformError):
     """工具结果未通过结构、大小、敏感字段或 Prompt Injection 检查。"""
 

@@ -3307,6 +3307,138 @@ tool_calls = Table(
 )
 Index("ix_tool_calls_workspace_time", tool_calls.c.workspace_id, tool_calls.c.created_at)
 
+tool_idempotency_records = Table(
+    "tool_idempotency_records",
+    metadata,
+    Column("idempotency_record_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_call_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_version", Integer, nullable=False),
+    Column("confirmation_id", UUID(as_uuid=True), nullable=False),
+    Column("confirmation_hash", String(64), nullable=False),
+    Column("idempotency_key_hash", String(64), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("state", String(24), nullable=False),
+    Column("result_hash", String(64), nullable=True),
+    Column("reserved_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    UniqueConstraint("tool_call_id", name="uq_tool_idempotency_records_call"),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key_hash",
+        name="uq_tool_idempotency_records_key",
+    ),
+    UniqueConstraint(
+        "idempotency_record_id",
+        "workspace_id",
+        "idempotency_key_hash",
+        "request_hash",
+        name="uq_tool_idempotency_records_effect_binding",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_tool_idempotency_records_workspace",
+    ),
+    ForeignKeyConstraint(
+        ["tool_call_id"],
+        [f"{SCHEMA_TOKEN}.tool_calls.tool_call_id"],
+        name="fk_tool_idempotency_records_call",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["confirmation_id"],
+        [f"{SCHEMA_TOKEN}.tool_confirmations.confirmation_id"],
+        name="fk_tool_idempotency_records_confirmation",
+    ),
+    CheckConstraint("tool_version >= 1", name="ck_tool_idempotency_records_version"),
+    CheckConstraint(
+        "confirmation_hash ~ '^[0-9a-f]{64}$' "
+        "AND idempotency_key_hash ~ '^[0-9a-f]{64}$' "
+        "AND request_hash ~ '^[0-9a-f]{64}$' "
+        "AND (result_hash IS NULL OR result_hash ~ '^[0-9a-f]{64}$')",
+        name="ck_tool_idempotency_records_hashes",
+    ),
+    CheckConstraint(
+        "state IN ('reserved', 'succeeded', 'failed', 'outcome_unknown')",
+        name="ck_tool_idempotency_records_state",
+    ),
+    CheckConstraint(
+        "(state = 'reserved' AND result_hash IS NULL AND completed_at IS NULL "
+        "AND error_code IS NULL) OR "
+        "(state = 'succeeded' AND result_hash IS NOT NULL AND completed_at IS NOT NULL "
+        "AND error_code IS NULL) OR "
+        "(state = 'failed' AND result_hash IS NULL AND completed_at IS NOT NULL "
+        "AND error_code IS NOT NULL) OR "
+        "(state = 'outcome_unknown' AND result_hash IS NULL AND completed_at IS NOT NULL "
+        "AND error_code = 'TOOL_OUTCOME_UNKNOWN')",
+        name="ck_tool_idempotency_records_outcome",
+    ),
+    CheckConstraint(
+        "completed_at IS NULL OR completed_at >= reserved_at",
+        name="ck_tool_idempotency_records_time",
+    ),
+)
+Index(
+    "ix_tool_idempotency_records_workspace_time",
+    tool_idempotency_records.c.workspace_id,
+    tool_idempotency_records.c.reserved_at,
+)
+
+synthetic_tool_side_effects = Table(
+    "synthetic_tool_side_effects",
+    metadata,
+    Column("side_effect_id", UUID(as_uuid=True), primary_key=True),
+    Column("idempotency_record_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("idempotency_key_hash", String(64), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("canonical_arguments_hash", String(64), nullable=False),
+    Column("result_hash", String(64), nullable=False),
+    Column("committed_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key_hash",
+        name="uq_synthetic_tool_side_effects_key",
+    ),
+    UniqueConstraint(
+        "idempotency_record_id",
+        name="uq_synthetic_tool_side_effects_record",
+    ),
+    ForeignKeyConstraint(
+        [
+            "idempotency_record_id",
+            "workspace_id",
+            "idempotency_key_hash",
+            "request_hash",
+        ],
+        [
+            f"{SCHEMA_TOKEN}.tool_idempotency_records.idempotency_record_id",
+            f"{SCHEMA_TOKEN}.tool_idempotency_records.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_idempotency_records.idempotency_key_hash",
+            f"{SCHEMA_TOKEN}.tool_idempotency_records.request_hash",
+        ],
+        name="fk_synthetic_tool_side_effects_record",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "idempotency_key_hash ~ '^[0-9a-f]{64}$' "
+        "AND request_hash ~ '^[0-9a-f]{64}$' "
+        "AND canonical_arguments_hash ~ '^[0-9a-f]{64}$' "
+        "AND result_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_synthetic_tool_side_effects_hashes",
+    ),
+)
+Index(
+    "ix_synthetic_tool_side_effects_workspace_time",
+    synthetic_tool_side_effects.c.workspace_id,
+    synthetic_tool_side_effects.c.committed_at,
+)
+
 agents = Table(
     "agents",
     metadata,

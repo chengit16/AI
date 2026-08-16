@@ -20,6 +20,10 @@ from ai_platform_api.modules.tool_execution.infrastructure.credentials_sqlalchem
 from ai_platform_api.modules.tool_execution.infrastructure.planning_sqlalchemy import (
     SqlAlchemyToolReleasePlanSource,
 )
+from ai_platform_api.modules.tool_execution.infrastructure.side_effects_sqlalchemy import (
+    SqlAlchemySyntheticSideEffectAdapter,
+    SqlAlchemyToolSideEffectStore,
+)
 from ai_platform_api.modules.tool_execution.infrastructure.sqlalchemy import (
     SqlAlchemyToolCatalogRepository,
 )
@@ -32,11 +36,13 @@ __all__ = [
     "DocumentReadAuthorizedRangeAdapter",
     "KnowledgeSearchAdapter",
     "QuotaGetUsageAdapter",
+    "SqlAlchemySyntheticSideEffectAdapter",
     "SqlAlchemyToolCatalogRepository",
     "SqlAlchemyToolConfirmationStore",
     "SqlAlchemyToolConfirmationSubjectLifecycle",
     "SqlAlchemyToolCredentialStore",
     "SqlAlchemyToolReleasePlanSource",
+    "SqlAlchemyToolSideEffectStore",
     "SqlAlchemyToolTaskStore",
     "WorkflowGetStatusAdapter",
     "build_internal_read_adapters",
