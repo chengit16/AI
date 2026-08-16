@@ -34,6 +34,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // 本地统一门禁会与 Python、容器等检查共享资源，限制并发可避免 jsdom 初始化争用造成随机超时。
+    maxWorkers: 2,
     setupFiles: "./src/test/setup.ts",
   },
 });
