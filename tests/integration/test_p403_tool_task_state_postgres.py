@@ -25,7 +25,10 @@ from ai_platform_api.modules.tool_execution.application.errors import (
     ToolExecutionDeniedError,
     ToolRunConflictError,
 )
+from ai_platform_api.modules.tool_execution.application.results import ToolResultFactsService
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
+from ai_platform_api.modules.tool_execution.domain.adapters import ToolAdapterResult
+from ai_platform_api.modules.tool_execution.domain.results import ToolAttemptOutcomeFacts
 from ai_platform_api.modules.tool_execution.domain.tasks import (
     ClaimedToolAttempt,
     ToolCallState,
@@ -38,6 +41,7 @@ from ai_platform_api.modules.tool_execution.infrastructure.tasks_sqlalchemy impo
 from ai_platform_api.persistence.database import create_platform_engine
 from ai_platform_api.persistence.tables import (
     agent_releases,
+    agent_tool_definitions,
     agents,
     ai_runtime_config_versions,
     service_access_policy_versions,
@@ -313,6 +317,53 @@ def _advance_call_to_executing(
         )
 
 
+def _accepted_facts(
+    database: P403Database,
+    claim: ClaimedToolAttempt,
+    *,
+    recorded_at: datetime,
+) -> ToolAttemptOutcomeFacts:
+    """构造不含正文且匹配数据库冻结输出 Schema 的合成成功事实。"""
+
+    with database.sessions() as session:
+        output_schema_hash = session.scalar(
+            select(agent_tool_definitions.c.output_schema_hash).where(
+                agent_tool_definitions.c.tool_id == claim.tool_id,
+                agent_tool_definitions.c.tool_version == claim.tool_version,
+            )
+        )
+    assert isinstance(output_schema_hash, str)
+    result = ToolAdapterResult(
+        tool_key="knowledge.search",
+        tool_version=claim.tool_version,
+        payload={},
+        output_schema_hash=output_schema_hash,
+        result_sha256="f" * 64,
+        result_size_bytes=2,
+        checks=("schema", "size", "sensitive_fields", "prompt_injection"),
+    )
+    return ToolResultFactsService().accepted(
+        workspace_id=claim.workspace_id,
+        tool_call_id=claim.tool_call_id,
+        adapter_result=result,
+        duration_ms=1,
+        cost_microunits=0,
+        recorded_at=recorded_at,
+    )
+
+
+def _failed_facts(error_code: str = "TOOL_ADAPTER_UNAVAILABLE") -> ToolAttemptOutcomeFacts:
+    """为旧状态机回归补充 P4-10 要求的失败用量事实。"""
+
+    return ToolResultFactsService().failed(
+        outcome="failed",
+        duration_ms=1,
+        cost_microunits=0,
+        result_size_bytes=0,
+        error_code=error_code,
+    )
+
+
 def test_migration_empty_roundtrip_creates_tool_state_tables(
     migration_database: tuple[Config, Connection, str, str],
 ) -> None:
@@ -323,7 +374,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     connection.commit()
 
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0059"
+        "20260816_0060"
     )
     tables = {
         row[0]
@@ -354,7 +405,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     command.upgrade(config, "head")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0059"
+        "20260816_0060"
     )
 
 
@@ -389,6 +440,11 @@ def test_idempotent_ordered_lifecycle_and_terminal_database_protection(
         assert (
             database.service.finish_attempt(
                 claim,
+                facts=_accepted_facts(
+                    database,
+                    claim,
+                    recorded_at=NOW + timedelta(seconds=2),
+                ),
                 succeeded=True,
                 completed_at=NOW + timedelta(seconds=2),
             )
@@ -474,6 +530,11 @@ def test_cancellation_late_success_and_worker_restart_timeout_never_overwrite_te
         assert (
             database.service.finish_attempt(
                 claim,
+                facts=_accepted_facts(
+                    database,
+                    claim,
+                    recorded_at=NOW + timedelta(seconds=3),
+                ),
                 succeeded=True,
                 completed_at=NOW + timedelta(seconds=3),
             )
@@ -525,6 +586,11 @@ def test_cancellation_late_success_and_worker_restart_timeout_never_overwrite_te
         assert (
             database.service.finish_attempt(
                 timeout_claim,
+                facts=_accepted_facts(
+                    database,
+                    timeout_claim,
+                    recorded_at=NOW + timedelta(minutes=3, seconds=7),
+                ),
                 succeeded=True,
                 completed_at=NOW + timedelta(minutes=3, seconds=7),
             )

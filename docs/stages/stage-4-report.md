@@ -7,7 +7,7 @@
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-10` 工具结果安全、SSE 进度、审计、用量、成本和观测 |
+| 当前节点 | `P4-11` 工具目录、执行计划、确认审批、任务进度、取消和历史页面 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -25,7 +25,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16；`P4-09` 节点前 Revision `20260816_0058`，公共本地实例当前为 `20260816_0059` |
+| 数据库基线 | PostgreSQL 16；`P4-11` 节点前 Revision `20260816_0060`，公共本地实例当前为 `20260816_0060` |
 | 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据、模型与工具 | 只使用版本化合成数据、Mock Provider 和合成内部副作用 Adapter；不包含真实客户系统或凭证 |
 
@@ -148,6 +148,18 @@
 - 运行诊断：公共本地数据库已真实升级至 Revision `20260816_0059`。首次最终镜像重建曾因 Docker Hub 元数据请求超时中断，自动审批服务恢复后在实现提交 `18937a8` 上重新执行 `./platform start`，API、Web、Migration、Tika、Worker 和 Scheduler 镜像全部构建并启动成功；随后 `./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
 - 验收结论：`passed`。当前证明安全只读有限重试、租约续期与重启恢复、取消和超时优先、迟到结果隔离、结果未知只读对账、最多三代人工恢复及最终容器运行成立，不代表工具结果安全、SSE 运营事实或页面已交付；这些能力继续由 `P4-10`～`P4-13` 独立验收。
 
+### P4-10 工具结果安全与运营事实
+
+- 状态：已完成，完成日期为 2026-08-16，实现提交待回填。
+- 交付范围：Adapter 的接受结果新增冻结输出 Schema 摘要与规范序列化字节数；新增不含结果正文的 `ToolSafeResult`、`ToolAttemptOutcomeFacts`、`ToolUsageRecord` 和 `ToolProgressEvent` 领域事实，固定 Schema、大小、敏感字段和 Prompt Injection 四项检查、十类进度事件及包含失败、取消、超时、迟到结果和人工恢复的用量终态集合。
+- 数据库与原子性：Revision `20260816_0060` 新增不可变 `tool_safe_results`、`tool_usage_records` 和 `tool_progress_events`；每个 Attempt 和 ToolCall 新终态必须存在唯一用量记录，成功调用必须存在四项全通过且可进入模型上下文的安全结果。Worker、合成副作用、取消、租约过期、总超时、迟到结果、人工恢复和未知结果对账均在原状态事务中追加用量与连续 Run 游标进度，成功、失败、审计和 Outbox 任一写入失败都会整体回滚；工作空间 Registry 升级为 `v9`，存在运营事实时拒绝破坏性降级。
+- 结果与最小事实：结果正文只停留在受控 Adapter 边缘，安全结果只保存输出 Schema 摘要、内容摘要、规范字节数和固定检查结论；调用终态审计与 Outbox 只包含工具版本、访问模式、风险、终态和稳定错误码，不复制参数、结果、凭证或主体正文。合成副作用使用固定摘要形成安全结果，未知结果成功对账只追加安全结果和进度，保留原 Attempt 的 `manual_recovery` 用量，不篡改历史事实。
+- 可恢复进度边界：`ToolProgressService` 通过可信 `RequestContext` 按 Run 和连续整数游标执行最多 1000 条的工作空间隔离回放，覆盖创建、状态、确认、调用和取消事件；跨空间与不存在统一拒绝，末游标重连返回空增量且不会重复执行。`P4-01` 只冻结了尚未激活的 `streamToolRun` 操作标识，未冻结工具专用 HTTP 路径或 SSE 帧 Schema，因此本节点交付供 `P4-11` 统一 API/页面接入的持久化断点回放边界，不擅自提前激活浏览器 API、菜单或新外部契约。
+- 观测边界：可观测字段注册表升级为 `v2`，新增工具访问模式、风险、结果检查和成本/字节数白名单；Prometheus 只按固定访问模式、风险、终态和检查码聚合调用量、耗时、成本及拒绝数，不允许 Workspace、Run、Step、ToolCall 或主体标识成为标签。失败与成本样本使用同一入口记录，不按成功结果筛选；仓库尚无生产 Celery 工具任务装配，未把可调用的观测记录 API 误报为已挂接生产调度。
+- 自动验证：P4-04 Adapter、P4-10 领域/观测与 P2-06 观测回归合计 `20/20`，非数据库专项合计 `70/70`；P4-08/P4-09/P4-10 PostgreSQL 为 `19/19`，生命周期与 P4-10 PostgreSQL 为 `6/6`。P4-02～P4-10 与 Migration 联合回归原为 `51/52`，唯一失败是历史 P4-05 降级测试被后置 P4-10 进度事实提前阻断；改用受控 `ai_platform.lifecycle_purge` 清理后置运营事实后，P4-05 自身降级隔离专项 `3/3` 通过，未放宽断言。最终 `./scripts/verify` 为 React `53/53`、Python `768/768`，Ruff、mypy strict `664` 个源文件、注释、架构、OpenAPI、Registry、ReleaseManifest、契约兼容、供应链和生产构建全部通过。
+- 运行诊断：使用最终工作树重建 API、Web、Migration、Worker、Scheduler 和 Tika 镜像并启动成功，公共数据库真实升级至 Revision `20260816_0060`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过，入口 `http://127.0.0.1:3000/status` 未复现此前 `503`。
+- 验收结论：`passed`。当前证明不可信结果隔离、完整终态用量、连续进度回放、最小审计与 Outbox、固定低基数指标和失败样本保留成立；工具浏览器 API、SSE 帧输出、目录与任务控制台由 `P4-11` 接续，联合故障演练由 `P4-12` 接续。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -158,4 +170,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-09` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-10` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。

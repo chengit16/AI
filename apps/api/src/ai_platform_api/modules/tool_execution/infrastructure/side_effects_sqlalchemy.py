@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable
 from datetime import datetime
 from typing import cast
@@ -20,6 +22,13 @@ from ai_platform_api.modules.tool_execution.domain.errors import (
     ToolIdempotencyConflictError,
     ToolRunConflictError,
 )
+from ai_platform_api.modules.tool_execution.domain.results import (
+    ToolAttemptOutcomeFacts,
+    ToolSafeResult,
+    ToolSafetyCheck,
+    ToolSafetyCheckCode,
+    ToolUsageOutcome,
+)
 from ai_platform_api.modules.tool_execution.domain.side_effects import (
     SyntheticSideEffectCommand,
     SyntheticSideEffectReceipt,
@@ -33,7 +42,13 @@ from ai_platform_api.modules.tool_execution.domain.side_effects import (
     synthetic_result_hash,
 )
 from ai_platform_api.modules.tool_execution.domain.tasks import ClaimedToolAttempt
+from ai_platform_api.modules.tool_execution.infrastructure.results_sqlalchemy import (
+    append_attempt_outcome,
+    append_progress_event,
+    append_safe_result,
+)
 from ai_platform_api.persistence.tables import (
+    agent_tool_definitions,
     synthetic_tool_side_effects,
     tool_attempts,
     tool_calls,
@@ -98,6 +113,19 @@ class SqlAlchemyToolSideEffectStore:
                     .where(tool_calls.c.tool_call_id == claim.tool_call_id)
                     .values(state="executing", updated_at=reserved_at)
                 )
+                append_progress_event(
+                    session,
+                    workspace_id=claim.workspace_id,
+                    run_id=claim.run_id,
+                    event_type="tool.call.started",
+                    run_state="running",
+                    step_id=claim.step_id,
+                    step_state="running",
+                    attempt_id=claim.attempt_id,
+                    tool_call_id=claim.tool_call_id,
+                    error_code=None,
+                    occurred_at=reserved_at,
+                )
                 _record_lifecycle(session, row, record, "tool.call.started", reserved_at)
                 return ToolIdempotencyReservation(record, created=True)
         except (IntegrityError, DBAPIError) as error:
@@ -137,6 +165,40 @@ class SqlAlchemyToolSideEffectStore:
 
                 # 2. 幂等终态、任务父级、审计和 Outbox 共用事务，任一失败都整体回滚。
                 updated = _update_success_record(session, record, receipt, completed_at)
+                facts = _synthetic_success_facts(row, claim, receipt, completed_at)
+                run_state = _successful_run_state(session, claim)
+                if reconciled:
+                    if facts.safe_result is None:
+                        raise ToolRunConflictError
+                    append_safe_result(session, claim=claim, safe_result=facts.safe_result)
+                    append_progress_event(
+                        session,
+                        workspace_id=claim.workspace_id,
+                        run_id=claim.run_id,
+                        event_type="tool.call.completed",
+                        run_state=run_state,
+                        step_id=claim.step_id,
+                        step_state="completed",
+                        attempt_id=claim.attempt_id,
+                        tool_call_id=claim.tool_call_id,
+                        error_code=None,
+                        occurred_at=completed_at,
+                    )
+                else:
+                    append_attempt_outcome(
+                        session,
+                        row=row,
+                        claim=claim,
+                        facts=facts,
+                        effective_outcome="succeeded",
+                        run_state=run_state,
+                        step_state="completed",
+                        event_type="tool.call.completed",
+                        error_code=None,
+                        recorded_at=completed_at,
+                        emit_lifecycle=False,
+                    )
+                # 3. 运营事实先于任务终态写入，数据库 Trigger 据此拒绝无结果的成功旁路。
                 _close_successful_claim(
                     session,
                     row,
@@ -168,6 +230,7 @@ class SqlAlchemyToolSideEffectStore:
 
         try:
             with self._session_factory() as session, session.begin():
+                # 1. 锁定当前调用与幂等预留，只有仍在执行的 reserved 事实可以失败收口。
                 row = _claim_row(session, claim, for_update=True)
                 record = _record(_locked_record(session, record_id))
                 if record.state == "failed":
@@ -181,6 +244,20 @@ class SqlAlchemyToolSideEffectStore:
                     state="failed",
                     error_code=error_code,
                     completed_at=completed_at,
+                )
+                # 2. 用量、进度、任务终态和既有横切事实必须在同一事务中全部成功。
+                append_attempt_outcome(
+                    session,
+                    row=row,
+                    claim=claim,
+                    facts=_failed_facts(row, "failed", error_code, completed_at),
+                    effective_outcome="failed",
+                    run_state="failed",
+                    step_state="failed",
+                    event_type="tool.call.failed",
+                    error_code=error_code,
+                    recorded_at=completed_at,
+                    emit_lifecycle=False,
                 )
                 _close_failed_claim(session, row, claim, error_code, completed_at)
                 _record_lifecycle(
@@ -205,6 +282,7 @@ class SqlAlchemyToolSideEffectStore:
 
         try:
             with self._session_factory() as session, session.begin():
+                # 1. 结果未知只能从当前执行中的 reserved 事实进入，重复提交返回原结论。
                 row = _claim_row(session, claim, for_update=True)
                 record = _record(_locked_record(session, record_id))
                 if record.state == "outcome_unknown":
@@ -218,6 +296,25 @@ class SqlAlchemyToolSideEffectStore:
                     state="outcome_unknown",
                     error_code="TOOL_OUTCOME_UNKNOWN",
                     completed_at=occurred_at,
+                )
+                # 2. 先固化人工恢复用量与进度，再关闭 Attempt，ToolCall 保留给只读对账。
+                append_attempt_outcome(
+                    session,
+                    row=row,
+                    claim=claim,
+                    facts=_failed_facts(
+                        row,
+                        "manual_recovery",
+                        "TOOL_OUTCOME_UNKNOWN",
+                        occurred_at,
+                    ),
+                    effective_outcome="manual_recovery",
+                    run_state="manual_recovery",
+                    step_state="manual_recovery",
+                    event_type="tool.call.failed",
+                    error_code="TOOL_OUTCOME_UNKNOWN",
+                    recorded_at=occurred_at,
+                    emit_lifecycle=False,
                 )
                 _close_unknown_claim(session, row, claim, occurred_at)
                 _record_lifecycle(
@@ -334,6 +431,7 @@ def _claim_row(
             tool_attempts.c.attempt_no,
             tool_attempts.c.worker_id,
             tool_attempts.c.lease_generation,
+            tool_attempts.c.lease_started_at,
             tool_attempts.c.lease_expires_at,
             tool_steps.c.current_attempt_no,
             tool_steps.c.recovery_generation.label("step_recovery_generation"),
@@ -350,11 +448,17 @@ def _claim_row(
             tool_policy_decisions.c.decision_id,
             tool_policy_decisions.c.permission_code,
             tool_policy_decisions.c.policy_version,
+            agent_tool_definitions.c.output_schema_hash,
         )
         .join(tool_attempts, tool_attempts.c.attempt_id == tool_calls.c.attempt_id)
         .join(tool_steps, tool_steps.c.step_id == tool_calls.c.step_id)
         .join(tool_runs, tool_runs.c.run_id == tool_calls.c.run_id)
         .join(tool_policy_decisions, tool_policy_decisions.c.decision_id == latest_policy)
+        .join(
+            agent_tool_definitions,
+            (agent_tool_definitions.c.tool_id == tool_calls.c.tool_id)
+            & (agent_tool_definitions.c.tool_version == tool_calls.c.tool_version),
+        )
         .where(tool_calls.c.tool_call_id == claim.tool_call_id)
     )
     if for_update:
@@ -614,6 +718,83 @@ def _require_receipt(
         or receipt.canonical_arguments_hash != claim.canonical_arguments_hash
     ):
         raise ToolIdempotencyConflictError
+
+
+def _synthetic_success_facts(
+    row: RowMapping,
+    claim: ClaimedToolAttempt,
+    receipt: SyntheticSideEffectReceipt,
+    completed_at: datetime,
+) -> ToolAttemptOutcomeFacts:
+    """把固定合成回执投影为通过四项检查的最小安全结果。"""
+
+    payload = json.dumps(
+        {"value": receipt.result_hash},
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    safe_result = ToolSafeResult(
+        result_id=uuid4(),
+        tool_call_id=claim.tool_call_id,
+        workspace_id=claim.workspace_id,
+        output_schema_hash=cast(str, row["output_schema_hash"]),
+        content_hash=hashlib.sha256(payload).hexdigest(),
+        result_size_bytes=len(payload),
+        status="accepted",
+        safety_checks=tuple(
+            ToolSafetyCheck(check_code=code, status="passed")
+            for code in cast(
+                tuple[ToolSafetyCheckCode, ...],
+                ("schema", "size", "sensitive_fields", "prompt_injection"),
+            )
+        ),
+        eligible_for_model_context=True,
+        credential_exposure_detected=False,
+        recorded_at=completed_at,
+    )
+    return ToolAttemptOutcomeFacts(
+        outcome="succeeded",
+        duration_ms=_duration_ms(row, completed_at),
+        cost_microunits=0,
+        result_size_bytes=len(payload),
+        error_code=None,
+        safe_result=safe_result,
+    )
+
+
+def _failed_facts(
+    row: RowMapping,
+    outcome: ToolUsageOutcome,
+    error_code: str,
+    completed_at: datetime,
+) -> ToolAttemptOutcomeFacts:
+    """为合成失败与未知结果保留耗时，正文大小和成本固定为零。"""
+
+    return ToolAttemptOutcomeFacts(
+        outcome=outcome,
+        duration_ms=_duration_ms(row, completed_at),
+        cost_microunits=0,
+        result_size_bytes=0,
+        error_code=error_code,
+        safe_result=None,
+    )
+
+
+def _duration_ms(row: RowMapping, completed_at: datetime) -> int:
+    started_at = cast(datetime, row["lease_started_at"])
+    return max(0, int((completed_at - started_at).total_seconds() * 1000))
+
+
+def _successful_run_state(session: Session, claim: ClaimedToolAttempt) -> str:
+    remaining = session.scalar(
+        select(func.count())
+        .select_from(tool_steps)
+        .where(tool_steps.c.run_id == claim.run_id, tool_steps.c.step_id != claim.step_id)
+        .where(tool_steps.c.state != "completed")
+    )
+    return "completed" if int(remaining or 0) == 0 else "running"
 
 
 def _close_successful_claim(

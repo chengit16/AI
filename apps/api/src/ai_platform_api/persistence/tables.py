@@ -3287,6 +3287,14 @@ tool_calls = Table(
     Column("completed_at", DateTime(timezone=True), nullable=True),
     Column("error_code", String(128), nullable=True),
     UniqueConstraint("attempt_id", name="uq_tool_calls_attempt"),
+    UniqueConstraint(
+        "tool_call_id",
+        "workspace_id",
+        "run_id",
+        "step_id",
+        "attempt_id",
+        name="uq_tool_calls_fact_binding",
+    ),
     ForeignKeyConstraint(
         ["attempt_id", "step_id", "run_id", "workspace_id"],
         [
@@ -3355,6 +3363,231 @@ tool_calls = Table(
     ),
 )
 Index("ix_tool_calls_workspace_time", tool_calls.c.workspace_id, tool_calls.c.created_at)
+
+tool_safe_results = Table(
+    "tool_safe_results",
+    metadata,
+    Column("result_id", UUID(as_uuid=True), primary_key=True),
+    Column("tool_call_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=False),
+    Column("attempt_id", UUID(as_uuid=True), nullable=False),
+    Column("output_schema_hash", String(64), nullable=False),
+    Column("content_hash", String(64), nullable=False),
+    Column("result_size_bytes", BigInteger, nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("schema_check", String(8), nullable=False),
+    Column("size_check", String(8), nullable=False),
+    Column("sensitive_fields_check", String(8), nullable=False),
+    Column("prompt_injection_check", String(8), nullable=False),
+    Column("eligible_for_model_context", Boolean, nullable=False),
+    Column("credential_exposure_detected", Boolean, nullable=False),
+    Column("recorded_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("tool_call_id", name="uq_tool_safe_results_call"),
+    ForeignKeyConstraint(
+        ["tool_call_id", "workspace_id", "run_id", "step_id", "attempt_id"],
+        [
+            f"{SCHEMA_TOKEN}.tool_calls.tool_call_id",
+            f"{SCHEMA_TOKEN}.tool_calls.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_calls.run_id",
+            f"{SCHEMA_TOKEN}.tool_calls.step_id",
+            f"{SCHEMA_TOKEN}.tool_calls.attempt_id",
+        ],
+        name="fk_tool_safe_results_call",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "output_schema_hash ~ '^[0-9a-f]{64}$' AND content_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_tool_safe_results_hashes",
+    ),
+    CheckConstraint("result_size_bytes >= 0", name="ck_tool_safe_results_size"),
+    CheckConstraint("status IN ('accepted', 'rejected')", name="ck_tool_safe_results_status"),
+    CheckConstraint(
+        "schema_check IN ('passed', 'failed') AND size_check IN ('passed', 'failed') "
+        "AND sensitive_fields_check IN ('passed', 'failed') "
+        "AND prompt_injection_check IN ('passed', 'failed')",
+        name="ck_tool_safe_results_checks",
+    ),
+    CheckConstraint(
+        "credential_exposure_detected = false AND "
+        "((status = 'accepted' AND schema_check = 'passed' AND size_check = 'passed' "
+        "AND sensitive_fields_check = 'passed' AND prompt_injection_check = 'passed' "
+        "AND eligible_for_model_context = true AND result_size_bytes <= 262144) OR "
+        "(status = 'rejected' AND eligible_for_model_context = false "
+        "AND (schema_check = 'failed' OR size_check = 'failed' "
+        "OR sensitive_fields_check = 'failed' OR prompt_injection_check = 'failed')))",
+        name="ck_tool_safe_results_eligibility",
+    ),
+)
+Index(
+    "ix_tool_safe_results_workspace_time",
+    tool_safe_results.c.workspace_id,
+    tool_safe_results.c.recorded_at,
+)
+
+tool_usage_records = Table(
+    "tool_usage_records",
+    metadata,
+    Column("usage_record_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=False),
+    Column("attempt_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_call_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_version", Integer, nullable=False),
+    Column("access_mode", String(16), nullable=False),
+    Column("risk_level", String(16), nullable=False),
+    Column("outcome", String(32), nullable=False),
+    Column("duration_ms", BigInteger, nullable=False),
+    Column("result_size_bytes", BigInteger, nullable=False),
+    Column("cost_microunits", BigInteger, nullable=False),
+    Column("error_code", String(128), nullable=True),
+    Column("recorded_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("attempt_id", name="uq_tool_usage_records_attempt"),
+    ForeignKeyConstraint(
+        ["tool_call_id", "workspace_id", "run_id", "step_id", "attempt_id"],
+        [
+            f"{SCHEMA_TOKEN}.tool_calls.tool_call_id",
+            f"{SCHEMA_TOKEN}.tool_calls.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_calls.run_id",
+            f"{SCHEMA_TOKEN}.tool_calls.step_id",
+            f"{SCHEMA_TOKEN}.tool_calls.attempt_id",
+        ],
+        name="fk_tool_usage_records_call",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["tool_id", "tool_version"],
+        [
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_id",
+            f"{SCHEMA_TOKEN}.agent_tool_definitions.tool_version",
+        ],
+        name="fk_tool_usage_records_definition",
+    ),
+    CheckConstraint("tool_version >= 1", name="ck_tool_usage_records_tool_version"),
+    CheckConstraint(
+        "access_mode IN ('read', 'write')",
+        name="ck_tool_usage_records_access_mode",
+    ),
+    CheckConstraint(
+        "risk_level IN ('low', 'medium', 'high', 'critical')",
+        name="ck_tool_usage_records_risk",
+    ),
+    CheckConstraint(
+        "outcome IN ('succeeded', 'failed', 'cancelled', 'timed_out', "
+        "'ignored_late_result', 'manual_recovery')",
+        name="ck_tool_usage_records_outcome",
+    ),
+    CheckConstraint(
+        "duration_ms >= 0 AND result_size_bytes >= 0 AND cost_microunits >= 0",
+        name="ck_tool_usage_records_values",
+    ),
+    CheckConstraint(
+        "(outcome = 'succeeded' AND error_code IS NULL) OR "
+        "(outcome <> 'succeeded' AND error_code IS NOT NULL)",
+        name="ck_tool_usage_records_error",
+    ),
+)
+Index(
+    "ix_tool_usage_records_workspace_time",
+    tool_usage_records.c.workspace_id,
+    tool_usage_records.c.recorded_at,
+)
+Index("ix_tool_usage_records_run", tool_usage_records.c.run_id, tool_usage_records.c.recorded_at)
+
+tool_progress_events = Table(
+    "tool_progress_events",
+    metadata,
+    Column("progress_event_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("cursor", BigInteger, nullable=False),
+    Column("event_type", String(64), nullable=False),
+    Column("run_state", String(32), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=True),
+    Column("step_state", String(32), nullable=True),
+    Column("attempt_id", UUID(as_uuid=True), nullable=True),
+    Column("tool_call_id", UUID(as_uuid=True), nullable=True),
+    Column("error_code", String(128), nullable=True),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("run_id", "cursor", name="uq_tool_progress_events_run_cursor"),
+    ForeignKeyConstraint(
+        ["run_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.tool_runs.run_id", f"{SCHEMA_TOKEN}.tool_runs.workspace_id"],
+        name="fk_tool_progress_events_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["step_id", "run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.tool_steps.step_id",
+            f"{SCHEMA_TOKEN}.tool_steps.run_id",
+            f"{SCHEMA_TOKEN}.tool_steps.workspace_id",
+        ],
+        name="fk_tool_progress_events_step",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["attempt_id", "step_id", "run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.tool_attempts.attempt_id",
+            f"{SCHEMA_TOKEN}.tool_attempts.step_id",
+            f"{SCHEMA_TOKEN}.tool_attempts.run_id",
+            f"{SCHEMA_TOKEN}.tool_attempts.workspace_id",
+        ],
+        name="fk_tool_progress_events_attempt",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["tool_call_id", "workspace_id", "run_id", "step_id", "attempt_id"],
+        [
+            f"{SCHEMA_TOKEN}.tool_calls.tool_call_id",
+            f"{SCHEMA_TOKEN}.tool_calls.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_calls.run_id",
+            f"{SCHEMA_TOKEN}.tool_calls.step_id",
+            f"{SCHEMA_TOKEN}.tool_calls.attempt_id",
+        ],
+        name="fk_tool_progress_events_call",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint("cursor >= 1", name="ck_tool_progress_events_cursor"),
+    CheckConstraint(
+        "event_type IN ('tool.run.created', 'tool.run.state_changed', "
+        "'tool.step.state_changed', 'tool.call.confirmation_requested', "
+        "'tool.call.confirmation_resolved', 'tool.call.started', "
+        "'tool.call.completed', 'tool.call.failed', "
+        "'tool.run.cancellation_requested', 'tool.run.cancelled')",
+        name="ck_tool_progress_events_type",
+    ),
+    CheckConstraint(
+        "run_state IN ('pending', 'planning', 'running', 'waiting_confirmation', "
+        "'waiting_approval', 'cancellation_requested', 'manual_recovery', "
+        "'completed', 'failed', 'cancelled', 'timed_out')",
+        name="ck_tool_progress_events_run_state",
+    ),
+    CheckConstraint(
+        "step_state IS NULL OR step_state IN ('planned', 'policy_checking', "
+        "'waiting_confirmation', 'waiting_approval', 'ready', 'retry_wait', "
+        "'running', 'manual_recovery', 'completed', 'failed', 'cancelled', 'timed_out')",
+        name="ck_tool_progress_events_step_state",
+    ),
+    CheckConstraint(
+        "(step_id IS NULL AND step_state IS NULL AND attempt_id IS NULL "
+        "AND tool_call_id IS NULL) OR "
+        "(step_id IS NOT NULL AND step_state IS NOT NULL "
+        "AND ((attempt_id IS NULL AND tool_call_id IS NULL) "
+        "OR (attempt_id IS NOT NULL AND tool_call_id IS NOT NULL)))",
+        name="ck_tool_progress_events_references",
+    ),
+)
+Index(
+    "ix_tool_progress_events_workspace_run_cursor",
+    tool_progress_events.c.workspace_id,
+    tool_progress_events.c.run_id,
+    tool_progress_events.c.cursor,
+)
 
 tool_idempotency_records = Table(
     "tool_idempotency_records",

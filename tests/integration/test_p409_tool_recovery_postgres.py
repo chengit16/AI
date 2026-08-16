@@ -15,7 +15,9 @@ from ai_platform_api.persistence.tables import (
     audit_records,
     outbox_events,
     tool_attempts,
+    tool_progress_events,
     tool_runs,
+    tool_usage_records,
 )
 from alembic import command
 from alembic.config import Config
@@ -26,8 +28,10 @@ from sqlalchemy.exc import DBAPIError
 from tests.integration.test_p403_tool_task_state_postgres import (
     NOW,
     P403Database,
+    _accepted_facts,
     _advance_call_to_executing,
     _database,
+    _failed_facts,
     _ready_run,
 )
 from tests.integration.test_p403_tool_task_state_postgres import (
@@ -55,6 +59,7 @@ def _fail_retryable_attempt(
     _advance_call_to_executing(database, claim, occurred_at=claimed_at)
     result = database.service.finish_attempt(
         claim,
+        facts=_failed_facts(),
         succeeded=False,
         error_code="TOOL_ADAPTER_UNAVAILABLE",
         retryable=True,
@@ -113,6 +118,7 @@ def test_safe_read_retry_backoff_and_three_manual_recovery_generations(
             assert (
                 database.service.finish_attempt(
                     first,
+                    facts=_failed_facts(),
                     succeeded=False,
                     error_code="TOOL_ADAPTER_UNAVAILABLE",
                     retryable=True,
@@ -135,6 +141,7 @@ def test_safe_read_retry_backoff_and_three_manual_recovery_generations(
             assert (
                 database.service.finish_attempt(
                     second,
+                    facts=_failed_facts(),
                     succeeded=False,
                     error_code="TOOL_ADAPTER_UNAVAILABLE",
                     retryable=True,
@@ -226,6 +233,11 @@ def test_lease_renewal_cancellation_observation_and_late_success_precedence(
         assert (
             database.service.finish_attempt(
                 renewed,
+                facts=_accepted_facts(
+                    database,
+                    renewed,
+                    recorded_at=NOW + timedelta(seconds=5),
+                ),
                 succeeded=True,
                 completed_at=NOW + timedelta(seconds=5),
             )
@@ -238,7 +250,25 @@ def test_lease_renewal_cancellation_observation_and_late_success_precedence(
                     tool_attempts.c.attempt_id == renewed.attempt_id
                 )
             )
+            usage = (
+                session.execute(
+                    select(tool_usage_records).where(
+                        tool_usage_records.c.attempt_id == renewed.attempt_id
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            progress_types = session.scalars(
+                select(tool_progress_events.c.event_type)
+                .where(tool_progress_events.c.run_id == run_id)
+                .order_by(tool_progress_events.c.cursor)
+            ).all()
         assert observed_at == NOW + timedelta(seconds=4)
+        assert usage["outcome"] == "ignored_late_result"
+        assert usage["error_code"] == "TOOL_LATE_RESULT_IGNORED"
+        assert "tool.run.cancellation_requested" in progress_types
+        assert progress_types[-1] == "tool.run.cancelled"
     finally:
         database.engine.dispose()
 
@@ -270,6 +300,11 @@ def test_total_deadline_blocks_recovery_and_ignores_late_success(
         assert (
             database.service.finish_attempt(
                 claim,
+                facts=_accepted_facts(
+                    database,
+                    claim,
+                    recorded_at=NOW + timedelta(seconds=122),
+                ),
                 succeeded=True,
                 completed_at=NOW + timedelta(seconds=122),
             )
@@ -284,6 +319,71 @@ def test_total_deadline_blocks_recovery_and_ignores_late_success(
                 )
                 == 1
             )
+            usage = (
+                session.execute(
+                    select(tool_usage_records).where(
+                        tool_usage_records.c.attempt_id == claim.attempt_id
+                    )
+                )
+                .mappings()
+                .one()
+            )
+        assert usage["outcome"] == "timed_out"
+        assert usage["error_code"] == "TOOL_RUN_DEADLINE_EXCEEDED"
+    finally:
+        database.engine.dispose()
+
+
+def test_expired_lease_keeps_timeout_usage_before_retry(
+    migration_database: tuple[Config, Connection, str, str],
+) -> None:
+    """Worker 重启扫描必须保留过期 Attempt，再允许安全只读工具进入下一次领取。"""
+
+    database = _database(migration_database)
+    try:
+        run_id, _ = _ready_run(database, "p409-lease-expiry-0001")
+        claim = database.service.claim_next(
+            worker_id="p409-expired-worker",
+            now=NOW,
+            lease_seconds=1,
+        )
+        assert claim is not None
+        _advance_call_to_executing(database, claim, occurred_at=NOW)
+
+        assert (
+            database.service.claim_next(
+                worker_id="p409-recovery-scan",
+                now=NOW + timedelta(seconds=2),
+                lease_seconds=30,
+            )
+            is None
+        )
+        with database.sessions() as session:
+            usage = (
+                session.execute(
+                    select(tool_usage_records).where(
+                        tool_usage_records.c.attempt_id == claim.attempt_id
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            attempt_state = session.scalar(
+                select(tool_attempts.c.state).where(tool_attempts.c.attempt_id == claim.attempt_id)
+            )
+        assert attempt_state == "timed_out"
+        assert usage["outcome"] == "timed_out"
+        assert usage["error_code"] == "TOOL_ADAPTER_UNAVAILABLE"
+
+        recovered = database.service.claim_next(
+            worker_id="p409-recovered-worker",
+            now=NOW + timedelta(seconds=3),
+            lease_seconds=30,
+        )
+        assert recovered is not None
+        assert recovered.run_id == run_id
+        assert recovered.attempt_no == 2
+        assert recovered.trigger == "lease_recovery"
     finally:
         database.engine.dispose()
 
@@ -314,6 +414,7 @@ def test_cross_workspace_recovery_and_direct_database_bypass_fail_closed(
         assert (
             database.service.finish_attempt(
                 claim,
+                facts=_failed_facts(),
                 succeeded=False,
                 error_code="TOOL_ADAPTER_UNAVAILABLE",
                 retryable=True,
@@ -332,6 +433,7 @@ def test_cross_workspace_recovery_and_direct_database_bypass_fail_closed(
         assert (
             database.service.finish_attempt(
                 second,
+                facts=_failed_facts(),
                 succeeded=False,
                 error_code="TOOL_ADAPTER_UNAVAILABLE",
                 retryable=True,

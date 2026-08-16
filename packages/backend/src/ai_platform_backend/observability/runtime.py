@@ -51,6 +51,12 @@ from ai_platform_backend.observability.fields import (
 P = ParamSpec("P")
 R = TypeVar("R")
 _PROCESS_PREFIX_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+_TOOL_ACCESS_MODES = frozenset({"read", "write"})
+_TOOL_RISK_LEVELS = frozenset({"low", "medium", "high", "critical"})
+_TOOL_OUTCOMES = frozenset(
+    {"succeeded", "failed", "cancelled", "timed_out", "ignored_late_result", "manual_recovery"}
+)
+_TOOL_RESULT_CHECKS = frozenset({"schema", "size", "sensitive_fields", "prompt_injection"})
 
 
 @dataclass(frozen=True)
@@ -198,6 +204,7 @@ class ObservabilityRuntime:
     def _configure_metrics(self) -> None:
         """集中创建低基数指标，业务调用方不能临时增加标签。"""
 
+        # 长函数保留原因: 指标名、说明与标签在一个注册入口集中审计，可防止拆分后出现标签漂移。
         # 1. HTTP、应用操作与任务共享服务/环境标签，资源 ID 只能进入业务事实和审计。
         common = ("service", "environment")
         self.http_requests = Counter(
@@ -308,6 +315,31 @@ class ObservabilityRuntime:
             "ai_platform_authorization_policy_cache_total",
             "策略版本见证的新建、命中与失败关闭数量。",
             (*common, "cache_status"),
+            registry=self.registry,
+        )
+        # 5. 工具指标只按冻结分类聚合；Run、Step、主体和工具 ID 永远不成为标签。
+        self.tool_calls = Counter(
+            "ai_platform_tool_calls_total",
+            "工具调用全部终态数量, 包含失败、取消、超时和迟到结果。",
+            (*common, "access_mode", "risk_level", "outcome"),
+            registry=self.registry,
+        )
+        self.tool_call_duration = Histogram(
+            "ai_platform_tool_call_duration_seconds",
+            "工具调用耗时, 按固定访问模式、风险和终态聚合。",
+            (*common, "access_mode", "risk_level", "outcome"),
+            registry=self.registry,
+        )
+        self.tool_cost_microunits = Counter(
+            "ai_platform_tool_cost_microunits_total",
+            "工具调用累计微单位成本, 失败样本不得剔除。",
+            (*common, "access_mode", "risk_level", "outcome"),
+            registry=self.registry,
+        )
+        self.tool_result_rejections = Counter(
+            "ai_platform_tool_result_rejections_total",
+            "工具结果被固定安全检查拒绝的数量。",
+            (*common, "check_code"),
             registry=self.registry,
         )
 
@@ -474,6 +506,17 @@ class ObservabilityRuntime:
     ) -> None:
         """输出单行 JSON 事件；调用方不能传异常文本、正文或未登记字段。"""
 
+        self._write_log(event_name, level=level, attributes=attributes)
+
+    def _write_log(
+        self,
+        event_name: str,
+        *,
+        level: int,
+        attributes: dict[str, ObservationScalar],
+    ) -> None:
+        """接收已结构化属性映射，供需要动态可选字段的固定事件复用。"""
+
         now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         fields: dict[str, ObservationScalar] = {
             "timestamp": now,
@@ -542,6 +585,67 @@ class ObservabilityRuntime:
                 cache_status=cache_status,
                 outcome="denied",
             )
+
+    def record_tool_execution(
+        self,
+        *,
+        access_mode: str,
+        risk_level: str,
+        outcome: str,
+        duration_ms: int,
+        cost_microunits: int,
+        result_size_bytes: int,
+        failed_check: str | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        """记录一次完整工具调用；固定分类之外的值全部失败关闭。"""
+
+        # 1. 所有分类和数值先按冻结集合校验，高基数或负数事实不能进入指标系统。
+        if (
+            access_mode not in _TOOL_ACCESS_MODES
+            or risk_level not in _TOOL_RISK_LEVELS
+            or outcome not in _TOOL_OUTCOMES
+            or duration_ms < 0
+            or cost_microunits < 0
+            or result_size_bytes < 0
+            or (failed_check is not None and failed_check not in _TOOL_RESULT_CHECKS)
+        ):
+            raise ValueError("工具可观测事实包含未冻结分类或负数用量")
+        # 2. 调用量、耗时和成本使用同一低基数标签，失败、取消和超时样本不会被过滤。
+        labels = {
+            **self.common_labels,
+            "access_mode": access_mode,
+            "risk_level": risk_level,
+            "outcome": outcome,
+        }
+        self.fields.validate("metric", labels)
+        self.tool_calls.labels(**labels).inc()
+        self.tool_call_duration.labels(**labels).observe(duration_ms / 1000)
+        self.tool_cost_microunits.labels(**labels).inc(cost_microunits)
+        if failed_check is not None:
+            rejection_labels = {**self.common_labels, "check_code": failed_check}
+            self.fields.validate("metric", rejection_labels)
+            self.tool_result_rejections.labels(**rejection_labels).inc()
+        # 3. 结构化日志只记录允许字段，参数、结果、凭证和业务主体标识均不进入载荷。
+        log_fields: dict[str, ObservationScalar] = {
+            "component": "tool_execution",
+            "operation": "execute",
+            "access_mode": access_mode,
+            "risk_level": risk_level,
+            "outcome": outcome,
+            "duration_ms": duration_ms,
+            "cost_microunits": cost_microunits,
+            "result_size_bytes": result_size_bytes,
+        }
+        if failed_check is not None:
+            log_fields["check_code"] = failed_check
+        if error_code is not None:
+            log_fields["error_code"] = error_code
+        self._write_log(
+            "tool_execution_completed",
+            level=logging.INFO,
+            attributes=log_fields,
+        )
 
     def metrics_payload(self) -> bytes:
         """生成当前进程 Prometheus 文本，不暴露 Trace 或业务资源标识。"""

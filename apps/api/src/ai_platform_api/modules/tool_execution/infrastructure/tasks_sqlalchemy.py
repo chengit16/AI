@@ -27,6 +27,10 @@ from ai_platform_api.modules.tool_execution.domain.planning import (
     ToolExecutionPlan,
     ToolPolicyDecisionRecord,
 )
+from ai_platform_api.modules.tool_execution.domain.results import (
+    ToolAttemptOutcomeFacts,
+    ToolUsageOutcome,
+)
 from ai_platform_api.modules.tool_execution.domain.tasks import (
     AttemptResult,
     ClaimedToolAttempt,
@@ -38,6 +42,10 @@ from ai_platform_api.modules.tool_execution.domain.tasks import (
     ToolStep,
     ToolStepBudget,
     ToolStepState,
+)
+from ai_platform_api.modules.tool_execution.infrastructure.results_sqlalchemy import (
+    append_attempt_outcome,
+    append_progress_event,
 )
 from ai_platform_api.persistence.tables import (
     agent_tool_definitions,
@@ -161,7 +169,21 @@ class SqlAlchemyToolTaskStore:
             except IntegrityError as error:
                 raise ToolExecutionDeniedError from error
             if inserted is not None:
+                append_progress_event(
+                    session,
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    event_type="tool.run.created",
+                    run_state="pending",
+                    step_id=None,
+                    step_state=None,
+                    attempt_id=None,
+                    tool_call_id=None,
+                    error_code=None,
+                    occurred_at=created_at,
+                )
                 return _run(inserted)
+            # 3. 冲突只允许同载荷重放；不同请求摘要不能借幂等键读取或改写既有 Run。
             existing = (
                 session.execute(
                     select(tool_runs).where(
@@ -214,6 +236,19 @@ class SqlAlchemyToolTaskStore:
                     target_state="planning",
                     occurred_at=frozen_at,
                 )
+                append_progress_event(
+                    session,
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    event_type="tool.run.state_changed",
+                    run_state="planning",
+                    step_id=None,
+                    step_state=None,
+                    attempt_id=None,
+                    tool_call_id=None,
+                    error_code=None,
+                    occurred_at=frozen_at,
+                )
 
                 # 2. 每个 Step 先进入策略检查，再写入匹配证据；数据库 Trigger 才允许 ready。
                 persisted_steps = tuple(
@@ -227,6 +262,20 @@ class SqlAlchemyToolTaskStore:
                     )
                     for frozen in steps
                 )
+                for step in persisted_steps:
+                    append_progress_event(
+                        session,
+                        workspace_id=workspace_id,
+                        run_id=run_id,
+                        event_type="tool.step.state_changed",
+                        run_state="planning",
+                        step_id=step.step_id,
+                        step_state=step.state,
+                        attempt_id=None,
+                        tool_call_id=None,
+                        error_code=None,
+                        occurred_at=frozen_at,
+                    )
 
                 # 3. 全部 Step 可执行后再发布 Run；任何异常由事务回滚到原始 pending 状态。
                 running = _advance_run(
@@ -235,6 +284,19 @@ class SqlAlchemyToolTaskStore:
                     workspace_id=workspace_id,
                     run_id=run_id,
                     target_state="running",
+                    occurred_at=frozen_at,
+                )
+                append_progress_event(
+                    session,
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    event_type="tool.run.state_changed",
+                    run_state="running",
+                    step_id=None,
+                    step_state=None,
+                    attempt_id=None,
+                    tool_call_id=None,
+                    error_code=None,
                     occurred_at=frozen_at,
                 )
                 return ToolExecutionPlan(
@@ -254,6 +316,7 @@ class SqlAlchemyToolTaskStore:
         occurred_at: datetime,
     ) -> ToolRun:
         with self._session_factory() as session, session.begin():
+            # 1. 锁定 Run 并校验状态图；进入运行或完成前额外复核子级事实。
             row = _locked_run(session, workspace_id, run_id)
             _require_state_transition(row["state"], target_state, RUN_TRANSITIONS, RUN_TERMINAL)
             if target_state == "running":
@@ -267,6 +330,7 @@ class SqlAlchemyToolTaskStore:
             }
             if target_state in RUN_TERMINAL:
                 values["completed_at"] = occurred_at
+            # 2. 版本条件更新和进度事件共用事务，竞争推进不能产生虚假 SSE 事实。
             updated = (
                 session.execute(
                     update(tool_runs)
@@ -283,6 +347,19 @@ class SqlAlchemyToolTaskStore:
             )
             if updated is None:
                 raise ToolRunConflictError
+            append_progress_event(
+                session,
+                workspace_id=workspace_id,
+                run_id=run_id,
+                event_type="tool.run.state_changed",
+                run_state=target_state,
+                step_id=None,
+                step_state=None,
+                attempt_id=None,
+                tool_call_id=None,
+                error_code=None,
+                occurred_at=occurred_at,
+            )
             return _run(updated)
 
     def append_step(
@@ -352,6 +429,19 @@ class SqlAlchemyToolTaskStore:
                 )
             except IntegrityError as error:
                 raise ToolRunConflictError from error
+            append_progress_event(
+                session,
+                workspace_id=workspace_id,
+                run_id=run_id,
+                event_type="tool.step.state_changed",
+                run_state=cast(str, run["state"]),
+                step_id=step_id,
+                step_state="planned",
+                attempt_id=None,
+                tool_call_id=None,
+                error_code=None,
+                occurred_at=created_at,
+            )
             return _step(row)
 
     def transition_step(
@@ -400,6 +490,25 @@ class SqlAlchemyToolTaskStore:
             )
             if updated is None:
                 raise ToolRunConflictError
+            run_state = cast(
+                str,
+                session.scalar(
+                    select(tool_runs.c.state).where(tool_runs.c.run_id == row["run_id"])
+                ),
+            )
+            append_progress_event(
+                session,
+                workspace_id=workspace_id,
+                run_id=cast(UUID, row["run_id"]),
+                event_type="tool.step.state_changed",
+                run_state=run_state,
+                step_id=step_id,
+                step_state=target_state,
+                attempt_id=None,
+                tool_call_id=None,
+                error_code=None,
+                occurred_at=occurred_at,
+            )
             return _step(updated)
 
     def claim_next(
@@ -537,12 +646,27 @@ class SqlAlchemyToolTaskStore:
                 .where(tool_calls.c.tool_call_id == claim.tool_call_id)
                 .values(state=target_state, updated_at=occurred_at)
             )
+            if target_state == "executing":
+                append_progress_event(
+                    session,
+                    workspace_id=claim.workspace_id,
+                    run_id=claim.run_id,
+                    event_type="tool.call.started",
+                    run_state="running",
+                    step_id=claim.step_id,
+                    step_state="running",
+                    attempt_id=claim.attempt_id,
+                    tool_call_id=claim.tool_call_id,
+                    error_code=None,
+                    occurred_at=occurred_at,
+                )
             return True
 
     def finish_attempt(
         self,
         claim: ClaimedToolAttempt,
         *,
+        facts: ToolAttemptOutcomeFacts,
         succeeded: bool,
         completed_at: datetime,
         error_code: str | None,
@@ -557,6 +681,18 @@ class SqlAlchemyToolTaskStore:
                 return "ignored_late_result"
             # 1. 取消优先于 Adapter 返回；旧 Worker 只关闭历史 Attempt，不能提交成功。
             if row["run_state"] == "cancellation_requested":
+                append_attempt_outcome(
+                    session,
+                    row=row,
+                    claim=claim,
+                    facts=facts,
+                    effective_outcome="ignored_late_result",
+                    run_state="cancelled",
+                    step_state="cancelled",
+                    event_type="tool.call.failed",
+                    error_code="TOOL_LATE_RESULT_IGNORED",
+                    recorded_at=completed_at,
+                )
                 _close_cancelled_claim(session, row, claim, completed_at)
                 return "ignored_late_result"
             if not _claim_is_current(row, claim, completed_at):
@@ -570,6 +706,18 @@ class SqlAlchemyToolTaskStore:
                 elif cast(int, row["attempt_no"]) < cast(int, row["max_attempts"]):
                     if next_attempt_at is None or next_attempt_at <= completed_at:
                         raise ToolRunConflictError
+                    append_attempt_outcome(
+                        session,
+                        row=row,
+                        claim=claim,
+                        facts=facts,
+                        effective_outcome="failed",
+                        run_state="running",
+                        step_state="retry_wait",
+                        event_type="tool.call.failed",
+                        error_code=error_code or "TOOL_ADAPTER_UNAVAILABLE",
+                        recorded_at=completed_at,
+                    )
                     _close_for_retry(
                         session,
                         row,
@@ -581,6 +729,18 @@ class SqlAlchemyToolTaskStore:
                     )
                     return "retry_wait"
                 else:
+                    append_attempt_outcome(
+                        session,
+                        row=row,
+                        claim=claim,
+                        facts=facts,
+                        effective_outcome="manual_recovery",
+                        run_state="manual_recovery",
+                        step_state="manual_recovery",
+                        event_type="tool.call.failed",
+                        error_code=error_code or "TOOL_ADAPTER_UNAVAILABLE",
+                        recorded_at=completed_at,
+                    )
                     _close_for_manual_recovery(
                         session,
                         row,
@@ -590,7 +750,21 @@ class SqlAlchemyToolTaskStore:
                     )
                     return "manual_recovery"
 
+            # 3. 非重试结论先写运营事实，再由数据库约束下的状态机原子关闭所有层级。
             outcome: AttemptResult = "succeeded" if succeeded else "failed"
+            effective_outcome: ToolUsageOutcome = "succeeded" if succeeded else "failed"
+            append_attempt_outcome(
+                session,
+                row=row,
+                claim=claim,
+                facts=facts,
+                effective_outcome=effective_outcome,
+                run_state="running" if succeeded else "failed",
+                step_state="completed" if succeeded else "failed",
+                event_type="tool.call.completed" if succeeded else "tool.call.failed",
+                error_code=error_code,
+                recorded_at=completed_at,
+            )
             _close_current_attempt(
                 session,
                 row,
@@ -605,12 +779,14 @@ class SqlAlchemyToolTaskStore:
         self,
         claim: ClaimedToolAttempt,
         *,
+        facts: ToolAttemptOutcomeFacts,
         error_code: str,
         occurred_at: datetime,
     ) -> AttemptResult:
         """把结果未知或不能自动接管的调用稳定转入人工恢复。"""
 
         with self._session_factory() as session, session.begin():
+            # 1. 总时限和既有人工恢复优先，已经失效的 Claim 不能创建第二条用量事实。
             _expire_due_runs(session, occurred_at)
             row = _locked_claim(session, claim)
             if row is None:
@@ -618,10 +794,35 @@ class SqlAlchemyToolTaskStore:
             if row["run_state"] == "manual_recovery" and row["step_state"] == "manual_recovery":
                 return "manual_recovery"
             if row["run_state"] == "cancellation_requested":
+                append_attempt_outcome(
+                    session,
+                    row=row,
+                    claim=claim,
+                    facts=facts,
+                    effective_outcome="ignored_late_result",
+                    run_state="cancelled",
+                    step_state="cancelled",
+                    event_type="tool.call.failed",
+                    error_code="TOOL_LATE_RESULT_IGNORED",
+                    recorded_at=occurred_at,
+                )
                 _close_cancelled_claim(session, row, claim, occurred_at)
                 return "ignored_late_result"
             if not _claim_is_current(row, claim, occurred_at):
                 return "ignored_late_result"
+            # 2. 当前结果未知样本先写用量和失败进度，再把父级稳定移入人工恢复。
+            append_attempt_outcome(
+                session,
+                row=row,
+                claim=claim,
+                facts=facts,
+                effective_outcome="manual_recovery",
+                run_state="manual_recovery",
+                step_state="manual_recovery",
+                event_type="tool.call.failed",
+                error_code=error_code,
+                recorded_at=occurred_at,
+            )
             _close_for_manual_recovery(
                 session,
                 row,
@@ -699,6 +900,33 @@ class SqlAlchemyToolTaskStore:
                     .mappings()
                     .one()
                 )
+                # 3. 恢复后的 Step/Run 进度与操作者审计、Outbox 共用同一事务提交。
+                append_progress_event(
+                    session,
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    event_type="tool.step.state_changed",
+                    run_state="running",
+                    step_id=cast(UUID, step["step_id"]),
+                    step_state="ready",
+                    attempt_id=None,
+                    tool_call_id=None,
+                    error_code=None,
+                    occurred_at=recovered_at,
+                )
+                append_progress_event(
+                    session,
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    event_type="tool.run.state_changed",
+                    run_state="running",
+                    step_id=None,
+                    step_state=None,
+                    attempt_id=None,
+                    tool_call_id=None,
+                    error_code=None,
+                    occurred_at=recovered_at,
+                )
                 _record_manual_recovery(
                     session,
                     updated,
@@ -743,6 +971,19 @@ class SqlAlchemyToolTaskStore:
                     version=cast(int, row["version"]) + 1,
                 )
             )
+            append_progress_event(
+                session,
+                workspace_id=workspace_id,
+                run_id=run_id,
+                event_type="tool.run.cancellation_requested",
+                run_state="cancellation_requested",
+                step_id=None,
+                step_state=None,
+                attempt_id=None,
+                tool_call_id=None,
+                error_code=None,
+                occurred_at=requested_at,
+            )
             session.execute(
                 update(tool_steps)
                 .where(
@@ -769,7 +1010,8 @@ class SqlAlchemyToolTaskStore:
             active = _active_claim_row(session, run_id)
             # 2. 尚未开始的租约可立即取消；执行中的调用等待回调并按迟到结果收敛。
             if active is not None and active["attempt_state"] == "leased":
-                _cancel_leased_claim(session, active, requested_at)
+                cancelled = _attempt_recovery_row(session, cast(UUID, active["attempt_id"]))
+                _close_cancelled_row(session, cancelled, requested_at)
                 active = None
             if active is None:
                 _finish_run_cancellation(session, run_id, requested_at)
@@ -946,6 +1188,7 @@ def _locked_claim(
                 tool_calls.c.tool_version,
                 tool_calls.c.canonical_arguments_hash,
                 tool_calls.c.access_mode,
+                tool_calls.c.risk_level,
                 tool_calls.c.state.label("call_state"),
                 agent_tool_definitions.c.retry_mode,
             )
@@ -1060,6 +1303,18 @@ def _expire_claim(session: Session, row: RowMapping, now: datetime) -> None:
 
     claim = _claim_from_recovery_row(row)
     if _is_safe_read(row) and cast(int, row["attempt_no"]) < cast(int, row["max_attempts"]):
+        append_attempt_outcome(
+            session,
+            row=row,
+            claim=claim,
+            facts=_derived_outcome_facts(row, "timed_out", "TOOL_ADAPTER_UNAVAILABLE", now),
+            effective_outcome="timed_out",
+            run_state="running",
+            step_state="retry_wait",
+            event_type="tool.call.failed",
+            error_code="TOOL_ADAPTER_UNAVAILABLE",
+            recorded_at=now,
+        )
         _close_for_retry(
             session,
             row,
@@ -1072,6 +1327,18 @@ def _expire_claim(session: Session, row: RowMapping, now: datetime) -> None:
         )
         return
     reason = _lease_recovery_reason(session, row)
+    append_attempt_outcome(
+        session,
+        row=row,
+        claim=claim,
+        facts=_derived_outcome_facts(row, "timed_out", reason, now),
+        effective_outcome="timed_out",
+        run_state="manual_recovery",
+        step_state="manual_recovery",
+        event_type="tool.call.failed",
+        error_code=reason,
+        recorded_at=now,
+    )
     _close_for_manual_recovery(
         session,
         row,
@@ -1106,6 +1373,7 @@ def _attempt_recovery_row(session: Session, attempt_id: UUID) -> RowMapping:
                 tool_calls.c.tool_version,
                 tool_calls.c.canonical_arguments_hash,
                 tool_calls.c.access_mode,
+                tool_calls.c.risk_level,
                 tool_calls.c.state.label("call_state"),
                 agent_tool_definitions.c.retry_mode,
             )
@@ -1295,6 +1563,25 @@ def _claim_from_row(
 def _close_cancelled_row(session: Session, row: RowMapping, occurred_at: datetime) -> None:
     """在无 Claim 对象的租约扫描中复用取消优先规则。"""
 
+    # 1. leased 表示尚未调用，executing 则只能记为迟到；两者都必须保留一条用量事实。
+    claim = _claim_from_recovery_row(row)
+    outcome: ToolUsageOutcome = (
+        "cancelled" if row["attempt_state"] == "leased" else "ignored_late_result"
+    )
+    error_code = "TOOL_CANCELLED" if outcome == "cancelled" else "TOOL_LATE_RESULT_IGNORED"
+    append_attempt_outcome(
+        session,
+        row=row,
+        claim=claim,
+        facts=_derived_outcome_facts(row, outcome, error_code, occurred_at),
+        effective_outcome=outcome,
+        run_state="cancelled",
+        step_state="cancelled",
+        event_type="tool.call.failed",
+        error_code=error_code,
+        recorded_at=occurred_at,
+    )
+    # 2. 运营事实成功后才关闭 Call、Attempt、Step 和 Run，避免终态与证据脱节。
     if row["call_state"] not in CALL_TERMINAL:
         session.execute(
             update(tool_calls)
@@ -1332,7 +1619,34 @@ def _time_out_run(session: Session, source: RowMapping, occurred_at: datetime) -
     )
     if run["state"] in RUN_TERMINAL:
         return
-    # 1. 先关闭所有未终止 Call 和活动 Attempt，迟到 Worker 随即失去写资格。
+    # 1. 先为所有活动 Attempt 写超时用量，确保后续批量终止不能剔除失败样本。
+    active_attempt_ids = session.scalars(
+        select(tool_attempts.c.attempt_id).where(
+            tool_attempts.c.run_id == run_id,
+            tool_attempts.c.state.in_(("leased", "executing")),
+        )
+    ).all()
+    for attempt_id in active_attempt_ids:
+        active = _attempt_recovery_row(session, attempt_id)
+        claim = _claim_from_recovery_row(active)
+        append_attempt_outcome(
+            session,
+            row=active,
+            claim=claim,
+            facts=_derived_outcome_facts(
+                active,
+                "timed_out",
+                "TOOL_RUN_DEADLINE_EXCEEDED",
+                occurred_at,
+            ),
+            effective_outcome="timed_out",
+            run_state="timed_out",
+            step_state="timed_out",
+            event_type="tool.call.failed",
+            error_code="TOOL_RUN_DEADLINE_EXCEEDED",
+            recorded_at=occurred_at,
+        )
+    # 2. 再关闭所有未终止 Call 和活动 Attempt，迟到 Worker 随即失去写资格。
     session.execute(
         update(tool_calls)
         .where(tool_calls.c.run_id == run_id, ~tool_calls.c.state.in_(CALL_TERMINAL))
@@ -1343,7 +1657,7 @@ def _time_out_run(session: Session, source: RowMapping, occurred_at: datetime) -
             error_code="TOOL_RUN_DEADLINE_EXCEEDED",
         )
     )
-    # 2. 再关闭未终止 Step 和 Run，清理人工恢复原因并固化绝对超时终态。
+    # 3. 最后关闭 Step 和 Run 并发布超时进度，人工恢复不能延长冻结的绝对期限。
     session.execute(
         update(tool_attempts)
         .where(tool_attempts.c.run_id == run_id, tool_attempts.c.state.in_(("leased", "executing")))
@@ -1374,6 +1688,19 @@ def _time_out_run(session: Session, source: RowMapping, occurred_at: datetime) -
             completed_at=occurred_at,
             version=cast(int, run["version"]) + 1,
         )
+    )
+    append_progress_event(
+        session,
+        workspace_id=cast(UUID, run["workspace_id"]),
+        run_id=run_id,
+        event_type="tool.run.state_changed",
+        run_state="timed_out",
+        step_id=None,
+        step_state=None,
+        attempt_id=None,
+        tool_call_id=None,
+        error_code="TOOL_RUN_DEADLINE_EXCEEDED",
+        occurred_at=occurred_at,
     )
 
 
@@ -1568,15 +1895,54 @@ def _active_claim_row(session: Session, run_id: UUID) -> RowMapping | None:
 
 
 def _finish_run_cancellation(session: Session, run_id: UUID, occurred_at: datetime) -> None:
-    session.execute(
-        update(tool_runs)
-        .where(tool_runs.c.run_id == run_id, tool_runs.c.state == "cancellation_requested")
-        .values(
-            state="cancelled",
-            updated_at=occurred_at,
-            completed_at=occurred_at,
-            version=tool_runs.c.version + 1,
+    updated = (
+        session.execute(
+            update(tool_runs)
+            .where(tool_runs.c.run_id == run_id, tool_runs.c.state == "cancellation_requested")
+            .values(
+                state="cancelled",
+                updated_at=occurred_at,
+                completed_at=occurred_at,
+                version=tool_runs.c.version + 1,
+            )
+            .returning(tool_runs.c.workspace_id)
         )
+        .mappings()
+        .one_or_none()
+    )
+    if updated is not None:
+        append_progress_event(
+            session,
+            workspace_id=cast(UUID, updated["workspace_id"]),
+            run_id=run_id,
+            event_type="tool.run.cancelled",
+            run_state="cancelled",
+            step_id=None,
+            step_state=None,
+            attempt_id=None,
+            tool_call_id=None,
+            error_code=None,
+            occurred_at=occurred_at,
+        )
+
+
+def _derived_outcome_facts(
+    row: RowMapping,
+    outcome: ToolUsageOutcome,
+    error_code: str,
+    occurred_at: datetime,
+) -> ToolAttemptOutcomeFacts:
+    """为租约、取消和总超时生成零正文、零成本但保留耗时的运营事实。"""
+
+    started_at = cast(datetime, row["lease_started_at"])
+    duration_ms = max(0, int((occurred_at - started_at).total_seconds() * 1000))
+    return ToolAttemptOutcomeFacts(
+        outcome=outcome,
+        duration_ms=duration_ms,
+        cost_microunits=0,
+        result_size_bytes=0,
+        error_code=error_code,
+        safe_result=None,
     )
 
 

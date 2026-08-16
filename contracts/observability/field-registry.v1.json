@@ -1,14 +1,17 @@
 {
   "schema_version": 1,
-  "registry_version": 1,
-  "description": "P2-06 可观测字段白名单。所有日志、Span、指标标签和告警字段在导出前均须通过本注册表。",
+  "registry_version": 2,
+  "description": "P2-06/P4-10 可观测字段白名单。所有日志、Span、指标标签和告警字段在导出前均须通过本注册表。",
   "channels": {
     "log": {
       "allowed_fields": [
+        "access_mode",
         "attempt",
         "cache_status",
         "checked_at",
+        "check_code",
         "component",
+        "cost_microunits",
         "count",
         "degraded_reason",
         "dependency",
@@ -25,6 +28,8 @@
         "queue",
         "reason_code",
         "request_id",
+        "result_size_bytes",
+        "risk_level",
         "result_count",
         "route",
         "service",
@@ -38,7 +43,9 @@
     },
     "span": {
       "allowed_fields": [
+        "access_mode",
         "attempt",
+        "check_code",
         "component",
         "degraded_reason",
         "dependency",
@@ -53,6 +60,7 @@
         "request_id",
         "result_count",
         "route",
+        "risk_level",
         "surface",
         "task_id",
         "task_name"
@@ -60,7 +68,9 @@
     },
     "metric": {
       "allowed_fields": [
+        "access_mode",
         "cache_status",
+        "check_code",
         "component",
         "degraded_reason",
         "dependency",
@@ -73,6 +83,7 @@
         "queue",
         "reason_code",
         "route",
+        "risk_level",
         "service",
         "surface",
         "task_name"

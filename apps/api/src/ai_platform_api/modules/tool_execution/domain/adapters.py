@@ -24,7 +24,9 @@ class ToolAdapterResult:
     tool_key: str
     tool_version: int
     payload: dict[str, object]
+    output_schema_hash: str
     result_sha256: str
+    result_size_bytes: int
     checks: tuple[str, ...]
 
 

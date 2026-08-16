@@ -8,12 +8,15 @@ from typing import cast
 from uuid import uuid4
 
 from ai_platform_api.modules.tool_execution.application.errors import ToolOutcomeUnknownError
+from ai_platform_api.modules.tool_execution.application.results import ToolResultFactsService
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
 from ai_platform_api.modules.tool_execution.application.worker import (
     ToolAttemptControl,
     ToolAttemptExecutionError,
     ToolWorkerProcessor,
 )
+from ai_platform_api.modules.tool_execution.domain.adapters import ToolAdapterResult
+from ai_platform_api.modules.tool_execution.domain.results import ToolAttemptOutcomeFacts
 from ai_platform_api.modules.tool_execution.domain.tasks import (
     AttemptResult,
     ClaimedToolAttempt,
@@ -48,6 +51,7 @@ class StubTasks:
         self.pending: ClaimedToolAttempt | None = claim
         self.result = result
         self.finished: list[dict[str, object]] = []
+        self.transitions: list[str] = []
         self.manual_recovery_calls = 0
         self.cancel_requested = False
 
@@ -73,13 +77,15 @@ class StubTasks:
         *,
         occurred_at: datetime,
     ) -> bool:
-        del claim, target_state, occurred_at
+        del claim, occurred_at
+        self.transitions.append(target_state)
         return True
 
     def finish_attempt(
         self,
         claim: ClaimedToolAttempt,
         *,
+        facts: ToolAttemptOutcomeFacts,
         succeeded: bool,
         completed_at: datetime,
         error_code: str | None = None,
@@ -89,6 +95,7 @@ class StubTasks:
         self.finished.append(
             {
                 "claim": claim,
+                "facts": facts,
                 "succeeded": succeeded,
                 "completed_at": completed_at,
                 "error_code": error_code,
@@ -102,10 +109,11 @@ class StubTasks:
         self,
         claim: ClaimedToolAttempt,
         *,
+        facts: ToolAttemptOutcomeFacts,
         error_code: str,
         occurred_at: datetime,
     ) -> AttemptResult:
-        del claim, error_code, occurred_at
+        del claim, facts, error_code, occurred_at
         self.manual_recovery_calls += 1
         return "manual_recovery"
 
@@ -137,10 +145,31 @@ class FailingExecutor:
     def __init__(self, error: Exception | None) -> None:
         self.error = error
 
-    def execute(self, claim: ClaimedToolAttempt, control: ToolAttemptControl) -> None:
-        del claim, control
+    def execute(
+        self,
+        claim: ClaimedToolAttempt,
+        control: ToolAttemptControl,
+    ) -> ToolAttemptOutcomeFacts:
+        del control
         if self.error is not None:
             raise self.error
+        adapter_result = ToolAdapterResult(
+            tool_key="knowledge.search",
+            tool_version=1,
+            payload={},
+            output_schema_hash="a" * 64,
+            result_sha256="b" * 64,
+            result_size_bytes=2,
+            checks=("schema", "size", "sensitive_fields", "prompt_injection"),
+        )
+        return ToolResultFactsService().accepted(
+            workspace_id=claim.workspace_id,
+            tool_call_id=claim.tool_call_id,
+            adapter_result=adapter_result,
+            duration_ms=1,
+            cost_microunits=0,
+            recorded_at=NOW,
+        )
 
 
 def _processor(tasks: StubTasks, executor: FailingExecutor) -> ToolWorkerProcessor:
@@ -202,3 +231,15 @@ def test_attempt_control_replaces_renewed_claim_and_observes_cancellation() -> N
     assert not control.cancellation_requested(observed_at=NOW + timedelta(seconds=6))
     tasks.cancel_requested = True
     assert control.cancellation_requested(observed_at=NOW + timedelta(seconds=7))
+
+
+def test_success_enters_executing_and_writes_accepted_result_facts() -> None:
+    tasks = StubTasks(_claim(), "succeeded")
+    result = _processor(tasks, FailingExecutor(None)).run_batch(limit=1, now=NOW)
+
+    assert result.succeeded == 1
+    assert tasks.transitions == ["authorized", "confirmed", "executing"]
+    facts = tasks.finished[0]["facts"]
+    assert isinstance(facts, ToolAttemptOutcomeFacts)
+    assert facts.safe_result is not None
+    assert facts.safe_result.eligible_for_model_context is True

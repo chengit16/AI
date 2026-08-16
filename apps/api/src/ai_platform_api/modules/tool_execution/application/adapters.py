@@ -174,7 +174,9 @@ class ToolAdapterService:
             tool_key=definition.tool_key,
             tool_version=definition.tool_version,
             payload=payload,
+            output_schema_hash=definition.output_schema_hash,
             result_sha256=hashlib.sha256(serialized).hexdigest(),
+            result_size_bytes=len(serialized),
             checks=("schema", "size", "sensitive_fields", "prompt_injection"),
         )
 

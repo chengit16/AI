@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 8,
+  "registry_version": 9,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -69,6 +69,9 @@
     { "table": "tool_credentials", "classification": "business", "export": true, "purge": true, "excluded_columns": ["encrypted_data_key", "data_key_nonce", "ciphertext", "data_nonce", "last_four"] },
     { "table": "tool_attempts", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "tool_calls", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "tool_safe_results", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "tool_usage_records", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "tool_progress_events", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "tool_idempotency_records", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "synthetic_tool_side_effects", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "conversations", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

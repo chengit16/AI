@@ -14,7 +14,9 @@ ObservationChannel = Literal["log", "span", "metric", "alert"]
 type ObservationScalar = str | int | float | bool
 
 _STABLE_NAME_FIELDS = {
+    "access_mode",
     "alert_name",
+    "check_code",
     "component",
     "degraded_reason",
     "dependency",
@@ -26,6 +28,7 @@ _STABLE_NAME_FIELDS = {
     "outcome",
     "queue",
     "reason_code",
+    "risk_level",
     "service",
     "severity",
     "status",

@@ -7,7 +7,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from ai_platform_api.modules.tool_execution.application.errors import ToolOutcomeUnknownError
+from ai_platform_api.modules.tool_execution.application.results import ToolResultFactsService
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
+from ai_platform_api.modules.tool_execution.domain.results import ToolAttemptOutcomeFacts
 from ai_platform_api.modules.tool_execution.domain.tasks import AttemptResult, ClaimedToolAttempt
 
 
@@ -18,16 +20,27 @@ class ToolAttemptExecutor(Protocol):
         self,
         claim: ClaimedToolAttempt,
         control: ToolAttemptControl,
-    ) -> None: ...
+    ) -> ToolAttemptOutcomeFacts: ...
 
 
 class ToolAttemptExecutionError(Exception):
     """携带稳定错误码和重试分类，不向任务事实暴露原始异常文本。"""
 
-    def __init__(self, error_code: str, *, retryable: bool) -> None:
+    def __init__(
+        self,
+        error_code: str,
+        *,
+        retryable: bool,
+        duration_ms: int = 0,
+        cost_microunits: int = 0,
+        result_size_bytes: int = 0,
+    ) -> None:
         super().__init__(error_code)
         self.error_code = error_code
         self.retryable = retryable
+        self.duration_ms = duration_ms
+        self.cost_microunits = cost_microunits
+        self.result_size_bytes = result_size_bytes
 
 
 @dataclass(frozen=True)
@@ -95,6 +108,7 @@ class ToolWorkerProcessor:
         self._worker_id = worker_id
         self._lease_seconds = lease_seconds
         self._retry_base_seconds = retry_base_seconds
+        self._result_facts = ToolResultFactsService()
 
     def run_batch(
         self,
@@ -134,16 +148,24 @@ class ToolWorkerProcessor:
         if not self._tasks.begin_attempt(claim, started_at=occurred_at):
             return "lost_claims"
         # 1. 每个 Attempt 都重新走授权和确认状态；副作用预留仍由 P4-08 服务在 executing 前完成。
-        for state in ("authorized", "confirmed"):
+        for state in ("authorized", "confirmed", "executing"):
             if not self._tasks.transition_call(claim, state, occurred_at=occurred_at):
                 return "lost_claims"
         # 2. Adapter 在短事务外执行，所有成功、稳定失败和未知结果统一交回任务状态机收敛。
         control = ToolAttemptControl(self._tasks, claim)
         try:
-            self._executor.execute(claim, control)
+            facts = self._executor.execute(claim, control)
         except ToolOutcomeUnknownError:
+            facts = self._result_facts.failed(
+                outcome="manual_recovery",
+                duration_ms=0,
+                cost_microunits=0,
+                result_size_bytes=0,
+                error_code="TOOL_OUTCOME_UNKNOWN",
+            )
             result = self._tasks.require_manual_recovery(
                 control.claim,
+                facts=facts,
                 error_code="TOOL_OUTCOME_UNKNOWN",
                 occurred_at=occurred_at,
             )
@@ -159,6 +181,7 @@ class ToolWorkerProcessor:
         else:
             result = self._tasks.finish_attempt(
                 control.claim,
+                facts=facts,
                 succeeded=True,
                 completed_at=occurred_at,
             )
@@ -177,8 +200,16 @@ class ToolWorkerProcessor:
         occurred_at: datetime,
     ) -> AttemptResult:
         backoff = self._retry_base_seconds * 2 ** max(claim.attempt_no - 1, 0)
+        facts = self._result_facts.failed(
+            outcome="failed",
+            duration_ms=error.duration_ms,
+            cost_microunits=error.cost_microunits,
+            result_size_bytes=error.result_size_bytes,
+            error_code=error.error_code,
+        )
         return self._tasks.finish_attempt(
             claim,
+            facts=facts,
             succeeded=False,
             completed_at=occurred_at,
             error_code=error.error_code,

@@ -44,12 +44,13 @@ from ai_platform_api.modules.tool_execution.infrastructure.tasks_sqlalchemy impo
 from ai_platform_api.modules.workflow.domain.approval_runtime import ApprovalRuntimeCommand
 from ai_platform_api.persistence.tables import (
     tool_policy_decisions,
+    tool_progress_events,
     tool_runs,
     tool_steps,
 )
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import func, insert, select
+from sqlalchemy import delete, func, insert, select, text
 from sqlalchemy.exc import DBAPIError
 
 from tests.integration.test_p304_agent_evaluation_postgres import (
@@ -473,5 +474,9 @@ def test_policy_facts_block_destructive_p405_downgrade(
     )
     config.set_main_option("ai_platform_schema", schema)
 
+    # 先按生命周期受控旁路移除后置 P4-10 事实，确保本测试能到达 P4-05 自身的降级保护。
+    with planning_database.sessions.begin() as session:
+        session.execute(text("SET LOCAL ai_platform.lifecycle_purge = 'on'"))
+        session.execute(delete(tool_progress_events))
     with pytest.raises(RuntimeError, match="存在工具计划策略事实"):
         command.downgrade(config, "20260816_0054")

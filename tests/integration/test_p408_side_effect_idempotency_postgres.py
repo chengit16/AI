@@ -41,7 +41,9 @@ from ai_platform_api.persistence.tables import (
     tool_idempotency_records,
     tool_policy_decisions,
     tool_runs,
+    tool_safe_results,
     tool_steps,
+    tool_usage_records,
 )
 from alembic import command
 from alembic.config import Config
@@ -229,11 +231,33 @@ def test_success_replay_and_atomic_task_lifecycle_are_secret_free(
                 outbox_events.c.event_type.in_(("tool.call.started", "tool.call.completed")),
             )
         ).all()
+        safe_result = (
+            session.execute(
+                select(tool_safe_results).where(
+                    tool_safe_results.c.tool_call_id == ready.claim.tool_call_id
+                )
+            )
+            .mappings()
+            .one()
+        )
+        usage = (
+            session.execute(
+                select(tool_usage_records).where(
+                    tool_usage_records.c.attempt_id == ready.claim.attempt_id
+                )
+            )
+            .mappings()
+            .one()
+        )
 
     assert side_effect_count == 1
     assert states == ("succeeded", "succeeded", "completed", "completed")
     assert {row.action for row in audits} == {"tool.call.started", "tool.call.completed"}
     assert {row.event_type for row in events} == {"tool.call.started", "tool.call.completed"}
+    assert safe_result["status"] == "accepted"
+    assert safe_result["eligible_for_model_context"] is True
+    assert usage["outcome"] == "succeeded"
+    assert usage["result_size_bytes"] == safe_result["result_size_bytes"]
     serialized = json.dumps({"audits": audits, "events": events}, default=str, sort_keys=True)
     assert "canonical_arguments_hash" not in serialized
     assert "credential_ref" not in serialized

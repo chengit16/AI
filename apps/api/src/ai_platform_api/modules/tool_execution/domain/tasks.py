@@ -9,6 +9,8 @@ from uuid import UUID
 
 from ai_platform_backend.integration.domain import AuditAuthorization
 
+from ai_platform_api.modules.tool_execution.domain.results import ToolAttemptOutcomeFacts
+
 ToolRunState = Literal[
     "pending",
     "planning",
@@ -251,6 +253,7 @@ class ToolTaskStore(Protocol):
         self,
         claim: ClaimedToolAttempt,
         *,
+        facts: ToolAttemptOutcomeFacts,
         succeeded: bool,
         completed_at: datetime,
         error_code: str | None,
@@ -262,6 +265,7 @@ class ToolTaskStore(Protocol):
         self,
         claim: ClaimedToolAttempt,
         *,
+        facts: ToolAttemptOutcomeFacts,
         error_code: str,
         occurred_at: datetime,
     ) -> AttemptResult: ...

@@ -14,6 +14,8 @@ from ai_platform_api.modules.tool_execution.application.errors import (
     ToolRunBudgetExceededError,
     ToolRunConflictError,
 )
+from ai_platform_api.modules.tool_execution.application.results import ToolResultFactsService
+from ai_platform_api.modules.tool_execution.domain.results import ToolAttemptOutcomeFacts
 from ai_platform_api.modules.tool_execution.domain.tasks import (
     AttemptResult,
     ClaimedToolAttempt,
@@ -206,6 +208,7 @@ class ToolTaskService:
         self,
         claim: ClaimedToolAttempt,
         *,
+        facts: ToolAttemptOutcomeFacts,
         succeeded: bool,
         completed_at: datetime,
         error_code: str | None = None,
@@ -214,8 +217,12 @@ class ToolTaskService:
     ) -> AttemptResult:
         """按完整租约身份提交结果，失租或父级终止时只返回迟到结论。"""
 
+        ToolResultFactsService.validate(facts)
+        if succeeded != (facts.outcome == "succeeded"):
+            raise ToolRunConflictError
         return self._store.finish_attempt(
             claim,
+            facts=facts,
             succeeded=succeeded,
             completed_at=completed_at,
             error_code=error_code,
@@ -227,6 +234,7 @@ class ToolTaskService:
         self,
         claim: ClaimedToolAttempt,
         *,
+        facts: ToolAttemptOutcomeFacts,
         error_code: str,
         occurred_at: datetime,
     ) -> AttemptResult:
@@ -234,8 +242,12 @@ class ToolTaskService:
 
         if not error_code or len(error_code) > 128:
             raise ToolRunConflictError
+        ToolResultFactsService.validate(facts)
+        if facts.outcome == "succeeded":
+            raise ToolRunConflictError
         return self._store.require_manual_recovery(
             claim,
+            facts=facts,
             error_code=error_code,
             occurred_at=occurred_at,
         )
