@@ -1,4 +1,4 @@
-"""导出工具注册、内部只读 Adapter 与任务状态领域端口。"""
+"""导出工具注册、内部只读 Adapter、任务状态与确认绑定领域端口。"""
 
 from ai_platform_api.modules.tool_execution.domain.adapters import (
     InternalReadAdapter,
@@ -8,6 +8,10 @@ from ai_platform_api.modules.tool_execution.domain.adapters import (
 from ai_platform_api.modules.tool_execution.domain.catalog import (
     ToolCatalogRepository,
     ToolDefinition,
+)
+from ai_platform_api.modules.tool_execution.domain.confirmations import (
+    ToolCallBinding,
+    ToolConfirmation,
 )
 from ai_platform_api.modules.tool_execution.domain.planning import (
     CandidateToolIntent,
@@ -35,7 +39,9 @@ __all__ = [
     "ReleaseToolReference",
     "ToolAdapterRequest",
     "ToolAdapterResult",
+    "ToolCallBinding",
     "ToolCatalogRepository",
+    "ToolConfirmation",
     "ToolDefinition",
     "ToolExecutionPlan",
     "ToolPlanStore",

@@ -313,7 +313,7 @@ def _advance_call_to_executing(
         )
 
 
-def test_migration_empty_roundtrip_creates_four_state_tables(
+def test_migration_empty_roundtrip_creates_tool_state_tables(
     migration_database: tuple[Config, Connection, str, str],
 ) -> None:
     config, connection, schema, _ = migration_database
@@ -323,7 +323,7 @@ def test_migration_empty_roundtrip_creates_four_state_tables(
     connection.commit()
 
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0055"
+        "20260816_0056"
     )
     tables = {
         row[0]
@@ -339,6 +339,8 @@ def test_migration_empty_roundtrip_creates_four_state_tables(
         "tool_runs",
         "tool_steps",
         "tool_policy_decisions",
+        "tool_confirmations",
+        "tool_confirmation_invalidations",
         "tool_attempts",
         "tool_calls",
     } <= tables
@@ -348,7 +350,7 @@ def test_migration_empty_roundtrip_creates_four_state_tables(
     command.upgrade(config, "head")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260816_0055"
+        "20260816_0056"
     )
 
 

@@ -1,7 +1,8 @@
-"""导出工具目录、内部只读 Adapter 和任务状态服务。"""
+"""导出工具目录、内部只读 Adapter、任务状态和人工确认服务。"""
 
 from ai_platform_api.modules.tool_execution.application.adapters import ToolAdapterService
 from ai_platform_api.modules.tool_execution.application.catalog import ToolCatalogService
+from ai_platform_api.modules.tool_execution.application.confirmations import ToolConfirmationService
 from ai_platform_api.modules.tool_execution.application.definitions import (
     parse_tool_definition,
     verify_tool_definition,
@@ -9,6 +10,8 @@ from ai_platform_api.modules.tool_execution.application.definitions import (
 from ai_platform_api.modules.tool_execution.application.errors import (
     ToolAdapterNotAllowedError,
     ToolAdapterUnavailableError,
+    ToolConfirmationRequiredError,
+    ToolConfirmationStaleError,
     ToolDefinitionInvalidError,
     ToolExecutionDeniedError,
     ToolResultRejectedError,
@@ -28,6 +31,9 @@ __all__ = [
     "ToolAdapterService",
     "ToolAdapterUnavailableError",
     "ToolCatalogService",
+    "ToolConfirmationRequiredError",
+    "ToolConfirmationService",
+    "ToolConfirmationStaleError",
     "ToolDefinitionInvalidError",
     "ToolExecutionDeniedError",
     "ToolExecutionPlanningService",

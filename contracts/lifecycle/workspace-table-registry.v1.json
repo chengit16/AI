@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 5,
+  "registry_version": 6,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -64,6 +64,8 @@
     { "table": "tool_runs", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "tool_steps", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "tool_policy_decisions", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "tool_confirmations", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "tool_confirmation_invalidations", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "tool_attempts", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "tool_calls", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "conversations", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

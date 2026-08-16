@@ -2853,7 +2853,11 @@ tool_policy_decisions = Table(
     Column("resource_scope_hash", String(64), nullable=False),
     Column("field_mask_hash", String(64), nullable=False),
     Column("evaluated_at", DateTime(timezone=True), nullable=False),
-    UniqueConstraint("step_id", name="uq_tool_policy_decisions_step"),
+    UniqueConstraint(
+        "step_id",
+        "evaluated_at",
+        name="uq_tool_policy_decisions_step_time",
+    ),
     ForeignKeyConstraint(
         [
             "step_id",
@@ -2900,6 +2904,166 @@ Index(
     "ix_tool_policy_decisions_workspace_time",
     tool_policy_decisions.c.workspace_id,
     tool_policy_decisions.c.evaluated_at,
+)
+
+tool_confirmations = Table(
+    "tool_confirmations",
+    metadata,
+    Column("confirmation_id", UUID(as_uuid=True), primary_key=True),
+    Column("approval_instance_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_id", UUID(as_uuid=True), nullable=False),
+    Column("tool_version", Integer, nullable=False),
+    Column("canonical_arguments_hash", String(64), nullable=False),
+    Column("mode", String(32), nullable=False),
+    Column("policy_decision_id", UUID(as_uuid=True), nullable=False),
+    Column("permission_code", String(160), nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("resource_scope_hash", String(64), nullable=False),
+    Column("field_mask_hash", String(64), nullable=False),
+    Column("policy_evaluated_at", DateTime(timezone=True), nullable=False),
+    Column("risk_level", String(16), nullable=False),
+    Column("confirmation_hash", String(64), nullable=False),
+    Column("subject_digest", String(64), nullable=False),
+    Column("chain_digest", String(64), nullable=False),
+    Column("state", String(16), nullable=False),
+    Column("confirmed_by_actor_id", UUID(as_uuid=True), nullable=True),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("resolved_at", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("approval_instance_id", name="uq_tool_confirmations_approval"),
+    UniqueConstraint("step_id", name="uq_tool_confirmations_step"),
+    UniqueConstraint(
+        "confirmation_id",
+        "workspace_id",
+        "run_id",
+        "step_id",
+        name="uq_tool_confirmations_identity",
+    ),
+    ForeignKeyConstraint(
+        ["approval_instance_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_instances.approval_instance_id",
+            f"{SCHEMA_TOKEN}.approval_instances.workspace_id",
+        ],
+        name="fk_tool_confirmations_approval",
+    ),
+    ForeignKeyConstraint(
+        [
+            "step_id",
+            "run_id",
+            "workspace_id",
+            "tool_id",
+            "tool_version",
+            "canonical_arguments_hash",
+        ],
+        [
+            f"{SCHEMA_TOKEN}.tool_steps.step_id",
+            f"{SCHEMA_TOKEN}.tool_steps.run_id",
+            f"{SCHEMA_TOKEN}.tool_steps.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_steps.tool_id",
+            f"{SCHEMA_TOKEN}.tool_steps.tool_version",
+            f"{SCHEMA_TOKEN}.tool_steps.canonical_arguments_hash",
+        ],
+        name="fk_tool_confirmations_step",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["policy_decision_id"],
+        [f"{SCHEMA_TOKEN}.tool_policy_decisions.decision_id"],
+        name="fk_tool_confirmations_policy",
+    ),
+    ForeignKeyConstraint(
+        ["confirmed_by_actor_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_tool_confirmations_actor",
+    ),
+    CheckConstraint(
+        "mode IN ('personal_owner', 'enterprise_approval')",
+        name="ck_tool_confirmations_mode",
+    ),
+    CheckConstraint(
+        "risk_level IN ('high', 'critical')",
+        name="ck_tool_confirmations_risk",
+    ),
+    CheckConstraint(
+        "canonical_arguments_hash ~ '^[0-9a-f]{64}$' "
+        "AND resource_scope_hash ~ '^[0-9a-f]{64}$' "
+        "AND field_mask_hash ~ '^[0-9a-f]{64}$' "
+        "AND confirmation_hash ~ '^[0-9a-f]{64}$' "
+        "AND subject_digest ~ '^[0-9a-f]{64}$' "
+        "AND chain_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_tool_confirmations_hashes",
+    ),
+    CheckConstraint(
+        "permission_code ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$'",
+        name="ck_tool_confirmations_permission",
+    ),
+    CheckConstraint(
+        "tool_version >= 1 AND policy_version >= 1", name="ck_tool_confirmations_versions"
+    ),
+    CheckConstraint(
+        "state IN ('pending', 'approved', 'rejected', 'expired', 'withdrawn')",
+        name="ck_tool_confirmations_state",
+    ),
+    CheckConstraint(
+        "(state = 'pending' AND resolved_at IS NULL AND confirmed_by_actor_id IS NULL) OR "
+        "(state <> 'pending' AND resolved_at IS NOT NULL)",
+        name="ck_tool_confirmations_resolution",
+    ),
+    CheckConstraint(
+        "expires_at > created_at AND updated_at >= created_at",
+        name="ck_tool_confirmations_time",
+    ),
+    CheckConstraint("version >= 1", name="ck_tool_confirmations_version"),
+)
+Index(
+    "ix_tool_confirmations_workspace_time",
+    tool_confirmations.c.workspace_id,
+    tool_confirmations.c.created_at,
+)
+
+tool_confirmation_invalidations = Table(
+    "tool_confirmation_invalidations",
+    metadata,
+    Column("invalidation_id", UUID(as_uuid=True), primary_key=True),
+    Column("confirmation_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("step_id", UUID(as_uuid=True), nullable=False),
+    Column("state", String(16), nullable=False),
+    Column("reason_code", String(32), nullable=False),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("confirmation_id", name="uq_tool_confirmation_invalidations_confirmation"),
+    ForeignKeyConstraint(
+        ["confirmation_id", "workspace_id", "run_id", "step_id"],
+        [
+            f"{SCHEMA_TOKEN}.tool_confirmations.confirmation_id",
+            f"{SCHEMA_TOKEN}.tool_confirmations.workspace_id",
+            f"{SCHEMA_TOKEN}.tool_confirmations.run_id",
+            f"{SCHEMA_TOKEN}.tool_confirmations.step_id",
+        ],
+        name="fk_tool_confirmation_invalidations_confirmation",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "state IN ('expired', 'withdrawn')",
+        name="ck_tool_confirmation_invalidations_state",
+    ),
+    CheckConstraint(
+        "reason_code IN ('arguments_changed', 'tool_changed', 'policy_changed', "
+        "'permission_revoked', 'expired')",
+        name="ck_tool_confirmation_invalidations_reason",
+    ),
+)
+Index(
+    "ix_tool_confirmation_invalidations_workspace_time",
+    tool_confirmation_invalidations.c.workspace_id,
+    tool_confirmation_invalidations.c.occurred_at,
 )
 
 tool_attempts = Table(

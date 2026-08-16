@@ -3,6 +3,8 @@
 from ai_platform_api.modules.tool_execution.domain.errors import (
     ToolAdapterNotAllowedError,
     ToolAdapterUnavailableError,
+    ToolConfirmationRequiredError,
+    ToolConfirmationStaleError,
     ToolDefinitionInvalidError,
     ToolExecutionDeniedError,
     ToolResultRejectedError,
@@ -15,6 +17,8 @@ from ai_platform_api.modules.tool_execution.domain.errors import (
 __all__ = [
     "ToolAdapterNotAllowedError",
     "ToolAdapterUnavailableError",
+    "ToolConfirmationRequiredError",
+    "ToolConfirmationStaleError",
     "ToolDefinitionInvalidError",
     "ToolExecutionDeniedError",
     "ToolResultRejectedError",

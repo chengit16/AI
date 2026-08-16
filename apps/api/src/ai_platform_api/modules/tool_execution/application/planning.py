@@ -120,7 +120,7 @@ class ToolExecutionPlanningService:
             _require_release_match(intent, reference.permission_code, definition)
             arguments_hash = _validate_and_hash_arguments(definition, intent.arguments)
             step_id = uuid4()
-            policy = _policy_record(
+            policy = build_tool_policy_decision_record(
                 decision,
                 workspace_id=run.workspace_id,
                 run_id=run.run_id,
@@ -287,7 +287,7 @@ def _step_budget(run_budget: ToolRunBudget, definition: ToolDefinition) -> ToolS
     )
 
 
-def _policy_record(
+def build_tool_policy_decision_record(
     decision: PolicyDecision,
     *,
     workspace_id: UUID,
@@ -297,6 +297,8 @@ def _policy_record(
     arguments_hash: str,
     evaluated_at: datetime,
 ) -> ToolPolicyDecisionRecord:
+    """把当前 PDP 结果绑定到具体 Run、Step、工具版本和参数摘要。"""
+
     if (
         not decision.allowed
         or decision.workspace_id != workspace_id
@@ -344,5 +346,6 @@ __all__ = [
     "MAXIMUM_ARGUMENT_BYTES",
     "ToolExecutionPlanningService",
     "ToolPlanningCatalog",
+    "build_tool_policy_decision_record",
     "parse_candidate_tool_intents",
 ]

@@ -55,3 +55,15 @@ class ToolResultRejectedError(PlatformError):
     """工具结果未通过结构、大小、敏感字段或 Prompt Injection 检查。"""
 
     error_code = "TOOL_RESULT_REJECTED"
+
+
+class ToolConfirmationRequiredError(PlatformError):
+    """副作用工具尚未获得与当前调用完全绑定的有效确认。"""
+
+    error_code = "TOOL_CONFIRMATION_REQUIRED"
+
+
+class ToolConfirmationStaleError(PlatformError):
+    """工具确认已经过期、撤回或与当前调用及策略版本不一致。"""
+
+    error_code = "TOOL_CONFIRMATION_STALE"

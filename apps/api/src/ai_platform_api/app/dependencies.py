@@ -187,10 +187,17 @@ from ai_platform_api.modules.streaming.infrastructure.sqlalchemy import (
 )
 from ai_platform_api.modules.streaming.infrastructure.valkey import ValkeyStreamNotifier
 from ai_platform_api.modules.tool_execution.application.catalog import ToolCatalogService
+from ai_platform_api.modules.tool_execution.application.confirmations import ToolConfirmationService
 from ai_platform_api.modules.tool_execution.application.planning import (
     ToolExecutionPlanningService,
 )
 from ai_platform_api.modules.tool_execution.application.tasks import ToolTaskService
+from ai_platform_api.modules.tool_execution.infrastructure.confirmation_approval_sqlalchemy import (
+    SqlAlchemyToolConfirmationSubjectLifecycle,
+)
+from ai_platform_api.modules.tool_execution.infrastructure.confirmations_sqlalchemy import (
+    SqlAlchemyToolConfirmationStore,
+)
 from ai_platform_api.modules.tool_execution.infrastructure.planning_sqlalchemy import (
     SqlAlchemyToolReleasePlanSource,
 )
@@ -208,6 +215,7 @@ from ai_platform_api.modules.workflow.application.executor import (
 )
 from ai_platform_api.modules.workflow.application.service import WorkflowDefinitionService
 from ai_platform_api.modules.workflow.infrastructure.approval_runtime_sqlalchemy import (
+    RoutedApprovalSubjectLifecycle,
     SqlAlchemyApprovalRuntimeUnitOfWork,
 )
 from ai_platform_api.modules.workflow.infrastructure.approvals_sqlalchemy import (
@@ -275,6 +283,7 @@ class ApplicationContainer:
     tool_catalogs: ToolCatalogService | None = None
     tool_tasks: ToolTaskService | None = None
     tool_planning: ToolExecutionPlanningService | None = None
+    tool_confirmations: ToolConfirmationService | None = None
     rag_safety: RagSafetyGate = field(default_factory=RagSafetyGate)
     field_policy_registry: FieldPolicyRegistry = field(
         default_factory=lambda: FieldPolicyRegistry(1, 1, ())
@@ -430,7 +439,12 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     approval_instances = ApprovalInstanceService(
         SqlAlchemyApprovalRuntimeUnitOfWork(
             database.sessions,
-            SqlAlchemyAgentApprovalSubjectLifecycle,
+            lambda session: RoutedApprovalSubjectLifecycle(
+                {
+                    "agent.release": SqlAlchemyAgentApprovalSubjectLifecycle(session),
+                    "tool.call": SqlAlchemyToolConfirmationSubjectLifecycle(session),
+                }
+            ),
         ),
         approval_policies,
     )
@@ -466,6 +480,11 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         tool_task_store,
         tool_catalogs,
         SqlAlchemyToolReleasePlanSource(database.sessions),
+    )
+    tool_confirmations = ToolConfirmationService(
+        SqlAlchemyToolConfirmationStore(database.sessions),
+        tool_catalogs,
+        approval_instances,
     )
     retrieval_planning = BoundedRetrievalPlanningService(
         SqlAlchemyRetrievalPlanningUnitOfWork(database.sessions),
@@ -571,6 +590,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             tool_catalogs=tool_catalogs,
             tool_tasks=tool_tasks,
             tool_planning=tool_planning,
+            tool_confirmations=tool_confirmations,
             workflow_run_executor=WorkflowRunExecutor(
                 SqlAlchemyWorkflowExecutionStore(database.sessions),
                 policy,

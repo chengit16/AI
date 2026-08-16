@@ -9,14 +9,20 @@ from collections.abc import Callable, Mapping
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
 from ai_platform_api.modules.tool_execution.domain.planning import (
     ReleaseToolReference,
+    ToolPolicyDecisionRecord,
     ToolReleasePlan,
 )
-from ai_platform_api.persistence.tables import agent_releases, agents, services
+from ai_platform_api.persistence.tables import (
+    agent_releases,
+    agents,
+    services,
+    tool_policy_decisions,
+)
 
 SessionFactory = Callable[[], Session]
 PERMISSION_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){2,}$")
@@ -107,6 +113,27 @@ class SqlAlchemyToolReleasePlanSource:
         )
 
 
+def insert_tool_policy_decision(session: Session, policy: ToolPolicyDecisionRecord) -> None:
+    """在调用方事务内追加一次不可变 PDP 证据，不负责提交 Session。"""
+
+    session.execute(
+        insert(tool_policy_decisions).values(
+            decision_id=policy.decision_id,
+            workspace_id=policy.workspace_id,
+            run_id=policy.run_id,
+            step_id=policy.step_id,
+            tool_id=policy.tool_id,
+            tool_version=policy.tool_version,
+            canonical_arguments_hash=policy.canonical_arguments_hash,
+            permission_code=policy.permission_code,
+            policy_version=policy.policy_version,
+            resource_scope_hash=policy.resource_scope_hash,
+            field_mask_hash=policy.field_mask_hash,
+            evaluated_at=policy.evaluated_at,
+        )
+    )
+
+
 def _read_only_tools(
     snapshot: Mapping[object, object],
 ) -> tuple[ReleaseToolReference, ...] | None:
@@ -178,4 +205,4 @@ def _document_hash(document: Mapping[object, object]) -> str | None:
     return hashlib.sha256(payload).hexdigest()
 
 
-__all__ = ["SqlAlchemyToolReleasePlanSource"]
+__all__ = ["SqlAlchemyToolReleasePlanSource", "insert_tool_policy_decision"]

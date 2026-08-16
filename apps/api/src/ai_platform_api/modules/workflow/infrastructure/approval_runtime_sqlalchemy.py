@@ -419,6 +419,35 @@ class NoopApprovalSubjectLifecycle(ApprovalSubjectLifecycle):
         return None
 
 
+class RoutedApprovalSubjectLifecycle(ApprovalSubjectLifecycle):
+    """按冻结资源类型把审批主题分发给唯一业务生命周期。
+
+    路由在组合根中显式注册，避免多个生命周期同时写入同一审批事务，也避免
+    后加入的工具审批替换既有 Agent 发布审批。
+    """
+
+    def __init__(self, routes: dict[str, ApprovalSubjectLifecycle]) -> None:
+        if not routes or any(not key for key in routes):
+            raise ValueError("审批主题生命周期路由不能为空")
+        self._routes = dict(routes)
+
+    def bind(
+        self,
+        state: ApprovalRuntimeState,
+        subject: ApprovalSubject,
+    ) -> ApprovalSubjectEvent | None:
+        lifecycle = self._routes.get(subject.resource_type)
+        return lifecycle.bind(state, subject) if lifecycle is not None else None
+
+    def apply_transition(
+        self,
+        previous: ApprovalRuntimeState,
+        transition: ApprovalRuntimeTransition,
+    ) -> ApprovalSubjectEvent | None:
+        lifecycle = self._routes.get(previous.instance.resource_type)
+        return lifecycle.apply_transition(previous, transition) if lifecycle is not None else None
+
+
 class SqlAlchemyApprovalRuntimeUnitOfWork(ApprovalRuntimeUnitOfWork):
     """为审批聚合、工作流业务、审计和 Outbox 提供不可嵌套事务。"""
 
