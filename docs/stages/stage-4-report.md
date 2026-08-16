@@ -7,7 +7,7 @@
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-04` 五个内部只读工具 |
+| 当前节点 | `P4-05` 执行计划与逐步策略校验 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -74,6 +74,18 @@
 - 运行诊断：公共本地实例按统一启动流程升级到 Revision `20260816_0054`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
 - 验收结论：`passed`。当前只证明普通工具任务的状态事实、租约和唯一写入权成立；五个内部只读工具 Adapter、执行计划、确认/审批、凭证注入、幂等副作用、SSE、页面和联合演练继续由 `P4-04`～`P4-13` 独立验收。
 
+### P4-04 五个内部只读工具与统一 Adapter
+
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `053998e`。
+- 交付范围：新增 `ToolAdapterService`、内部只读 Adapter 端口、五个冻结工具的封闭适配类和责任模块函数装配入口；继续使用 `P4-02` 唯一工具目录解析精确版本，没有新建数据库表、HTTP API、菜单、任意 HTTP/SQL/文件系统入口、凭证或真实外部连接器，数据库保持 Revision `20260816_0054`。
+- 调用前门禁：只允许 `internal_read`、`read`、无凭证且非合成的已登记工具版本；参数按对应 Draft 2020-12 Schema 校验，未知字段和错误类型失败关闭；文档、工作流运行和审批实例目标必须落在当前工作空间级或资源级授权范围内，空资源集合不退化为全量授权。
+- 责任边界：五个 Adapter 只接收可信 `RequestContext` 和已校验参数，装配入口允许组合根注入原知识、文档、工作流、审批和配额模块的公开只读处理函数；当前节点不直接导入其他模块私有 Repository，也不建立网络或任意查询能力。模型候选意图、AgentRelease 允许列表、冻结 Step 与实际任务入口由 `P4-05` 接续。
+- 结果安全：返回值必须匹配冻结输出 Schema 且为可规范序列化 JSON；在进入后续模型上下文前再次执行字段遮罩、256 KiB 大小、敏感字段/凭证格式和中英文 Prompt Injection 检查，失败统一拒绝；通过结果生成稳定 SHA-256 和四项检查回执，不把原始结果写入工具任务事实。
+- 专项验证：`.venv/bin/pytest -q tests/unit/test_p404_internal_read_adapters.py` 为 `5/5`；真实 PostgreSQL `tests/integration/test_p404_internal_read_adapters_postgres.py` 为 `1/1`，验证个人套餐、当前 PDP、五个数据库冻结定义、输入/输出 Schema 和 Adapter 分发闭环。
+- 统一门禁：`./scripts/verify` 通过，React 为 `53/53`，Python 为 `715/715`，mypy strict 检查 `632` 个源文件；OpenAPI、权限资源、ReleaseManifest、契约兼容、架构依赖、注释、UnoCSS、生产构建和 Secret Scanner 均无漂移。
+- 运行诊断：`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过，数据库保持 Revision `20260816_0054`。
+- 验收结论：`passed`。当前证明五个冻结内部只读工具具备统一且失败关闭的 Adapter 边界，不代表模型已经能够生成或执行工具计划；执行计划、逐步策略复核、确认/审批、凭证注入、幂等副作用、SSE、页面和联合演练继续由 `P4-05`～`P4-13` 独立验收。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -84,4 +96,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-03` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-04` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
