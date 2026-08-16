@@ -7,7 +7,7 @@
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-07` 工具凭证安全注入 |
+| 当前节点 | `P4-08` 合成内部副作用 Adapter 与幂等提交协议 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -25,7 +25,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0056` |
+| 数据库基线 | PostgreSQL 16，Revision `20260816_0057` |
 | 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据、模型与工具 | 只使用版本化合成数据、Mock Provider 和合成内部副作用 Adapter；不包含真实客户系统或凭证 |
 
@@ -110,6 +110,19 @@
 - 运行诊断：使用最终工作树重建本地 API、Web、Migration 和 Worker 镜像，公共数据库真实升级到 Revision `20260816_0056`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
 - 验收结论：`passed`。当前证明个人确认、企业多级审批、批准后重新授权和陈旧确认失效门禁成立，不代表凭证注入、合成副作用执行、Worker 重试取消、SSE、审计运营事实或页面已交付；这些能力继续由 `P4-07`～`P4-13` 独立验收。
 
+### P4-07 工具凭证安全注入
+
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `f8d6eef`。
+- 交付范围：新增 `ToolCredentialService`、`ToolCredentialStore`、受控 `ToolCredentialCallEdge`、PostgreSQL Adapter、`tool_credentials` 和 Revision `20260816_0057`；凭证与 Workspace、工具 ID、精确工具版本及轮换版本绑定。本节点没有开放 HTTP API、菜单、真实外部连接器或任意 HTTP/SQL/文件系统工具。
+- 管理权限：只允许浏览器会话中当前 Workspace 的活动所有者创建、轮换或撤销凭证；个人空间和企业空间执行同一所有者规则，普通企业成员失败关闭。每个工具版本最多存在一个活动凭证，每次轮换产生新的不可猜测 `credential_ref`，历史版本只能从 `active` 转为 `revoked`，不能删除或恢复。
+- 加密与明文边界：凭证使用 AES-256-GCM 信封加密，每条记录具有独立数据密钥，认证关联数据固定 Workspace、工具身份、凭证身份和轮换版本；明文只在持有当前活动凭证共享锁的 Adapter 回调期间存在，不作为服务返回值暴露。回调返回值或异常携带明文时统一隔离为 `TOOL_CREDENTIAL_EXPOSURE_DETECTED`，引用失效、撤销、轮换或解密失败统一返回 `TOOL_CREDENTIAL_UNAVAILABLE`。
+- 调用与并发：ToolCall 只允许在 `proposed → authorized` 时从 `NULL` 一次性绑定当前活动凭证，数据库复合外键和 Trigger 拒绝跨空间、跨工具、跨版本或后续改绑；进入 `confirmed`、`executing` 和实际调用前均重新要求引用仍为活动状态。已开始的回调持有共享锁并先完成，轮换等待回调结束后提交，轮换提交后旧引用立即失败关闭。
+- 生命周期与密钥轮换：主密钥轮换脚本在同一事务内同时重包裹模型供应商和工具凭证数据密钥；工作空间 Registry 升级为 `v7`，`tool_credentials` 作为可清除业务事实纳入精确覆盖，导出排除密文、加密数据密钥、Nonce 和 `last_four`。存在凭证或绑定调用时拒绝破坏性降级到 Revision `20260816_0056`。
+- 专项验证：真实 PostgreSQL `tests/integration/test_p407_tool_credentials_postgres.py` 为 `9/9`，覆盖个人/企业所有者、普通成员拒绝、信封密文、关联字段不可改写、精确版本和一次性绑定、撤销/轮换失败关闭、回调返回值与异常泄漏隔离、调用/轮换并发锁、破坏性降级和主密钥重包裹。
+- 统一门禁：`./scripts/verify` 通过，React 为 `53/53`，Python 为 `739/739`，mypy strict 检查 `649` 个源文件；Ruff、架构、前后端注释、UnoCSS、契约、Registry、供应链和生产构建全部通过。
+- 运行诊断：使用最终工作树重建 API、Web、Migration、Worker、Scheduler 和 Tika 镜像，公共数据库升级到 Revision `20260816_0057`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
+- 验收结论：`passed`。当前证明工具凭证的所有者管理、精确版本绑定、加密存储、调用边缘短时注入和轮换撤销失败关闭成立，不代表合成副作用、Worker 重试取消、SSE、页面或真实连接器已交付；这些能力继续由 `P4-08`～`P4-13` 独立验收。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -120,4 +133,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-06` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-07` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。

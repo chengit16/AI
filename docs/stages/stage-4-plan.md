@@ -9,7 +9,7 @@
 ## 2. 继承基线
 
 - 阶段 1 `core_functional=passed`、阶段 2 可靠性为 `passed`、阶段 3 Agent 平台为 `passed`，分别由 `stage-1-complete`、`stage-2-complete` 和 `stage-3-complete` 标签冻结。
-- 当前数据库基线 Revision 为 `20260816_0056`；阶段 3 本地 Agent 平台版本为 `0.3.0`，ReleaseManifest 摘要为 `60e5d17d…73e7c81`。
+- 当前数据库基线 Revision 为 `20260816_0057`；阶段 3 本地 Agent 平台版本为 `0.3.0`，ReleaseManifest 摘要为 `60e5d17d…73e7c81`。
 - 继续复用可信 `RequestContext`、工作空间隔离、RBAC/ABAC、字段过滤、自定义菜单与接口绑定、多级审批、凭证加密、Transactional Outbox、Worker Lane、SSE 恢复、审计、用量和 Trace，不建立第二套权限、审批、密钥、事件或任务事实源。
 - Runtime 继续只加载不可变 AgentRelease；工具配置必须来自 Release 冻结的允许列表，草稿、模型输出或请求参数不能临时扩大工具权限。
 - 测试数据只使用版本化合成数据；真实外部 API、真实凭证、真实客户资料、真实供应商质量和生产容量继续独立记录。
@@ -50,7 +50,7 @@ flowchart TD
     P412 --> P413
 ```
 
-截至 2026-08-16，阶段 2 和阶段 3 依赖已经通过并冻结，`P4-01`～`P4-06` 已完成并通过各自门禁，下一节点为 `P4-07` 工具凭证安全注入。
+截至 2026-08-16，阶段 2 和阶段 3 依赖已经通过并冻结，`P4-01`～`P4-07` 已完成并通过各自门禁，当前节点为 `P4-08` 合成内部副作用 Adapter 与幂等提交协议。
 
 ## 5. 建设节点
 
