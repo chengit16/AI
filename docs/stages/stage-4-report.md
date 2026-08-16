@@ -7,7 +7,7 @@
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
 | 状态 | 进行中 |
 | 报告日期 | 2026-08-16 |
-| 当前节点 | `P4-09` Worker 租约、超时、有限重试、取消、死信与人工恢复 |
+| 当前节点 | `P4-10` 工具结果安全、SSE 进度、审计、用量、成本和观测 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -25,7 +25,7 @@
 | Node.js / pnpm | 24.19.0 / 11.20.0 |
 | 项目 Python | 3.12.12，由 uv 管理 |
 | 容器运行时 | Docker Desktop 4.86.0，Docker Engine 29.7.2，Compose v5.3.1 |
-| 数据库基线 | PostgreSQL 16，Revision `20260816_0058` |
+| 数据库基线 | PostgreSQL 16；`P4-09` 节点前 Revision `20260816_0058`，公共本地实例当前为 `20260816_0059` |
 | 阶段 3 发布 | 本地 Agent 平台版本 `0.3.0`，ReleaseManifest 摘要 `60e5d17d…73e7c81` |
 | 数据、模型与工具 | 只使用版本化合成数据、Mock Provider 和合成内部副作用 Adapter；不包含真实客户系统或凭证 |
 
@@ -136,6 +136,18 @@
 - 运行诊断：公共本地数据库升级到 Revision `20260816_0058`；`./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
 - 验收结论：`passed`。当前证明合成副作用执行前预留、跨 Attempt 稳定幂等、重复调用零新增副作用、响应丢失恢复和未知结果禁止自动重放成立，不代表 Worker 超时重试取消、人工恢复、SSE、运营事实或页面已交付；这些能力继续由 `P4-09`～`P4-13` 独立验收。
 
+### P4-09 Worker 租约、有限重试、取消与人工恢复
+
+- 状态：已完成，完成日期为 2026-08-16，实现提交为 `18937a8`。
+- 执行与租约：新增唯一 `ToolWorkerProcessor` 和受控 `ToolAttemptControl`，Adapter 在短事务外执行，租约心跳同时受 Step 冻结时限和 Run 绝对截止时间约束；领取前有界收敛过期 Run 与 Worker 重启遗留租约，完整 Claim 身份、恢复代际和租约截止时间不匹配时拒绝写回。
+- 重试与死信：仅 `read + safe_read` 工具可以在同一恢复代际内按有限指数退避自动重试，自动尝试耗尽、不可安全重放或租约恢复无法证明安全时进入 `manual_recovery`；写工具禁止跨 Attempt 自动接管。人工恢复最多三代，每代 Attempt 从 1 重新编号，租约代际固定为 `recovery_generation * 10 + attempt_no`，超过上限失败关闭。
+- 取消与超时：取消事实先阻止新 Attempt，未执行租约立即关闭，执行中的 Adapter 可查询并持久化取消观察时间后尽力中止；取消和总截止时间优先于迟到成功，旧 Worker 只能形成不可变历史终态。总截止时间同时关闭未终止 Call、Attempt、Step 和 Run，人工恢复不能延长冻结预算。
+- 结果未知：`TOOL_OUTCOME_UNKNOWN` 关闭原 Attempt、保留 ToolCall `executing` 并把 Run/Step 转入人工恢复，禁止人工重放，只允许查询合成副作用事实对账。对账成功后原失败 Attempt 保持不可变；单步 Run 收敛完成，多步 Run 恢复 `running` 并允许顺序领取剩余 Step，避免父级永久滞留。
+- 数据库与审计：Revision `20260816_0059` 新增恢复代际、可用时间、尝试触发来源、取消观察和恢复操作者事实，扩展状态约束及 Transition Trigger，普通事务不能伪造续租或恢复代际；存在重试、续租观察或恢复事实时拒绝破坏性降级。每次人工恢复将操作者审计和 `tool.run.state_changed` Outbox 与状态变更放在同一事务，横切事实不含参数、结果或凭证正文。
+- 自动验证：Worker 单元 `4/4`；P4-08/P4-09 未知结果、对账和多步恢复专项 `19/19`；P4-02～P4-09 PostgreSQL 联合回归及 Migration 往返已通过。最终 `./scripts/verify` 为 React `53/53`、Python `758/758`，Ruff、mypy strict `658` 个源文件、Secret Scanner、OpenAPI、Registry、ReleaseManifest、SBOM、架构、注释、UnoCSS、契约兼容和生产构建全部通过。
+- 运行诊断：公共本地数据库已真实升级至 Revision `20260816_0059`。首次最终镜像重建曾因 Docker Hub 元数据请求超时中断，自动审批服务恢复后在实现提交 `18937a8` 上重新执行 `./platform start`，API、Web、Migration、Tika、Worker 和 Scheduler 镜像全部构建并启动成功；随后 `./platform doctor` 的 Web、API、MinIO、Tika、PostgreSQL、Revision、Valkey、5 个 Worker 和 Scheduler 共 13 项全部通过。
+- 验收结论：`passed`。当前证明安全只读有限重试、租约续期与重启恢复、取消和超时优先、迟到结果隔离、结果未知只读对账、最多三代人工恢复及最终容器运行成立，不代表工具结果安全、SSE 运营事实或页面已交付；这些能力继续由 `P4-10`～`P4-13` 独立验收。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -146,4 +158,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-08` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`not_run`。`P4-01`～`P4-09` 已通过，但尚未给出阶段 4 工具执行整体通过结论；在 `P4-01`～`P4-13` 全部完成、未授权工具拒绝、未确认副作用拒绝、幂等零重复、步骤/尝试可追溯、凭证零泄漏和安全取消六项门禁通过、阶段报告与 ReleaseManifest 同步并创建 `stage-4-complete` 标签前，不关闭阶段。
