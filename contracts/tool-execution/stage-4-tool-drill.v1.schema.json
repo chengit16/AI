@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/tool-execution/stage-4-tool-drill.v1.schema.json",
+  "title": "阶段 4 工具联合故障演练清单 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "drill_id",
+    "status",
+    "baseline_ref",
+    "source_scenarios_ref",
+    "synthetic",
+    "description",
+    "execution_policy",
+    "required_invariants",
+    "required_capabilities",
+    "required_sample_classes",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "drill_id": { "const": "p4-12-v1" },
+    "status": { "const": "frozen" },
+    "baseline_ref": {
+      "const": "contracts/tool-execution/tool-execution-baseline.v1.json"
+    },
+    "source_scenarios_ref": {
+      "const": "tests/fixtures/tool-execution/p4-01-v1.json"
+    },
+    "synthetic": { "const": true },
+    "description": { "$ref": "#/$defs/text" },
+    "execution_policy": { "$ref": "#/$defs/execution_policy" },
+    "required_invariants": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "required_capabilities": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "required_sample_classes": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sample_class" }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/scenario" }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{2,95}$"
+    },
+    "capability": {
+      "enum": [
+        "duplicate_delivery",
+        "adapter_timeout",
+        "response_loss",
+        "credential_revocation",
+        "approval_expiry",
+        "cancellation_race",
+        "worker_restart",
+        "workspace_isolation"
+      ]
+    },
+    "sample_class": {
+      "enum": ["success", "failure", "timeout", "cancellation", "recovery", "denial"]
+    },
+    "execution_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preflight_command",
+        "recovery_command",
+        "stop_scenarios_on_preflight_failure",
+        "always_run_recovery_check",
+        "failure_mode",
+        "evidence_path"
+      ],
+      "properties": {
+        "preflight_command": { "const": "./platform doctor" },
+        "recovery_command": { "const": "./platform doctor" },
+        "stop_scenarios_on_preflight_failure": { "const": true },
+        "always_run_recovery_check": { "const": true },
+        "failure_mode": { "const": "fail_closed" },
+        "evidence_path": {
+          "const": ".ai-platform/evidence/p4-12-latest.json"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "title",
+        "capability",
+        "sample_classes",
+        "source_case_refs",
+        "pytest_node",
+        "expected_case_count",
+        "verified_invariants",
+        "success_criteria"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^p412-[a-z0-9-]+-[0-9]{3}$"
+        },
+        "title": { "$ref": "#/$defs/text" },
+        "capability": { "$ref": "#/$defs/capability" },
+        "sample_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/sample_class" }
+        },
+        "source_case_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^p401-[a-z0-9-]+-[0-9]{3}$"
+          }
+        },
+        "pytest_node": {
+          "type": "string",
+          "pattern": "^tests/(?:integration|unit)/test_[a-z0-9_]+\\.py::test_[a-z0-9_]+$"
+        },
+        "expected_case_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "verified_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "success_criteria": { "$ref": "#/$defs/text" }
+      }
+    }
+  }
+}

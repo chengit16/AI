@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "drill_id": "p4-12-v1",
+  "status": "frozen",
+  "baseline_ref": "contracts/tool-execution/tool-execution-baseline.v1.json",
+  "source_scenarios_ref": "tests/fixtures/tool-execution/p4-01-v1.json",
+  "synthetic": true,
+  "description": "在同一次本地演练中复用真实 PostgreSQL 故障测试，验证工具重复投递、Adapter 超时、响应丢失、凭证撤销、审批过期、取消竞态、Worker 重启和跨空间攻击的失败关闭边界。",
+  "execution_policy": {
+    "preflight_command": "./platform doctor",
+    "recovery_command": "./platform doctor",
+    "stop_scenarios_on_preflight_failure": true,
+    "always_run_recovery_check": true,
+    "failure_mode": "fail_closed",
+    "evidence_path": ".ai-platform/evidence/p4-12-latest.json"
+  },
+  "required_invariants": [
+    "p4_current_policy_recheck",
+    "p4_read_write_permission_separation",
+    "p4_confirmation_digest_binding",
+    "p4_idempotency_before_side_effect",
+    "p4_credential_call_edge_only",
+    "p4_bounded_retry_and_terminal_precedence",
+    "p4_transactional_fact_consistency"
+  ],
+  "required_capabilities": [
+    "duplicate_delivery",
+    "adapter_timeout",
+    "response_loss",
+    "credential_revocation",
+    "approval_expiry",
+    "cancellation_race",
+    "worker_restart",
+    "workspace_isolation"
+  ],
+  "required_sample_classes": [
+    "success",
+    "failure",
+    "timeout",
+    "cancellation",
+    "recovery",
+    "denial"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "p412-duplicate-delivery-001",
+      "title": "并发重复投递只产生一个 Adapter 所有者和零重复副作用",
+      "capability": "duplicate_delivery",
+      "sample_classes": ["success"],
+      "source_case_refs": ["p401-idempotent-replay-014"],
+      "pytest_node": "tests/integration/test_p408_side_effect_idempotency_postgres.py::test_concurrent_duplicate_delivery_has_one_adapter_call_owner",
+      "expected_case_count": 1,
+      "verified_invariants": [
+        "p4_idempotency_before_side_effect",
+        "p4_transactional_fact_consistency"
+      ],
+      "success_criteria": "两个并发投递只能有一个预留创建者调用 Adapter，幂等记录唯一且重复副作用计数为零。"
+    },
+    {
+      "scenario_id": "p412-adapter-timeout-002",
+      "title": "Adapter 超时使当前租约终止并只允许安全只读调用恢复",
+      "capability": "adapter_timeout",
+      "sample_classes": ["failure", "timeout", "recovery"],
+      "source_case_refs": ["p401-unsafe-write-retry-denied-023"],
+      "pytest_node": "tests/integration/test_p409_tool_recovery_postgres.py::test_expired_lease_keeps_timeout_usage_before_retry",
+      "expected_case_count": 1,
+      "verified_invariants": [
+        "p4_idempotency_before_side_effect",
+        "p4_bounded_retry_and_terminal_precedence"
+      ],
+      "success_criteria": "Adapter 超时后当前 Attempt 形成不可变超时与用量事实，只有安全只读工具能以新租约恢复且旧 Worker 不能写回。"
+    },
+    {
+      "scenario_id": "p412-response-loss-003",
+      "title": "副作用提交后响应丢失只能只读对账且不重复调用",
+      "capability": "response_loss",
+      "sample_classes": ["failure", "recovery"],
+      "source_case_refs": ["p401-outcome-unknown-manual-016"],
+      "pytest_node": "tests/integration/test_p408_side_effect_idempotency_postgres.py::test_committed_side_effect_with_lost_response_can_only_be_reconciled",
+      "expected_case_count": 1,
+      "verified_invariants": [
+        "p4_idempotency_before_side_effect",
+        "p4_bounded_retry_and_terminal_precedence"
+      ],
+      "success_criteria": "响应丢失先进入结果未知和人工恢复，只读对账命中既有提交事实，Adapter 与副作用均不发生第二次调用。"
+    },
+    {
+      "scenario_id": "p412-credential-revocation-004",
+      "title": "凭证轮换和撤销使已绑定旧引用立即失败关闭",
+      "capability": "credential_revocation",
+      "sample_classes": ["failure", "denial"],
+      "source_case_refs": ["p401-credential-result-leak-020"],
+      "pytest_node": "tests/integration/test_p407_tool_credentials_postgres.py::test_rotation_and_revocation_fail_closed_after_binding",
+      "expected_case_count": 2,
+      "verified_invariants": ["p4_credential_call_edge_only"],
+      "success_criteria": "旧凭证引用在轮换或撤销提交后不能进入 Adapter 调用边缘，失败事实不包含明文凭证。"
+    },
+    {
+      "scenario_id": "p412-approval-expiry-005",
+      "title": "确认拒绝、撤回和审批过期均不能使步骤可执行",
+      "capability": "approval_expiry",
+      "sample_classes": ["failure", "denial"],
+      "source_case_refs": ["p401-expired-confirmation-denied-011"],
+      "pytest_node": "tests/integration/test_p406_tool_confirmation_postgres.py::test_reject_withdraw_and_expire_never_make_step_ready",
+      "expected_case_count": 1,
+      "verified_invariants": [
+        "p4_confirmation_digest_binding",
+        "p4_idempotency_before_side_effect"
+      ],
+      "success_criteria": "拒绝、撤回或过期确认只形成不可执行终态，不创建 Attempt、幂等预留或合成副作用。"
+    },
+    {
+      "scenario_id": "p412-cancellation-race-006",
+      "title": "取消观察与迟到成功竞态始终由取消终态优先",
+      "capability": "cancellation_race",
+      "sample_classes": ["cancellation"],
+      "source_case_refs": [
+        "p401-cancel-running-attempt-018",
+        "p401-late-success-ignored-019"
+      ],
+      "pytest_node": "tests/integration/test_p409_tool_recovery_postgres.py::test_lease_renewal_cancellation_observation_and_late_success_precedence",
+      "expected_case_count": 1,
+      "verified_invariants": [
+        "p4_bounded_retry_and_terminal_precedence",
+        "p4_transactional_fact_consistency"
+      ],
+      "success_criteria": "Worker 观察取消后不再续租或写入成功，迟到结果只能形成隔离事实且不能覆盖取消终态。"
+    },
+    {
+      "scenario_id": "p412-worker-restart-007",
+      "title": "Worker 重启从过期租约创建唯一新 Attempt 并隔离旧结果",
+      "capability": "worker_restart",
+      "sample_classes": ["timeout", "recovery"],
+      "source_case_refs": [
+        "p401-unsafe-write-retry-denied-023",
+        "p401-late-success-ignored-019"
+      ],
+      "pytest_node": "tests/integration/test_p403_tool_task_state_postgres.py::test_cancellation_late_success_and_worker_restart_timeout_never_overwrite_terminal",
+      "expected_case_count": 1,
+      "verified_invariants": [
+        "p4_idempotency_before_side_effect",
+        "p4_bounded_retry_and_terminal_precedence",
+        "p4_transactional_fact_consistency"
+      ],
+      "success_criteria": "Worker 重启扫描使过期租约失效并创建唯一新 Attempt，旧 Worker 的迟到成功不能覆盖新执行或已提交终态。"
+    },
+    {
+      "scenario_id": "p412-workspace-isolation-008",
+      "title": "跨空间恢复和数据库直接绕过均失败关闭",
+      "capability": "workspace_isolation",
+      "sample_classes": ["failure", "denial"],
+      "source_case_refs": ["p401-cross-workspace-denied-006"],
+      "pytest_node": "tests/integration/test_p409_tool_recovery_postgres.py::test_cross_workspace_recovery_and_direct_database_bypass_fail_closed",
+      "expected_case_count": 1,
+      "verified_invariants": [
+        "p4_current_policy_recheck",
+        "p4_read_write_permission_separation"
+      ],
+      "success_criteria": "错误工作空间上下文不能读取或恢复 Run，直接修改恢复代际、续租或取消事实也由数据库拒绝。"
+    }
+  ]
+}

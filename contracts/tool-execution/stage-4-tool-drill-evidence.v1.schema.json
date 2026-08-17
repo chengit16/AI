@@ -1,0 +1,536 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/tool-execution/stage-4-tool-drill-evidence.v1.schema.json",
+  "title": "阶段 4 工具联合故障演练证据 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_version",
+    "drill_id",
+    "run_id",
+    "synthetic",
+    "manifest_ref",
+    "manifest_sha256",
+    "repository_revision",
+    "repository_dirty",
+    "started_at",
+    "finished_at",
+    "duration_seconds",
+    "overall_status",
+    "checks",
+    "scenarios",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "evidence_version": { "const": "p4-12-evidence-v1" },
+    "drill_id": { "const": "p4-12-v1" },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "synthetic": { "const": true },
+    "manifest_ref": {
+      "const": "tests/fixtures/tool-execution/p4-12-v1.json"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "repository_revision": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+        { "const": "unknown" }
+      ]
+    },
+    "repository_dirty": { "type": "boolean" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "duration_seconds": { "type": "number", "minimum": 0 },
+    "overall_status": { "enum": ["passed", "failed"] },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preflight", "scenario_execution", "recovery"],
+      "properties": {
+        "preflight": { "$ref": "#/$defs/check_result" },
+        "scenario_execution": { "$ref": "#/$defs/check_result" },
+        "recovery": { "$ref": "#/$defs/check_result" }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/scenario_result" },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "scenario_id": { "const": "p412-duplicate-delivery-001" },
+              "capability": { "const": "duplicate_delivery" },
+              "sample_classes": { "const": ["success"] },
+              "verified_invariants": {
+                "const": [
+                  "p4_idempotency_before_side_effect",
+                  "p4_transactional_fact_consistency"
+                ]
+              },
+              "pytest_node": {
+                "const": "tests/integration/test_p408_side_effect_idempotency_postgres.py::test_concurrent_duplicate_delivery_has_one_adapter_call_owner"
+              },
+              "expected_case_count": { "const": 1 }
+            },
+            "required": [
+              "scenario_id",
+              "capability",
+              "sample_classes",
+              "verified_invariants",
+              "pytest_node",
+              "expected_case_count"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "scenario_id": { "const": "p412-adapter-timeout-002" },
+              "capability": { "const": "adapter_timeout" },
+              "sample_classes": { "const": ["failure", "timeout", "recovery"] },
+              "verified_invariants": {
+                "const": [
+                  "p4_idempotency_before_side_effect",
+                  "p4_bounded_retry_and_terminal_precedence"
+                ]
+              },
+              "pytest_node": {
+                "const": "tests/integration/test_p409_tool_recovery_postgres.py::test_expired_lease_keeps_timeout_usage_before_retry"
+              },
+              "expected_case_count": { "const": 1 }
+            },
+            "required": [
+              "scenario_id",
+              "capability",
+              "sample_classes",
+              "verified_invariants",
+              "pytest_node",
+              "expected_case_count"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "scenario_id": { "const": "p412-response-loss-003" },
+              "capability": { "const": "response_loss" },
+              "sample_classes": { "const": ["failure", "recovery"] },
+              "verified_invariants": {
+                "const": [
+                  "p4_idempotency_before_side_effect",
+                  "p4_bounded_retry_and_terminal_precedence"
+                ]
+              },
+              "pytest_node": {
+                "const": "tests/integration/test_p408_side_effect_idempotency_postgres.py::test_committed_side_effect_with_lost_response_can_only_be_reconciled"
+              },
+              "expected_case_count": { "const": 1 }
+            },
+            "required": [
+              "scenario_id",
+              "capability",
+              "sample_classes",
+              "verified_invariants",
+              "pytest_node",
+              "expected_case_count"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "scenario_id": { "const": "p412-credential-revocation-004" },
+              "capability": { "const": "credential_revocation" },
+              "sample_classes": { "const": ["failure", "denial"] },
+              "verified_invariants": {
+                "const": ["p4_credential_call_edge_only"]
+              },
+              "pytest_node": {
+                "const": "tests/integration/test_p407_tool_credentials_postgres.py::test_rotation_and_revocation_fail_closed_after_binding"
+              },
+              "expected_case_count": { "const": 2 }
+            },
+            "required": [
+              "scenario_id",
+              "capability",
+              "sample_classes",
+              "verified_invariants",
+              "pytest_node",
+              "expected_case_count"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "scenario_id": { "const": "p412-approval-expiry-005" },
+              "capability": { "const": "approval_expiry" },
+              "sample_classes": { "const": ["failure", "denial"] },
+              "verified_invariants": {
+                "const": [
+                  "p4_confirmation_digest_binding",
+                  "p4_idempotency_before_side_effect"
+                ]
+              },
+              "pytest_node": {
+                "const": "tests/integration/test_p406_tool_confirmation_postgres.py::test_reject_withdraw_and_expire_never_make_step_ready"
+              },
+              "expected_case_count": { "const": 1 }
+            },
+            "required": [
+              "scenario_id",
+              "capability",
+              "sample_classes",
+              "verified_invariants",
+              "pytest_node",
+              "expected_case_count"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "scenario_id": { "const": "p412-cancellation-race-006" },
+              "capability": { "const": "cancellation_race" },
+              "sample_classes": { "const": ["cancellation"] },
+              "verified_invariants": {
+                "const": [
+                  "p4_bounded_retry_and_terminal_precedence",
+                  "p4_transactional_fact_consistency"
+                ]
+              },
+              "pytest_node": {
+                "const": "tests/integration/test_p409_tool_recovery_postgres.py::test_lease_renewal_cancellation_observation_and_late_success_precedence"
+              },
+              "expected_case_count": { "const": 1 }
+            },
+            "required": [
+              "scenario_id",
+              "capability",
+              "sample_classes",
+              "verified_invariants",
+              "pytest_node",
+              "expected_case_count"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "scenario_id": { "const": "p412-worker-restart-007" },
+              "capability": { "const": "worker_restart" },
+              "sample_classes": { "const": ["timeout", "recovery"] },
+              "verified_invariants": {
+                "const": [
+                  "p4_idempotency_before_side_effect",
+                  "p4_bounded_retry_and_terminal_precedence",
+                  "p4_transactional_fact_consistency"
+                ]
+              },
+              "pytest_node": {
+                "const": "tests/integration/test_p403_tool_task_state_postgres.py::test_cancellation_late_success_and_worker_restart_timeout_never_overwrite_terminal"
+              },
+              "expected_case_count": { "const": 1 }
+            },
+            "required": [
+              "scenario_id",
+              "capability",
+              "sample_classes",
+              "verified_invariants",
+              "pytest_node",
+              "expected_case_count"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "scenario_id": { "const": "p412-workspace-isolation-008" },
+              "capability": { "const": "workspace_isolation" },
+              "sample_classes": { "const": ["failure", "denial"] },
+              "verified_invariants": {
+                "const": [
+                  "p4_current_policy_recheck",
+                  "p4_read_write_permission_separation"
+                ]
+              },
+              "pytest_node": {
+                "const": "tests/integration/test_p409_tool_recovery_postgres.py::test_cross_workspace_recovery_and_direct_database_bypass_fail_closed"
+              },
+              "expected_case_count": { "const": 1 }
+            },
+            "required": [
+              "scenario_id",
+              "capability",
+              "sample_classes",
+              "verified_invariants",
+              "pytest_node",
+              "expected_case_count"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "expected_case_total",
+        "observed_case_total",
+        "passed",
+        "failed",
+        "error",
+        "skipped",
+        "not_run",
+        "sample_counts"
+      ],
+      "properties": {
+        "total": { "const": 8 },
+        "expected_case_total": { "const": 9 },
+        "observed_case_total": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "passed": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "failed": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "error": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "skipped": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "not_run": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "sample_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["success", "failure", "timeout", "cancellation", "recovery", "denial"],
+          "properties": {
+            "success": { "const": 1 },
+            "failure": { "const": 5 },
+            "timeout": { "const": 2 },
+            "cancellation": { "const": 1 },
+            "recovery": { "const": 3 },
+            "denial": { "const": 3 }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "overall_status": { "const": "passed" } },
+        "required": ["overall_status"]
+      },
+      "then": {
+        "properties": {
+          "repository_revision": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40,64}$"
+          },
+          "checks": {
+            "properties": {
+              "preflight": { "properties": { "status": { "const": "passed" } } },
+              "scenario_execution": {
+                "properties": { "status": { "const": "passed" } }
+              },
+              "recovery": { "properties": { "status": { "const": "passed" } } }
+            }
+          },
+          "scenarios": {
+            "items": { "properties": { "status": { "const": "passed" } } }
+          },
+          "summary": {
+            "properties": {
+              "expected_case_total": { "const": 9 },
+              "observed_case_total": { "const": 9 },
+              "passed": { "const": 8 },
+              "failed": { "const": 0 },
+              "error": { "const": 0 },
+              "skipped": { "const": 0 },
+              "not_run": { "const": 0 }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sample_class": {
+      "enum": ["success", "failure", "timeout", "cancellation", "recovery", "denial"]
+    },
+    "invariant_id": {
+      "enum": [
+        "p4_current_policy_recheck",
+        "p4_read_write_permission_separation",
+        "p4_confirmation_digest_binding",
+        "p4_idempotency_before_side_effect",
+        "p4_credential_call_edge_only",
+        "p4_bounded_retry_and_terminal_precedence",
+        "p4_transactional_fact_consistency"
+      ]
+    },
+    "reason_code": {
+      "enum": [
+        null,
+        "command_unavailable",
+        "command_failed",
+        "runner_exception",
+        "runner_invalid_result",
+        "preflight_failed",
+        "manifest_changed",
+        "junit_not_created",
+        "junit_invalid",
+        "junit_case_missing",
+        "junit_case_count_mismatch",
+        "junit_case_identity_mismatch",
+        "pytest_error",
+        "pytest_failure",
+        "pytest_skipped"
+      ]
+    },
+    "check_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "exit_code", "duration_seconds", "reason_code"],
+      "properties": {
+        "status": { "enum": ["passed", "failed"] },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "reason_code": { "$ref": "#/$defs/reason_code" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "passed" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "exit_code": { "const": 0 },
+              "reason_code": { "const": null }
+            }
+          },
+          "else": {
+            "properties": {
+              "exit_code": { "minimum": 1 },
+              "reason_code": { "not": { "const": null } }
+            }
+          }
+        }
+      ]
+    },
+    "scenario_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "capability",
+        "sample_classes",
+        "verified_invariants",
+        "pytest_node",
+        "expected_case_count",
+        "observed_case_count",
+        "status",
+        "duration_seconds",
+        "reason_code"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^p412-[a-z0-9-]+-[0-9]{3}$"
+        },
+        "capability": {
+          "enum": [
+            "duplicate_delivery",
+            "adapter_timeout",
+            "response_loss",
+            "credential_revocation",
+            "approval_expiry",
+            "cancellation_race",
+            "worker_restart",
+            "workspace_isolation"
+          ]
+        },
+        "sample_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/sample_class" }
+        },
+        "verified_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/invariant_id" }
+        },
+        "pytest_node": {
+          "type": "string",
+          "pattern": "^tests/(?:integration|unit)/test_[a-z0-9_]+\\.py::test_[a-z0-9_]+$"
+        },
+        "expected_case_count": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "observed_case_count": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "status": { "enum": ["passed", "failed", "error", "skipped", "not_run"] },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "reason_code": { "$ref": "#/$defs/reason_code" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "passed" } },
+            "required": ["status"]
+          },
+          "then": { "properties": { "reason_code": { "const": null } } },
+          "else": { "properties": { "reason_code": { "not": { "const": null } } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": { "const": "passed" },
+              "expected_case_count": { "const": 1 }
+            },
+            "required": ["status", "expected_case_count"]
+          },
+          "then": { "properties": { "observed_case_count": { "const": 1 } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": { "const": "passed" },
+              "expected_case_count": { "const": 2 }
+            },
+            "required": ["status", "expected_case_count"]
+          },
+          "then": { "properties": { "observed_case_count": { "const": 2 } } }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "not_run" } },
+            "required": ["status"]
+          },
+          "then": { "properties": { "observed_case_count": { "const": 0 } } }
+        }
+      ]
+    }
+  }
+}

@@ -2,9 +2,11 @@
 
 ## 1. 目录职责
 
-本目录固定阶段 4 的受控工具执行语义。`tool-execution.v1.schema.json` 定义不可变工具版本、`Run`、`Step`、`Attempt`、`ToolCall`、策略决策、确认/审批、幂等事实、取消事实和安全结果；`tool-execution-baseline.v1.json` 冻结状态机、安全不变量、首批五个内部只读工具以及后续实现使用的权限、菜单、API 和事件标识；场景 Schema 约束版本化全合成验收数据。
+本目录固定阶段 4 的受控工具执行语义。`tool-execution.v1.schema.json` 定义不可变工具版本、`Run`、`Step`、`Attempt`、`ToolCall`、策略决策、确认/审批、幂等事实、取消事实和安全结果；`tool-execution-baseline.v1.json` 冻结状态机、安全不变量、首批五个内部只读工具以及后续实现使用的权限、菜单、API 和事件标识；场景 Schema 约束版本化全合成验收数据；`stage-4-tool-drill*.schema.json` 约束 `P4-12` 固定联合故障清单与不含业务正文的本地最小证据。
 
-预留标识不是已上线能力。只有对应节点完成实现、OpenAPI、资源注册表、菜单发布、Migration 和验收后，权限或接口才能进入运行平台。`P4-01` 不创建活动数据库表、API、菜单、凭证或真实 Adapter；`P4-02` 只落地不可变工具注册和工作空间目录服务；`P4-03` 已落地内部 Run/Step/Attempt/ToolCall 状态事实、租约和唯一写入权；`P4-04` 已落地五个冻结内部只读工具的统一 Adapter、Schema、资源范围和结果安全边界；`P4-05` 已落地严格候选意图、Release 允许列表、每步预算、当前 PDP 证据和原子只读计划冻结，但仍未激活工具 HTTP API、菜单、确认/审批、凭证值、写工具或真实外部连接器。
+预留标识不是已上线能力。只有对应节点完成实现、OpenAPI、资源注册表、菜单发布、Migration 和验收后，权限或接口才能进入运行平台。`P4-01` 冻结契约与边界；`P4-02`～`P4-05` 已落地不可变工具注册、工作空间目录、Run/Step/Attempt/ToolCall 状态事实、五个内部只读 Adapter、严格候选意图、Release 允许列表、预算、当前 PDP 证据和原子计划冻结；`P4-06`～`P4-10` 已落地个人确认、企业审批、凭证边缘注入、合成副作用幂等、Worker 恢复、安全结果与连续进度事实。
+
+`P4-11` 已正式激活工具目录、任务控制、确认/驳回/取消、可恢复 SSE、菜单、浏览器 API 和页面；Runtime 与 Worker 内部执行入口仍不注册为浏览器 API。阶段 4 仍只开放五个内部只读工具，写操作只由全合成内部 Adapter 验证控制机制，不包含真实外部连接器、客户凭证或任意 HTTP、SQL、文件系统工具。
 
 ## 2. 核心边界
 
@@ -36,3 +38,7 @@ uv run --locked python scripts/check_contract_compatibility.py HEAD
 `P4-04` 另以 `tests/unit/test_p404_internal_read_adapters.py` 和 `tests/integration/test_p404_internal_read_adapters_postgres.py` 验证五工具分发、真实目录精确版本、当前套餐/PDP、输入输出 Schema、空资源范围、字段遮罩、结果大小、敏感字段、Prompt Injection 和 Adapter 故障的失败关闭行为。
 
 `P4-05` 另以 `tests/unit/test_p405_tool_planning.py` 和 `tests/integration/test_p405_tool_planning_postgres.py` 验证严格候选信封、Release 快照允许列表、当前套餐/PDP、参数 Schema、Step 预算、策略证据、单事务冻结、数据库防绕过、冲突回滚和 Migration 往返。
+
+`P4-12` 使用 `./platform accept-stage-4-tools` 在前后各执行一次 `./platform doctor`，并以一次 pytest/JUnit 运行固定 8 类真实 PostgreSQL 故障节点；Shell 包装层由回归测试把整个函数体精确冻结为 6 条非空行，只能依次执行 `check_runtime`、`ensure_environment`、`export_local_service_settings` 和唯一正式执行器及其清单、证据参数，不能追加其他命令或扩大执行范围。清单的前置/恢复命令、前置失败停止、始终恢复诊断、失败关闭模式和证据路径还分别具有参数化反例，任一放宽都会拒绝。清单同时要求完整节点和裸测试函数名各自唯一，将每类能力与场景 ID、P4-01 来源和 PostgreSQL 节点三元绑定，并在清单加载阶段精确绑定每个能力的样本类别与验证不变量；即使全局总并集仍完整，单场景虚增样本类别或减少自身验证责任也会失败关闭。清单冻结 8 个场景对应 9 个 JUnit case；凭证场景除数量外还精确要求 `[rotate]` 和 `[revoke]` 两个参数 ID，缺失与同数量身份替换分别记录 `junit_case_count_mismatch` 和 `junit_case_identity_mismatch`，冻结 case 全部存在时若仍混入额外 testcase 则整份 JUnit 失败关闭。正式证据只能由仓库冻结清单生成，保证固定 `manifest_ref` 与校验时冻结的 SHA-256 一致，并在清单校验后、恢复诊断后和通过证据原子写入后复核清单未发生漂移；最后一次复核失败会删除刚写出的证据，未知 Git 修订也不能判定通过。确认使用冻结清单后，执行器先拒绝与清单、Schema、基线、来源场景或真实测试节点重合的证据路径，并要求所有证据目标都位于当前 `AI_PLATFORM_ROOT/evidence`；仓库外任意文件同样不能成为失效或覆盖目标。通过路径守卫的新尝试才会使旧证据失效，避免清单校验或命令异常继续暴露上次通过结论，替代清单也不能触发该失效操作。前置、场景或恢复 Runner 抛出的未捕获异常统一收敛为 `runner_exception`，前置或场景异常仍会执行恢复诊断；Runner 返回越界退出码、非有限耗时、成功携带原因或未注册原因时统一记为 `runner_invalid_result`。证据 Schema 只接受冻结原因码枚举，证据写入 `.ai-platform/evidence/p4-12-latest.json`；每个场景记录 `expected_case_count` 与 `observed_case_count`，汇总固定 `expected_case_total = 9` 并记录 `observed_case_total`。Schema 以八组 `contains/minContains/maxContains` 独立固定每个场景的 ID、能力、样本类别、真实测试节点和期望 case 数，重复或替换任一绑定都会被拒绝；六类样本汇总同步固定为成功 `1`、失败 `5`、超时 `2`、取消 `1`、恢复 `3`、拒绝 `3`。`overall_status = passed` 时还要求三个检查和八个场景全部通过、期望与实际 case 都为 `9`，并且失败、错误、跳过和未运行计数全部为 `0`。证据其余字段只包含清单摘要、场景与样本类别、测试节点、状态、耗时和稳定原因码，不包含参数正文、结果正文、凭证或测试错误正文。
+
+收口时进一步把每个场景的 `verified_invariants` 写入最小证据，并由八组 Schema 约束精确绑定；证据消费者无需只依赖样本类别或测试节点推断验证责任，不变量归属被减少或替换时会直接校验失败。
