@@ -149,7 +149,11 @@ from ai_platform_api.modules.model_gateway.infrastructure.runtime_sqlalchemy imp
     SqlAlchemyRuntimeConfigurationUnitOfWork,
     SqlAlchemyRuntimeInvocationStore,
 )
+from ai_platform_api.modules.operations.application.control_tower import (
+    OperationsControlTowerService,
+)
 from ai_platform_api.modules.operations.application.service import OperationsWorkbenchService
+from ai_platform_api.modules.operations.domain.control_tower import ControlTowerSnapshotSource
 from ai_platform_api.modules.operations.infrastructure.sqlalchemy import (
     SqlAlchemyOperationsWorkbenchUnitOfWork,
 )
@@ -278,6 +282,7 @@ class ApplicationContainer:
     menu_releases: MenuReleaseService | None = None
     integration_operations: IntegrationOperationsService | None = None
     operations_workbench: OperationsWorkbenchService | None = None
+    operations_control_tower: OperationsControlTowerService | None = None
     workspace_lifecycle: WorkspaceLifecycleService | None = None
     regulatory_compliance: RegulatoryComplianceService | None = None
     lifecycle_cache: ValkeyWorkspaceCacheCleaner | None = None
@@ -676,6 +681,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             operations_workbench=OperationsWorkbenchService(
                 SqlAlchemyOperationsWorkbenchUnitOfWork(database.sessions)
+            ),
+            operations_control_tower=OperationsControlTowerService(
+                ControlTowerSnapshotSource(Path(settings.control_tower_baseline_path))
             ),
             workspace_lifecycle=lifecycle,
             regulatory_compliance=regulatory_compliance,

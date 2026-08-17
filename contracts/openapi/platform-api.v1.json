@@ -3248,6 +3248,138 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/operations/workbench/control-tower": {
+      "get": {
+        "tags": [
+          "运营工作台"
+        ],
+        "summary": "Get Control Tower Snapshot",
+        "description": "返回当前工作空间的质量、成本、隔离、法规和私有实例状态。",
+        "operationId": "getOperationsControlTowerSnapshot",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsControlTowerResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/operations/workbench/overview": {
       "get": {
         "tags": [
@@ -27332,6 +27464,125 @@
         ],
         "title": "Body_uploadKnowledgeDocumentVersion"
       },
+      "ControlTowerFactResponse": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "blocked",
+              "not_run",
+              "not_configured",
+              "failed"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value",
+          "status"
+        ],
+        "title": "ControlTowerFactResponse",
+        "description": "返回控制台中的单个低敏状态字段。"
+      },
+      "ControlTowerSectionResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "quality",
+              "cost",
+              "isolation",
+              "compliance",
+              "private_instance"
+            ],
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "blocked",
+              "not_run",
+              "not_configured",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reason Codes"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/ControlTowerFactResponse"
+            },
+            "type": "array",
+            "title": "Facts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "status",
+          "summary",
+          "reason_codes",
+          "facts"
+        ],
+        "title": "ControlTowerSectionResponse",
+        "description": "返回一个质量治理分区及其阻断原因。"
+      },
+      "ControlTowerSourceContractResponse": {
+        "properties": {
+          "contract_id": {
+            "type": "string",
+            "title": "Contract Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "frozen",
+              "not_configured",
+              "not_run"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contract_id",
+          "version",
+          "status"
+        ],
+        "title": "ControlTowerSourceContractResponse",
+        "description": "返回控制台读取的版本化来源契约状态。"
+      },
       "ConversationListResponse": {
         "properties": {
           "items": {
@@ -28347,6 +28598,37 @@
         ],
         "title": "CurrentMessageFeedbackResponse",
         "description": "表示反馈可能尚未提交的稳定读取包装。"
+      },
+      "DangerousOperationNoticeResponse": {
+        "properties": {
+          "operation": {
+            "type": "string",
+            "title": "Operation"
+          },
+          "permission_code": {
+            "type": "string",
+            "title": "Permission Code"
+          },
+          "confirmation_required": {
+            "type": "boolean",
+            "const": true,
+            "title": "Confirmation Required"
+          },
+          "backend_reauthorization": {
+            "type": "boolean",
+            "const": true,
+            "title": "Backend Reauthorization"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operation",
+          "permission_code",
+          "confirmation_required",
+          "backend_reauthorization"
+        ],
+        "title": "DangerousOperationNoticeResponse",
+        "description": "返回危险动作的二次确认和后端重授权要求。"
       },
       "DeletionCertificateResponse": {
         "properties": {
@@ -31819,6 +32101,56 @@
         ],
         "title": "OperationsAlertResponse",
         "description": "返回稳定告警码和阈值，禁止携带动态正文或主体标识。"
+      },
+      "OperationsControlTowerResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "snapshot_version": {
+            "type": "integer",
+            "title": "Snapshot Version"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/ControlTowerSectionResponse"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "dangerous_operations": {
+            "items": {
+              "$ref": "#/components/schemas/DangerousOperationNoticeResponse"
+            },
+            "type": "array",
+            "title": "Dangerous Operations"
+          },
+          "source_contracts": {
+            "items": {
+              "$ref": "#/components/schemas/ControlTowerSourceContractResponse"
+            },
+            "type": "array",
+            "title": "Source Contracts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "snapshot_version",
+          "generated_at",
+          "sections",
+          "dangerous_operations",
+          "source_contracts"
+        ],
+        "title": "OperationsControlTowerResponse",
+        "description": "统一质量、成本、隔离、法规与私有实例控制台快照。"
       },
       "OperationsIngestionJobListResponse": {
         "properties": {

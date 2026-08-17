@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     release_manifest_path: str = "contracts/fixtures/release-manifest.v1.valid.json"
     compatibility_matrix_path: str = "contracts/release/compatibility-matrix.v1.json"
     resource_registry_path: str = "contracts/authorization/resource-registry.v1.json"
+    control_tower_baseline_path: str = "contracts/operations/control-tower-baseline.v1.json"
     field_policy_registry_path: str = "contracts/authorization/field-policy-registry.v1.json"
     observability_field_registry_path: str = "contracts/observability/field-registry.v1.json"
     lifecycle_table_registry_path: str = "contracts/lifecycle/workspace-table-registry.v1.json"

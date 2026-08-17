@@ -25,11 +25,21 @@ export type IntegrationInspection = components["schemas"]["IntegrationInspection
 export type UsageReconciliation = components["schemas"]["UsageReconciliationResponse"];
 /** 服务端分别授权和确认的三类索引维护命令。 */
 export type IndexCommand = "inspection" | "full_rebuild" | "cleanup";
+/** 质量、成本、隔离、法规与私有实例的统一只读控制台快照。 */
+export type OperationsControlTower = components["schemas"]["OperationsControlTowerResponse"];
 
 /** 返回任务、索引、Outbox 和生命周期的低基数聚合快照。 */
 export function getOperationsOverview(workspaceId: string, signal?: AbortSignal) {
   return apiRequest<OperationsOverview>(
     `/api/v1/workspaces/${workspaceId}/operations/workbench/overview`,
+    { signal },
+  );
+}
+
+/** 查询当前空间的治理状态；真实外部输入缺失状态由服务端原样返回。 */
+export function getOperationsControlTowerSnapshot(workspaceId: string, signal?: AbortSignal) {
+  return apiRequest<OperationsControlTower>(
+    `/api/v1/workspaces/${workspaceId}/operations/workbench/control-tower`,
     { signal },
   );
 }

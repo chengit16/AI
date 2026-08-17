@@ -393,6 +393,27 @@ class Body_uploadKnowledgeDocumentVersion(typing.TypedDict):
     file: str
 
 
+class ControlTowerFactResponse(typing.TypedDict):
+    label: str
+    status: typing.Literal["passed", "blocked", "not_run", "not_configured", "failed"]
+    value: str
+
+
+class ControlTowerSectionResponse(typing.TypedDict):
+    facts: list[ControlTowerFactResponse]
+    key: typing.Literal["quality", "cost", "isolation", "compliance", "private_instance"]
+    reason_codes: list[str]
+    status: typing.Literal["passed", "blocked", "not_run", "not_configured", "failed"]
+    summary: str
+    title: str
+
+
+class ControlTowerSourceContractResponse(typing.TypedDict):
+    contract_id: str
+    status: typing.Literal["frozen", "not_configured", "not_run"]
+    version: int
+
+
 class ConversationListResponse(typing.TypedDict):
     items: list[ConversationResponse]
 
@@ -556,6 +577,13 @@ class CurrentMenuReleaseResponse(typing.TypedDict):
 
 class CurrentMessageFeedbackResponse(typing.TypedDict):
     item: MessageFeedbackResponse | None
+
+
+class DangerousOperationNoticeResponse(typing.TypedDict):
+    backend_reauthorization: bool
+    confirmation_required: bool
+    operation: str
+    permission_code: str
 
 
 class DeletionCertificateResponse(typing.TypedDict):
@@ -1137,6 +1165,15 @@ class OperationsAlertResponse(typing.TypedDict):
     release_role: typing.Literal["primary", "canary", "previous"]
     severity: typing.Literal["warning", "critical"]
     threshold_value: int
+
+
+class OperationsControlTowerResponse(typing.TypedDict):
+    dangerous_operations: list[DangerousOperationNoticeResponse]
+    generated_at: str
+    sections: list[ControlTowerSectionResponse]
+    snapshot_version: int
+    source_contracts: list[ControlTowerSourceContractResponse]
+    workspace_id: str
 
 
 class OperationsIngestionJobListResponse(typing.TypedDict):

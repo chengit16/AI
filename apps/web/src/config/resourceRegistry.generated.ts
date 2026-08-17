@@ -1,7 +1,7 @@
 // 由 scripts/generate_resource_registry.py 自动生成, 请勿手工修改。
 export const resourceRegistry = {
   schema_version: 1,
-  registry_version: 23,
+  registry_version: 24,
   permissions: [
     {
       code: "workspace.overview.access",
@@ -543,6 +543,13 @@ export const resourceRegistry = {
       status: "active",
     },
     {
+      code: "operations.control_tower.read",
+      resource_type: "operations_control_tower",
+      action: "read",
+      scope: "workspace",
+      status: "active",
+    },
+    {
       code: "operations.outbox.replay",
       resource_type: "outbox_event",
       action: "replay",
@@ -954,6 +961,17 @@ export const resourceRegistry = {
       layout_key: "layout.workspace",
       access_level: "authorized",
       permission_code: "tool.run.read",
+      resource_version: 1,
+      status: "active",
+    },
+    {
+      page_resource_id: "80000000-0000-4000-8000-000000000015",
+      page_key: "operations.control_tower",
+      route: "/workspace/control-tower",
+      component_key: "OperationsControlTowerPage",
+      layout_key: "layout.workspace",
+      access_level: "authorized",
+      permission_code: "operations.control_tower.read",
       resource_version: 1,
       status: "active",
     },
@@ -2653,6 +2671,17 @@ export const resourceRegistry = {
       risk_level: "high",
       status: "active",
     },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000152",
+      api_key: "operations.control_tower.snapshot",
+      operation_id: "getOperationsControlTowerSnapshot",
+      method: "GET",
+      path_pattern: "/api/v1/workspaces/{workspace_id}/operations/workbench/control-tower",
+      access_level: "authorized",
+      permission_code: "operations.control_tower.read",
+      risk_level: "high",
+      status: "active",
+    },
   ],
   menus: [
     {
@@ -4281,6 +4310,32 @@ export const resourceRegistry = {
       status: "active",
     },
     {
+      menu_id: "82000000-0000-4000-8000-000000000232",
+      menu_key: "navigation.workspace.control_tower",
+      parent_menu_key: "navigation.workspace",
+      name: "治理控制台",
+      menu_type: "page",
+      page_resource_id: "80000000-0000-4000-8000-000000000015",
+      permission_code: "operations.control_tower.read",
+      icon_key: "activity",
+      sort_order: 410,
+      source: "system",
+      status: "active",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000233",
+      menu_key: "navigation.workspace.control_tower.read",
+      parent_menu_key: "navigation.workspace.control_tower",
+      name: "查看治理控制台",
+      menu_type: "action",
+      page_resource_id: null,
+      permission_code: "operations.control_tower.read",
+      icon_key: null,
+      sort_order: 100,
+      source: "system",
+      status: "active",
+    },
+    {
       menu_id: "82000000-0000-4000-8000-000000000152",
       menu_key: "navigation.platform.models.provider_query",
       parent_menu_key: "navigation.platform.models",
@@ -5143,6 +5198,11 @@ export const resourceRegistry = {
     {
       menu_id: "82000000-0000-4000-8000-000000000231",
       api_resource_id: "81000000-0000-4000-8000-000000000151",
+      action_type: "query",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000233",
+      api_resource_id: "81000000-0000-4000-8000-000000000152",
       action_type: "query",
     },
   ],

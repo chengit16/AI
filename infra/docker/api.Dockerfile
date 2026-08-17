@@ -18,6 +18,7 @@ COPY contracts/errors ./contracts/errors
 COPY contracts/authorization ./contracts/authorization
 COPY contracts/lifecycle ./contracts/lifecycle
 COPY contracts/observability ./contracts/observability
+COPY contracts/operations ./contracts/operations
 COPY contracts/fixtures/release-manifest.v1.valid.json ./contracts/fixtures/release-manifest.v1.valid.json
 COPY contracts/release ./contracts/release
 

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/operations/control-tower-baseline.v1.schema.json",
+  "title": "质量成本隔离合规运营控制台快照",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "status_vocabulary", "sections", "dangerous_operations", "source_contracts"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "contract_id": { "const": "p5-12-v1" },
+    "status_vocabulary": {
+      "type": "array",
+      "items": { "enum": ["passed", "blocked", "not_run", "not_configured", "failed"] },
+      "minItems": 5,
+      "uniqueItems": true
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "title", "status", "summary", "reason_codes", "facts"],
+        "properties": {
+          "key": { "enum": ["quality", "cost", "isolation", "compliance", "private_instance"] },
+          "title": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["passed", "blocked", "not_run", "not_configured", "failed"] },
+          "summary": { "type": "string", "minLength": 1 },
+          "reason_codes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "facts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["label", "value", "status"],
+              "properties": {
+                "label": { "type": "string", "minLength": 1 },
+                "value": { "type": "string", "minLength": 1 },
+                "status": { "enum": ["passed", "blocked", "not_run", "not_configured", "failed"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dangerous_operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operation", "permission_code", "confirmation_required", "backend_reauthorization"],
+        "properties": {
+          "operation": { "type": "string", "minLength": 1 },
+          "permission_code": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$" },
+          "confirmation_required": { "const": true },
+          "backend_reauthorization": { "const": true }
+        }
+      }
+    },
+    "source_contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contract_id", "version", "status"],
+        "properties": {
+          "contract_id": { "type": "string", "minLength": 1 },
+          "version": { "type": "integer", "minimum": 1 },
+          "status": { "enum": ["frozen", "not_configured", "not_run"] }
+        }
+      }
+    }
+  }
+}

@@ -16,9 +16,13 @@ from ai_platform_api.modules.operations.api.schemas import (
     IndexMaintenanceRunResponse,
     LifecycleOperationListResponse,
     LifecycleOperationResponse,
+    OperationsControlTowerResponse,
     OperationsIngestionJobListResponse,
     OperationsIngestionJobResponse,
     OperationsOverviewResponse,
+)
+from ai_platform_api.modules.operations.application.control_tower import (
+    OperationsControlTowerService,
 )
 from ai_platform_api.modules.operations.application.service import OperationsWorkbenchService
 
@@ -35,6 +39,33 @@ def operations_workbench_service(request: Request) -> OperationsWorkbenchService
     if not isinstance(service, OperationsWorkbenchService):
         raise RuntimeError("运营工作台服务尚未完成装配")
     return service
+
+
+def operations_control_tower_service(request: Request) -> OperationsControlTowerService:
+    """从组合根解析控制台服务，路由不直接读取其他模块私有数据。"""
+
+    service = getattr(request.app.state, "operations_control_tower_service", None)
+    if not isinstance(service, OperationsControlTowerService):
+        raise RuntimeError("运营控制台服务尚未完成装配")
+    return service
+
+
+@router.get(
+    "/control-tower",
+    response_model=OperationsControlTowerResponse,
+    operation_id="getOperationsControlTowerSnapshot",
+    responses=error_responses(401, 403, 422, 500),
+)
+def get_control_tower_snapshot(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[OperationsControlTowerService, Depends(operations_control_tower_service)],
+) -> OperationsControlTowerResponse:
+    """返回当前工作空间的质量、成本、隔离、法规和私有实例状态。"""
+
+    return OperationsControlTowerResponse.from_domain(
+        service.snapshot(context, workspace_id=workspace_id)
+    )
 
 
 @router.get(

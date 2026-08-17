@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "contract_id": "p5-12-v1",
+  "status_vocabulary": ["passed", "blocked", "not_run", "not_configured", "failed"],
+  "sections": [
+    {
+      "key": "quality",
+      "title": "质量运营",
+      "status": "blocked",
+      "summary": "本地质量采集与发布门禁已具备，但真实供应商、固定模型参数和足够授权样本尚未配置。",
+      "reason_codes": ["real_provider_not_configured", "real_quality_samples_not_run"],
+      "facts": [
+        { "label": "核心功能", "value": "passed", "status": "passed" },
+        { "label": "供应商集成", "value": "not_configured", "status": "not_configured" },
+        { "label": "AI 质量", "value": "not_configured", "status": "not_configured" },
+        { "label": "容量认证", "value": "not_run", "status": "not_run" },
+        { "label": "发布门禁", "value": "blocked", "status": "blocked" }
+      ]
+    },
+    {
+      "key": "cost",
+      "title": "成本治理",
+      "status": "blocked",
+      "summary": "跨组件归因和对账机制已具备，真实价格版本与供应商账单尚未配置。",
+      "reason_codes": ["price_catalog_not_configured", "supplier_statement_not_configured"],
+      "facts": [
+        { "label": "归因维度", "value": "7 个组件", "status": "passed" },
+        { "label": "价格版本", "value": "not_configured", "status": "not_configured" },
+        { "label": "供应商账单", "value": "not_configured", "status": "not_configured" },
+        { "label": "成本对账", "value": "not_run", "status": "not_run" }
+      ]
+    },
+    {
+      "key": "isolation",
+      "title": "隔离治理",
+      "status": "blocked",
+      "summary": "当前空间默认使用 L1 逻辑隔离；L3/L4 目标环境与真实合规策略未配置。",
+      "reason_codes": ["target_environment_not_configured", "real_compliance_policy_not_configured"],
+      "facts": [
+        { "label": "当前等级", "value": "L1 logical_workspace", "status": "passed" },
+        { "label": "可升级上限", "value": "L2（合成本地）", "status": "passed" },
+        { "label": "L3 目标环境", "value": "not_configured", "status": "not_configured" },
+        { "label": "L4 独立实例", "value": "not_configured", "status": "not_configured" },
+        { "label": "迁移执行", "value": "not_run", "status": "not_run" }
+      ]
+    },
+    {
+      "key": "compliance",
+      "title": "法规与法律保留",
+      "status": "blocked",
+      "summary": "失败关闭、保留和证明机制已具备，但适用法域、法规复核和真实监管要求未配置。",
+      "reason_codes": ["jurisdiction_not_configured", "external_review_not_configured", "regulatory_certification_not_run"],
+      "facts": [
+        { "label": "适用法域", "value": "not_configured", "status": "not_configured" },
+        { "label": "外部复核", "value": "not_configured", "status": "not_configured" },
+        { "label": "法律保留", "value": "按策略阻断破坏性操作", "status": "blocked" },
+        { "label": "监管认证", "value": "not_run", "status": "not_run" }
+      ]
+    },
+    {
+      "key": "private_instance",
+      "title": "L4 私有实例",
+      "status": "blocked",
+      "summary": "本地独立实例安装、升级、回滚和恢复已验证，客户环境、KMS/Vault、证书与容量仍未配置。",
+      "reason_codes": ["customer_environment_not_configured", "production_secret_backend_not_configured", "capacity_certification_not_run"],
+      "facts": [
+        { "label": "本地生命周期", "value": "passed", "status": "passed" },
+        { "label": "客户环境", "value": "not_configured", "status": "not_configured" },
+        { "label": "生产 KMS/Vault", "value": "not_configured", "status": "not_configured" },
+        { "label": "生产证书与对象存储", "value": "not_configured", "status": "not_configured" },
+        { "label": "容量认证", "value": "not_run", "status": "not_run" }
+      ]
+    }
+  ],
+  "dangerous_operations": [
+    { "operation": "索引清理", "permission_code": "operations.index.cleanup", "confirmation_required": true, "backend_reauthorization": true },
+    { "operation": "业务数据清除", "permission_code": "workspace.lifecycle.purge", "confirmation_required": true, "backend_reauthorization": true },
+    { "operation": "保留期执行", "permission_code": "workspace.lifecycle.retention.execute", "confirmation_required": true, "backend_reauthorization": true }
+  ],
+  "source_contracts": [
+    { "contract_id": "p5-04-v1", "version": 1, "status": "not_configured" },
+    { "contract_id": "p5-05-v1", "version": 1, "status": "not_configured" },
+    { "contract_id": "p5-07-v1", "version": 1, "status": "frozen" },
+    { "contract_id": "p5-08-v1", "version": 1, "status": "frozen" },
+    { "contract_id": "p5-09-v1", "version": 1, "status": "not_configured" },
+    { "contract_id": "p5-10-v1", "version": 1, "status": "not_configured" }
+  ]
+}

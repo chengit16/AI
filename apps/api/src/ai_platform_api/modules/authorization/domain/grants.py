@@ -88,6 +88,7 @@ OWNER_PERMISSION_CODES = (
     "organization.structure.access",
     "operations.outbox.replay",
     "operations.records.read",
+    "operations.control_tower.read",
     "operations.index.inspect",
     "operations.index.rebuild",
     "operations.index.cleanup",

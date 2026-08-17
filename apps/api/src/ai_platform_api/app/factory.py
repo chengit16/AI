@@ -102,6 +102,7 @@ def create_app(
     application.state.entitlement_service = dependencies.entitlements
     application.state.integration_operations_service = dependencies.integration_operations
     application.state.operations_workbench_service = dependencies.operations_workbench
+    application.state.operations_control_tower_service = dependencies.operations_control_tower
     application.state.workspace_lifecycle_service = dependencies.workspace_lifecycle
     application.state.regulatory_compliance_service = dependencies.regulatory_compliance
     application.state.organization_service = dependencies.organization

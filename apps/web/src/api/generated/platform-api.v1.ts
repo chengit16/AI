@@ -1696,6 +1696,26 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/control-tower": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Control Tower Snapshot
+     * @description 返回当前工作空间的质量、成本、隔离、法规和私有实例状态。
+     */
+    readonly get: operations["getOperationsControlTowerSnapshot"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/operations/workbench/index-maintenance/cleanups": {
     readonly parameters: {
       readonly query?: never;
@@ -3703,6 +3723,60 @@ export type components = {
       readonly file: string;
     };
     /**
+     * ControlTowerFactResponse
+     * @description 返回控制台中的单个低敏状态字段。
+     */
+    readonly ControlTowerFactResponse: {
+      /** Label */
+      readonly label: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "passed" | "blocked" | "not_run" | "not_configured" | "failed";
+      /** Value */
+      readonly value: string;
+    };
+    /**
+     * ControlTowerSectionResponse
+     * @description 返回一个质量治理分区及其阻断原因。
+     */
+    readonly ControlTowerSectionResponse: {
+      /** Facts */
+      readonly facts: readonly components["schemas"]["ControlTowerFactResponse"][];
+      /**
+       * Key
+       * @enum {string}
+       */
+      readonly key: "quality" | "cost" | "isolation" | "compliance" | "private_instance";
+      /** Reason Codes */
+      readonly reason_codes: readonly string[];
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "passed" | "blocked" | "not_run" | "not_configured" | "failed";
+      /** Summary */
+      readonly summary: string;
+      /** Title */
+      readonly title: string;
+    };
+    /**
+     * ControlTowerSourceContractResponse
+     * @description 返回控制台读取的版本化来源契约状态。
+     */
+    readonly ControlTowerSourceContractResponse: {
+      /** Contract Id */
+      readonly contract_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "frozen" | "not_configured" | "not_run";
+      /** Version */
+      readonly version: number;
+    };
+    /**
      * ConversationListResponse
      * @description 表示当前账号私有会话列表。
      */
@@ -4113,6 +4187,26 @@ export type components = {
      */
     readonly CurrentMessageFeedbackResponse: {
       readonly item: components["schemas"]["MessageFeedbackResponse"] | null;
+    };
+    /**
+     * DangerousOperationNoticeResponse
+     * @description 返回危险动作的二次确认和后端重授权要求。
+     */
+    readonly DangerousOperationNoticeResponse: {
+      /**
+       * Backend Reauthorization
+       * @constant
+       */
+      readonly backend_reauthorization: true;
+      /**
+       * Confirmation Required
+       * @constant
+       */
+      readonly confirmation_required: true;
+      /** Operation */
+      readonly operation: string;
+      /** Permission Code */
+      readonly permission_code: string;
     };
     /**
      * DeletionCertificateResponse
@@ -5666,6 +5760,30 @@ export type components = {
       readonly severity: "warning" | "critical";
       /** Threshold Value */
       readonly threshold_value: number;
+    };
+    /**
+     * OperationsControlTowerResponse
+     * @description 统一质量、成本、隔离、法规与私有实例控制台快照。
+     */
+    readonly OperationsControlTowerResponse: {
+      /** Dangerous Operations */
+      readonly dangerous_operations: readonly components["schemas"]["DangerousOperationNoticeResponse"][];
+      /**
+       * Generated At
+       * Format: date-time
+       */
+      readonly generated_at: string;
+      /** Sections */
+      readonly sections: readonly components["schemas"]["ControlTowerSectionResponse"][];
+      /** Snapshot Version */
+      readonly snapshot_version: number;
+      /** Source Contracts */
+      readonly source_contracts: readonly components["schemas"]["ControlTowerSourceContractResponse"][];
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
     };
     /**
      * OperationsIngestionJobListResponse
@@ -16383,6 +16501,77 @@ export interface operations {
         };
         content: {
           readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getOperationsControlTowerSnapshot: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["OperationsControlTowerResponse"];
         };
       };
       /** @description 身份凭证无效 */

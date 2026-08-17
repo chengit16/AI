@@ -50,6 +50,7 @@ describe("平台路由与运行状态", () => {
       ["工具执行", "/workspace/tools", "tool.page.access"],
       ["工具任务", "/workspace/tool-runs", "tool.run.read"],
       ["运行状态", "/status", "system.runtime.access"],
+      ["治理控制台", "/workspace/control-tower", "operations.control_tower.read"],
     ]);
   });
 
