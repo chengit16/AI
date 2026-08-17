@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/deployment/private-instance-baseline.v1.schema.json",
+  "title": "P5-10 L4 私有化独立实例交付基线契约",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "delivery_mode",
+    "required_services",
+    "lifecycle",
+    "upgrade_policy",
+    "offline_dependencies",
+    "external_status",
+    "secret_policy"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "contract_id": {"const": "p5-10-v1"},
+    "delivery_mode": {"const": "independent_instance"},
+    "required_services": {
+      "const": ["web", "api", "worker", "postgres", "valkey", "minio", "tika"]
+    },
+    "lifecycle": {"const": ["install", "upgrade", "rollback", "restore"]},
+    "upgrade_policy": {
+      "const": {
+        "migration_tool": "alembic",
+        "backup_before_upgrade": true,
+        "rollback_mode": "restore_pre_upgrade_backup",
+        "down_migration_for_rollback": false,
+        "exact_release_manifest_required": true,
+        "newer_backup_into_older_release": false
+      }
+    },
+    "offline_dependencies": {
+      "type": "array",
+      "const": [
+        {
+          "name": "docker_engine",
+          "mode": "local_required",
+          "network_required": false,
+          "status": "required"
+        },
+        {
+          "name": "postgresql",
+          "mode": "local_service",
+          "network_required": false,
+          "status": "required"
+        },
+        {
+          "name": "valkey",
+          "mode": "local_service",
+          "network_required": false,
+          "status": "required"
+        },
+        {
+          "name": "minio",
+          "mode": "local_service",
+          "network_required": false,
+          "status": "required"
+        },
+        {
+          "name": "tika",
+          "mode": "bundled_image",
+          "network_required": false,
+          "status": "required"
+        },
+        {
+          "name": "model_provider",
+          "mode": "external_optional",
+          "network_required": true,
+          "status": "not_configured"
+        },
+        {
+          "name": "kms_vault",
+          "mode": "production_only",
+          "network_required": true,
+          "status": "not_configured"
+        },
+        {
+          "name": "certificates",
+          "mode": "production_only",
+          "network_required": true,
+          "status": "not_configured"
+        }
+      ]
+    },
+    "external_status": {
+      "const": {
+        "customer_environment": "not_configured",
+        "production_kms_vault": "not_configured",
+        "production_certificates": "not_configured",
+        "production_object_storage": "not_configured",
+        "real_model_provider": "not_configured",
+        "capacity_certification": "not_run",
+        "image_scan": "not_configured"
+      }
+    },
+    "secret_policy": {
+      "const": {
+        "local_master_key": "generated_outside_git",
+        "backup_encryption_key": "operator_managed_separately",
+        "production_key_backend": "kms_or_vault",
+        "key_material_in_release_manifest": false,
+        "application_recovery_keys_encrypted_in_bundle": true,
+        "backup_encryption_key_in_bundle": false
+      }
+    }
+  }
+}

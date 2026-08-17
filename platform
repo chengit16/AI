@@ -51,6 +51,16 @@ run_python() {
   fi
 }
 
+migration_head_revision() {
+  # 诊断必须读取当前代码树的唯一 Alembic head，不能把旧阶段 Revision 写死。
+  local heads
+  heads="$(run_python -c 'from alembic.config import Config; from alembic.script import ScriptDirectory; print("\n".join(ScriptDirectory.from_config(Config("alembic.ini")).get_heads()))')"
+  heads="$(printf '%s' "$heads" | sed '/^[[:space:]]*$/d')"
+  [[ -n "$heads" ]] || fail "无法解析 Alembic head"
+  [[ "$(printf '%s\n' "$heads" | wc -l | tr -d ' ')" == "1" ]] || fail "检测到多个 Alembic head，拒绝继续"
+  printf '%s' "$heads"
+}
+
 canonicalize_local_path() {
   run_python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=False))' "$1"
 }
@@ -479,17 +489,18 @@ doctor() {
     log "PostgreSQL: 失败"
     failed=1
   fi
-  local database_revision
+  local database_revision expected_revision
+  expected_revision="$(migration_head_revision)"
   database_revision="$(
     compose exec -T postgres \
       psql -U ai_platform -d ai_platform -Atqc \
       'SELECT version_num FROM public.alembic_version' 2>/dev/null || true
   )"
   database_revision="$(printf '%s' "$database_revision" | tr -d '[:space:]')"
-  if [[ "$database_revision" == "20260816_0061" ]]; then
+  if [[ "$database_revision" == "$expected_revision" ]]; then
     log "数据库 Revision: 正常 ($database_revision)"
   else
-    log "数据库 Revision: 失败 (期望 20260816_0061，实际 ${database_revision:-unknown})"
+    log "数据库 Revision: 失败 (期望 ${expected_revision}，实际 ${database_revision:-unknown})"
     failed=1
   fi
   if [[ "$(compose exec -T valkey valkey-cli ping)" == "PONG" ]]; then
@@ -516,6 +527,20 @@ doctor() {
 
   (( failed == 0 )) || fail "存在未通过的诊断项"
   log "全部诊断项通过"
+}
+
+validate_instance() {
+  ensure_environment
+  run_python scripts/private_instance.py validate \
+    --profile "$PROJECT_DIR/contracts/deployment/private-instance-baseline.v1.json"
+  compose config --quiet
+  log "L4 私有实例配置和 Compose 校验通过"
+}
+
+accept_stage_5_private_instance() {
+  ensure_environment
+  run_python scripts/private_instance.py accept \
+    --evidence "$AI_PLATFORM_ROOT/evidence/p5-10-latest.json"
 }
 
 drill_stage_2() {
@@ -575,6 +600,8 @@ usage() {
   accept-stage-3  执行阶段 3 联合验收并生成本地 JSON 证据
   accept-stage-4-tools  执行阶段 4 工具联合故障演练并生成本地 JSON 证据
   accept-stage-4  执行阶段 4 联合验收并生成本地 JSON 证据
+  validate-instance  校验 L4 私有实例部署档案和 Compose 配置
+  accept-stage-5-private-instance  执行 P5-10 本地合成安装、升级、回滚和恢复验收
 EOF
 }
 
@@ -596,5 +623,7 @@ case "$command_name" in
   accept-stage-3) accept_stage_3 ;;
   accept-stage-4-tools) accept_stage_4_tools ;;
   accept-stage-4) accept_stage_4 ;;
+  validate-instance) validate_instance ;;
+  accept-stage-5-private-instance) accept_stage_5_private_instance ;;
   *) usage; [[ -z "$command_name" ]] || exit 1 ;;
 esac
