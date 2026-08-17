@@ -37,6 +37,7 @@
 - 文档、工程规则、Python 注释与契约专项测试 `53/53` 通过，`git diff --check` 通过。
 - 2026-08-17 08:30 CST 原样执行 `./scripts/verify`，敏感信息、契约生成、权限注册表、SBOM/许可证、ReleaseManifest 漂移、供应链、模块依赖、注释、UnoCSS、兼容性、React `58/58` 和生产构建通过；Python 阶段因沙箱拒绝访问本机 PostgreSQL、Valkey、MinIO、Tika 与 OCR 服务，结果为 `607 passed / 8 failed / 194 errors`，不作为项目逻辑失败或统一门禁通过证据。
 - 随后原样申请提升权限重跑 `./scripts/verify`，项目代码执行前再次被审批服务 `503 Service Unavailable` 拒绝。按用户“直接提交”的明确指令，本次只提交计划基线并保留节点进行中，不以提交替代验收。
+- 计划基线已提交为 `9088801`。用户在获知审批风险后于 2026-08-17 10:54 CST 明确要求继续，原样 `./platform accept-stage-4-tools` 与 `./scripts/verify` 再次申请提权，仍分别在项目代码执行前被审批服务 `503` 拒绝；节点继续保持进行中。
 
 ## 4. 当前限制与下一步
 
