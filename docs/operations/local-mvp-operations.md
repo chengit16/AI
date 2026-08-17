@@ -222,6 +222,30 @@ P2-07 提供工作空间级运营 API，P2-10 已将任务、索引、Outbox、�
 
 前两项必须通过。当前正式发布检查必须因镜像扫描 `not_configured` 和 Linux 验收 `not_run` 返回非零；只有补齐可信外部证据后才允许转为 `passed`，不得为了生成发布包而手工修改状态清单。
 
+### 7.6 阶段 4 联合故障演练与验收
+
+平台运行且 `./platform doctor` 的 13 项诊断正常时，先执行阶段 4 工具故障演练，再执行阶段联合验收：
+
+```bash
+./platform accept-stage-4-tools
+./platform accept-stage-4
+```
+
+前一入口固定运行 `p4-12-v1` 八场景、九个 case，覆盖重复投递、Adapter 超时、响应丢失、凭证撤销、审批过期、取消竞态、Worker 重启和跨空间拒绝；后一入口固定运行 `p4-13-v1` 十五场景，复核 12 条阶段不变量和六项关闭门禁。两个执行器均在场景前后运行 13 项诊断，任一诊断、场景、跳过、清单漂移或证据异常都会失败关闭。
+
+最新最小证据分别原子写入 `.ai-platform/evidence/p4-12-latest.json` 与 `.ai-platform/evidence/p4-13-latest.json`。阶段关闭证据必须绑定干净 Git 修订并满足 `repository_dirty=false`；本地证据目录保持忽略，不得将测试输出、业务正文、参数正文或凭证明文写入证据或 Git。
+
+阶段关闭或本地版本切换后复验 `0.4.0` ReleaseManifest：
+
+```bash
+.venv/bin/python scripts/generate_release_manifest.py \
+  --inputs docs/releases/stage-4-local-tool-execution/release-manifest-input.v1.json \
+  --output docs/releases/stage-4-local-tool-execution/release-manifest.v1.json \
+  --check
+```
+
+该检查只证明清单与冻结输入一致。开发级供应链必须通过；镜像扫描或 Linux 宿主机验收未配置时，正式发布继续保持 `blocked`，不能用本地联合验收替代生产发布证据。
+
 ## 8. 备份、导出、恢复与导入
 
 ### 8.1 创建恢复包

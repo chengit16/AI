@@ -5,9 +5,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 阶段 | 阶段 4：Agent 工具执行与任务状态机 |
-| 状态 | 进行中 |
+| 状态 | 已完成 |
 | 报告日期 | 2026-08-17 |
-| 当前节点 | `P4-13` 阶段 4 端到端验收、ReleaseManifest 与关闭 |
+| 当前节点 | 阶段 4 已关闭，进入阶段 5 |
 | 阶段 1 `core_functional` | `passed`，继承标签 `stage-1-complete` |
 | 阶段 2 可靠性 | `passed`，继承标签 `stage-2-complete` |
 | 阶段 3 Agent 平台 | `passed`，继承标签 `stage-3-complete` |
@@ -184,6 +184,17 @@
 - 最终统一门禁：随后原样执行 `./scripts/verify`，React `58/58`、Python `809/809`、Ruff、mypy strict `675` 个源文件、OpenAPI 与生成类型、Registry、ReleaseManifest、契约兼容、架构、注释、UnoCSS、开发级供应链、生产构建和 Secret Scanner 全部通过。
 - 验收结论：`passed`。P4-12 已满足固定联合演练、恢复诊断、最小证据、零重复副作用、失败关闭和统一门禁要求，可以进入 P4-13 阶段关闭。
 
+### P4-13 阶段 4 端到端验收、ReleaseManifest 与关闭
+
+- 状态：`passed`。联合验收实现提交为 `62fac84`，阶段关闭材料和 `0.4.0` ReleaseManifest 由 `stage-4-complete` 标签冻结。
+- 验收入口：新增 `./platform accept-stage-4`、`p4-13-v1` 十五场景冻结清单、最小证据 Schema 和失败关闭执行器；十五场景完整覆盖 P4-01 的 12 条安全不变量，以及未授权工具拒绝、未确认副作用拒绝、重复副作用为零、Step/Attempt 可追溯、凭证暴露为零、取消/超时后迟到结果不能覆盖终态六项关闭门禁。
+- 自动验证：P4-13 专项为 `26/26`，P3/P4-12 相邻验收器为 `44/44`，契约与工程规则组合为 `103/103`；Ruff、mypy strict、Draft 2020-12 Schema 独立校验和中文注释检查均通过。
+- 正式联合验收：2026-08-17 在干净修订 `62fac84a194d1338af6d14283c84dc40c4f07461` 原样执行 `./platform accept-stage-4`，`repository_dirty=false`；十五场景实际 `15/15`，前后两轮 Web、API、MinIO、Tika、PostgreSQL、Revision `20260816_0061`、Valkey、五个 Worker Lane 和 Scheduler 共 13 项诊断全部通过，总耗时 `44.343659s`。正式证据位于 `.ai-platform/evidence/p4-13-latest.json`，冻结清单 SHA-256 为 `f9a80b18…b546f69`，P4-12 清单 SHA-256 为 `c7886e87…64d7604`，证据文件 SHA-256 为 `5e7f0c9c…626098`。
+- 最终统一门禁：随后原样执行 `./scripts/verify`，React `58/58`、Python `835/835`、Ruff、mypy strict `677` 个源文件、OpenAPI 与生成类型、Registry、ReleaseManifest、契约兼容、架构、注释、UnoCSS、SBOM/许可证、开发级供应链、生产构建和全历史 Secret Scanner 全部通过。
+- 镜像与浏览器：使用最终源码重建 Web、API、Worker、Migration 与 Tika 镜像并启动成功，独立诊断和统一门禁后的最终诊断均为 13 项全绿。在 `1440×900` 与 `390×844` 真实浏览器中，工具执行页均展示 5 个固定只读工具，工具任务页空态和权限导航正常，两视口两页面均无页面级横向溢出，控制台无 warning/error；验收账号和数据均为本地全合成数据。
+- 发布清单：`0.4.0` ReleaseManifest 固定 Node.js `24.19.0`、Python `3.12.12`、`linux/arm64` 容器目标、Revision `20260816_0061`、四类源码摘要和七个本地镜像摘要，自摘要为 `sha256:ecacb54f8fbd9e64fa38685e00fbcda4dc754b5c0e5d087a50210e241a3f2190`。开发级供应链为 `passed`；镜像扫描 `not_configured`、Linux 宿主机验收 `not_run`，因此正式发布继续为 `blocked`。
+- 验收结论：`passed`。阶段 4 的实现、联合回归、统一门禁、最终镜像、13 项运行诊断、桌面与移动浏览器、中文文档、ReleaseManifest 和提交追溯均已完成；本结论不扩展到真实外部连接器、真实供应商质量、生产容量或正式发布。
+
 ## 4. 当前限制
 
 - 当前没有真实模型供应商配置，不能给出真实供应商兼容性、模型质量、成本或数据政策结论。
@@ -194,4 +205,4 @@
 
 ## 5. 阶段结论
 
-`not_run`。`P4-01`～`P4-12` 已通过，当前进入 `P4-13` 端到端验收、ReleaseManifest 与阶段关闭；在六项阶段门禁复核、阶段报告和提交追溯同步并创建 `stage-4-complete` 标签前，不关闭阶段。
+`passed`。`P4-01`～`P4-13` 已全部完成，六项阶段关闭门禁、统一门禁、容器、浏览器、联合故障演练、ReleaseManifest、阶段报告和提交追溯均已通过，阶段由 `stage-4-complete` 标签冻结。真实模型供应商、真实外部连接器、镜像扫描、Linux 宿主机验收和容量认证继续保持各自的 `not_configured/not_run`，不影响本地受控工具执行阶段结论，也不得被解释为生产发布通过。
