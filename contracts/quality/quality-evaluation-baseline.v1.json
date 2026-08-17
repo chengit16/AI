@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "baseline_id": "p5-03-v1",
+  "status": "frozen",
+  "synthetic": true,
+  "evaluator_kind": "deterministic_rules",
+  "evaluator_version": "deterministic-layered-v1",
+  "llm_grading": false,
+  "layers": [
+    {
+      "layer": "retrieval",
+      "minimum_sample_count": 2,
+      "minimum_score_bps": 8000,
+      "allowed_reason_codes": [
+        "evaluation_failed",
+        "evaluation_skipped",
+        "evaluation_timeout",
+        "invalid_citation",
+        "restricted_field_leakage",
+        "retrieval_low_relevance",
+        "retrieval_miss",
+        "unauthorized_access",
+        "unauthorized_tool_call"
+      ]
+    },
+    {
+      "layer": "citation",
+      "minimum_sample_count": 2,
+      "minimum_score_bps": 9000,
+      "allowed_reason_codes": [
+        "citation_mismatch",
+        "citation_missing",
+        "evaluation_failed",
+        "evaluation_skipped",
+        "evaluation_timeout",
+        "invalid_citation",
+        "restricted_field_leakage",
+        "unauthorized_access",
+        "unauthorized_tool_call"
+      ]
+    },
+    {
+      "layer": "model",
+      "minimum_sample_count": 2,
+      "minimum_score_bps": 8000,
+      "allowed_reason_codes": [
+        "answer_incorrect",
+        "evaluation_failed",
+        "evaluation_skipped",
+        "evaluation_timeout",
+        "invalid_citation",
+        "output_contract_violation",
+        "restricted_field_leakage",
+        "unauthorized_access",
+        "unauthorized_tool_call"
+      ]
+    },
+    {
+      "layer": "prompt",
+      "minimum_sample_count": 2,
+      "minimum_score_bps": 10000,
+      "allowed_reason_codes": [
+        "evaluation_failed",
+        "evaluation_skipped",
+        "evaluation_timeout",
+        "invalid_citation",
+        "prompt_injection_bypass",
+        "prompt_instruction_loss",
+        "restricted_field_leakage",
+        "unauthorized_access",
+        "unauthorized_tool_call"
+      ]
+    },
+    {
+      "layer": "workflow",
+      "minimum_sample_count": 2,
+      "minimum_score_bps": 9000,
+      "allowed_reason_codes": [
+        "evaluation_failed",
+        "evaluation_skipped",
+        "evaluation_timeout",
+        "invalid_citation",
+        "restricted_field_leakage",
+        "unauthorized_access",
+        "unauthorized_tool_call",
+        "workflow_incomplete",
+        "workflow_transition_invalid"
+      ]
+    },
+    {
+      "layer": "tool",
+      "minimum_sample_count": 2,
+      "minimum_score_bps": 10000,
+      "allowed_reason_codes": [
+        "evaluation_failed",
+        "evaluation_skipped",
+        "evaluation_timeout",
+        "invalid_citation",
+        "restricted_field_leakage",
+        "tool_call_failed",
+        "tool_result_incorrect",
+        "unauthorized_access",
+        "unauthorized_tool_call"
+      ]
+    }
+  ],
+  "hard_failure_reason_codes": [
+    "invalid_citation",
+    "restricted_field_leakage",
+    "unauthorized_access",
+    "unauthorized_tool_call"
+  ],
+  "aggregate_reason_codes": [
+    "batch_integrity_drift",
+    "configuration_identity_drift",
+    "dataset_identity_drift",
+    "evaluator_identity_drift",
+    "observation_failed",
+    "observation_skipped",
+    "observation_timeout",
+    "release_identity_drift",
+    "sample_identity_drift",
+    "sample_insufficient",
+    "score_below_threshold",
+    "service_identity_drift",
+    "workspace_identity_drift"
+  ],
+  "target": {
+    "workspace_id": "55000000-0000-4000-8000-000000000500",
+    "dataset_version_id": "55000000-0000-4000-8000-000000000510",
+    "dataset_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "service_id": "55000000-0000-4000-8000-000000000511",
+    "agent_release_id": "55000000-0000-4000-8000-000000000512",
+    "run_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "member_sample_ids": [
+    "55000000-0000-4000-8000-000000000521",
+    "55000000-0000-4000-8000-000000000522"
+  ],
+  "passing_observations": [
+    { "sample_version_id": "55000000-0000-4000-8000-000000000521", "layer": "retrieval", "outcome": "passed", "score_bps": 10000, "duration_ms": 10, "reason_codes": [], "evidence": { "detail": "合成检索证据一" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000522", "layer": "retrieval", "outcome": "passed", "score_bps": 10000, "duration_ms": 11, "reason_codes": [], "evidence": { "detail": "合成检索证据二" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000521", "layer": "citation", "outcome": "passed", "score_bps": 10000, "duration_ms": 12, "reason_codes": [], "evidence": { "detail": "合成引用证据一" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000522", "layer": "citation", "outcome": "passed", "score_bps": 10000, "duration_ms": 13, "reason_codes": [], "evidence": { "detail": "合成引用证据二" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000521", "layer": "model", "outcome": "passed", "score_bps": 10000, "duration_ms": 14, "reason_codes": [], "evidence": { "detail": "合成模型证据一" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000522", "layer": "model", "outcome": "passed", "score_bps": 10000, "duration_ms": 15, "reason_codes": [], "evidence": { "detail": "合成模型证据二" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000521", "layer": "prompt", "outcome": "passed", "score_bps": 10000, "duration_ms": 16, "reason_codes": [], "evidence": { "detail": "合成 Prompt 证据一" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000522", "layer": "prompt", "outcome": "passed", "score_bps": 10000, "duration_ms": 17, "reason_codes": [], "evidence": { "detail": "合成 Prompt 证据二" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000521", "layer": "workflow", "outcome": "passed", "score_bps": 10000, "duration_ms": 18, "reason_codes": [], "evidence": { "detail": "合成工作流证据一" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000522", "layer": "workflow", "outcome": "passed", "score_bps": 10000, "duration_ms": 19, "reason_codes": [], "evidence": { "detail": "合成工作流证据二" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000521", "layer": "tool", "outcome": "passed", "score_bps": 10000, "duration_ms": 20, "reason_codes": [], "evidence": { "detail": "合成工具证据一" } },
+    { "sample_version_id": "55000000-0000-4000-8000-000000000522", "layer": "tool", "outcome": "passed", "score_bps": 10000, "duration_ms": 21, "reason_codes": [], "evidence": { "detail": "合成工具证据二" } }
+  ],
+  "external_evidence": {
+    "real_model_quality": "not_run",
+    "real_online_feedback": "not_run"
+  }
+}

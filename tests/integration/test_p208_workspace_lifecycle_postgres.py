@@ -36,8 +36,13 @@ from ai_platform_api.modules.lifecycle.infrastructure.sqlalchemy import (
 from ai_platform_api.modules.lifecycle.infrastructure.storage import (
     MinioLifecycleObjectStorage,
 )
+from ai_platform_api.modules.quality.application.evaluation import QualityEvaluationService
 from ai_platform_api.modules.quality.application.service import QualitySampleService
+from ai_platform_api.modules.quality.domain.evaluation import QualityEvaluationTarget
 from ai_platform_api.modules.quality.domain.models import QualitySampleCapture
+from ai_platform_api.modules.quality.infrastructure.evaluation_sqlalchemy import (
+    SqlAlchemyQualityEvaluationUnitOfWork,
+)
 from ai_platform_api.modules.quality.infrastructure.sqlalchemy import (
     SqlAlchemyQualityUnitOfWork,
 )
@@ -50,6 +55,9 @@ from ai_platform_api.persistence.tables import (
     outbox_events,
     quality_dataset_members,
     quality_dataset_versions,
+    quality_evaluation_layer_results,
+    quality_evaluation_runs,
+    quality_evaluation_sample_results,
     quality_sample_versions,
     role_permission_grants,
     stream_events,
@@ -65,6 +73,8 @@ from redis import Redis
 from sqlalchemy import Engine, create_engine, delete, func, insert, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
+
+from tests.support.p503_quality import StaticQualityExecutor
 
 ROOT = Path(__file__).parents[2]
 REGISTRY_PATH = ROOT / "contracts/lifecycle/workspace-table-registry.v1.json"
@@ -279,21 +289,38 @@ def _seed_export_and_purge_facts(
         )
     object_key = _put_object(harness, target.workspace_id, b"synthetic-p208-export-object")
     for account, suffix in ((target, "target"), (other, "other")):
-        harness.quality.capture(
-            _context(account, "assistant.feedback.manage"),
-            QualitySampleCapture(
-                source_type="user_feedback",
-                source_workspace_id=account.workspace_id,
-                source_id=uuid4(),
-                source_version=1,
-                resource_id=uuid4(),
-                signal_code="unhelpful",
-                reason_codes=("incorrect",),
-                input_text=f"synthetic-p208-quality-{suffix}-input",
-                output_text=f"synthetic-p208-quality-{suffix}-output",
-                feedback_text=None,
-                correction_text=None,
-                source_security_level="PUBLIC",
+        snapshot = None
+        for index in range(2):
+            snapshot = harness.quality.capture(
+                _context(account, "assistant.feedback.manage"),
+                QualitySampleCapture(
+                    source_type="user_feedback",
+                    source_workspace_id=account.workspace_id,
+                    source_id=uuid4(),
+                    source_version=1,
+                    resource_id=uuid4(),
+                    signal_code="unhelpful",
+                    reason_codes=("incorrect",),
+                    input_text=f"synthetic-p208-quality-{suffix}-input-{index}",
+                    output_text=f"synthetic-p208-quality-{suffix}-output-{index}",
+                    feedback_text=None,
+                    correction_text=None,
+                    source_security_level="PUBLIC",
+                ),
+            )
+        assert snapshot is not None
+        evaluator = QualityEvaluationService(
+            SqlAlchemyQualityEvaluationUnitOfWork(harness.sessions),
+            StaticQualityExecutor(evidence_marker=f"synthetic-p208-evaluation-{suffix}"),
+        )
+        evaluator.evaluate(
+            _context(account, "agent.test.execute"),
+            QualityEvaluationTarget(
+                snapshot.dataset.dataset_version_id,
+                snapshot.dataset.dataset_digest,
+                uuid4(),
+                uuid4(),
+                ("a" if suffix == "target" else "b") * 64,
             ),
         )
     cache_key = f"effective-roles:v1:{target.workspace_id}:{uuid4()}:1"
@@ -354,14 +381,35 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             json.loads(line)
             for line in archive.read("tables/quality_sample_versions.jsonl").splitlines()
         ]
+        evaluation_rows = [
+            json.loads(line)
+            for line in archive.read("tables/quality_evaluation_runs.jsonl").splitlines()
+        ]
+        evaluation_layer_rows = [
+            json.loads(line)
+            for line in archive.read("tables/quality_evaluation_layer_results.jsonl").splitlines()
+        ]
+        evaluation_sample_rows = [
+            json.loads(line)
+            for line in archive.read("tables/quality_evaluation_sample_results.jsonl").splitlines()
+        ]
     assert {row["resource_id"] for row in resource_rows} == {str(resource_id)}
     assert str(other_resource_id) not in json.dumps(resource_rows)
     assert key_rows[0]["last_four"] == "0208"
     assert "secret_digest" not in key_rows[0]
-    assert len(quality_rows) == 1
-    assert quality_rows[0]["workspace_id"] == str(target.workspace_id)
+    assert len(quality_rows) == 2
+    assert {row["workspace_id"] for row in quality_rows} == {str(target.workspace_id)}
     assert "synthetic-p208-quality-target-input" not in json.dumps(quality_rows)
     assert "synthetic-p208-quality-other-input" not in json.dumps(quality_rows)
+    assert len(evaluation_rows) == 1
+    assert len(evaluation_layer_rows) == 6
+    assert len(evaluation_sample_rows) == 12
+    assert "synthetic-p208-evaluation-target" not in json.dumps(
+        (evaluation_rows, evaluation_layer_rows, evaluation_sample_rows)
+    )
+    assert "synthetic-p208-evaluation-other" not in json.dumps(
+        (evaluation_rows, evaluation_layer_rows, evaluation_sample_rows)
+    )
     assert {item["object_key"] for item in manifest["objects"]} == {object_key}
 
     # 2. 普通事务仍不能删审计；正式清除后业务、对象、缓存为空而空间壳层和证明保留。
@@ -400,6 +448,9 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             quality_sample_versions,
             quality_dataset_versions,
             quality_dataset_members,
+            quality_evaluation_runs,
+            quality_evaluation_layer_results,
+            quality_evaluation_sample_results,
         ):
             assert (
                 session.scalar(
@@ -470,7 +521,7 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
         )
     assert target_events == ("workspace.lifecycle.purge_completed",)
     assert other_resource == other_resource_id
-    assert other_quality_count == 1
+    assert other_quality_count == 2
     assert (
         tuple(
             lifecycle_database.minio.list_objects(

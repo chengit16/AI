@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/quality/quality-evaluation-baseline.v1.schema.json",
+  "title": "六层质量评估全合成基线 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "status",
+    "synthetic",
+    "evaluator_kind",
+    "evaluator_version",
+    "llm_grading",
+    "layers",
+    "hard_failure_reason_codes",
+    "aggregate_reason_codes",
+    "target",
+    "member_sample_ids",
+    "passing_observations",
+    "external_evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "baseline_id": { "const": "p5-03-v1" },
+    "status": { "const": "frozen" },
+    "synthetic": { "const": true },
+    "evaluator_kind": { "const": "deterministic_rules" },
+    "evaluator_version": { "const": "deterministic-layered-v1" },
+    "llm_grading": { "const": false },
+    "layers": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/layer_policy" }
+    },
+    "hard_failure_reason_codes": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/code" }
+    },
+    "aggregate_reason_codes": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/code" }
+    },
+    "target": { "$ref": "#/$defs/target" },
+    "member_sample_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "type": "string", "format": "uuid" }
+    },
+    "passing_observations": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "external_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["real_model_quality", "real_online_feedback"],
+      "properties": {
+        "real_model_quality": { "const": "not_run" },
+        "real_online_feedback": { "const": "not_run" }
+      }
+    }
+  },
+  "$defs": {
+    "layer": {
+      "enum": ["retrieval", "citation", "model", "prompt", "workflow", "tool"]
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{1,63}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "layer_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer",
+        "minimum_sample_count",
+        "minimum_score_bps",
+        "allowed_reason_codes"
+      ],
+      "properties": {
+        "layer": { "$ref": "#/$defs/layer" },
+        "minimum_sample_count": { "type": "integer", "minimum": 1 },
+        "minimum_score_bps": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "allowed_reason_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/code" }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace_id",
+        "dataset_version_id",
+        "dataset_digest",
+        "service_id",
+        "agent_release_id",
+        "run_configuration_digest"
+      ],
+      "properties": {
+        "workspace_id": { "type": "string", "format": "uuid" },
+        "dataset_version_id": { "type": "string", "format": "uuid" },
+        "dataset_digest": { "$ref": "#/$defs/digest" },
+        "service_id": { "type": "string", "format": "uuid" },
+        "agent_release_id": { "type": "string", "format": "uuid" },
+        "run_configuration_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_version_id",
+        "layer",
+        "outcome",
+        "score_bps",
+        "duration_ms",
+        "reason_codes",
+        "evidence"
+      ],
+      "properties": {
+        "sample_version_id": { "type": "string", "format": "uuid" },
+        "layer": { "$ref": "#/$defs/layer" },
+        "outcome": { "const": "passed" },
+        "score_bps": { "const": 10000 },
+        "duration_ms": { "type": "integer", "minimum": 0, "maximum": 3600000 },
+        "reason_codes": { "type": "array", "maxItems": 0 },
+        "evidence": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

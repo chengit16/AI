@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 10,
+  "registry_version": 11,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -82,6 +82,9 @@
     { "table": "quality_sample_versions", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "quality_dataset_versions", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "quality_dataset_members", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "quality_evaluation_runs", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "quality_evaluation_layer_results", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "quality_evaluation_sample_results", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "stream_runs", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "stream_events", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "approval_policies", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

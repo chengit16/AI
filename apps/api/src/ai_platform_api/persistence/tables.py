@@ -5412,6 +5412,186 @@ quality_dataset_members = Table(
     CheckConstraint("position >= 1", name="ck_quality_dataset_members_position"),
 )
 
+quality_evaluation_runs = Table(
+    "quality_evaluation_runs",
+    metadata,
+    Column("evaluation_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("run_identity_digest", String(64), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("dataset_version_id", UUID(as_uuid=True), nullable=False),
+    Column("dataset_digest", String(64), nullable=False),
+    Column("service_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_release_id", UUID(as_uuid=True), nullable=False),
+    Column("run_configuration_digest", String(64), nullable=False),
+    Column("policy_version_id", UUID(as_uuid=True), nullable=False),
+    Column("policy_digest", String(64), nullable=False),
+    Column("evaluator_version", String(128), nullable=False),
+    Column("evaluator_identity_digest", String(64), nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("observation_count", Integer, nullable=False),
+    Column("passed_count", Integer, nullable=False),
+    Column("failed_count", Integer, nullable=False),
+    Column("timeout_count", Integer, nullable=False),
+    Column("skipped_count", Integer, nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("result_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "evaluation_run_id",
+        "workspace_id",
+        name="uq_quality_evaluation_runs_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "run_identity_digest",
+        name="uq_quality_evaluation_runs_identity",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_quality_evaluation_runs_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["dataset_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_dataset_versions.dataset_version_id",
+            f"{SCHEMA_TOKEN}.quality_dataset_versions.workspace_id",
+        ],
+        name="fk_quality_evaluation_runs_dataset",
+    ),
+    CheckConstraint("status IN ('passed', 'failed')", name="ck_quality_evaluation_runs_status"),
+    CheckConstraint(
+        "run_identity_digest ~ '^[0-9a-f]{64}$' "
+        "AND dataset_digest ~ '^[0-9a-f]{64}$' "
+        "AND run_configuration_digest ~ '^[0-9a-f]{64}$' "
+        "AND policy_digest ~ '^[0-9a-f]{64}$' "
+        "AND evaluator_identity_digest ~ '^[0-9a-f]{64}$' "
+        "AND result_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_quality_evaluation_runs_digests",
+    ),
+    CheckConstraint(
+        "observation_count >= 0 AND passed_count >= 0 AND failed_count >= 0 "
+        "AND timeout_count >= 0 AND skipped_count >= 0 "
+        "AND observation_count = passed_count + failed_count + timeout_count + skipped_count",
+        name="ck_quality_evaluation_runs_counts",
+    ),
+    CheckConstraint(
+        "cardinality(reason_codes) <= 32 AND array_position(reason_codes, NULL) IS NULL",
+        name="ck_quality_evaluation_runs_reasons",
+    ),
+)
+Index(
+    "ix_quality_evaluation_runs_workspace_completed",
+    quality_evaluation_runs.c.workspace_id,
+    quality_evaluation_runs.c.completed_at,
+)
+
+quality_evaluation_layer_results = Table(
+    "quality_evaluation_layer_results",
+    metadata,
+    Column("evaluation_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("layer", String(32), primary_key=True),
+    Column("status", String(16), nullable=False),
+    Column("sample_count", Integer, nullable=False),
+    Column("passed_count", Integer, nullable=False),
+    Column("score_bps", Integer, nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("evidence_digest", String(64), nullable=False),
+    UniqueConstraint(
+        "evaluation_run_id",
+        "position",
+        name="uq_quality_evaluation_layers_position",
+    ),
+    ForeignKeyConstraint(
+        ["evaluation_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_evaluation_runs.evaluation_run_id",
+            f"{SCHEMA_TOKEN}.quality_evaluation_runs.workspace_id",
+        ],
+        name="fk_quality_evaluation_layers_run",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "layer IN ('retrieval', 'citation', 'model', 'prompt', 'workflow', 'tool')",
+        name="ck_quality_evaluation_layers_layer",
+    ),
+    CheckConstraint("status IN ('passed', 'failed')", name="ck_quality_evaluation_layers_status"),
+    CheckConstraint(
+        "position BETWEEN 1 AND 6 AND sample_count >= 0 AND passed_count >= 0 "
+        "AND passed_count <= sample_count AND score_bps BETWEEN 0 AND 10000",
+        name="ck_quality_evaluation_layers_metrics",
+    ),
+    CheckConstraint(
+        "cardinality(reason_codes) <= 32 AND array_position(reason_codes, NULL) IS NULL",
+        name="ck_quality_evaluation_layers_reasons",
+    ),
+    CheckConstraint(
+        "evidence_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_quality_evaluation_layers_digest",
+    ),
+)
+
+quality_evaluation_sample_results = Table(
+    "quality_evaluation_sample_results",
+    metadata,
+    Column("evaluation_run_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("sample_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("layer", String(32), primary_key=True),
+    Column("outcome", String(16), nullable=False),
+    Column("score_bps", Integer, nullable=False),
+    Column("duration_ms", Integer, nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("evidence_digest", String(64), nullable=False),
+    UniqueConstraint(
+        "evaluation_run_id",
+        "position",
+        name="uq_quality_evaluation_samples_position",
+    ),
+    ForeignKeyConstraint(
+        ["evaluation_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_evaluation_runs.evaluation_run_id",
+            f"{SCHEMA_TOKEN}.quality_evaluation_runs.workspace_id",
+        ],
+        name="fk_quality_evaluation_samples_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["sample_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_sample_versions.sample_version_id",
+            f"{SCHEMA_TOKEN}.quality_sample_versions.workspace_id",
+        ],
+        name="fk_quality_evaluation_samples_sample",
+    ),
+    CheckConstraint(
+        "layer IN ('retrieval', 'citation', 'model', 'prompt', 'workflow', 'tool')",
+        name="ck_quality_evaluation_samples_layer",
+    ),
+    CheckConstraint(
+        "outcome IN ('passed', 'failed', 'timeout', 'skipped')",
+        name="ck_quality_evaluation_samples_outcome",
+    ),
+    CheckConstraint(
+        "position >= 1 AND score_bps BETWEEN 0 AND 10000 AND duration_ms BETWEEN 0 AND 3600000",
+        name="ck_quality_evaluation_samples_metrics",
+    ),
+    CheckConstraint(
+        "cardinality(reason_codes) <= 8 AND array_position(reason_codes, NULL) IS NULL",
+        name="ck_quality_evaluation_samples_reasons",
+    ),
+    CheckConstraint(
+        "evidence_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_quality_evaluation_samples_digest",
+    ),
+)
+
 retrieval_plans = Table(
     "retrieval_plans",
     metadata,
