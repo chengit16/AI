@@ -374,7 +374,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     connection.commit()
 
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260817_0063"
+        "20260817_0064"
     )
     tables = {
         row[0]
@@ -405,7 +405,7 @@ def test_migration_empty_roundtrip_creates_tool_state_tables(
     command.upgrade(config, "head")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260817_0063"
+        "20260817_0064"
     )
 
 

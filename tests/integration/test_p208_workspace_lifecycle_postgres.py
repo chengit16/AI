@@ -37,11 +37,25 @@ from ai_platform_api.modules.lifecycle.infrastructure.storage import (
     MinioLifecycleObjectStorage,
 )
 from ai_platform_api.modules.quality.application.evaluation import QualityEvaluationService
+from ai_platform_api.modules.quality.application.operations import (
+    build_quality_operation_report,
+)
+from ai_platform_api.modules.quality.application.operations_policy import (
+    QUALITY_OPERATION_COLLECTOR_VERSION,
+)
 from ai_platform_api.modules.quality.application.service import QualitySampleService
 from ai_platform_api.modules.quality.domain.evaluation import QualityEvaluationTarget
 from ai_platform_api.modules.quality.domain.models import QualitySampleCapture
+from ai_platform_api.modules.quality.domain.operations import (
+    QualityEvaluationOperationContext,
+    QualityOperationBatch,
+    QualityOperationTarget,
+)
 from ai_platform_api.modules.quality.infrastructure.evaluation_sqlalchemy import (
     SqlAlchemyQualityEvaluationUnitOfWork,
+)
+from ai_platform_api.modules.quality.infrastructure.operations_sqlalchemy import (
+    SqlAlchemyQualityOperationUnitOfWork,
 )
 from ai_platform_api.modules.quality.infrastructure.sqlalchemy import (
     SqlAlchemyQualityUnitOfWork,
@@ -58,6 +72,8 @@ from ai_platform_api.persistence.tables import (
     quality_evaluation_layer_results,
     quality_evaluation_runs,
     quality_evaluation_sample_results,
+    quality_operation_source_results,
+    quality_operation_windows,
     quality_sample_versions,
     role_permission_grants,
     stream_events,
@@ -75,6 +91,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
 from tests.support.p503_quality import StaticQualityExecutor
+from tests.support.p504_quality import passing_offline_observation
 
 ROOT = Path(__file__).parents[2]
 REGISTRY_PATH = ROOT / "contracts/lifecycle/workspace-table-registry.v1.json"
@@ -313,7 +330,7 @@ def _seed_export_and_purge_facts(
             SqlAlchemyQualityEvaluationUnitOfWork(harness.sessions),
             StaticQualityExecutor(evidence_marker=f"synthetic-p208-evaluation-{suffix}"),
         )
-        evaluator.evaluate(
+        evaluation = evaluator.evaluate(
             _context(account, "agent.test.execute"),
             QualityEvaluationTarget(
                 snapshot.dataset.dataset_version_id,
@@ -323,6 +340,47 @@ def _seed_export_and_purge_facts(
                 ("a" if suffix == "target" else "b") * 64,
             ),
         )
+        operation_target = QualityOperationTarget(
+            evaluation.run.evaluation_run_id,
+            "offline_release",
+            evaluation.run.completed_at - timedelta(hours=24),
+            evaluation.run.completed_at,
+            "local.synthetic",
+            ("c" if suffix == "target" else "d") * 64,
+        )
+        operation = build_quality_operation_report(
+            workspace_id=account.workspace_id,
+            target=operation_target,
+            batch=QualityOperationBatch(
+                account.workspace_id,
+                operation_target,
+                "synthetic",
+                None,
+                (
+                    passing_offline_observation(
+                        evidence_marker=f"synthetic-p208-operation-{suffix}"
+                    ),
+                ),
+            ),
+            collector_version=QUALITY_OPERATION_COLLECTOR_VERSION,
+            evaluation=QualityEvaluationOperationContext(
+                evaluation.run.evaluation_run_id,
+                evaluation.run.status,
+                evaluation.run.result_digest,
+                evaluation.run.dataset_version_id,
+                evaluation.run.dataset_digest,
+                evaluation.run.service_id,
+                evaluation.run.agent_release_id,
+                uuid4(),
+                evaluation.run.run_configuration_digest,
+            ),
+            provider=None,
+            actor_id=account.account_id,
+            completed_at=evaluation.run.completed_at,
+        )
+        with SqlAlchemyQualityOperationUnitOfWork(harness.sessions) as unit_of_work:
+            unit_of_work.operations.add_report(operation)
+            unit_of_work.commit()
     cache_key = f"effective-roles:v1:{target.workspace_id}:{uuid4()}:1"
     harness.valkey.set(cache_key, "synthetic-p208-cache", ex=300)
     return resource_id, other_resource_id, object_key
@@ -393,6 +451,14 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             json.loads(line)
             for line in archive.read("tables/quality_evaluation_sample_results.jsonl").splitlines()
         ]
+        operation_rows = [
+            json.loads(line)
+            for line in archive.read("tables/quality_operation_windows.jsonl").splitlines()
+        ]
+        operation_source_rows = [
+            json.loads(line)
+            for line in archive.read("tables/quality_operation_source_results.jsonl").splitlines()
+        ]
     assert {row["resource_id"] for row in resource_rows} == {str(resource_id)}
     assert str(other_resource_id) not in json.dumps(resource_rows)
     assert key_rows[0]["last_four"] == "0208"
@@ -404,11 +470,19 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
     assert len(evaluation_rows) == 1
     assert len(evaluation_layer_rows) == 6
     assert len(evaluation_sample_rows) == 12
+    assert len(operation_rows) == 1
+    assert len(operation_source_rows) == 3
     assert "synthetic-p208-evaluation-target" not in json.dumps(
         (evaluation_rows, evaluation_layer_rows, evaluation_sample_rows)
     )
     assert "synthetic-p208-evaluation-other" not in json.dumps(
         (evaluation_rows, evaluation_layer_rows, evaluation_sample_rows)
+    )
+    assert "synthetic-p208-operation-target" not in json.dumps(
+        (operation_rows, operation_source_rows)
+    )
+    assert "synthetic-p208-operation-other" not in json.dumps(
+        (operation_rows, operation_source_rows)
     )
     assert {item["object_key"] for item in manifest["objects"]} == {object_key}
 
@@ -451,6 +525,8 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             quality_evaluation_runs,
             quality_evaluation_layer_results,
             quality_evaluation_sample_results,
+            quality_operation_windows,
+            quality_operation_source_results,
         ):
             assert (
                 session.scalar(

@@ -5861,6 +5861,194 @@ retrieval_evidence_items = Table(
     ),
 )
 
+quality_operation_windows = Table(
+    "quality_operation_windows",
+    metadata,
+    Column("quality_window_id", UUID(as_uuid=True), primary_key=True),
+    Column("window_identity_digest", String(64), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("evaluation_run_id", UUID(as_uuid=True), nullable=False),
+    Column("evaluation_result_digest", String(64), nullable=False),
+    Column("dataset_version_id", UUID(as_uuid=True), nullable=False),
+    Column("dataset_digest", String(64), nullable=False),
+    Column("service_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_release_id", UUID(as_uuid=True), nullable=False),
+    Column("run_configuration_digest", String(64), nullable=False),
+    Column("gate_stage", String(32), nullable=False),
+    Column("evidence_kind", String(32), nullable=False),
+    Column("collector_version", String(128), nullable=False),
+    Column("provider_id", UUID(as_uuid=True), nullable=True),
+    Column("provider_configuration_version", Integer, nullable=True),
+    Column("model_id", String(255), nullable=True),
+    Column("model_parameters_digest", String(64), nullable=False),
+    Column("network_region", String(64), nullable=False),
+    Column("window_started_at", DateTime(timezone=True), nullable=False),
+    Column("window_ended_at", DateTime(timezone=True), nullable=False),
+    Column("core_functional_status", String(32), nullable=False),
+    Column("provider_integration_status", String(32), nullable=False),
+    Column("ai_quality_status", String(32), nullable=False),
+    Column("capacity_certification_status", String(32), nullable=False),
+    Column("release_gate_status", String(16), nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("result_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "quality_window_id",
+        "workspace_id",
+        name="uq_quality_operation_windows_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "window_identity_digest",
+        name="uq_quality_operation_windows_identity",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_quality_operation_windows_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["evaluation_run_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_evaluation_runs.evaluation_run_id",
+            f"{SCHEMA_TOKEN}.quality_evaluation_runs.workspace_id",
+        ],
+        name="fk_quality_operation_windows_evaluation",
+    ),
+    CheckConstraint(
+        "gate_stage IN ('offline_release', 'canary_promotion', 'online_continuation')",
+        name="ck_quality_operation_windows_stage",
+    ),
+    CheckConstraint(
+        "evidence_kind IN ('synthetic', 'authorized_real')",
+        name="ck_quality_operation_windows_evidence",
+    ),
+    CheckConstraint(
+        "(provider_id IS NULL AND provider_configuration_version IS NULL AND model_id IS NULL) "
+        "OR (provider_id IS NOT NULL AND provider_configuration_version >= 1 "
+        "AND char_length(btrim(model_id)) BETWEEN 1 AND 255)",
+        name="ck_quality_operation_windows_provider",
+    ),
+    CheckConstraint(
+        "window_identity_digest ~ '^[0-9a-f]{64}$' "
+        "AND evaluation_result_digest ~ '^[0-9a-f]{64}$' "
+        "AND dataset_digest ~ '^[0-9a-f]{64}$' "
+        "AND run_configuration_digest ~ '^[0-9a-f]{64}$' "
+        "AND model_parameters_digest ~ '^[0-9a-f]{64}$' "
+        "AND result_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_quality_operation_windows_digests",
+    ),
+    CheckConstraint(
+        "network_region ~ '^[a-z0-9][a-z0-9.-]{1,63}$' AND window_ended_at > window_started_at",
+        name="ck_quality_operation_windows_window",
+    ),
+    CheckConstraint(
+        "core_functional_status IN ('not_configured', 'not_run', 'passed', 'failed') "
+        "AND provider_integration_status IN ('not_configured', 'not_run', 'passed', 'failed') "
+        "AND ai_quality_status IN ('not_configured', 'not_run', 'passed', 'failed') "
+        "AND capacity_certification_status IN "
+        "('not_configured', 'not_run', 'passed', 'failed')",
+        name="ck_quality_operation_windows_verification",
+    ),
+    CheckConstraint(
+        "release_gate_status IN ('blocked', 'passed', 'failed')",
+        name="ck_quality_operation_windows_gate",
+    ),
+    CheckConstraint(
+        "cardinality(reason_codes) <= 32 AND array_position(reason_codes, NULL) IS NULL",
+        name="ck_quality_operation_windows_reasons",
+    ),
+)
+Index(
+    "ix_quality_operation_windows_workspace_completed",
+    quality_operation_windows.c.workspace_id,
+    quality_operation_windows.c.completed_at,
+)
+
+quality_operation_source_results = Table(
+    "quality_operation_source_results",
+    metadata,
+    Column("quality_window_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("source", String(32), primary_key=True),
+    Column("status", String(16), nullable=False),
+    Column("sample_count", Integer, nullable=False),
+    Column("citation_claim_count", Integer, nullable=False),
+    Column("valid_citation_count", Integer, nullable=False),
+    Column("supported_citation_count", Integer, nullable=False),
+    Column("citation_presence_rate_bps", Integer, nullable=True),
+    Column("citation_support_rate_bps", Integer, nullable=True),
+    Column("answer_evaluated_count", Integer, nullable=False),
+    Column("acceptable_answer_count", Integer, nullable=False),
+    Column("answer_acceptance_rate_bps", Integer, nullable=True),
+    Column("feedback_count", Integer, nullable=False),
+    Column("positive_feedback_count", Integer, nullable=False),
+    Column("positive_feedback_rate_bps", Integer, nullable=True),
+    Column("tool_call_count", Integer, nullable=False),
+    Column("unauthorized_access_count", Integer, nullable=False),
+    Column("restricted_field_leakage_count", Integer, nullable=False),
+    Column("unauthorized_tool_call_count", Integer, nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("evidence_digest", String(64), nullable=False),
+    UniqueConstraint(
+        "quality_window_id",
+        "position",
+        name="uq_quality_operation_sources_position",
+    ),
+    ForeignKeyConstraint(
+        ["quality_window_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_operation_windows.quality_window_id",
+            f"{SCHEMA_TOKEN}.quality_operation_windows.workspace_id",
+        ],
+        name="fk_quality_operation_sources_window",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "source IN ('offline', 'canary', 'online_feedback') AND position BETWEEN 1 AND 3",
+        name="ck_quality_operation_sources_source",
+    ),
+    CheckConstraint(
+        "status IN ('not_run', 'passed', 'failed')",
+        name="ck_quality_operation_sources_status",
+    ),
+    CheckConstraint(
+        "sample_count BETWEEN 0 AND 1000000 "
+        "AND citation_claim_count BETWEEN 0 AND 1000000 "
+        "AND valid_citation_count BETWEEN 0 AND citation_claim_count "
+        "AND supported_citation_count BETWEEN 0 AND valid_citation_count "
+        "AND answer_evaluated_count BETWEEN 0 AND 1000000 "
+        "AND acceptable_answer_count BETWEEN 0 AND answer_evaluated_count "
+        "AND feedback_count BETWEEN 0 AND 1000000 "
+        "AND positive_feedback_count BETWEEN 0 AND feedback_count "
+        "AND tool_call_count BETWEEN 0 AND 1000000 "
+        "AND unauthorized_access_count BETWEEN 0 AND 1000000 "
+        "AND restricted_field_leakage_count BETWEEN 0 AND 1000000 "
+        "AND unauthorized_tool_call_count BETWEEN 0 AND tool_call_count",
+        name="ck_quality_operation_sources_counts",
+    ),
+    CheckConstraint(
+        "(citation_presence_rate_bps IS NULL OR citation_presence_rate_bps BETWEEN 0 AND 10000) "
+        "AND (citation_support_rate_bps IS NULL OR citation_support_rate_bps BETWEEN 0 AND 10000) "
+        "AND (answer_acceptance_rate_bps IS NULL OR "
+        "answer_acceptance_rate_bps BETWEEN 0 AND 10000) "
+        "AND (positive_feedback_rate_bps IS NULL OR "
+        "positive_feedback_rate_bps BETWEEN 0 AND 10000)",
+        name="ck_quality_operation_sources_rates",
+    ),
+    CheckConstraint(
+        "cardinality(reason_codes) <= 16 AND array_position(reason_codes, NULL) IS NULL",
+        name="ck_quality_operation_sources_reasons",
+    ),
+    CheckConstraint(
+        "evidence_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_quality_operation_sources_digest",
+    ),
+)
+
 stream_runs = Table(
     "stream_runs",
     metadata,

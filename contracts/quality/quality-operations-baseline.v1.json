@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "baseline_id": "p5-04-v1",
+  "status": "frozen",
+  "synthetic": true,
+  "policy_version": "quality-operations-v1",
+  "collector_version": "quality-window-collector-v1",
+  "llm_grading": false,
+  "verification_dimensions": [
+    "core_functional",
+    "provider_integration",
+    "ai_quality",
+    "capacity_certification"
+  ],
+  "verification_statuses": ["not_configured", "not_run", "passed", "failed"],
+  "thresholds": {
+    "citation_presence_rate_bps": 10000,
+    "citation_support_rate_bps": 9500,
+    "answer_acceptance_rate_bps": 8500,
+    "positive_feedback_rate_bps": 8000,
+    "unauthorized_access_count": 0,
+    "restricted_field_leakage_count": 0,
+    "unauthorized_tool_call_count": 0
+  },
+  "source_policies": [
+    {
+      "source": "offline",
+      "minimum_sample_count": 10,
+      "require_citations": true,
+      "require_answers": true,
+      "require_feedback": false
+    },
+    {
+      "source": "canary",
+      "minimum_sample_count": 5,
+      "require_citations": true,
+      "require_answers": true,
+      "require_feedback": false
+    },
+    {
+      "source": "online_feedback",
+      "minimum_sample_count": 3,
+      "require_citations": false,
+      "require_answers": false,
+      "require_feedback": true
+    }
+  ],
+  "gate_stages": [
+    { "stage": "offline_release", "required_sources": ["offline"] },
+    { "stage": "canary_promotion", "required_sources": ["offline", "canary"] },
+    {
+      "stage": "online_continuation",
+      "required_sources": ["offline", "canary", "online_feedback"]
+    }
+  ],
+  "hard_failure_reason_codes": [
+    "restricted_field_leakage",
+    "unauthorized_access",
+    "unauthorized_tool_call"
+  ],
+  "synthetic_fixture": {
+    "evidence_kind": "synthetic",
+    "gate_stage": "offline_release",
+    "network_region": "local.synthetic",
+    "model_parameters_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "observations": [
+      {
+        "source": "offline",
+        "sample_count": 10,
+        "citation_claim_count": 10,
+        "valid_citation_count": 10,
+        "supported_citation_count": 10,
+        "answer_evaluated_count": 10,
+        "acceptable_answer_count": 10,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "tool_call_count": 4,
+        "unauthorized_access_count": 0,
+        "restricted_field_leakage_count": 0,
+        "unauthorized_tool_call_count": 0,
+        "evidence": { "marker": "synthetic-p5-04-offline" }
+      }
+    ],
+    "expected": {
+      "core_functional": "passed",
+      "provider_integration": "not_configured",
+      "ai_quality": "not_configured",
+      "capacity_certification": "not_run",
+      "release_gate": "blocked"
+    }
+  },
+  "external_evidence": {
+    "reviewed_real_provider": "not_configured",
+    "real_quality_samples": "not_run",
+    "capacity_certification": "not_run"
+  }
+}

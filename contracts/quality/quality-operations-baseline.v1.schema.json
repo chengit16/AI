@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/quality/quality-operations-baseline.v1.schema.json",
+  "title": "质量运营与发布门禁全合成基线 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "status",
+    "synthetic",
+    "policy_version",
+    "collector_version",
+    "llm_grading",
+    "verification_dimensions",
+    "verification_statuses",
+    "thresholds",
+    "source_policies",
+    "gate_stages",
+    "hard_failure_reason_codes",
+    "synthetic_fixture",
+    "external_evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "baseline_id": { "const": "p5-04-v1" },
+    "status": { "const": "frozen" },
+    "synthetic": { "const": true },
+    "policy_version": { "const": "quality-operations-v1" },
+    "collector_version": { "const": "quality-window-collector-v1" },
+    "llm_grading": { "const": false },
+    "verification_dimensions": {
+      "const": [
+        "core_functional",
+        "provider_integration",
+        "ai_quality",
+        "capacity_certification"
+      ]
+    },
+    "verification_statuses": {
+      "const": ["not_configured", "not_run", "passed", "failed"]
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "citation_presence_rate_bps",
+        "citation_support_rate_bps",
+        "answer_acceptance_rate_bps",
+        "positive_feedback_rate_bps",
+        "unauthorized_access_count",
+        "restricted_field_leakage_count",
+        "unauthorized_tool_call_count"
+      ],
+      "properties": {
+        "citation_presence_rate_bps": { "const": 10000 },
+        "citation_support_rate_bps": { "const": 9500 },
+        "answer_acceptance_rate_bps": { "const": 8500 },
+        "positive_feedback_rate_bps": { "const": 8000 },
+        "unauthorized_access_count": { "const": 0 },
+        "restricted_field_leakage_count": { "const": 0 },
+        "unauthorized_tool_call_count": { "const": 0 }
+      }
+    },
+    "source_policies": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/source_policy" }
+    },
+    "gate_stages": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/gate_stage" }
+    },
+    "hard_failure_reason_codes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/code" }
+    },
+    "synthetic_fixture": { "$ref": "#/$defs/synthetic_fixture" },
+    "external_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewed_real_provider",
+        "real_quality_samples",
+        "capacity_certification"
+      ],
+      "properties": {
+        "reviewed_real_provider": { "const": "not_configured" },
+        "real_quality_samples": { "const": "not_run" },
+        "capacity_certification": { "const": "not_run" }
+      }
+    }
+  },
+  "$defs": {
+    "source": { "enum": ["offline", "canary", "online_feedback"] },
+    "code": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,63}$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "minimum_sample_count",
+        "require_citations",
+        "require_answers",
+        "require_feedback"
+      ],
+      "properties": {
+        "source": { "$ref": "#/$defs/source" },
+        "minimum_sample_count": { "type": "integer", "minimum": 1 },
+        "require_citations": { "type": "boolean" },
+        "require_answers": { "type": "boolean" },
+        "require_feedback": { "type": "boolean" }
+      }
+    },
+    "gate_stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "required_sources"],
+      "properties": {
+        "stage": {
+          "enum": ["offline_release", "canary_promotion", "online_continuation"]
+        },
+        "required_sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/source" }
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "sample_count",
+        "citation_claim_count",
+        "valid_citation_count",
+        "supported_citation_count",
+        "answer_evaluated_count",
+        "acceptable_answer_count",
+        "feedback_count",
+        "positive_feedback_count",
+        "tool_call_count",
+        "unauthorized_access_count",
+        "restricted_field_leakage_count",
+        "unauthorized_tool_call_count",
+        "evidence"
+      ],
+      "properties": {
+        "source": { "$ref": "#/$defs/source" },
+        "sample_count": { "type": "integer", "minimum": 0 },
+        "citation_claim_count": { "type": "integer", "minimum": 0 },
+        "valid_citation_count": { "type": "integer", "minimum": 0 },
+        "supported_citation_count": { "type": "integer", "minimum": 0 },
+        "answer_evaluated_count": { "type": "integer", "minimum": 0 },
+        "acceptable_answer_count": { "type": "integer", "minimum": 0 },
+        "feedback_count": { "type": "integer", "minimum": 0 },
+        "positive_feedback_count": { "type": "integer", "minimum": 0 },
+        "tool_call_count": { "type": "integer", "minimum": 0 },
+        "unauthorized_access_count": { "type": "integer", "minimum": 0 },
+        "restricted_field_leakage_count": { "type": "integer", "minimum": 0 },
+        "unauthorized_tool_call_count": { "type": "integer", "minimum": 0 },
+        "evidence": { "type": "object", "minProperties": 1, "additionalProperties": true }
+      }
+    },
+    "synthetic_fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_kind",
+        "gate_stage",
+        "network_region",
+        "model_parameters_digest",
+        "observations",
+        "expected"
+      ],
+      "properties": {
+        "evidence_kind": { "const": "synthetic" },
+        "gate_stage": { "const": "offline_release" },
+        "network_region": { "const": "local.synthetic" },
+        "model_parameters_digest": { "$ref": "#/$defs/digest" },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/observation" }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "core_functional",
+            "provider_integration",
+            "ai_quality",
+            "capacity_certification",
+            "release_gate"
+          ],
+          "properties": {
+            "core_functional": { "const": "passed" },
+            "provider_integration": { "const": "not_configured" },
+            "ai_quality": { "const": "not_configured" },
+            "capacity_certification": { "const": "not_run" },
+            "release_gate": { "const": "blocked" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-"""定义质量样本采集与查询的稳定应用错误。"""
+"""定义质量样本、评估与运营门禁的稳定应用错误。"""
 
 from ai_platform_api.common.errors import PlatformError
 
@@ -19,3 +19,9 @@ class QualityConflictError(PlatformError):
     """同一来源版本已指向不同内容或版本发生倒退。"""
 
     error_code = "IDEMPOTENCY_CONFLICT"
+
+
+class QualityNotFoundError(PlatformError):
+    """目标质量评估或运营窗口在当前工作空间不可见。"""
+
+    error_code = "RESOURCE_NOT_FOUND"
