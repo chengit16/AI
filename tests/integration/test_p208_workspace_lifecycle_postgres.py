@@ -23,6 +23,7 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityReader,
     SqlAlchemyRegistrationUnitOfWork,
 )
+from ai_platform_api.modules.isolation.application.service import MANAGE_PERMISSION
 from ai_platform_api.modules.lifecycle.application.service import (
     EXPORT_PERMISSION,
     PURGE_PERMISSION,
@@ -91,6 +92,7 @@ from ai_platform_api.persistence.tables import (
     quality_sample_versions,
     role_permission_grants,
     stream_events,
+    workspace_isolation_policy_versions,
     workspace_memberships,
     workspace_resources,
     workspace_usage_records,
@@ -107,6 +109,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from tests.support.p503_quality import StaticQualityExecutor
 from tests.support.p504_quality import passing_offline_observation
 from tests.support.p505_costs import seed_cost_release, synthetic_observations
+from tests.support.p507_isolation import (
+    StaticIsolationComplianceSource,
+    isolation_service,
+)
 
 ROOT = Path(__file__).parents[2]
 REGISTRY_PATH = ROOT / "contracts/lifecycle/workspace-table-registry.v1.json"
@@ -430,6 +436,10 @@ def _seed_export_and_purge_facts(
         with SqlAlchemyCostAttributionUnitOfWork(harness.sessions) as unit_of_work:
             unit_of_work.costs.add_report(cost_report)
             unit_of_work.commit()
+        isolation_service(harness.sessions, StaticIsolationComplianceSource()).request_upgrade(
+            _context(account, MANAGE_PERMISSION),
+            "L2",
+        )
     cache_key = f"effective-roles:v1:{target.workspace_id}:{uuid4()}:1"
     harness.valkey.set(cache_key, "synthetic-p208-cache", ex=300)
     return resource_id, other_resource_id, object_key
@@ -520,6 +530,12 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             json.loads(line)
             for line in archive.read("tables/cost_attribution_lines.jsonl").splitlines()
         ]
+        isolation_policy_rows = [
+            json.loads(line)
+            for line in archive.read(
+                "tables/workspace_isolation_policy_versions.jsonl"
+            ).splitlines()
+        ]
     assert {row["resource_id"] for row in resource_rows} == {str(resource_id)}
     assert str(other_resource_id) not in json.dumps(resource_rows)
     assert key_rows[0]["last_four"] == "0208"
@@ -536,6 +552,8 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
     assert len(cost_window_rows) == 1
     assert len(cost_entry_rows) == 9
     assert len(cost_line_rows) == 7
+    assert len(isolation_policy_rows) == 1
+    assert isolation_policy_rows[0]["workspace_id"] == str(target.workspace_id)
     assert "synthetic-p208-evaluation-target" not in json.dumps(
         (evaluation_rows, evaluation_layer_rows, evaluation_sample_rows)
     )
@@ -609,6 +627,14 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
                 )
                 == 0
             )
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(workspace_isolation_policy_versions)
+                .where(workspace_isolation_policy_versions.c.workspace_id == target.workspace_id)
+            )
+            == 1
+        )
         assert (
             session.scalar(
                 select(func.count())

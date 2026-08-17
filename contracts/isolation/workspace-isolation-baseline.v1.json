@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "contract_id": "p5-07-v1",
+  "levels": ["L1", "L2", "L3", "L4"],
+  "level_definitions": {
+    "L1": "logical_workspace",
+    "L2": "search_namespace",
+    "L3": "database_object_key",
+    "L4": "independent_deployment"
+  },
+  "plan_maximum_levels": {
+    "personal_local": "L1",
+    "enterprise_simulated": "L2",
+    "enterprise_isolated": "L3",
+    "enterprise_private": "L4"
+  },
+  "compliance_statuses": ["not_required", "not_configured", "approved", "rejected"],
+  "decisions": ["allowed", "denied", "not_configured"],
+  "migration_statuses": [
+    "planned",
+    "approved",
+    "executing",
+    "verifying",
+    "switch_ready",
+    "completed",
+    "rollback_required",
+    "rolled_back",
+    "cancelled"
+  ],
+  "active_migration_statuses": [
+    "planned",
+    "approved",
+    "executing",
+    "verifying",
+    "switch_ready",
+    "rollback_required"
+  ],
+  "migration_transitions": {
+    "planned": ["approved", "cancelled"],
+    "approved": ["executing", "cancelled"],
+    "executing": ["verifying", "rollback_required"],
+    "verifying": ["switch_ready", "rollback_required"],
+    "switch_ready": ["completed", "rollback_required"],
+    "rollback_required": ["rolled_back"],
+    "completed": [],
+    "rolled_back": [],
+    "cancelled": []
+  },
+  "route_rules": {
+    "caller_level_override": false,
+    "default_level_without_route": "L1",
+    "long_term_dual_write": false,
+    "route_keys_contain_credentials": false,
+    "L2_search_namespace": "workspace_unique",
+    "L3_activation": "requires_p5_08",
+    "L4_activation": "requires_p5_10"
+  },
+  "external_status": {
+    "real_compliance_policy": "not_configured",
+    "L3_target_environment": "not_configured",
+    "L4_target_environment": "not_configured"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/isolation/workspace-isolation-baseline.v1.schema.json",
+  "title": "P5-07 工作空间隔离基线契约",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_id",
+    "levels",
+    "level_definitions",
+    "plan_maximum_levels",
+    "compliance_statuses",
+    "decisions",
+    "migration_statuses",
+    "active_migration_statuses",
+    "migration_transitions",
+    "route_rules",
+    "external_status"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "contract_id": {"const": "p5-07-v1"},
+    "levels": {"const": ["L1", "L2", "L3", "L4"]},
+    "level_definitions": {
+      "const": {
+        "L1": "logical_workspace",
+        "L2": "search_namespace",
+        "L3": "database_object_key",
+        "L4": "independent_deployment"
+      }
+    },
+    "plan_maximum_levels": {
+      "const": {
+        "personal_local": "L1",
+        "enterprise_simulated": "L2",
+        "enterprise_isolated": "L3",
+        "enterprise_private": "L4"
+      }
+    },
+    "compliance_statuses": {
+      "const": ["not_required", "not_configured", "approved", "rejected"]
+    },
+    "decisions": {"const": ["allowed", "denied", "not_configured"]},
+    "migration_statuses": {
+      "const": [
+        "planned",
+        "approved",
+        "executing",
+        "verifying",
+        "switch_ready",
+        "completed",
+        "rollback_required",
+        "rolled_back",
+        "cancelled"
+      ]
+    },
+    "active_migration_statuses": {
+      "const": [
+        "planned",
+        "approved",
+        "executing",
+        "verifying",
+        "switch_ready",
+        "rollback_required"
+      ]
+    },
+    "migration_transitions": {
+      "const": {
+        "planned": ["approved", "cancelled"],
+        "approved": ["executing", "cancelled"],
+        "executing": ["verifying", "rollback_required"],
+        "verifying": ["switch_ready", "rollback_required"],
+        "switch_ready": ["completed", "rollback_required"],
+        "rollback_required": ["rolled_back"],
+        "completed": [],
+        "rolled_back": [],
+        "cancelled": []
+      }
+    },
+    "route_rules": {
+      "type": "object",
+      "required": [
+        "caller_level_override",
+        "default_level_without_route",
+        "long_term_dual_write",
+        "route_keys_contain_credentials",
+        "L2_search_namespace",
+        "L3_activation",
+        "L4_activation"
+      ],
+      "properties": {
+        "caller_level_override": {"const": false},
+        "default_level_without_route": {"const": "L1"},
+        "long_term_dual_write": {"const": false},
+        "route_keys_contain_credentials": {"const": false},
+        "L2_search_namespace": {"const": "workspace_unique"},
+        "L3_activation": {"const": "requires_p5_08"},
+        "L4_activation": {"const": "requires_p5_10"}
+      },
+      "additionalProperties": false
+    },
+    "external_status": {
+      "const": {
+        "real_compliance_policy": "not_configured",
+        "L3_target_environment": "not_configured",
+        "L4_target_environment": "not_configured"
+      }
+    }
+  },
+  "additionalProperties": false
+}

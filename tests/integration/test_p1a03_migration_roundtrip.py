@@ -404,7 +404,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260817_0065"
+    assert current_revision(connection, schema) == "20260817_0066"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -519,6 +519,9 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "workspace_resources",
         "workspace_usage_counters",
         "workspace_usage_records",
+        "workspace_isolation_migration_plans",
+        "workspace_isolation_policy_versions",
+        "workspace_isolation_route_versions",
         "workspaces",
         "workflow_drafts",
         "workflow_node_attempts",
@@ -547,7 +550,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260817_0065"
+    assert current_revision(connection, schema) == "20260817_0066"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -896,7 +899,7 @@ def test_agent_console_upgrade_restores_roles_bindings_and_menu_publication(
     # 3. 同一非空事实再次升级仍只生成一个确定性控制台发布。
     command.upgrade(config, "head")
     connection.commit()
-    assert current_revision(connection, schema) == "20260817_0065"
+    assert current_revision(connection, schema) == "20260817_0066"
     assert (
         connection.scalar(
             text(

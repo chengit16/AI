@@ -6331,6 +6331,241 @@ cost_attribution_lines = Table(
     ),
 )
 
+workspace_isolation_policy_versions = Table(
+    "workspace_isolation_policy_versions",
+    metadata,
+    Column("isolation_policy_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("requested_level", String(2), nullable=False),
+    Column("current_level", String(2), nullable=False),
+    Column("maximum_eligible_level", String(2), nullable=False),
+    Column("plan_code", String(64), nullable=False),
+    Column("entitlement_version", Integer, nullable=False),
+    Column("compliance_status", String(24), nullable=False),
+    Column("compliance_policy_digest", String(64), nullable=True),
+    Column("decision", String(24), nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("decision_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "isolation_policy_id",
+        "workspace_id",
+        name="uq_workspace_isolation_policies_id_workspace",
+    ),
+    UniqueConstraint(
+        "isolation_policy_id",
+        "workspace_id",
+        "requested_level",
+        name="uq_workspace_isolation_policies_plan_target",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "policy_version",
+        name="uq_workspace_isolation_policies_version",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_workspace_isolation_policies_workspace",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "requested_level IN ('L1', 'L2', 'L3', 'L4') "
+        "AND current_level IN ('L1', 'L2', 'L3', 'L4') "
+        "AND maximum_eligible_level IN ('L1', 'L2', 'L3', 'L4')",
+        name="ck_workspace_isolation_policies_levels",
+    ),
+    CheckConstraint(
+        "(current_level = 'L1' AND requested_level IN ('L2', 'L3', 'L4')) "
+        "OR (current_level = 'L2' AND requested_level IN ('L3', 'L4')) "
+        "OR (current_level = 'L3' AND requested_level = 'L4')",
+        name="ck_workspace_isolation_policies_upgrade",
+    ),
+    CheckConstraint(
+        "plan_code ~ '^[a-z][a-z0-9_]{2,63}$' AND entitlement_version >= 1 AND policy_version >= 1",
+        name="ck_workspace_isolation_policies_versions",
+    ),
+    CheckConstraint(
+        "compliance_status IN ('not_required', 'not_configured', 'approved', 'rejected') "
+        "AND decision IN ('allowed', 'denied', 'not_configured')",
+        name="ck_workspace_isolation_policies_decision",
+    ),
+    CheckConstraint(
+        "decision_digest ~ '^[0-9a-f]{64}$' "
+        "AND (compliance_policy_digest IS NULL OR "
+        "compliance_policy_digest ~ '^[0-9a-f]{64}$')",
+        name="ck_workspace_isolation_policies_digests",
+    ),
+    CheckConstraint(
+        "(compliance_status IN ('not_required', 'not_configured') "
+        "AND compliance_policy_digest IS NULL) "
+        "OR (compliance_status IN ('approved', 'rejected') "
+        "AND compliance_policy_digest IS NOT NULL)",
+        name="ck_workspace_isolation_policies_compliance",
+    ),
+    CheckConstraint(
+        "cardinality(reason_codes) <= 16 AND array_position(reason_codes, NULL) IS NULL "
+        "AND reason_codes <@ ARRAY['workspace_inactive', 'personal_workspace_l1_only', "
+        "'plan_not_supported', 'plan_not_eligible', 'compliance_policy_not_configured', "
+        "'compliance_policy_rejected']::varchar[] "
+        "AND ((decision = 'allowed' AND cardinality(reason_codes) = 0) "
+        "OR (decision <> 'allowed' AND cardinality(reason_codes) > 0))",
+        name="ck_workspace_isolation_policies_reasons",
+    ),
+)
+Index(
+    "ix_workspace_isolation_policies_workspace_created",
+    workspace_isolation_policy_versions.c.workspace_id,
+    workspace_isolation_policy_versions.c.created_at,
+)
+
+workspace_isolation_migration_plans = Table(
+    "workspace_isolation_migration_plans",
+    metadata,
+    Column("migration_plan_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("isolation_policy_id", UUID(as_uuid=True), nullable=False),
+    Column("from_level", String(2), nullable=False),
+    Column("target_level", String(2), nullable=False),
+    Column("status", String(24), nullable=False),
+    Column("route_requirement_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "migration_plan_id",
+        "workspace_id",
+        name="uq_workspace_isolation_migrations_id_workspace",
+    ),
+    UniqueConstraint(
+        "migration_plan_id",
+        "workspace_id",
+        "target_level",
+        name="uq_workspace_isolation_migrations_route_target",
+    ),
+    ForeignKeyConstraint(
+        ["isolation_policy_id", "workspace_id", "target_level"],
+        [
+            f"{SCHEMA_TOKEN}.workspace_isolation_policy_versions.isolation_policy_id",
+            f"{SCHEMA_TOKEN}.workspace_isolation_policy_versions.workspace_id",
+            f"{SCHEMA_TOKEN}.workspace_isolation_policy_versions.requested_level",
+        ],
+        name="fk_workspace_isolation_migrations_policy",
+    ),
+    CheckConstraint(
+        "from_level IN ('L1', 'L2', 'L3') AND target_level IN ('L2', 'L3', 'L4')",
+        name="ck_workspace_isolation_migrations_levels",
+    ),
+    CheckConstraint(
+        "(from_level = 'L1' AND target_level IN ('L2', 'L3', 'L4')) "
+        "OR (from_level = 'L2' AND target_level IN ('L3', 'L4')) "
+        "OR (from_level = 'L3' AND target_level = 'L4')",
+        name="ck_workspace_isolation_migrations_upgrade",
+    ),
+    CheckConstraint(
+        "status IN ('planned', 'approved', 'executing', 'verifying', 'switch_ready', "
+        "'completed', 'rollback_required', 'rolled_back', 'cancelled')",
+        name="ck_workspace_isolation_migrations_status",
+    ),
+    CheckConstraint(
+        "route_requirement_digest ~ '^[0-9a-f]{64}$' AND version >= 1 AND updated_at >= created_at",
+        name="ck_workspace_isolation_migrations_identity",
+    ),
+)
+Index(
+    "ix_workspace_isolation_migrations_workspace_updated",
+    workspace_isolation_migration_plans.c.workspace_id,
+    workspace_isolation_migration_plans.c.updated_at,
+)
+Index(
+    "uq_workspace_isolation_migrations_active",
+    workspace_isolation_migration_plans.c.workspace_id,
+    unique=True,
+    postgresql_where=workspace_isolation_migration_plans.c.status.in_(
+        (
+            "planned",
+            "approved",
+            "executing",
+            "verifying",
+            "switch_ready",
+            "rollback_required",
+        )
+    ),
+)
+
+workspace_isolation_route_versions = Table(
+    "workspace_isolation_route_versions",
+    metadata,
+    Column("route_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("route_version", Integer, nullable=False),
+    Column("isolation_level", String(2), nullable=False),
+    Column("database_route_key", String(128), nullable=False),
+    Column("object_storage_route_key", String(128), nullable=False),
+    Column("encryption_key_route_key", String(128), nullable=False),
+    Column("search_namespace", String(128), nullable=False),
+    Column("deployment_route_key", String(128), nullable=False),
+    Column("migration_plan_id", UUID(as_uuid=True), nullable=False),
+    Column("route_digest", String(64), nullable=False),
+    Column("activated_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("activated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "route_id",
+        "workspace_id",
+        name="uq_workspace_isolation_routes_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "route_version",
+        name="uq_workspace_isolation_routes_version",
+    ),
+    ForeignKeyConstraint(
+        ["migration_plan_id", "workspace_id", "isolation_level"],
+        [
+            f"{SCHEMA_TOKEN}.workspace_isolation_migration_plans.migration_plan_id",
+            f"{SCHEMA_TOKEN}.workspace_isolation_migration_plans.workspace_id",
+            f"{SCHEMA_TOKEN}.workspace_isolation_migration_plans.target_level",
+        ],
+        name="fk_workspace_isolation_routes_migration",
+    ),
+    CheckConstraint(
+        "isolation_level IN ('L2', 'L3', 'L4') AND route_version >= 1",
+        name="ck_workspace_isolation_routes_level",
+    ),
+    CheckConstraint(
+        "database_route_key ~ '^[a-z][a-z0-9._:-]{2,127}$' "
+        "AND object_storage_route_key ~ '^[a-z][a-z0-9._:-]{2,127}$' "
+        "AND encryption_key_route_key ~ '^[a-z][a-z0-9._:-]{2,127}$' "
+        "AND search_namespace ~ '^[a-z][a-z0-9._:-]{2,127}$' "
+        "AND deployment_route_key ~ '^[a-z][a-z0-9._:-]{2,127}$'",
+        name="ck_workspace_isolation_routes_keys",
+    ),
+    CheckConstraint(
+        "(isolation_level = 'L2' "
+        "AND database_route_key = 'shared.primary' "
+        "AND object_storage_route_key = 'shared.objects' "
+        "AND encryption_key_route_key = 'shared.workspace' "
+        "AND deployment_route_key = 'shared.runtime' "
+        "AND search_namespace = "
+        "'workspace.' || replace(workspace_id::text, '-', '')) "
+        "OR isolation_level IN ('L3', 'L4')",
+        name="ck_workspace_isolation_routes_l2",
+    ),
+    CheckConstraint(
+        "route_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_workspace_isolation_routes_digest",
+    ),
+)
+Index(
+    "ix_workspace_isolation_routes_workspace_activated",
+    workspace_isolation_route_versions.c.workspace_id,
+    workspace_isolation_route_versions.c.activated_at,
+)
+
 stream_runs = Table(
     "stream_runs",
     metadata,
