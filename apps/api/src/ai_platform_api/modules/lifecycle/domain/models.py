@@ -44,6 +44,7 @@ class LifecycleExport:
     created_at: datetime
     completed_at: datetime | None
     error_code: str | None
+    compliance_proof_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -71,6 +72,7 @@ class LifecyclePurge:
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
+    compliance_proof_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -103,3 +105,6 @@ class RetentionRun:
     created_at: datetime
     completed_at: datetime | None
     error_code: str | None
+    request_hash: str = ""
+    regulatory_policy_id: UUID | None = None
+    compliance_proof_id: UUID | None = None

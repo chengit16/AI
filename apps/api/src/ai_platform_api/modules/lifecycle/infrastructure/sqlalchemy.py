@@ -29,6 +29,10 @@ from sqlalchemy.engine import Connection, RowMapping
 from sqlalchemy.orm import Session, sessionmaker
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.lifecycle.domain.compliance import (
+    LifecycleComplianceWriteConflictError,
+    LifecycleOperationBlockedError,
+)
 from ai_platform_api.modules.lifecycle.domain.models import (
     DeletionCertificate,
     LifecycleExport,
@@ -40,11 +44,17 @@ from ai_platform_api.modules.lifecycle.domain.ports import (
     LifecycleWriteConflictError,
 )
 from ai_platform_api.modules.lifecycle.domain.registry import WorkspaceTableRegistry
+from ai_platform_api.modules.lifecycle.infrastructure.compliance import (
+    record_lifecycle_compliance_decision,
+)
 from ai_platform_api.persistence.tables import (
     ingestion_job_attempts,
     lifecycle_deletion_certificates,
     lifecycle_export_records,
+    lifecycle_legal_hold_releases,
+    lifecycle_legal_holds,
     lifecycle_purge_requests,
+    lifecycle_regulatory_policy_versions,
     lifecycle_retention_runs,
     stream_events,
     workspace_usage_records,
@@ -147,10 +157,29 @@ class SqlAlchemyWorkspaceLifecycleStore:
         """原子认领幂等键；并发失败方读取获胜请求而不重复生成导出包。"""
 
         with self._session_factory() as session, session.begin():
+            # 1. 在同一工作空间锁内先冻结导出裁决，导出权限仍由原调用链独立校验。
+            proof = record_lifecycle_compliance_decision(
+                session,
+                workspace_id=export.workspace_id,
+                operation="export",
+                operation_id=export.export_id,
+                idempotency_key=export.idempotency_key,
+                request_hash=export.request_hash,
+                actor_id=export.requested_by_account_id,
+                occurred_at=export.created_at,
+            )
+            # 2. 插入使用证明绑定的操作身份，并发失败方随后读取获胜请求。
             row = (
                 session.execute(
                     postgresql_insert(lifecycle_export_records)
-                    .values(**export.__dict__)
+                    .values(
+                        **{
+                            **export.__dict__,
+                            # 并发失败方复用获胜证明冻结的操作身份，才能命中同一幂等事实。
+                            "export_id": proof.operation_id,
+                            "compliance_proof_id": proof.compliance_proof_id,
+                        }
+                    )
                     .on_conflict_do_nothing(
                         index_elements=[
                             lifecycle_export_records.c.workspace_id,
@@ -243,34 +272,65 @@ class SqlAlchemyWorkspaceLifecycleStore:
     def add_purge(self, purge: LifecyclePurge) -> LifecyclePurge:
         """原子认领清理请求，避免并发请求绕过幂等键唯一事实。"""
 
+        blocked = None
+        row: RowMapping | None = None
         with self._session_factory() as session, session.begin():
-            row = (
-                session.execute(
-                    postgresql_insert(lifecycle_purge_requests)
-                    .values(**purge.__dict__)
-                    .on_conflict_do_nothing(
-                        index_elements=[
-                            lifecycle_purge_requests.c.workspace_id,
-                            lifecycle_purge_requests.c.idempotency_key,
-                        ]
-                    )
-                    .returning(lifecycle_purge_requests)
+            # 1. 先冻结法规策略与活动保留集合，阻断证明也必须作为不可变事实提交。
+            try:
+                proof = record_lifecycle_compliance_decision(
+                    session,
+                    workspace_id=purge.workspace_id,
+                    operation="purge",
+                    operation_id=purge.purge_request_id,
+                    idempotency_key=purge.idempotency_key,
+                    request_hash=purge.request_hash,
+                    actor_id=purge.requested_by_account_id,
+                    occurred_at=purge.created_at,
                 )
-                .mappings()
-                .one_or_none()
-            )
-            if row is None:
+            except LifecycleComplianceWriteConflictError as error:
+                raise LifecycleWriteConflictError from error
+            if proof.decision != "allowed":
+                blocked = proof
+            else:
+                # 2. 允许时使用证明绑定的请求身份原子认领，避免并发随机 ID 脱钩。
                 row = (
                     session.execute(
-                        select(lifecycle_purge_requests).where(
-                            lifecycle_purge_requests.c.workspace_id == purge.workspace_id,
-                            lifecycle_purge_requests.c.idempotency_key == purge.idempotency_key,
+                        postgresql_insert(lifecycle_purge_requests)
+                        .values(
+                            **{
+                                **purge.__dict__,
+                                # 证明先于请求事实裁决，复用其操作身份可消除并发随机 ID 竞态。
+                                "purge_request_id": proof.operation_id,
+                                "compliance_proof_id": proof.compliance_proof_id,
+                            }
                         )
+                        .on_conflict_do_nothing(
+                            index_elements=[
+                                lifecycle_purge_requests.c.workspace_id,
+                                lifecycle_purge_requests.c.idempotency_key,
+                            ]
+                        )
+                        .returning(lifecycle_purge_requests)
                     )
                     .mappings()
-                    .one()
+                    .one_or_none()
                 )
-            return _purge(row)
+                if row is None:
+                    row = (
+                        session.execute(
+                            select(lifecycle_purge_requests).where(
+                                lifecycle_purge_requests.c.workspace_id == purge.workspace_id,
+                                lifecycle_purge_requests.c.idempotency_key == purge.idempotency_key,
+                            )
+                        )
+                        .mappings()
+                        .one()
+                    )
+        if blocked is not None:
+            raise LifecycleOperationBlockedError(blocked)
+        if row is None:
+            raise LifecycleWriteConflictError
+        return _purge(row)
 
     def purge_database(
         self,
@@ -283,6 +343,9 @@ class SqlAlchemyWorkspaceLifecycleStore:
         # 1. 锁定清理请求并只在当前事务开启旁路，普通事务仍受不可变触发器保护。
         with self._session_factory() as session, session.begin():
             row = _locked_purge(session, purge_request_id)
+            _lock_compliance_workspace(session, cast(UUID, row["workspace_id"]))
+            if _active_legal_hold_ids(session, cast(UUID, row["workspace_id"])):
+                raise LifecycleWriteConflictError
             if cast(bool, row["database_cleared"]):
                 return _purge(row)
             session.execute(text("SET LOCAL ai_platform.lifecycle_purge = 'on'"))
@@ -510,34 +573,66 @@ class SqlAlchemyWorkspaceLifecycleStore:
     def add_retention_run(self, run: RetentionRun) -> RetentionRun:
         """原子认领保留期运行，使并发调用共同等待同一个数据库事实。"""
 
+        blocked = None
+        row: RowMapping | None = None
         with self._session_factory() as session, session.begin():
-            row = (
-                session.execute(
-                    postgresql_insert(lifecycle_retention_runs)
-                    .values(**run.__dict__)
-                    .on_conflict_do_nothing(
-                        index_elements=[
-                            lifecycle_retention_runs.c.workspace_id,
-                            lifecycle_retention_runs.c.idempotency_key,
-                        ]
-                    )
-                    .returning(lifecycle_retention_runs)
+            # 1. 先冻结策略与法律保留裁决，同一幂等键只能绑定一个证明。
+            try:
+                proof = record_lifecycle_compliance_decision(
+                    session,
+                    workspace_id=run.workspace_id,
+                    operation="retention",
+                    operation_id=run.retention_run_id,
+                    idempotency_key=run.idempotency_key,
+                    request_hash=run.request_hash,
+                    actor_id=run.requested_by_account_id,
+                    occurred_at=run.created_at,
                 )
-                .mappings()
-                .one_or_none()
-            )
-            if row is None:
+            except LifecycleComplianceWriteConflictError as error:
+                raise LifecycleWriteConflictError from error
+            if proof.decision != "allowed" or proof.regulatory_policy_id is None:
+                blocked = proof
+            else:
+                # 2. 运行身份复用证明中的获胜 ID，使并发请求命中同一运行事实。
                 row = (
                     session.execute(
-                        select(lifecycle_retention_runs).where(
-                            lifecycle_retention_runs.c.workspace_id == run.workspace_id,
-                            lifecycle_retention_runs.c.idempotency_key == run.idempotency_key,
+                        postgresql_insert(lifecycle_retention_runs)
+                        .values(
+                            **{
+                                **run.__dict__,
+                                # 同一幂等键的第二个请求必须引用首个证明绑定的运行身份。
+                                "retention_run_id": proof.operation_id,
+                                "regulatory_policy_id": proof.regulatory_policy_id,
+                                "compliance_proof_id": proof.compliance_proof_id,
+                            }
                         )
+                        .on_conflict_do_nothing(
+                            index_elements=[
+                                lifecycle_retention_runs.c.workspace_id,
+                                lifecycle_retention_runs.c.idempotency_key,
+                            ]
+                        )
+                        .returning(lifecycle_retention_runs)
                     )
                     .mappings()
-                    .one()
+                    .one_or_none()
                 )
-            return _retention(row)
+                if row is None:
+                    row = (
+                        session.execute(
+                            select(lifecycle_retention_runs).where(
+                                lifecycle_retention_runs.c.workspace_id == run.workspace_id,
+                                lifecycle_retention_runs.c.idempotency_key == run.idempotency_key,
+                            )
+                        )
+                        .mappings()
+                        .one()
+                    )
+        if blocked is not None:
+            raise LifecycleOperationBlockedError(blocked)
+        if row is None:
+            raise LifecycleWriteConflictError
+        return _retention(row)
 
     def execute_retention(
         self,
@@ -547,15 +642,8 @@ class SqlAlchemyWorkspaceLifecycleStore:
     ) -> RetentionRun:
         """按冻结边界删除到期事实，并为本次运行保存计数摘要。"""
 
-        # 1. 截止时间由运行创建时刻一次冻结，并发重放必须复用同一组 30/90/365 天边界。
-        cutoffs = {
-            "stream_events": now,
-            "published_outbox": now - timedelta(days=30),
-            "attempts_and_dead_letters": now - timedelta(days=90),
-            "minimum_records": now - timedelta(days=365),
-        }
         with self._session_factory() as session, session.begin():
-            session.execute(text("SET LOCAL ai_platform.lifecycle_purge = 'on'"))
+            # 1. 锁定获胜运行与工作空间，重新确认没有并发激活的法律保留。
             run_row = (
                 session.execute(
                     select(lifecycle_retention_runs)
@@ -567,8 +655,25 @@ class SqlAlchemyWorkspaceLifecycleStore:
             )
             if run_row["status"] == "completed":
                 return _retention(run_row)
-            # 2. 在受限旁路事务内删除到期事实，并把计数摘要、审计和终态一次提交。
             workspace_id = cast(UUID, run_row["workspace_id"])
+            _lock_compliance_workspace(session, workspace_id)
+            if _active_legal_hold_ids(session, workspace_id):
+                raise LifecycleWriteConflictError
+            policy_row = (
+                session.execute(
+                    select(lifecycle_regulatory_policy_versions).where(
+                        lifecycle_regulatory_policy_versions.c.regulatory_policy_id
+                        == run_row["regulatory_policy_id"],
+                        lifecycle_regulatory_policy_versions.c.workspace_id == workspace_id,
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            periods = dict(cast(Mapping[str, int], policy_row["retention_period_days"]))
+            cutoffs = {key: now - timedelta(days=periods[key]) for key in periods}
+            session.execute(text("SET LOCAL ai_platform.lifecycle_purge = 'on'"))
+            # 2. 在受限旁路事务内删除到期事实，并把计数摘要、审计和终态一次提交。
             counts = _delete_expired_records(session, workspace_id, cutoffs)
             result = {
                 "workspace_id": str(workspace_id),
@@ -577,6 +682,7 @@ class SqlAlchemyWorkspaceLifecycleStore:
                 "deleted_table_counts": counts,
             }
             result_sha256 = _document_hash(result)
+            # 3. 删除摘要、审计和运行终态同事务提交，不持久化被删除的业务正文。
             SqlAlchemyAuditWriter(session).add(
                 AuditRecord(
                     audit_id=uuid4(),
@@ -661,7 +767,7 @@ def _delete_expired_records(
         session.execute(
             delete(stream_events).where(
                 stream_events.c.workspace_id == workspace_id,
-                stream_events.c.expires_at <= cutoffs["stream_events"],
+                stream_events.c.occurred_at <= cutoffs["stream_events"],
             )
         )
     )
@@ -827,6 +933,36 @@ def _document_hash(value: object) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(content).hexdigest()
+
+
+def _lock_compliance_workspace(session: Session, workspace_id: UUID) -> None:
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:workspace_key, 509))"),
+        {"workspace_key": str(workspace_id)},
+    )
+
+
+def _active_legal_hold_ids(session: Session, workspace_id: UUID) -> tuple[UUID, ...]:
+    return tuple(
+        session.scalars(
+            select(lifecycle_legal_holds.c.legal_hold_id)
+            .outerjoin(
+                lifecycle_legal_hold_releases,
+                (
+                    lifecycle_legal_hold_releases.c.workspace_id
+                    == lifecycle_legal_holds.c.workspace_id
+                )
+                & (
+                    lifecycle_legal_hold_releases.c.legal_hold_id
+                    == lifecycle_legal_holds.c.legal_hold_id
+                ),
+            )
+            .where(
+                lifecycle_legal_holds.c.workspace_id == workspace_id,
+                lifecycle_legal_hold_releases.c.release_id.is_(None),
+            )
+        )
+    )
 
 
 def _export(row: RowMapping) -> LifecycleExport:

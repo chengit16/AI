@@ -1248,6 +1248,26 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/lifecycle/compliance-proofs": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Compliance Proofs
+     * @description 按独立权限读取证明，不查询或返回业务、案件与法规正文。
+     */
+    readonly get: operations["listWorkspaceLifecycleComplianceProofs"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/lifecycle/exports": {
     readonly parameters: {
       readonly query?: never;
@@ -1268,6 +1288,46 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/lifecycle/legal-holds": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Activate Legal Hold
+     * @description 激活工作空间级法律保留，案件正文不进入请求或持久化。
+     */
+    readonly post: operations["activateWorkspaceLegalHold"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/lifecycle/legal-holds/{legal_hold_id}/release": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Release Legal Hold
+     * @description 以独立权限和只追加证据解除法律保留。
+     */
+    readonly post: operations["releaseWorkspaceLegalHold"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/lifecycle/purges": {
     readonly parameters: {
       readonly query?: never;
@@ -1282,6 +1342,26 @@ export type paths = {
      * @description 保留可登录治理壳层，并清除业务数据与派生介质。
      */
     readonly post: operations["purgeWorkspaceBusinessData"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/lifecycle/regulatory-policies": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Publish Regulatory Policy
+     * @description 仅触发受信配置源发布，调用方不能提交法域和外部审核结果。
+     */
+    readonly post: operations["publishWorkspaceRegulatoryPolicy"];
     readonly delete?: never;
     readonly options?: never;
     readonly head?: never;
@@ -4850,6 +4930,123 @@ export type components = {
       readonly visibility: "private" | "workspace" | "departments";
     };
     /**
+     * LegalHoldBody
+     * @description 只接收案件摘要和结构化原因，不接收案件或法规正文。
+     */
+    readonly LegalHoldBody: {
+      /** Case Reference Digest */
+      readonly case_reference_digest: string;
+      /** Reason Code */
+      readonly reason_code: string;
+    };
+    /**
+     * LegalHoldReleaseBody
+     * @description 要求解除证据摘要和结构化原因，解除正文不进入平台。
+     */
+    readonly LegalHoldReleaseBody: {
+      /** Reason Code */
+      readonly reason_code: string;
+      /** Release Evidence Digest */
+      readonly release_evidence_digest: string;
+    };
+    /**
+     * LegalHoldReleaseResponse
+     * @description 返回独立的法律保留解除事实。
+     */
+    readonly LegalHoldReleaseResponse: {
+      /**
+       * Legal Hold Id
+       * Format: uuid
+       */
+      readonly legal_hold_id: string;
+      /** Reason Code */
+      readonly reason_code: string;
+      /** Release Evidence Digest */
+      readonly release_evidence_digest: string;
+      /**
+       * Release Id
+       * Format: uuid
+       */
+      readonly release_id: string;
+      /**
+       * Released At
+       * Format: date-time
+       */
+      readonly released_at: string;
+    };
+    /**
+     * LegalHoldResponse
+     * @description 返回工作空间级法律保留的只追加事实。
+     */
+    readonly LegalHoldResponse: {
+      /**
+       * Activated At
+       * Format: date-time
+       */
+      readonly activated_at: string;
+      /** Case Reference Digest */
+      readonly case_reference_digest: string;
+      /**
+       * Legal Hold Id
+       * Format: uuid
+       */
+      readonly legal_hold_id: string;
+      /** Reason Code */
+      readonly reason_code: string;
+      /**
+       * Regulatory Policy Id
+       * Format: uuid
+       */
+      readonly regulatory_policy_id: string;
+      /** Scope Digest */
+      readonly scope_digest: string;
+      /** Scope Type */
+      readonly scope_type: string;
+    };
+    /**
+     * LifecycleComplianceProofResponse
+     * @description 返回一次生命周期裁决的低敏、可复算证明。
+     */
+    readonly LifecycleComplianceProofResponse: {
+      /** Active Hold Count */
+      readonly active_hold_count: number;
+      /**
+       * Compliance Proof Id
+       * Format: uuid
+       */
+      readonly compliance_proof_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Decision */
+      readonly decision: string;
+      /** External Review Status */
+      readonly external_review_status: string;
+      /** Hold Set Digest */
+      readonly hold_set_digest: string;
+      /** Operation */
+      readonly operation: string;
+      /**
+       * Operation Id
+       * Format: uuid
+       */
+      readonly operation_id: string;
+      /** Policy Digest */
+      readonly policy_digest: string | null;
+      /** Proof Digest */
+      readonly proof_digest: string;
+      /** Reason Codes */
+      readonly reason_codes: readonly string[];
+      /** Regulatory Policy Id */
+      readonly regulatory_policy_id: string | null;
+      /** Request Hash */
+      readonly request_hash: string;
+      /** Request Key Digest */
+      readonly request_key_digest: string;
+    };
+    /**
      * LifecycleExportResponse
      * @description 返回导出包位置和双层完整性摘要。
      */
@@ -5867,6 +6064,38 @@ export type components = {
        * Format: uuid
        */
       readonly personal_workspace_id: string;
+    };
+    /**
+     * RegulatoryPolicyResponse
+     * @description 返回受信配置源发布的低敏策略身份与外部状态。
+     */
+    readonly RegulatoryPolicyResponse: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** External Review Digest */
+      readonly external_review_digest: string | null;
+      /** External Review Status */
+      readonly external_review_status: string;
+      /** Jurisdiction Codes */
+      readonly jurisdiction_codes: readonly string[];
+      /** Jurisdiction Status */
+      readonly jurisdiction_status: string;
+      /** Policy Digest */
+      readonly policy_digest: string;
+      /** Policy Version */
+      readonly policy_version: number;
+      /**
+       * Regulatory Policy Id
+       * Format: uuid
+       */
+      readonly regulatory_policy_id: string;
+      /** Retention Period Days */
+      readonly retention_period_days: {
+        readonly [key: string]: number;
+      };
     };
     /**
      * ReleaseOperationsMetricsResponse
@@ -13953,6 +14182,79 @@ export interface operations {
       };
     };
   };
+  readonly listWorkspaceLifecycleComplianceProofs: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": readonly components["schemas"]["LifecycleComplianceProofResponse"][];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   readonly createWorkspaceLifecycleExport: {
     readonly parameters: {
       readonly query?: never;
@@ -14043,6 +14345,204 @@ export interface operations {
       };
     };
   };
+  readonly activateWorkspaceLegalHold: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["LegalHoldBody"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["LegalHoldResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly releaseWorkspaceLegalHold: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header: {
+        readonly Authorization?: string | null;
+        readonly "Idempotency-Key": string;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly legal_hold_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["LegalHoldReleaseBody"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["LegalHoldReleaseResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   readonly purgeWorkspaceBusinessData: {
     readonly parameters: {
       readonly query?: never;
@@ -14070,6 +14570,104 @@ export interface operations {
         };
         content: {
           readonly "application/json": components["schemas"]["LifecyclePurgeResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly publishWorkspaceRegulatoryPolicy: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["RegulatoryPolicyResponse"];
         };
       };
       /** @description 请求上下文无效 */

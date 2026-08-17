@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/lifecycle/regulatory-compliance-baseline.v1.schema.json",
+  "title": "P5-09 法规策略与法律保留基线契约",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_id",
+    "jurisdiction_statuses",
+    "external_review_statuses",
+    "retention_classes",
+    "legal_hold_scopes",
+    "lifecycle_operations",
+    "operation_decisions",
+    "reason_codes",
+    "permissions",
+    "rules",
+    "external_status"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "contract_id": {"const": "p5-09-v1"},
+    "jurisdiction_statuses": {"const": ["not_configured", "configured"]},
+    "external_review_statuses": {"const": ["not_configured", "approved", "rejected"]},
+    "retention_classes": {
+      "const": [
+        "stream_events",
+        "published_outbox",
+        "attempts_and_dead_letters",
+        "minimum_records"
+      ]
+    },
+    "legal_hold_scopes": {"const": ["workspace"]},
+    "lifecycle_operations": {"const": ["export", "purge", "retention"]},
+    "operation_decisions": {"const": ["allowed", "blocked", "not_configured"]},
+    "reason_codes": {
+      "const": [
+        "authorized_export_preserved",
+        "jurisdiction_not_configured",
+        "regulatory_policy_configured",
+        "active_legal_hold",
+        "external_review_not_configured",
+        "external_review_rejected"
+      ]
+    },
+    "permissions": {
+      "const": {
+        "policy_manage": "workspace.lifecycle.regulatory_policy.manage",
+        "hold_create": "workspace.lifecycle.legal_hold.create",
+        "hold_release": "workspace.lifecycle.legal_hold.release",
+        "proof_read": "workspace.lifecycle.compliance_proof.read"
+      }
+    },
+    "rules": {
+      "const": {
+        "caller_can_claim_external_review": false,
+        "policy_versions_are_immutable": true,
+        "hold_scope_expands_read_access": false,
+        "hold_and_release_are_append_only": true,
+        "active_hold_blocks": ["purge", "retention"],
+        "active_hold_blocks_authorized_export": false,
+        "unconfigured_jurisdiction_blocks": ["purge", "retention"],
+        "proof_contains_business_content": false,
+        "destructive_operation_and_hold_activation_are_serialized": true,
+        "blocked_idempotency_key_can_be_reinterpreted": false
+      }
+    },
+    "external_status": {
+      "const": {
+        "applicable_jurisdictions": "not_configured",
+        "reviewed_regulatory_policy": "not_configured",
+        "real_legal_hold_requirements": "not_configured",
+        "regulatory_certification": "not_run"
+      }
+    }
+  },
+  "additionalProperties": false
+}

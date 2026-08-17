@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "contract_id": "p5-09-v1",
+  "jurisdiction_statuses": ["not_configured", "configured"],
+  "external_review_statuses": ["not_configured", "approved", "rejected"],
+  "retention_classes": [
+    "stream_events",
+    "published_outbox",
+    "attempts_and_dead_letters",
+    "minimum_records"
+  ],
+  "legal_hold_scopes": ["workspace"],
+  "lifecycle_operations": ["export", "purge", "retention"],
+  "operation_decisions": ["allowed", "blocked", "not_configured"],
+  "reason_codes": [
+    "authorized_export_preserved",
+    "jurisdiction_not_configured",
+    "regulatory_policy_configured",
+    "active_legal_hold",
+    "external_review_not_configured",
+    "external_review_rejected"
+  ],
+  "permissions": {
+    "policy_manage": "workspace.lifecycle.regulatory_policy.manage",
+    "hold_create": "workspace.lifecycle.legal_hold.create",
+    "hold_release": "workspace.lifecycle.legal_hold.release",
+    "proof_read": "workspace.lifecycle.compliance_proof.read"
+  },
+  "rules": {
+    "caller_can_claim_external_review": false,
+    "policy_versions_are_immutable": true,
+    "hold_scope_expands_read_access": false,
+    "hold_and_release_are_append_only": true,
+    "active_hold_blocks": ["purge", "retention"],
+    "active_hold_blocks_authorized_export": false,
+    "unconfigured_jurisdiction_blocks": ["purge", "retention"],
+    "proof_contains_business_content": false,
+    "destructive_operation_and_hold_activation_are_serialized": true,
+    "blocked_idempotency_key_can_be_reinterpreted": false
+  },
+  "external_status": {
+    "applicable_jurisdictions": "not_configured",
+    "reviewed_regulatory_policy": "not_configured",
+    "real_legal_hold_requirements": "not_configured",
+    "regulatory_certification": "not_run"
+  }
+}

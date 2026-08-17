@@ -6,6 +6,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ai_platform_api.modules.lifecycle.application.compliance import (
+    LegalHold,
+    LegalHoldRelease,
+    LifecycleComplianceProof,
+    RegulatoryPolicyVersion,
+)
 from ai_platform_api.modules.lifecycle.application.service import (
     DeletionCertificate,
     LifecycleExport,
@@ -104,4 +110,101 @@ class RetentionRunResponse(BaseModel):
 
     @classmethod
     def from_domain(cls, value: RetentionRun) -> Self:
+        return cls(**{field: getattr(value, field) for field in cls.model_fields})
+
+
+class RegulatoryPolicyResponse(BaseModel):
+    """返回受信配置源发布的低敏策略身份与外部状态。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    regulatory_policy_id: UUID
+    policy_version: int
+    jurisdiction_status: str
+    jurisdiction_codes: tuple[str, ...]
+    retention_period_days: dict[str, int]
+    external_review_status: str
+    external_review_digest: str | None
+    policy_digest: str
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, value: RegulatoryPolicyVersion) -> Self:
+        return cls(**{field: getattr(value, field) for field in cls.model_fields})
+
+
+class LegalHoldBody(BaseModel):
+    """只接收案件摘要和结构化原因，不接收案件或法规正文。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    case_reference_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reason_code: str = Field(pattern=r"^[A-Z][A-Z0-9_]{2,63}$")
+
+
+class LegalHoldResponse(BaseModel):
+    """返回工作空间级法律保留的只追加事实。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    legal_hold_id: UUID
+    regulatory_policy_id: UUID
+    scope_type: str
+    scope_digest: str
+    case_reference_digest: str
+    reason_code: str
+    activated_at: datetime
+
+    @classmethod
+    def from_domain(cls, value: LegalHold) -> Self:
+        return cls(**{field: getattr(value, field) for field in cls.model_fields})
+
+
+class LegalHoldReleaseBody(BaseModel):
+    """要求解除证据摘要和结构化原因，解除正文不进入平台。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    release_evidence_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reason_code: str = Field(pattern=r"^[A-Z][A-Z0-9_]{2,63}$")
+
+
+class LegalHoldReleaseResponse(BaseModel):
+    """返回独立的法律保留解除事实。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    release_id: UUID
+    legal_hold_id: UUID
+    reason_code: str
+    release_evidence_digest: str
+    released_at: datetime
+
+    @classmethod
+    def from_domain(cls, value: LegalHoldRelease) -> Self:
+        return cls(**{field: getattr(value, field) for field in cls.model_fields})
+
+
+class LifecycleComplianceProofResponse(BaseModel):
+    """返回一次生命周期裁决的低敏、可复算证明。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    compliance_proof_id: UUID
+    operation: str
+    operation_id: UUID
+    request_key_digest: str
+    request_hash: str
+    decision: str
+    reason_codes: tuple[str, ...]
+    regulatory_policy_id: UUID | None
+    policy_digest: str | None
+    external_review_status: str
+    active_hold_count: int
+    hold_set_digest: str
+    proof_digest: str
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, value: LifecycleComplianceProof) -> Self:
         return cls(**{field: getattr(value, field) for field in cls.model_fields})

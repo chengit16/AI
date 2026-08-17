@@ -33,12 +33,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 22
-    assert len(resource_registry.permissions) == 110
+    assert resource_registry.registry_version == 23
+    assert len(resource_registry.permissions) == 114
     assert len(resource_registry.page_resources) == 14
-    assert len(resource_registry.api_resources) == 147
-    assert len(resource_registry.menus) == 132
-    assert len(resource_registry.menu_api_bindings) == 140
+    assert len(resource_registry.api_resources) == 151
+    assert len(resource_registry.menus) == 136
+    assert len(resource_registry.menu_api_bindings) == 144
     assert registry_openapi_violations() == ()
 
 
@@ -46,6 +46,12 @@ def test_new_workspace_owner_gets_operations_permissions_but_member_does_not() -
     """新建个人和企业空间必须与 0039 对历史 Owner 的回填结果一致。"""
 
     assert {"operations.records.read", "operations.outbox.replay"}.issubset(OWNER_PERMISSION_CODES)
+    assert {
+        "workspace.lifecycle.regulatory_policy.manage",
+        "workspace.lifecycle.legal_hold.create",
+        "workspace.lifecycle.legal_hold.release",
+        "workspace.lifecycle.compliance_proof.read",
+    }.issubset(OWNER_PERMISSION_CODES)
     assert {
         "knowledge.ingestion.cancel",
         "operations.index.inspect",

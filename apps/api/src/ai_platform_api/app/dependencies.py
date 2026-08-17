@@ -108,8 +108,13 @@ from ai_platform_api.modules.knowledge.infrastructure.upload_security import (
     BoundedUploadInspector,
     DeterministicUploadScanner,
 )
+from ai_platform_api.modules.lifecycle.application.compliance import RegulatoryComplianceService
 from ai_platform_api.modules.lifecycle.application.service import WorkspaceLifecycleService
 from ai_platform_api.modules.lifecycle.infrastructure.cache import ValkeyWorkspaceCacheCleaner
+from ai_platform_api.modules.lifecycle.infrastructure.compliance import (
+    SqlAlchemyLifecycleComplianceUnitOfWork,
+    UnconfiguredRegulatoryPolicySource,
+)
 from ai_platform_api.modules.lifecycle.infrastructure.sqlalchemy import (
     SqlAlchemyWorkspaceLifecycleStore,
 )
@@ -274,6 +279,7 @@ class ApplicationContainer:
     integration_operations: IntegrationOperationsService | None = None
     operations_workbench: OperationsWorkbenchService | None = None
     workspace_lifecycle: WorkspaceLifecycleService | None = None
+    regulatory_compliance: RegulatoryComplianceService | None = None
     lifecycle_cache: ValkeyWorkspaceCacheCleaner | None = None
     knowledge_facts: KnowledgeFactService | None = None
     knowledge_uploads: KnowledgeUploadService | None = None
@@ -404,6 +410,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         ),
         lifecycle_cache,
         Path(settings.lifecycle_table_registry_path),
+    )
+    regulatory_compliance = RegulatoryComplianceService(
+        SqlAlchemyLifecycleComplianceUnitOfWork(database.sessions),
+        UnconfiguredRegulatoryPolicySource(),
     )
     secret_cipher = EnvelopeSecretCipher(
         MasterKeyFile(settings.master_key_path, settings.master_key_version)
@@ -668,6 +678,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 SqlAlchemyOperationsWorkbenchUnitOfWork(database.sessions)
             ),
             workspace_lifecycle=lifecycle,
+            regulatory_compliance=regulatory_compliance,
             lifecycle_cache=lifecycle_cache,
             organization=OrganizationService(
                 unit_of_work=SqlAlchemyOrganizationUnitOfWork(database.sessions),

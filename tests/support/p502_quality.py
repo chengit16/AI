@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from typing import Protocol
 from uuid import UUID, uuid4
 
 from ai_platform_api.common.request_context import RequestContext
@@ -33,7 +34,17 @@ class QualityHarness:
     quality: QualitySampleService
 
 
-def register(harness: QualityHarness, identity: str) -> RegisteredAccount:
+class QualityRegistrationHarness(Protocol):
+    """描述跨质量节点注册合成账号所需的最小 Harness 接口。"""
+
+    @property
+    def registration(self) -> RegistrationService:
+        """返回临时 Schema 使用的账号注册服务。"""
+
+        ...
+
+
+def register(harness: QualityRegistrationHarness, identity: str) -> RegisteredAccount:
     """注册全合成账号，并返回服务端创建的可信个人空间。"""
 
     result = harness.registration.register(

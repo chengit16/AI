@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 15,
+  "registry_version": 16,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -119,6 +119,10 @@
     { "table": "workspace_usage_counters", "classification": "retained", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_usage_records", "classification": "retained", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "lifecycle_deletion_certificates", "classification": "retained", "export": false, "purge": false, "excluded_columns": [] },
+    { "table": "lifecycle_regulatory_policy_versions", "classification": "retained", "export": false, "purge": false, "excluded_columns": [] },
+    { "table": "lifecycle_legal_holds", "classification": "retained", "export": false, "purge": false, "excluded_columns": [] },
+    { "table": "lifecycle_legal_hold_releases", "classification": "retained", "export": false, "purge": false, "excluded_columns": [] },
+    { "table": "lifecycle_compliance_proofs", "classification": "retained", "export": false, "purge": false, "excluded_columns": [] },
 
     { "table": "lifecycle_export_records", "classification": "lifecycle", "export": false, "purge": false, "excluded_columns": [] },
     { "table": "lifecycle_purge_requests", "classification": "lifecycle", "export": false, "purge": false, "excluded_columns": [] },

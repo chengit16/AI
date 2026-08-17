@@ -24,6 +24,10 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyRegistrationUnitOfWork,
 )
 from ai_platform_api.modules.isolation.application.service import MANAGE_PERMISSION
+from ai_platform_api.modules.lifecycle.application.compliance import (
+    POLICY_MANAGE_PERMISSION,
+    RegulatoryComplianceService,
+)
 from ai_platform_api.modules.lifecycle.application.service import (
     EXPORT_PERMISSION,
     PURGE_PERMISSION,
@@ -113,6 +117,7 @@ from tests.support.p507_isolation import (
     StaticIsolationComplianceSource,
     isolation_service,
 )
+from tests.support.p509_compliance import regulatory_compliance_service
 
 ROOT = Path(__file__).parents[2]
 REGISTRY_PATH = ROOT / "contracts/lifecycle/workspace-table-registry.v1.json"
@@ -140,6 +145,7 @@ class LifecycleHarness:
     registration: RegistrationService
     quality: QualitySampleService
     service: WorkspaceLifecycleService
+    compliance: RegulatoryComplianceService
     minio: Minio
     bucket: str
     valkey: Redis
@@ -200,6 +206,7 @@ def lifecycle_database() -> Iterator[LifecycleHarness]:
             registration,
             QualitySampleService(SqlAlchemyQualityUnitOfWork(sessions)),
             service,
+            regulatory_compliance_service(sessions),
             minio,
             bucket,
             valkey,
@@ -248,6 +255,15 @@ def _context(account: RegisteredAccount, permission: str) -> RequestContext:
         authorized_policy_decision_id=uuid4(),
         authorized_policy_version=17,
         authorized_workspace=True,
+    )
+
+
+def _publish_synthetic_policy(harness: LifecycleHarness, account: RegisteredAccount) -> None:
+    """破坏性生命周期回归显式发布合成策略，不把未知法域当作已配置。"""
+
+    harness.compliance.publish_policy(
+        _context(account, POLICY_MANAGE_PERMISSION),
+        workspace_id=account.workspace_id,
     )
 
 
@@ -455,6 +471,7 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
         target,
         other,
     )
+    _publish_synthetic_policy(lifecycle_database, target)
 
     # 1. 新注册 Owner 必须立即拥有三项权限，导出包只含目标空间且排除 Key 摘要。
     with lifecycle_database.sessions() as session:
@@ -717,6 +734,7 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
 
 def test_retention_respects_frozen_time_boundaries(lifecycle_database: LifecycleHarness) -> None:
     account = _register(lifecycle_database, uuid4().hex)
+    _publish_synthetic_policy(lifecycle_database, account)
     now = datetime(2026, 8, 15, 10, 0, tzinfo=UTC)
     old_audit_id, current_audit_id = uuid4(), uuid4()
     old_usage_id, current_usage_id = uuid4(), uuid4()
@@ -813,6 +831,7 @@ def test_concurrent_retention_reuses_one_idempotent_run(
     lifecycle_database: LifecycleHarness,
 ) -> None:
     account = _register(lifecycle_database, uuid4().hex)
+    _publish_synthetic_policy(lifecycle_database, account)
     context = _context(account, RETENTION_PERMISSION)
     now = datetime(2026, 8, 15, 11, 0, tzinfo=UTC)
 

@@ -861,6 +861,51 @@ class KnowledgeDocumentSummaryResponse(typing.TypedDict):
     visibility: typing.Literal["private", "workspace", "departments"]
 
 
+class LegalHoldBody(typing.TypedDict):
+    case_reference_digest: str
+    reason_code: str
+
+
+class LegalHoldReleaseBody(typing.TypedDict):
+    reason_code: str
+    release_evidence_digest: str
+
+
+class LegalHoldReleaseResponse(typing.TypedDict):
+    legal_hold_id: str
+    reason_code: str
+    release_evidence_digest: str
+    release_id: str
+    released_at: str
+
+
+class LegalHoldResponse(typing.TypedDict):
+    activated_at: str
+    case_reference_digest: str
+    legal_hold_id: str
+    reason_code: str
+    regulatory_policy_id: str
+    scope_digest: str
+    scope_type: str
+
+
+class LifecycleComplianceProofResponse(typing.TypedDict):
+    active_hold_count: int
+    compliance_proof_id: str
+    created_at: str
+    decision: str
+    external_review_status: str
+    hold_set_digest: str
+    operation: str
+    operation_id: str
+    policy_digest: str | None
+    proof_digest: str
+    reason_codes: list[str]
+    regulatory_policy_id: str | None
+    request_hash: str
+    request_key_digest: str
+
+
 class LifecycleExportResponse(typing.TypedDict):
     bundle_sha256: str | None
     bundle_size_bytes: int | None
@@ -1245,6 +1290,18 @@ class RegistrationRequest(typing.TypedDict):
 class RegistrationResponse(typing.TypedDict):
     account_id: str
     personal_workspace_id: str
+
+
+class RegulatoryPolicyResponse(typing.TypedDict):
+    created_at: str
+    external_review_digest: str | None
+    external_review_status: str
+    jurisdiction_codes: list[str]
+    jurisdiction_status: str
+    policy_digest: str
+    policy_version: int
+    regulatory_policy_id: str
+    retention_period_days: dict[str, int]
 
 
 class ReleaseOperationsMetricsResponse(typing.TypedDict):

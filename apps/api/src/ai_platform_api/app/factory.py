@@ -103,6 +103,7 @@ def create_app(
     application.state.integration_operations_service = dependencies.integration_operations
     application.state.operations_workbench_service = dependencies.operations_workbench
     application.state.workspace_lifecycle_service = dependencies.workspace_lifecycle
+    application.state.regulatory_compliance_service = dependencies.regulatory_compliance
     application.state.organization_service = dependencies.organization
     application.state.role_service = dependencies.roles
     application.state.resource_registry = dependencies.resource_registry

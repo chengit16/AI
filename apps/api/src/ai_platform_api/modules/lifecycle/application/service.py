@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.lifecycle.application.bundle import build_workspace_export_bundle
+from ai_platform_api.modules.lifecycle.domain.compliance import LifecycleOperationBlockedError
 from ai_platform_api.modules.lifecycle.domain.models import (
     DeletionCertificate,
     LifecycleExport,
@@ -72,6 +73,12 @@ class LifecycleUnavailableError(PlatformError):
     """生命周期跨存储步骤暂时失败，可使用同一幂等键重试。"""
 
     error_code = "DEPENDENCY_UNAVAILABLE"
+
+
+class LifecycleComplianceBlockedError(PlatformError):
+    """未知法域、拒绝审核或活动法律保留阻止破坏性操作。"""
+
+    error_code = "STATE_CONFLICT"
 
 
 class WorkspaceLifecycleService:
@@ -231,7 +238,12 @@ class WorkspaceLifecycleService:
                 completed_at=None,
             )
             self._store.assert_registry_coverage(self._registry)
-            purge = self._store.add_purge(purge)
+            try:
+                purge = self._store.add_purge(purge)
+            except LifecycleOperationBlockedError as error:
+                raise LifecycleComplianceBlockedError from error
+            except LifecycleDependencyError as error:
+                raise LifecycleUnavailableError from error
             if purge.request_hash != request_hash:
                 raise LifecycleIdempotencyConflictError
         try:
@@ -282,6 +294,7 @@ class WorkspaceLifecycleService:
     ) -> RetentionRun:
         """执行冻结保留期，并确保同一运行只删除一次。"""
 
+        # 1. 先校验授权并复用已有运行，重复请求不得产生新的删除边界。
         self._require(context, workspace_id, RETENTION_PERMISSION)
         account_id = _require_browser_subject(context)
         _require_idempotency_key(idempotency_key)
@@ -295,6 +308,8 @@ class WorkspaceLifecycleService:
                 )
             return previous
         now = requested_at or datetime.now(UTC)
+        request_hash = _request_hash({"workspace_id": str(workspace_id), "operation": "retention"})
+        # 2. 新请求先原子认领运行事实，再使用获胜事实冻结的时间执行删除。
         run = RetentionRun(
             retention_run_id=uuid4(),
             workspace_id=workspace_id,
@@ -307,8 +322,14 @@ class WorkspaceLifecycleService:
             created_at=now,
             completed_at=None,
             error_code=None,
+            request_hash=request_hash,
         )
-        run = self._store.add_retention_run(run)
+        try:
+            run = self._store.add_retention_run(run)
+        except LifecycleOperationBlockedError as error:
+            raise LifecycleComplianceBlockedError from error
+        except LifecycleDependencyError as error:
+            raise LifecycleUnavailableError from error
         # 并发认领失败方使用获胜事实的创建时间，避免同一运行出现两套截止边界。
         return self._store.execute_retention(run.retention_run_id, context, run.created_at)
 

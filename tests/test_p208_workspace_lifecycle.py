@@ -28,7 +28,7 @@ def test_registry_classifies_credentials_and_dependent_facts() -> None:
     dependent = {item.table: item for item in registry.dependent_tables}
 
     assert registry.schema_version == 1
-    assert registry.registry_version == 15
+    assert registry.registry_version == 16
     assert policies["workspaces"].classification == "governance"
     assert policies["workspaces"].purge is False
     assert policies["workspace_resources"].classification == "business"
@@ -70,6 +70,15 @@ def test_registry_classifies_credentials_and_dependent_facts() -> None:
     assert policies["l3_isolation_migration_checkpoints"].purge is False
     assert policies["l3_isolation_recovery_records"].purge is False
     assert policies["workspace_isolation_route_versions"].purge is False
+    for table_name in (
+        "lifecycle_regulatory_policy_versions",
+        "lifecycle_legal_holds",
+        "lifecycle_legal_hold_releases",
+        "lifecycle_compliance_proofs",
+    ):
+        assert policies[table_name].classification == "retained"
+        assert policies[table_name].export is False
+        assert policies[table_name].purge is False
     assert dependent["consumer_receipts"].parent_table == "outbox_events"
     assert dependent["retrieval_query_variants"].parent_table == "retrieval_plans"
     assert dependent["retrieval_candidate_snapshots"].parent_table == "retrieval_plans"

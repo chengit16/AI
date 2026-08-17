@@ -6781,6 +6781,7 @@ lifecycle_export_records = Table(
     Column("workspace_id", UUID(as_uuid=True), nullable=False),
     Column("idempotency_key", String(128), nullable=False),
     Column("request_hash", String(64), nullable=False),
+    Column("compliance_proof_id", UUID(as_uuid=True), nullable=True),
     Column("status", String(32), nullable=False),
     Column("registry_version", Integer, nullable=False),
     Column("object_key", String(2048), nullable=True),
@@ -6840,6 +6841,7 @@ lifecycle_purge_requests = Table(
     Column("workspace_id", UUID(as_uuid=True), nullable=False),
     Column("idempotency_key", String(128), nullable=False),
     Column("request_hash", String(64), nullable=False),
+    Column("compliance_proof_id", UUID(as_uuid=True), nullable=True),
     Column("reason_code", String(64), nullable=False),
     Column("confirmed_workspace_name", String(120), nullable=False),
     Column("status", String(32), nullable=False),
@@ -6934,6 +6936,9 @@ lifecycle_retention_runs = Table(
     Column("retention_run_id", UUID(as_uuid=True), primary_key=True),
     Column("workspace_id", UUID(as_uuid=True), nullable=False),
     Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=True),
+    Column("regulatory_policy_id", UUID(as_uuid=True), nullable=True),
+    Column("compliance_proof_id", UUID(as_uuid=True), nullable=True),
     Column("status", String(32), nullable=False),
     Column("cutoffs", JSONB, nullable=False),
     Column("deleted_table_counts", JSONB, nullable=False),
@@ -6974,6 +6979,191 @@ lifecycle_retention_runs = Table(
         name="ck_lifecycle_retention_completion",
     ),
 )
+
+lifecycle_regulatory_policy_versions = Table(
+    "lifecycle_regulatory_policy_versions",
+    metadata,
+    Column("regulatory_policy_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("jurisdiction_status", String(24), nullable=False),
+    Column("jurisdiction_codes", ARRAY(String(32)), nullable=False),
+    Column("retention_period_days", JSONB, nullable=False),
+    Column("external_review_status", String(24), nullable=False),
+    Column("external_review_digest", String(64), nullable=True),
+    Column("policy_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "regulatory_policy_id",
+        "workspace_id",
+        name="uq_lifecycle_regulatory_policies_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "policy_version",
+        name="uq_lifecycle_regulatory_policies_version",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_lifecycle_regulatory_policies_workspace",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "policy_version >= 1 AND policy_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_lifecycle_regulatory_policies_identity",
+    ),
+    CheckConstraint(
+        "jurisdiction_status IN ('not_configured', 'configured') "
+        "AND external_review_status IN ('not_configured', 'approved', 'rejected')",
+        name="ck_lifecycle_regulatory_policies_status",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(retention_period_days) = 'object'",
+        name="ck_lifecycle_regulatory_policies_retention",
+    ),
+)
+
+lifecycle_legal_holds = Table(
+    "lifecycle_legal_holds",
+    metadata,
+    Column("legal_hold_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("regulatory_policy_id", UUID(as_uuid=True), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("scope_type", String(24), nullable=False),
+    Column("scope_digest", String(64), nullable=False),
+    Column("case_reference_digest", String(64), nullable=False),
+    Column("reason_code", String(64), nullable=False),
+    Column("activated_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("activated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "legal_hold_id",
+        "workspace_id",
+        name="uq_lifecycle_legal_holds_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_lifecycle_legal_holds_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["regulatory_policy_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.lifecycle_regulatory_policy_versions.regulatory_policy_id",
+            f"{SCHEMA_TOKEN}.lifecycle_regulatory_policy_versions.workspace_id",
+        ],
+        name="fk_lifecycle_legal_holds_policy",
+    ),
+    CheckConstraint(
+        "scope_type = 'workspace' AND request_hash ~ '^[0-9a-f]{64}$' "
+        "AND scope_digest ~ '^[0-9a-f]{64}$' "
+        "AND case_reference_digest ~ '^[0-9a-f]{64}$' "
+        "AND reason_code ~ '^[A-Z][A-Z0-9_]{2,63}$'",
+        name="ck_lifecycle_legal_holds_evidence",
+    ),
+)
+
+lifecycle_legal_hold_releases = Table(
+    "lifecycle_legal_hold_releases",
+    metadata,
+    Column("release_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("legal_hold_id", UUID(as_uuid=True), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("reason_code", String(64), nullable=False),
+    Column("release_evidence_digest", String(64), nullable=False),
+    Column("released_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("released_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "legal_hold_id",
+        name="uq_lifecycle_legal_hold_releases_hold",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_lifecycle_legal_hold_releases_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["legal_hold_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.lifecycle_legal_holds.legal_hold_id",
+            f"{SCHEMA_TOKEN}.lifecycle_legal_holds.workspace_id",
+        ],
+        name="fk_lifecycle_legal_hold_releases_hold",
+    ),
+    CheckConstraint(
+        "request_hash ~ '^[0-9a-f]{64}$' "
+        "AND release_evidence_digest ~ '^[0-9a-f]{64}$' "
+        "AND reason_code ~ '^[A-Z][A-Z0-9_]{2,63}$'",
+        name="ck_lifecycle_legal_hold_releases_evidence",
+    ),
+)
+
+lifecycle_compliance_proofs = Table(
+    "lifecycle_compliance_proofs",
+    metadata,
+    Column("compliance_proof_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("operation", String(24), nullable=False),
+    Column("operation_id", UUID(as_uuid=True), nullable=False),
+    Column("request_key_digest", String(64), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("decision", String(24), nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("regulatory_policy_id", UUID(as_uuid=True), nullable=True),
+    Column("policy_digest", String(64), nullable=True),
+    Column("external_review_status", String(24), nullable=False),
+    Column("active_hold_count", Integer, nullable=False),
+    Column("hold_set_digest", String(64), nullable=False),
+    Column("proof_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "operation",
+        "request_key_digest",
+        name="uq_lifecycle_compliance_proofs_request",
+    ),
+    UniqueConstraint(
+        "compliance_proof_id",
+        "workspace_id",
+        "operation",
+        "operation_id",
+        name="uq_lifecycle_compliance_proofs_operation",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_lifecycle_compliance_proofs_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["regulatory_policy_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.lifecycle_regulatory_policy_versions.regulatory_policy_id",
+            f"{SCHEMA_TOKEN}.lifecycle_regulatory_policy_versions.workspace_id",
+        ],
+        name="fk_lifecycle_compliance_proofs_policy",
+    ),
+    CheckConstraint(
+        "operation IN ('export', 'purge', 'retention') "
+        "AND decision IN ('allowed', 'blocked', 'not_configured') "
+        "AND external_review_status IN ('not_configured', 'approved', 'rejected')",
+        name="ck_lifecycle_compliance_proofs_decision",
+    ),
+    CheckConstraint(
+        "request_key_digest ~ '^[0-9a-f]{64}$' AND request_hash ~ '^[0-9a-f]{64}$' "
+        "AND hold_set_digest ~ '^[0-9a-f]{64}$' AND proof_digest ~ '^[0-9a-f]{64}$' "
+        "AND (policy_digest IS NULL OR policy_digest ~ '^[0-9a-f]{64}$') "
+        "AND active_hold_count >= 0 AND cardinality(reason_codes) >= 1",
+        name="ck_lifecycle_compliance_proofs_evidence",
+    ),
+)
 Index(
     "ix_lifecycle_exports_workspace_created",
     lifecycle_export_records.c.workspace_id,
@@ -6993,6 +7183,26 @@ Index(
     "ix_lifecycle_retention_workspace_created",
     lifecycle_retention_runs.c.workspace_id,
     lifecycle_retention_runs.c.created_at,
+)
+Index(
+    "ix_lifecycle_regulatory_policies_workspace_created",
+    lifecycle_regulatory_policy_versions.c.workspace_id,
+    lifecycle_regulatory_policy_versions.c.created_at,
+)
+Index(
+    "ix_lifecycle_legal_holds_workspace_activated",
+    lifecycle_legal_holds.c.workspace_id,
+    lifecycle_legal_holds.c.activated_at,
+)
+Index(
+    "ix_lifecycle_legal_hold_releases_workspace_released",
+    lifecycle_legal_hold_releases.c.workspace_id,
+    lifecycle_legal_hold_releases.c.released_at,
+)
+Index(
+    "ix_lifecycle_compliance_proofs_workspace_created",
+    lifecycle_compliance_proofs.c.workspace_id,
+    lifecycle_compliance_proofs.c.created_at,
 )
 Index(
     "ix_retrieval_chunks_document_sequence",
