@@ -21,6 +21,7 @@ CONTRACT_DIRS = (
     "release",
     "agent-control",
     "tool-execution",
+    "quality",
 )
 
 

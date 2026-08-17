@@ -36,6 +36,11 @@ from ai_platform_api.modules.lifecycle.infrastructure.sqlalchemy import (
 from ai_platform_api.modules.lifecycle.infrastructure.storage import (
     MinioLifecycleObjectStorage,
 )
+from ai_platform_api.modules.quality.application.service import QualitySampleService
+from ai_platform_api.modules.quality.domain.models import QualitySampleCapture
+from ai_platform_api.modules.quality.infrastructure.sqlalchemy import (
+    SqlAlchemyQualityUnitOfWork,
+)
 from ai_platform_api.persistence.database import create_platform_engine, create_session_factory
 from ai_platform_api.persistence.tables import (
     audit_records,
@@ -43,6 +48,9 @@ from ai_platform_api.persistence.tables import (
     lifecycle_retention_runs,
     open_api_keys,
     outbox_events,
+    quality_dataset_members,
+    quality_dataset_versions,
+    quality_sample_versions,
     role_permission_grants,
     stream_events,
     workspace_memberships,
@@ -82,6 +90,7 @@ class LifecycleHarness:
     engine: Engine
     sessions: sessionmaker[Session]
     registration: RegistrationService
+    quality: QualitySampleService
     service: WorkspaceLifecycleService
     minio: Minio
     bucket: str
@@ -137,7 +146,16 @@ def lifecycle_database() -> Iterator[LifecycleHarness]:
         REGISTRY_PATH,
     )
     try:
-        yield LifecycleHarness(engine, sessions, registration, service, minio, bucket, valkey)
+        yield LifecycleHarness(
+            engine,
+            sessions,
+            registration,
+            QualitySampleService(SqlAlchemyQualityUnitOfWork(sessions)),
+            service,
+            minio,
+            bucket,
+            valkey,
+        )
     finally:
         cache.close()
         for item in minio.list_objects(bucket, recursive=True):
@@ -260,6 +278,24 @@ def _seed_export_and_purge_facts(
             )
         )
     object_key = _put_object(harness, target.workspace_id, b"synthetic-p208-export-object")
+    for account, suffix in ((target, "target"), (other, "other")):
+        harness.quality.capture(
+            _context(account, "assistant.feedback.manage"),
+            QualitySampleCapture(
+                source_type="user_feedback",
+                source_workspace_id=account.workspace_id,
+                source_id=uuid4(),
+                source_version=1,
+                resource_id=uuid4(),
+                signal_code="unhelpful",
+                reason_codes=("incorrect",),
+                input_text=f"synthetic-p208-quality-{suffix}-input",
+                output_text=f"synthetic-p208-quality-{suffix}-output",
+                feedback_text=None,
+                correction_text=None,
+                source_security_level="PUBLIC",
+            ),
+        )
     cache_key = f"effective-roles:v1:{target.workspace_id}:{uuid4()}:1"
     harness.valkey.set(cache_key, "synthetic-p208-cache", ex=300)
     return resource_id, other_resource_id, object_key
@@ -314,10 +350,18 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             json.loads(line) for line in archive.read("tables/open_api_keys.jsonl").splitlines()
         ]
         manifest = json.loads(archive.read("manifest.json"))
+        quality_rows = [
+            json.loads(line)
+            for line in archive.read("tables/quality_sample_versions.jsonl").splitlines()
+        ]
     assert {row["resource_id"] for row in resource_rows} == {str(resource_id)}
     assert str(other_resource_id) not in json.dumps(resource_rows)
     assert key_rows[0]["last_four"] == "0208"
     assert "secret_digest" not in key_rows[0]
+    assert len(quality_rows) == 1
+    assert quality_rows[0]["workspace_id"] == str(target.workspace_id)
+    assert "synthetic-p208-quality-target-input" not in json.dumps(quality_rows)
+    assert "synthetic-p208-quality-other-input" not in json.dumps(quality_rows)
     assert {item["object_key"] for item in manifest["objects"]} == {object_key}
 
     # 2. 普通事务仍不能删审计；正式清除后业务、对象、缓存为空而空间壳层和证明保留。
@@ -352,6 +396,19 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             )
             == 0
         )
+        for quality_table in (
+            quality_sample_versions,
+            quality_dataset_versions,
+            quality_dataset_members,
+        ):
+            assert (
+                session.scalar(
+                    select(func.count())
+                    .select_from(quality_table)
+                    .where(quality_table.c.workspace_id == target.workspace_id)
+                )
+                == 0
+            )
         assert (
             session.scalar(
                 select(func.count())
@@ -406,8 +463,14 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
                 workspace_resources.c.resource_id == other_resource_id
             )
         )
+        other_quality_count = session.scalar(
+            select(func.count())
+            .select_from(quality_sample_versions)
+            .where(quality_sample_versions.c.workspace_id == other.workspace_id)
+        )
     assert target_events == ("workspace.lifecycle.purge_completed",)
     assert other_resource == other_resource_id
+    assert other_quality_count == 1
     assert (
         tuple(
             lifecycle_database.minio.list_objects(

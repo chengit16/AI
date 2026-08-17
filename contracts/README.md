@@ -15,6 +15,7 @@
 | `reliability/`   | 可靠性不变量、SLO、保留期、传播时限和故障场景契约            |
 | `agent-control/` | Agent 草稿、发布快照、服务路由、运行绑定和阶段安全基线       |
 | `tool-execution/` | 工具定义、任务状态、确认、幂等、取消和阶段安全基线          |
+| `quality/`       | 质量样本来源、授权投影、摘要、版本和删除传播契约             |
 | `fixtures/`      | Python 和未来 Go 实现共用的 Golden Fixtures                  |
 
 ## 2. 版本规则

@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "baseline_id": "p5-02-v1",
+  "status": "frozen",
+  "synthetic": true,
+  "description": "阶段五质量样本闭环全合成固定基线，不包含真实客户、供应商、Prompt、凭证或线上反馈数据。",
+  "persistence_mode": "sha256_only",
+  "deletion_behavior": "append_tombstone_and_remove_active_member",
+  "source_contracts": [
+    {
+      "source_type": "run_failure",
+      "permission_code": "operations.records.read",
+      "required_text_fields": ["input_text"]
+    },
+    {
+      "source_type": "user_feedback",
+      "permission_code": "assistant.feedback.manage",
+      "required_text_fields": ["input_text", "output_text"]
+    },
+    {
+      "source_type": "human_correction",
+      "permission_code": "agent.test.execute",
+      "required_text_fields": ["input_text", "output_text", "correction_text"]
+    }
+  ],
+  "capture_cases": [
+    {
+      "case_id": "p502-run-failure-001",
+      "synthetic": true,
+      "source_type": "run_failure",
+      "source_workspace_id": "55000000-0000-4000-8000-000000000500",
+      "source_id": "55000000-0000-4000-8000-000000000001",
+      "source_version": 1,
+      "resource_id": "55000000-0000-4000-8000-000000000101",
+      "permission_code": "operations.records.read",
+      "signal_code": "model_timeout",
+      "reason_codes": ["timeout"],
+      "source_security_level": "INTERNAL",
+      "input_text": "合成问题:退款规则是什么?",
+      "output_text": null,
+      "feedback_text": null,
+      "correction_text": null,
+      "expected_digests": {
+        "input_digest": "e933e3e24bc479bac9f721130c5193bbcbd7cbbf53a7ab841258de7e607313f4",
+        "output_digest": null,
+        "feedback_digest": null,
+        "correction_digest": null
+      }
+    },
+    {
+      "case_id": "p502-user-feedback-002",
+      "synthetic": true,
+      "source_type": "user_feedback",
+      "source_workspace_id": "55000000-0000-4000-8000-000000000500",
+      "source_id": "55000000-0000-4000-8000-000000000002",
+      "source_version": 1,
+      "resource_id": "55000000-0000-4000-8000-000000000102",
+      "permission_code": "assistant.feedback.manage",
+      "signal_code": "unhelpful",
+      "reason_codes": ["incorrect", "missing_source"],
+      "source_security_level": "INTERNAL",
+      "input_text": "合成问题:退款规则是什么?",
+      "output_text": "合成回答:可以无限期退款。",
+      "feedback_text": "合成反馈:规则与引用不一致。",
+      "correction_text": null,
+      "expected_digests": {
+        "input_digest": "e933e3e24bc479bac9f721130c5193bbcbd7cbbf53a7ab841258de7e607313f4",
+        "output_digest": "8c63bf3410e77568cdf4a43be18837d45b909273d4df092d07bdb4966de676aa",
+        "feedback_digest": "8cc439cdba2079d6c98a7e0c923160c2a70b97ab4bb865dff4113592bebf1bb4",
+        "correction_digest": null
+      }
+    },
+    {
+      "case_id": "p502-human-correction-003",
+      "synthetic": true,
+      "source_type": "human_correction",
+      "source_workspace_id": "55000000-0000-4000-8000-000000000500",
+      "source_id": "55000000-0000-4000-8000-000000000003",
+      "source_version": 1,
+      "resource_id": "55000000-0000-4000-8000-000000000103",
+      "permission_code": "agent.test.execute",
+      "signal_code": "corrected",
+      "reason_codes": ["incorrect"],
+      "source_security_level": "INTERNAL",
+      "input_text": "合成问题:退款规则是什么?",
+      "output_text": "合成回答:可以无限期退款。",
+      "feedback_text": null,
+      "correction_text": "合成人工修正:退款期限为七天。",
+      "expected_digests": {
+        "input_digest": "e933e3e24bc479bac9f721130c5193bbcbd7cbbf53a7ab841258de7e607313f4",
+        "output_digest": "8c63bf3410e77568cdf4a43be18837d45b909273d4df092d07bdb4966de676aa",
+        "feedback_digest": null,
+        "correction_digest": "f710ba264314c44442db8394b2f94dd3a2d67d0630e82a716c85bb81ec32c8f8"
+      }
+    }
+  ],
+  "deletion_case": {
+    "case_id": "p502-source-deletion-004",
+    "synthetic": true,
+    "source_type": "user_feedback",
+    "source_workspace_id": "55000000-0000-4000-8000-000000000500",
+    "source_id": "55000000-0000-4000-8000-000000000002",
+    "source_version": 2,
+    "resource_id": "55000000-0000-4000-8000-000000000102",
+    "permission_code": "assistant.feedback.manage",
+    "reason_code": "source_deleted",
+    "source_security_level": "INTERNAL",
+    "expected_operation": "deleted"
+  },
+  "external_evidence": {
+    "real_online_feedback": "not_run",
+    "real_model_quality": "not_run"
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/quality/quality-sample-baseline.v1.schema.json",
+  "title": "质量样本全合成基线 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "status",
+    "synthetic",
+    "description",
+    "persistence_mode",
+    "deletion_behavior",
+    "source_contracts",
+    "capture_cases",
+    "deletion_case",
+    "external_evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "baseline_id": { "const": "p5-02-v1" },
+    "status": { "const": "frozen" },
+    "synthetic": { "const": true },
+    "description": { "type": "string", "minLength": 1 },
+    "persistence_mode": { "const": "sha256_only" },
+    "deletion_behavior": { "const": "append_tombstone_and_remove_active_member" },
+    "source_contracts": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/source_contract" }
+    },
+    "capture_cases": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/capture_case" }
+    },
+    "deletion_case": { "$ref": "#/$defs/deletion_case" },
+    "external_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["real_online_feedback", "real_model_quality"],
+      "properties": {
+        "real_online_feedback": { "const": "not_run" },
+        "real_model_quality": { "const": "not_run" }
+      }
+    }
+  },
+  "$defs": {
+    "source_type": {
+      "enum": ["run_failure", "user_feedback", "human_correction"]
+    },
+    "security_level": {
+      "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{1,63}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullable_text": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "minLength": 1, "maxLength": 128000 }
+      ]
+    },
+    "nullable_digest": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/digest" }
+      ]
+    },
+    "source_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "permission_code", "required_text_fields"],
+      "properties": {
+        "source_type": { "$ref": "#/$defs/source_type" },
+        "permission_code": { "type": "string", "minLength": 1 },
+        "required_text_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["input_text", "output_text", "feedback_text", "correction_text"]
+          }
+        }
+      }
+    },
+    "expected_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_digest",
+        "output_digest",
+        "feedback_digest",
+        "correction_digest"
+      ],
+      "properties": {
+        "input_digest": { "$ref": "#/$defs/nullable_digest" },
+        "output_digest": { "$ref": "#/$defs/nullable_digest" },
+        "feedback_digest": { "$ref": "#/$defs/nullable_digest" },
+        "correction_digest": { "$ref": "#/$defs/nullable_digest" }
+      }
+    },
+    "capture_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "synthetic",
+        "source_type",
+        "source_workspace_id",
+        "source_id",
+        "source_version",
+        "resource_id",
+        "permission_code",
+        "signal_code",
+        "reason_codes",
+        "source_security_level",
+        "input_text",
+        "output_text",
+        "feedback_text",
+        "correction_text",
+        "expected_digests"
+      ],
+      "properties": {
+        "case_id": { "type": "string", "pattern": "^p502-[a-z0-9-]+-[0-9]{3}$" },
+        "synthetic": { "const": true },
+        "source_type": { "$ref": "#/$defs/source_type" },
+        "source_workspace_id": { "type": "string", "format": "uuid" },
+        "source_id": { "type": "string", "format": "uuid" },
+        "source_version": { "type": "integer", "minimum": 1 },
+        "resource_id": { "type": "string", "format": "uuid" },
+        "permission_code": { "type": "string", "minLength": 1 },
+        "signal_code": { "$ref": "#/$defs/code" },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/code" }
+        },
+        "source_security_level": { "$ref": "#/$defs/security_level" },
+        "input_text": { "$ref": "#/$defs/nullable_text" },
+        "output_text": { "$ref": "#/$defs/nullable_text" },
+        "feedback_text": { "$ref": "#/$defs/nullable_text" },
+        "correction_text": { "$ref": "#/$defs/nullable_text" },
+        "expected_digests": { "$ref": "#/$defs/expected_digests" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source_type": { "const": "run_failure" } } },
+          "then": { "properties": { "input_text": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "source_type": { "const": "user_feedback" } } },
+          "then": {
+            "properties": {
+              "input_text": { "type": "string" },
+              "output_text": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "source_type": { "const": "human_correction" } } },
+          "then": {
+            "properties": {
+              "input_text": { "type": "string" },
+              "output_text": { "type": "string" },
+              "correction_text": { "type": "string" }
+            }
+          }
+        }
+      ]
+    },
+    "deletion_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "synthetic",
+        "source_type",
+        "source_workspace_id",
+        "source_id",
+        "source_version",
+        "resource_id",
+        "permission_code",
+        "reason_code",
+        "source_security_level",
+        "expected_operation"
+      ],
+      "properties": {
+        "case_id": { "type": "string", "pattern": "^p502-[a-z0-9-]+-[0-9]{3}$" },
+        "synthetic": { "const": true },
+        "source_type": { "$ref": "#/$defs/source_type" },
+        "source_workspace_id": { "type": "string", "format": "uuid" },
+        "source_id": { "type": "string", "format": "uuid" },
+        "source_version": { "type": "integer", "minimum": 1 },
+        "resource_id": { "type": "string", "format": "uuid" },
+        "permission_code": { "type": "string", "minLength": 1 },
+        "reason_code": { "$ref": "#/$defs/code" },
+        "source_security_level": { "$ref": "#/$defs/security_level" },
+        "expected_operation": { "const": "deleted" }
+      }
+    }
+  }
+}

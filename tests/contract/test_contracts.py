@@ -92,6 +92,13 @@ def test_tool_execution_baseline_contract() -> None:
     )
 
 
+def test_quality_sample_baseline_contract() -> None:
+    assert_valid(
+        "quality/quality-sample-baseline.v1.schema.json",
+        "quality/quality-sample-baseline.v1.json",
+    )
+
+
 def test_policy_contract_fixture() -> None:
     assert_valid(
         "policy/decision.v1.schema.json",

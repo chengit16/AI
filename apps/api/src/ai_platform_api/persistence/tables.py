@@ -5210,6 +5210,208 @@ Index(
     message_feedbacks.c.updated_at,
 )
 
+quality_sample_versions = Table(
+    "quality_sample_versions",
+    metadata,
+    Column("sample_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("logical_sample_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("source_type", String(32), nullable=False),
+    Column("source_id", UUID(as_uuid=True), nullable=False),
+    Column("source_version", Integer, nullable=False),
+    Column("resource_id", UUID(as_uuid=True), nullable=False),
+    Column("operation", String(16), nullable=False),
+    Column("signal_code", String(64), nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("source_digest", String(64), nullable=False),
+    Column("input_digest", String(64), nullable=True),
+    Column("output_digest", String(64), nullable=True),
+    Column("feedback_digest", String(64), nullable=True),
+    Column("correction_digest", String(64), nullable=True),
+    Column("supersedes_sample_version_id", UUID(as_uuid=True), nullable=True),
+    Column("authorized_permission_code", String(160), nullable=False),
+    Column("policy_decision_id", UUID(as_uuid=True), nullable=False),
+    Column("policy_version", Integer, nullable=False),
+    Column("workspace_scope", Boolean, nullable=False),
+    Column("department_scope_ids", ARRAY(UUID(as_uuid=True)), nullable=False),
+    Column("account_scope_ids", ARRAY(UUID(as_uuid=True)), nullable=False),
+    Column("resource_scope_ids", ARRAY(UUID(as_uuid=True)), nullable=False),
+    Column("field_mask", ARRAY(String(128)), nullable=False),
+    Column("maximum_security_level", String(32), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "sample_version_id",
+        "workspace_id",
+        name="uq_quality_samples_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "source_type",
+        "source_id",
+        "source_version",
+        name="uq_quality_samples_source_version",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_quality_samples_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["supersedes_sample_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_sample_versions.sample_version_id",
+            f"{SCHEMA_TOKEN}.quality_sample_versions.workspace_id",
+        ],
+        name="fk_quality_samples_superseded",
+    ),
+    CheckConstraint(
+        "source_type IN ('run_failure', 'user_feedback', 'human_correction')",
+        name="ck_quality_samples_source_type",
+    ),
+    CheckConstraint("source_version >= 1", name="ck_quality_samples_source_version"),
+    CheckConstraint(
+        "operation IN ('upsert', 'deleted')",
+        name="ck_quality_samples_operation",
+    ),
+    CheckConstraint(
+        "signal_code ~ '^[a-z][a-z0-9_.-]{1,63}$'",
+        name="ck_quality_samples_signal_code",
+    ),
+    CheckConstraint(
+        "cardinality(reason_codes) <= 16",
+        name="ck_quality_samples_reason_codes",
+    ),
+    CheckConstraint(
+        "source_digest ~ '^[0-9a-f]{64}$' "
+        "AND (input_digest IS NULL OR input_digest ~ '^[0-9a-f]{64}$') "
+        "AND (output_digest IS NULL OR output_digest ~ '^[0-9a-f]{64}$') "
+        "AND (feedback_digest IS NULL OR feedback_digest ~ '^[0-9a-f]{64}$') "
+        "AND (correction_digest IS NULL OR correction_digest ~ '^[0-9a-f]{64}$')",
+        name="ck_quality_samples_digests",
+    ),
+    CheckConstraint(
+        "(operation = 'upsert' AND num_nonnulls(input_digest, output_digest, "
+        "feedback_digest, correction_digest) >= 1) OR "
+        "(operation = 'deleted' AND num_nonnulls(input_digest, output_digest, "
+        "feedback_digest, correction_digest) = 0)",
+        name="ck_quality_samples_content_operation",
+    ),
+    CheckConstraint("policy_version >= 1", name="ck_quality_samples_policy_version"),
+    CheckConstraint(
+        "maximum_security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
+        name="ck_quality_samples_security_level",
+    ),
+)
+Index(
+    "ix_quality_samples_workspace_source",
+    quality_sample_versions.c.workspace_id,
+    quality_sample_versions.c.source_type,
+    quality_sample_versions.c.source_id,
+    quality_sample_versions.c.source_version,
+)
+
+quality_dataset_versions = Table(
+    "quality_dataset_versions",
+    metadata,
+    Column("dataset_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("version_number", Integer, nullable=False),
+    Column("previous_dataset_version_id", UUID(as_uuid=True), nullable=True),
+    Column("trigger_sample_version_id", UUID(as_uuid=True), nullable=False),
+    Column("sample_count", Integer, nullable=False),
+    Column("dataset_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "dataset_version_id",
+        "workspace_id",
+        name="uq_quality_datasets_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "version_number",
+        name="uq_quality_datasets_workspace_version",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_quality_datasets_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["previous_dataset_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_dataset_versions.dataset_version_id",
+            f"{SCHEMA_TOKEN}.quality_dataset_versions.workspace_id",
+        ],
+        name="fk_quality_datasets_previous",
+    ),
+    ForeignKeyConstraint(
+        ["trigger_sample_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_sample_versions.sample_version_id",
+            f"{SCHEMA_TOKEN}.quality_sample_versions.workspace_id",
+        ],
+        name="fk_quality_datasets_trigger_sample",
+    ),
+    CheckConstraint("version_number >= 1", name="ck_quality_datasets_version"),
+    CheckConstraint("sample_count >= 0", name="ck_quality_datasets_sample_count"),
+    CheckConstraint(
+        "dataset_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_quality_datasets_digest",
+    ),
+    CheckConstraint(
+        "(version_number = 1 AND previous_dataset_version_id IS NULL) OR "
+        "(version_number > 1 AND previous_dataset_version_id IS NOT NULL)",
+        name="ck_quality_datasets_previous",
+    ),
+)
+Index(
+    "ix_quality_datasets_workspace_version",
+    quality_dataset_versions.c.workspace_id,
+    quality_dataset_versions.c.version_number,
+)
+
+quality_dataset_members = Table(
+    "quality_dataset_members",
+    metadata,
+    Column("dataset_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("sample_version_id", UUID(as_uuid=True), primary_key=True),
+    Column("logical_sample_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    UniqueConstraint(
+        "dataset_version_id",
+        "logical_sample_id",
+        name="uq_quality_dataset_members_logical",
+    ),
+    UniqueConstraint(
+        "dataset_version_id",
+        "position",
+        name="uq_quality_dataset_members_position",
+    ),
+    ForeignKeyConstraint(
+        ["dataset_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_dataset_versions.dataset_version_id",
+            f"{SCHEMA_TOKEN}.quality_dataset_versions.workspace_id",
+        ],
+        name="fk_quality_dataset_members_dataset",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["sample_version_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.quality_sample_versions.sample_version_id",
+            f"{SCHEMA_TOKEN}.quality_sample_versions.workspace_id",
+        ],
+        name="fk_quality_dataset_members_sample",
+    ),
+    CheckConstraint("position >= 1", name="ck_quality_dataset_members_position"),
+)
+
 retrieval_plans = Table(
     "retrieval_plans",
     metadata,
