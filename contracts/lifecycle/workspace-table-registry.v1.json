@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 12,
+  "registry_version": 13,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -87,6 +87,9 @@
     { "table": "quality_evaluation_sample_results", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "quality_operation_windows", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "quality_operation_source_results", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "cost_attribution_windows", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "cost_ledger_entries", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "cost_attribution_lines", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "stream_runs", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "stream_events", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "approval_policies", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

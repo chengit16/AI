@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/quality/quality-cost-attribution-baseline.v1.schema.json",
+  "title": "P5-05 成本归因基线契约",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract_id",
+    "evidence_kinds",
+    "components",
+    "source_components",
+    "amount_policy",
+    "statuses",
+    "reconciliation_reasons",
+    "identity_fields",
+    "real_evidence_requirements"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "contract_id": {"const": "p5-05-v1"},
+    "evidence_kinds": {
+      "type": "array",
+      "items": {"enum": ["synthetic", "authorized_real"]},
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
+    "components": {
+      "type": "array",
+      "const": ["model", "retrieval", "ocr", "indexing", "embedding", "reranker", "tool"]
+    },
+    "source_components": {
+      "type": "object",
+      "const": {
+        "model_attempt": "model",
+        "retrieval_run": "retrieval",
+        "ocr_attempt": "ocr",
+        "index_build": "indexing",
+        "embedding_batch": "embedding",
+        "reranker_request": "reranker",
+        "tool_attempt": "tool"
+      }
+    },
+    "amount_policy": {
+      "type": "object",
+      "required": [
+        "currency",
+        "amount_unit",
+        "rounding",
+        "failed_and_retried_attempts",
+        "evidence_body_persistence"
+      ],
+      "properties": {
+        "currency": {"const": "ISO_4217_uppercase"},
+        "amount_unit": {"const": "integer_minimum_currency_unit"},
+        "rounding": {"const": "ceil_per_ledger_entry"},
+        "failed_and_retried_attempts": {"const": "included"},
+        "evidence_body_persistence": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "statuses": {
+      "type": "object",
+      "required": ["verification", "reconciliation"],
+      "properties": {
+        "verification": {"const": ["not_configured", "not_run", "passed", "failed"]},
+        "reconciliation": {"const": ["not_configured", "not_run", "matched", "explained", "failed"]}
+      },
+      "additionalProperties": false
+    },
+    "reconciliation_reasons": {
+      "type": "array",
+      "const": ["billing_window_timing", "provider_rounding", "provider_discount", "provider_credit", "provider_tax"]
+    },
+    "identity_fields": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 12,
+      "uniqueItems": true
+    },
+    "real_evidence_requirements": {
+      "type": "object",
+      "required": ["reviewed_price_version", "supplier_statement", "synthetic_rate_substitution", "provider_reported_amount"],
+      "properties": {
+        "reviewed_price_version": {"const": "required"},
+        "supplier_statement": {"const": "required_for_reconciliation"},
+        "synthetic_rate_substitution": {"const": false},
+        "provider_reported_amount": {"const": "optional_per_entry"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

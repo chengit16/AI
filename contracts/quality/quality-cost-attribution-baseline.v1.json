@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "contract_id": "p5-05-v1",
+  "evidence_kinds": ["synthetic", "authorized_real"],
+  "components": ["model", "retrieval", "ocr", "indexing", "embedding", "reranker", "tool"],
+  "source_components": {
+    "model_attempt": "model",
+    "retrieval_run": "retrieval",
+    "ocr_attempt": "ocr",
+    "index_build": "indexing",
+    "embedding_batch": "embedding",
+    "reranker_request": "reranker",
+    "tool_attempt": "tool"
+  },
+  "amount_policy": {
+    "currency": "ISO_4217_uppercase",
+    "amount_unit": "integer_minimum_currency_unit",
+    "rounding": "ceil_per_ledger_entry",
+    "failed_and_retried_attempts": "included",
+    "evidence_body_persistence": false
+  },
+  "statuses": {
+    "verification": ["not_configured", "not_run", "passed", "failed"],
+    "reconciliation": ["not_configured", "not_run", "matched", "explained", "failed"]
+  },
+  "reconciliation_reasons": [
+    "billing_window_timing",
+    "provider_rounding",
+    "provider_discount",
+    "provider_credit",
+    "provider_tax"
+  ],
+  "identity_fields": [
+    "workspace_id",
+    "service_id",
+    "agent_release_id",
+    "runtime_config_version_id",
+    "run_configuration_digest",
+    "price_version",
+    "price_catalog_digest",
+    "currency",
+    "network_region",
+    "window_started_at",
+    "window_ended_at",
+    "collector_version"
+  ],
+  "real_evidence_requirements": {
+    "reviewed_price_version": "required",
+    "supplier_statement": "required_for_reconciliation",
+    "synthetic_rate_substitution": false,
+    "provider_reported_amount": "optional_per_entry"
+  }
+}

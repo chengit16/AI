@@ -36,6 +36,8 @@ from ai_platform_api.modules.lifecycle.infrastructure.sqlalchemy import (
 from ai_platform_api.modules.lifecycle.infrastructure.storage import (
     MinioLifecycleObjectStorage,
 )
+from ai_platform_api.modules.quality.application.cost_policy import COST_COLLECTOR_VERSION
+from ai_platform_api.modules.quality.application.costs import build_cost_attribution_report
 from ai_platform_api.modules.quality.application.evaluation import QualityEvaluationService
 from ai_platform_api.modules.quality.application.operations import (
     build_quality_operation_report,
@@ -44,12 +46,21 @@ from ai_platform_api.modules.quality.application.operations_policy import (
     QUALITY_OPERATION_COLLECTOR_VERSION,
 )
 from ai_platform_api.modules.quality.application.service import QualitySampleService
+from ai_platform_api.modules.quality.domain.costs import (
+    CostAttributionTarget,
+    CostCollectionBatch,
+    CostReleaseContext,
+    CostSupplierStatement,
+)
 from ai_platform_api.modules.quality.domain.evaluation import QualityEvaluationTarget
 from ai_platform_api.modules.quality.domain.models import QualitySampleCapture
 from ai_platform_api.modules.quality.domain.operations import (
     QualityEvaluationOperationContext,
     QualityOperationBatch,
     QualityOperationTarget,
+)
+from ai_platform_api.modules.quality.infrastructure.costs_sqlalchemy import (
+    SqlAlchemyCostAttributionUnitOfWork,
 )
 from ai_platform_api.modules.quality.infrastructure.evaluation_sqlalchemy import (
     SqlAlchemyQualityEvaluationUnitOfWork,
@@ -63,6 +74,9 @@ from ai_platform_api.modules.quality.infrastructure.sqlalchemy import (
 from ai_platform_api.persistence.database import create_platform_engine, create_session_factory
 from ai_platform_api.persistence.tables import (
     audit_records,
+    cost_attribution_lines,
+    cost_attribution_windows,
+    cost_ledger_entries,
     lifecycle_deletion_certificates,
     lifecycle_retention_runs,
     open_api_keys,
@@ -92,6 +106,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from tests.support.p503_quality import StaticQualityExecutor
 from tests.support.p504_quality import passing_offline_observation
+from tests.support.p505_costs import seed_cost_release, synthetic_observations
 
 ROOT = Path(__file__).parents[2]
 REGISTRY_PATH = ROOT / "contracts/lifecycle/workspace-table-registry.v1.json"
@@ -381,6 +396,40 @@ def _seed_export_and_purge_facts(
         with SqlAlchemyQualityOperationUnitOfWork(harness.sessions) as unit_of_work:
             unit_of_work.operations.add_report(operation)
             unit_of_work.commit()
+        service_id, release_id, runtime_id, run_digest = seed_cost_release(
+            harness.sessions,
+            workspace_id=account.workspace_id,
+            account_id=account.account_id,
+        )
+        cost_target = CostAttributionTarget(
+            service_id,
+            release_id,
+            run_digest,
+            "synthetic-price-v1",
+            ("e" if suffix == "target" else "f") * 64,
+            "CNY",
+            "local.synthetic",
+            evaluation.run.completed_at - timedelta(hours=24),
+            evaluation.run.completed_at,
+        )
+        cost_report = build_cost_attribution_report(
+            workspace_id=account.workspace_id,
+            target=cost_target,
+            batch=CostCollectionBatch(
+                account.workspace_id,
+                cost_target,
+                "synthetic",
+                synthetic_observations(evidence_marker=f"synthetic-p208-cost-{suffix}"),
+                CostSupplierStatement("not_configured", None, None, None, None, (), {}),
+            ),
+            collector_version=COST_COLLECTOR_VERSION,
+            release=CostReleaseContext(service_id, release_id, runtime_id, run_digest),
+            actor_id=account.account_id,
+            completed_at=evaluation.run.completed_at,
+        )
+        with SqlAlchemyCostAttributionUnitOfWork(harness.sessions) as unit_of_work:
+            unit_of_work.costs.add_report(cost_report)
+            unit_of_work.commit()
     cache_key = f"effective-roles:v1:{target.workspace_id}:{uuid4()}:1"
     harness.valkey.set(cache_key, "synthetic-p208-cache", ex=300)
     return resource_id, other_resource_id, object_key
@@ -459,6 +508,18 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             json.loads(line)
             for line in archive.read("tables/quality_operation_source_results.jsonl").splitlines()
         ]
+        cost_window_rows = [
+            json.loads(line)
+            for line in archive.read("tables/cost_attribution_windows.jsonl").splitlines()
+        ]
+        cost_entry_rows = [
+            json.loads(line)
+            for line in archive.read("tables/cost_ledger_entries.jsonl").splitlines()
+        ]
+        cost_line_rows = [
+            json.loads(line)
+            for line in archive.read("tables/cost_attribution_lines.jsonl").splitlines()
+        ]
     assert {row["resource_id"] for row in resource_rows} == {str(resource_id)}
     assert str(other_resource_id) not in json.dumps(resource_rows)
     assert key_rows[0]["last_four"] == "0208"
@@ -472,6 +533,9 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
     assert len(evaluation_sample_rows) == 12
     assert len(operation_rows) == 1
     assert len(operation_source_rows) == 3
+    assert len(cost_window_rows) == 1
+    assert len(cost_entry_rows) == 9
+    assert len(cost_line_rows) == 7
     assert "synthetic-p208-evaluation-target" not in json.dumps(
         (evaluation_rows, evaluation_layer_rows, evaluation_sample_rows)
     )
@@ -483,6 +547,12 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
     )
     assert "synthetic-p208-operation-other" not in json.dumps(
         (operation_rows, operation_source_rows)
+    )
+    assert "synthetic-p208-cost-target" not in json.dumps(
+        (cost_window_rows, cost_entry_rows, cost_line_rows)
+    )
+    assert "synthetic-p208-cost-other" not in json.dumps(
+        (cost_window_rows, cost_entry_rows, cost_line_rows)
     )
     assert {item["object_key"] for item in manifest["objects"]} == {object_key}
 
@@ -527,6 +597,9 @@ def test_export_and_purge_are_isolated_complete_and_idempotent(
             quality_evaluation_sample_results,
             quality_operation_windows,
             quality_operation_source_results,
+            cost_attribution_windows,
+            cost_ledger_entries,
+            cost_attribution_lines,
         ):
             assert (
                 session.scalar(

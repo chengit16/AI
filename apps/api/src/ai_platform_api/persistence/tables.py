@@ -6049,6 +6049,288 @@ quality_operation_source_results = Table(
     ),
 )
 
+cost_attribution_windows = Table(
+    "cost_attribution_windows",
+    metadata,
+    Column("cost_window_id", UUID(as_uuid=True), primary_key=True),
+    Column("window_identity_digest", String(64), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("service_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_release_id", UUID(as_uuid=True), nullable=False),
+    Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
+    Column("run_configuration_digest", String(64), nullable=False),
+    Column("price_version", String(128), nullable=False),
+    Column("price_catalog_digest", String(64), nullable=False),
+    Column("currency", String(3), nullable=False),
+    Column("network_region", String(64), nullable=False),
+    Column("window_started_at", DateTime(timezone=True), nullable=False),
+    Column("window_ended_at", DateTime(timezone=True), nullable=False),
+    Column("evidence_kind", String(32), nullable=False),
+    Column("collector_version", String(64), nullable=False),
+    Column("attribution_status", String(16), nullable=False),
+    Column("price_verification_status", String(16), nullable=False),
+    Column("reconciliation_status", String(24), nullable=False),
+    Column("entry_count", Integer, nullable=False),
+    Column("failed_entry_count", Integer, nullable=False),
+    Column("retry_entry_count", Integer, nullable=False),
+    Column("estimated_amount_minor", BigInteger, nullable=False),
+    Column("reported_amount_minor", BigInteger, nullable=False),
+    Column("recognized_amount_minor", BigInteger, nullable=False),
+    Column("supplier_statement_amount_minor", BigInteger, nullable=True),
+    Column("reconciliation_difference_minor", BigInteger, nullable=True),
+    Column("supplier_account_digest", String(64), nullable=True),
+    Column("supplier_statement_digest", String(64), nullable=True),
+    Column("supplier_evidence_digest", String(64), nullable=False),
+    Column("reason_codes", ARRAY(String(64)), nullable=False),
+    Column("result_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "cost_window_id",
+        "workspace_id",
+        name="uq_cost_attribution_windows_id_workspace",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "window_identity_digest",
+        name="uq_cost_attribution_windows_identity",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_cost_attribution_windows_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["service_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.services.service_id", f"{SCHEMA_TOKEN}.services.workspace_id"],
+        name="fk_cost_attribution_windows_service",
+    ),
+    ForeignKeyConstraint(
+        ["agent_release_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.agent_releases.release_id",
+            f"{SCHEMA_TOKEN}.agent_releases.workspace_id",
+        ],
+        name="fk_cost_attribution_windows_release",
+    ),
+    ForeignKeyConstraint(
+        ["runtime_config_version_id"],
+        [f"{SCHEMA_TOKEN}.ai_runtime_config_versions.runtime_config_version_id"],
+        name="fk_cost_attribution_windows_runtime_config",
+    ),
+    CheckConstraint(
+        "evidence_kind IN ('synthetic', 'authorized_real')",
+        name="ck_cost_attribution_windows_evidence",
+    ),
+    CheckConstraint(
+        "attribution_status IN ('not_configured', 'not_run', 'passed', 'failed') "
+        "AND price_verification_status IN ('not_configured', 'not_run', 'passed', 'failed')",
+        name="ck_cost_attribution_windows_verification",
+    ),
+    CheckConstraint(
+        "reconciliation_status IN ('not_configured', 'not_run', 'matched', 'explained', 'failed')",
+        name="ck_cost_attribution_windows_reconciliation",
+    ),
+    CheckConstraint(
+        "entry_count BETWEEN 0 AND 100000 "
+        "AND failed_entry_count BETWEEN 0 AND entry_count "
+        "AND retry_entry_count BETWEEN 0 AND entry_count",
+        name="ck_cost_attribution_windows_counts",
+    ),
+    CheckConstraint(
+        "estimated_amount_minor BETWEEN 0 AND 9000000000000000 "
+        "AND reported_amount_minor BETWEEN 0 AND 9000000000000000 "
+        "AND recognized_amount_minor BETWEEN 0 AND 9000000000000000 "
+        "AND (supplier_statement_amount_minor IS NULL OR "
+        "supplier_statement_amount_minor BETWEEN 0 AND 9000000000000000) "
+        "AND (reconciliation_difference_minor IS NULL OR "
+        "reconciliation_difference_minor BETWEEN -9000000000000000 AND 9000000000000000)",
+        name="ck_cost_attribution_windows_amounts",
+    ),
+    CheckConstraint(
+        "window_ended_at > window_started_at AND completed_at >= window_started_at",
+        name="ck_cost_attribution_windows_time",
+    ),
+    CheckConstraint(
+        "currency ~ '^[A-Z]{3}$' "
+        "AND price_version ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' "
+        "AND network_region ~ '^[a-z0-9][a-z0-9.-]{1,63}$'",
+        name="ck_cost_attribution_windows_identity_values",
+    ),
+    CheckConstraint(
+        "window_identity_digest ~ '^[0-9a-f]{64}$' "
+        "AND run_configuration_digest ~ '^[0-9a-f]{64}$' "
+        "AND price_catalog_digest ~ '^[0-9a-f]{64}$' "
+        "AND supplier_evidence_digest ~ '^[0-9a-f]{64}$' "
+        "AND result_digest ~ '^[0-9a-f]{64}$' "
+        "AND (supplier_account_digest IS NULL OR supplier_account_digest ~ '^[0-9a-f]{64}$') "
+        "AND (supplier_statement_digest IS NULL OR "
+        "supplier_statement_digest ~ '^[0-9a-f]{64}$')",
+        name="ck_cost_attribution_windows_digests",
+    ),
+    CheckConstraint(
+        "cardinality(reason_codes) <= 24 AND array_position(reason_codes, NULL) IS NULL",
+        name="ck_cost_attribution_windows_reasons",
+    ),
+)
+Index(
+    "ix_cost_attribution_windows_workspace_completed",
+    cost_attribution_windows.c.workspace_id,
+    cost_attribution_windows.c.completed_at,
+)
+
+cost_ledger_entries = Table(
+    "cost_ledger_entries",
+    metadata,
+    Column("ledger_entry_id", UUID(as_uuid=True), primary_key=True),
+    Column("cost_window_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("service_id", UUID(as_uuid=True), nullable=False),
+    Column("agent_release_id", UUID(as_uuid=True), nullable=False),
+    Column("component", String(32), nullable=False),
+    Column("source_kind", String(32), nullable=False),
+    Column("source_record_id", UUID(as_uuid=True), nullable=False),
+    Column("meter_key", String(64), nullable=False),
+    Column("attempt_no", Integer, nullable=False),
+    Column("outcome", String(16), nullable=False),
+    Column("is_retry", Boolean, nullable=False),
+    Column("quantity", BigInteger, nullable=False),
+    Column("usage_unit", String(16), nullable=False),
+    Column("unit_size", BigInteger, nullable=False),
+    Column("unit_price_minor", BigInteger, nullable=False),
+    Column("estimated_amount_minor", BigInteger, nullable=False),
+    Column("reported_amount_minor", BigInteger, nullable=True),
+    Column("recognized_amount_minor", BigInteger, nullable=False),
+    Column("amount_source", String(32), nullable=False),
+    Column("price_version", String(128), nullable=False),
+    Column("currency", String(3), nullable=False),
+    Column("evidence_digest", String(64), nullable=False),
+    UniqueConstraint(
+        "cost_window_id",
+        "position",
+        name="uq_cost_ledger_entries_position",
+    ),
+    UniqueConstraint(
+        "cost_window_id",
+        "source_kind",
+        "source_record_id",
+        "meter_key",
+        name="uq_cost_ledger_entries_source_meter",
+    ),
+    ForeignKeyConstraint(
+        ["cost_window_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.cost_attribution_windows.cost_window_id",
+            f"{SCHEMA_TOKEN}.cost_attribution_windows.workspace_id",
+        ],
+        name="fk_cost_ledger_entries_window",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "component IN ('model', 'retrieval', 'ocr', 'indexing', 'embedding', 'reranker', 'tool')",
+        name="ck_cost_ledger_entries_component",
+    ),
+    CheckConstraint(
+        "source_kind IN ('model_attempt', 'retrieval_run', 'ocr_attempt', 'index_build', "
+        "'embedding_batch', 'reranker_request', 'tool_attempt')",
+        name="ck_cost_ledger_entries_source",
+    ),
+    CheckConstraint(
+        "usage_unit IN ('token', 'request', 'page', 'chunk', 'pair', 'millisecond')",
+        name="ck_cost_ledger_entries_unit",
+    ),
+    CheckConstraint(
+        "outcome IN ('succeeded', 'failed', 'timed_out', 'cancelled', 'degraded')",
+        name="ck_cost_ledger_entries_outcome",
+    ),
+    CheckConstraint(
+        "amount_source IN "
+        "('synthetic_rate', 'contract_rate', 'provider_rate', 'provider_reported')",
+        name="ck_cost_ledger_entries_amount_source",
+    ),
+    CheckConstraint(
+        "position BETWEEN 1 AND 100000 AND attempt_no >= 1 AND is_retry = (attempt_no > 1)",
+        name="ck_cost_ledger_entries_attempt",
+    ),
+    CheckConstraint(
+        "quantity BETWEEN 0 AND 1000000000000 "
+        "AND unit_size BETWEEN 1 AND 1000000000000 "
+        "AND unit_price_minor BETWEEN 0 AND 9000000000000000 "
+        "AND estimated_amount_minor BETWEEN 0 AND 9000000000000000 "
+        "AND (reported_amount_minor IS NULL OR "
+        "reported_amount_minor BETWEEN 0 AND 9000000000000000) "
+        "AND recognized_amount_minor BETWEEN 0 AND 9000000000000000",
+        name="ck_cost_ledger_entries_amounts",
+    ),
+    CheckConstraint(
+        "meter_key ~ '^[a-z][a-z0-9_.-]{0,63}$' "
+        "AND price_version ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' "
+        "AND currency ~ '^[A-Z]{3}$' "
+        "AND evidence_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_cost_ledger_entries_identity",
+    ),
+)
+Index(
+    "ix_cost_ledger_entries_workspace_component",
+    cost_ledger_entries.c.workspace_id,
+    cost_ledger_entries.c.component,
+)
+
+cost_attribution_lines = Table(
+    "cost_attribution_lines",
+    metadata,
+    Column("cost_window_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("component", String(32), primary_key=True),
+    Column("entry_count", Integer, nullable=False),
+    Column("failed_entry_count", Integer, nullable=False),
+    Column("retry_entry_count", Integer, nullable=False),
+    Column("quantity", BigInteger, nullable=False),
+    Column("estimated_amount_minor", BigInteger, nullable=False),
+    Column("reported_amount_minor", BigInteger, nullable=False),
+    Column("recognized_amount_minor", BigInteger, nullable=False),
+    Column("evidence_digest", String(64), nullable=False),
+    UniqueConstraint(
+        "cost_window_id",
+        "position",
+        name="uq_cost_attribution_lines_position",
+    ),
+    ForeignKeyConstraint(
+        ["cost_window_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.cost_attribution_windows.cost_window_id",
+            f"{SCHEMA_TOKEN}.cost_attribution_windows.workspace_id",
+        ],
+        name="fk_cost_attribution_lines_window",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "component IN ('model', 'retrieval', 'ocr', 'indexing', 'embedding', 'reranker', 'tool') "
+        "AND position BETWEEN 1 AND 7",
+        name="ck_cost_attribution_lines_component",
+    ),
+    CheckConstraint(
+        "entry_count BETWEEN 0 AND 100000 "
+        "AND failed_entry_count BETWEEN 0 AND entry_count "
+        "AND retry_entry_count BETWEEN 0 AND entry_count",
+        name="ck_cost_attribution_lines_counts",
+    ),
+    CheckConstraint(
+        "quantity BETWEEN 0 AND 1000000000000 "
+        "AND estimated_amount_minor BETWEEN 0 AND 9000000000000000 "
+        "AND reported_amount_minor BETWEEN 0 AND 9000000000000000 "
+        "AND recognized_amount_minor BETWEEN 0 AND 9000000000000000",
+        name="ck_cost_attribution_lines_amounts",
+    ),
+    CheckConstraint(
+        "evidence_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_cost_attribution_lines_digest",
+    ),
+)
+
 stream_runs = Table(
     "stream_runs",
     metadata,
