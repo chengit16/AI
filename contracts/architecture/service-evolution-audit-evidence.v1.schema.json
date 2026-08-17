@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/architecture/service-evolution-audit-evidence.v1.schema.json",
+  "title": "P5-11 服务演进低敏审计证据",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_version",
+    "overall_status",
+    "decision",
+    "decision_reason",
+    "service_trigger_summary",
+    "go_trigger_summary",
+    "benchmark_report_status",
+    "external_status",
+    "go_implementation_started",
+    "long_term_dual_write_present",
+    "sensitive_detail_in_evidence"
+  ],
+  "properties": {
+    "evidence_version": {"const": "p5-11-evidence-v1"},
+    "overall_status": {"const": "passed"},
+    "decision": {"const": "retain_modular_monolith"},
+    "decision_reason": {"const": "no_verified_trigger"},
+    "service_trigger_summary": {
+      "const": {"not_configured": 3, "not_run": 2}
+    },
+    "go_trigger_summary": {
+      "const": {"not_configured": 2, "not_run": 2}
+    },
+    "benchmark_report_status": {"const": "not_run"},
+    "external_status": {
+      "const": {
+        "capacity_certification": "not_run",
+        "production_load_profile": "not_configured",
+        "team_ownership_model": "not_configured",
+        "go_operations_capability": "not_configured"
+      }
+    },
+    "go_implementation_started": {"const": false},
+    "long_term_dual_write_present": {"const": false},
+    "sensitive_detail_in_evidence": {"const": false}
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/architecture/service-evolution-audit.v1.schema.json",
+  "title": "P5-11 服务拆分与 Go 演进触发审计契约",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "audit_status",
+    "decision",
+    "decision_reason",
+    "service_split_triggers",
+    "go_evolution_triggers",
+    "benchmark_report_status",
+    "current_runtime",
+    "future_migration_guardrails",
+    "external_status"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "contract_id": {"const": "p5-11-v1"},
+    "audit_status": {"enum": ["passed", "failed"]},
+    "decision": {
+      "enum": ["retain_modular_monolith", "split_python_service", "start_go_evolution"]
+    },
+    "decision_reason": {
+      "enum": ["no_verified_trigger", "verified_service_split_trigger", "verified_go_trigger"]
+    },
+    "service_split_triggers": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"$ref": "#/$defs/trigger"}
+    },
+    "go_evolution_triggers": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/trigger"}
+    },
+    "benchmark_report_status": {"enum": ["not_run", "failed", "passed"]},
+    "current_runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "go_service_directories_present",
+        "go_runtime_present",
+        "long_term_dual_write_present",
+        "python_remains_single_writer"
+      ],
+      "properties": {
+        "go_service_directories_present": {"type": "boolean"},
+        "go_runtime_present": {"type": "boolean"},
+        "long_term_dual_write_present": {"type": "boolean"},
+        "python_remains_single_writer": {"type": "boolean"}
+      }
+    },
+    "future_migration_guardrails": {
+      "const": [
+        "adr_before_implementation",
+        "shared_versioned_contracts",
+        "shadow_traffic_result_comparison",
+        "security_and_workspace_isolation_regression",
+        "single_writer_cutover",
+        "python_route_rollback",
+        "no_long_term_dual_write"
+      ]
+    },
+    "external_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity_certification",
+        "production_load_profile",
+        "team_ownership_model",
+        "go_operations_capability"
+      ],
+      "properties": {
+        "capacity_certification": {"enum": ["not_run", "failed", "passed"]},
+        "production_load_profile": {"enum": ["not_configured", "configured"]},
+        "team_ownership_model": {"enum": ["not_configured", "configured"]},
+        "go_operations_capability": {"enum": ["not_configured", "configured"]}
+      }
+    }
+  },
+  "$defs": {
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trigger_id", "status", "reason_code", "evidence_ref"],
+      "properties": {
+        "trigger_id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["not_run", "not_configured", "not_triggered", "triggered"]},
+        "reason_code": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "evidence_ref": {"type": ["string", "null"], "minLength": 1}
+      }
+    }
+  }
+}

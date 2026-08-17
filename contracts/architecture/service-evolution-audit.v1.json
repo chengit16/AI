@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "contract_id": "p5-11-v1",
+  "audit_status": "passed",
+  "decision": "retain_modular_monolith",
+  "decision_reason": "no_verified_trigger",
+  "service_split_triggers": [
+    {
+      "trigger_id": "independent_scaling_limit",
+      "status": "not_run",
+      "reason_code": "capacity_certification_not_run",
+      "evidence_ref": "docs/project-progress.md#容量认证"
+    },
+    {
+      "trigger_id": "ownership_release_cadence_divergence",
+      "status": "not_configured",
+      "reason_code": "team_ownership_input_not_configured",
+      "evidence_ref": null
+    },
+    {
+      "trigger_id": "explicit_fault_isolation_requirement",
+      "status": "not_configured",
+      "reason_code": "target_fault_domain_not_configured",
+      "evidence_ref": null
+    },
+    {
+      "trigger_id": "compliance_independent_deployment_requirement",
+      "status": "not_configured",
+      "reason_code": "customer_compliance_input_not_configured",
+      "evidence_ref": "contracts/deployment/private-instance-baseline.v1.json#/external_status/customer_environment"
+    },
+    {
+      "trigger_id": "measured_monolith_bottleneck",
+      "status": "not_run",
+      "reason_code": "attributed_benchmark_not_run",
+      "evidence_ref": null
+    }
+  ],
+  "go_evolution_triggers": [
+    {
+      "trigger_id": "sse_connection_threshold_or_python_instability",
+      "status": "not_run",
+      "reason_code": "sustained_5000_connection_benchmark_not_run",
+      "evidence_ref": "docs/project-progress.md#容量认证"
+    },
+    {
+      "trigger_id": "gateway_proxy_primary_bottleneck",
+      "status": "not_run",
+      "reason_code": "cpu_memory_p95_attribution_not_run",
+      "evidence_ref": null
+    },
+    {
+      "trigger_id": "runtime_independent_scaling_or_fault_isolation",
+      "status": "not_configured",
+      "reason_code": "runtime_target_requirement_not_configured",
+      "evidence_ref": null
+    },
+    {
+      "trigger_id": "go_ownership_operations_and_rollback",
+      "status": "not_configured",
+      "reason_code": "go_owner_and_operations_not_configured",
+      "evidence_ref": null
+    }
+  ],
+  "benchmark_report_status": "not_run",
+  "current_runtime": {
+    "go_service_directories_present": false,
+    "go_runtime_present": false,
+    "long_term_dual_write_present": false,
+    "python_remains_single_writer": true
+  },
+  "future_migration_guardrails": [
+    "adr_before_implementation",
+    "shared_versioned_contracts",
+    "shadow_traffic_result_comparison",
+    "security_and_workspace_isolation_regression",
+    "single_writer_cutover",
+    "python_route_rollback",
+    "no_long_term_dual_write"
+  ],
+  "external_status": {
+    "capacity_certification": "not_run",
+    "production_load_profile": "not_configured",
+    "team_ownership_model": "not_configured",
+    "go_operations_capability": "not_configured"
+  }
+}

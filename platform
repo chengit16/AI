@@ -543,6 +543,12 @@ accept_stage_5_private_instance() {
     --evidence "$AI_PLATFORM_ROOT/evidence/p5-10-latest.json"
 }
 
+accept_stage_5_service_evolution() {
+  ensure_environment
+  run_python scripts/service_evolution_audit.py \
+    --evidence "$AI_PLATFORM_ROOT/evidence/p5-11-latest.json"
+}
+
 drill_stage_2() {
   check_runtime
   ensure_environment
@@ -602,6 +608,7 @@ usage() {
   accept-stage-4  执行阶段 4 联合验收并生成本地 JSON 证据
   validate-instance  校验 L4 私有实例部署档案和 Compose 配置
   accept-stage-5-private-instance  执行 P5-10 本地合成安装、升级、回滚和恢复验收
+  accept-stage-5-service-evolution  执行 P5-11 服务拆分与 Go 演进触发审计
 EOF
 }
 
@@ -625,5 +632,6 @@ case "$command_name" in
   accept-stage-4) accept_stage_4 ;;
   validate-instance) validate_instance ;;
   accept-stage-5-private-instance) accept_stage_5_private_instance ;;
+  accept-stage-5-service-evolution) accept_stage_5_service_evolution ;;
   *) usage; [[ -z "$command_name" ]] || exit 1 ;;
 esac
