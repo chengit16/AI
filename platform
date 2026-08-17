@@ -545,6 +545,15 @@ accept_stage_4_tools() {
     --evidence "$AI_PLATFORM_ROOT/evidence/p4-12-latest.json"
 }
 
+accept_stage_4() {
+  check_runtime
+  ensure_environment
+  export_local_service_settings
+  run_python scripts/run_p413_acceptance.py \
+    --manifest "$PROJECT_DIR/tests/fixtures/tool-execution/p4-13-v1.json" \
+    --evidence "$AI_PLATFORM_ROOT/evidence/p4-13-latest.json"
+}
+
 usage() {
   cat <<'EOF'
 用法: ./platform <command>
@@ -565,6 +574,7 @@ usage() {
   drill-stage-2  执行阶段 2 联合故障演练并生成本地 JSON 证据
   accept-stage-3  执行阶段 3 联合验收并生成本地 JSON 证据
   accept-stage-4-tools  执行阶段 4 工具联合故障演练并生成本地 JSON 证据
+  accept-stage-4  执行阶段 4 联合验收并生成本地 JSON 证据
 EOF
 }
 
@@ -585,5 +595,6 @@ case "$command_name" in
   drill-stage-2) drill_stage_2 ;;
   accept-stage-3) accept_stage_3 ;;
   accept-stage-4-tools) accept_stage_4_tools ;;
+  accept-stage-4) accept_stage_4 ;;
   *) usage; [[ -z "$command_name" ]] || exit 1 ;;
 esac

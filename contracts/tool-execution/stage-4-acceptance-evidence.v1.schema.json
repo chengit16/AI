@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/tool-execution/stage-4-acceptance-evidence.v1.schema.json",
+  "title": "阶段 4 联合验收证据 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_version",
+    "acceptance_id",
+    "run_id",
+    "synthetic",
+    "manifest_ref",
+    "manifest_sha256",
+    "tool_drill_manifest_ref",
+    "tool_drill_manifest_sha256",
+    "repository_revision",
+    "repository_dirty",
+    "started_at",
+    "finished_at",
+    "duration_seconds",
+    "overall_status",
+    "checks",
+    "scenarios",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "evidence_version": { "const": "p4-13-evidence-v1" },
+    "acceptance_id": { "const": "p4-13-v1" },
+    "run_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "synthetic": { "const": true },
+    "manifest_ref": { "const": "tests/fixtures/tool-execution/p4-13-v1.json" },
+    "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "tool_drill_manifest_ref": { "const": "tests/fixtures/tool-execution/p4-12-v1.json" },
+    "tool_drill_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "repository_revision": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+        { "const": "unknown" }
+      ]
+    },
+    "repository_dirty": { "type": "boolean" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "duration_seconds": { "type": "number", "minimum": 0 },
+    "overall_status": { "enum": ["passed", "failed"] },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preflight", "scenario_execution", "recovery"],
+      "properties": {
+        "preflight": { "$ref": "#/$defs/check_result" },
+        "scenario_execution": { "$ref": "#/$defs/check_result" },
+        "recovery": { "$ref": "#/$defs/check_result" }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": { "$ref": "#/$defs/scenario_result" }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "expected_case_total",
+        "observed_case_total",
+        "passed",
+        "failed",
+        "error",
+        "skipped",
+        "not_run",
+        "covered_invariants",
+        "covered_gates"
+      ],
+      "properties": {
+        "total": { "const": 15 },
+        "expected_case_total": { "const": 15 },
+        "observed_case_total": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "passed": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "failed": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "error": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "skipped": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "not_run": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "covered_invariants": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "covered_gates": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/gate" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "overall_status": { "const": "passed" } },
+        "required": ["overall_status"]
+      },
+      "then": {
+        "properties": {
+          "repository_revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+          "checks": {
+            "properties": {
+              "preflight": { "properties": { "status": { "const": "passed" }, "exit_code": { "const": 0 }, "reason_code": { "type": "null" } } },
+              "scenario_execution": { "properties": { "status": { "const": "passed" }, "exit_code": { "const": 0 }, "reason_code": { "type": "null" } } },
+              "recovery": { "properties": { "status": { "const": "passed" }, "exit_code": { "const": 0 }, "reason_code": { "type": "null" } } }
+            }
+          },
+          "scenarios": {
+            "items": {
+              "properties": {
+                "expected_case_count": { "const": 1 },
+                "observed_case_count": { "const": 1 },
+                "status": { "const": "passed" },
+                "reason_code": { "type": "null" }
+              }
+            }
+          },
+          "summary": {
+            "properties": {
+              "observed_case_total": { "const": 15 },
+              "passed": { "const": 15 },
+              "failed": { "const": 0 },
+              "error": { "const": 0 },
+              "skipped": { "const": 0 },
+              "not_run": { "const": 0 }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z][a-z0-9_]{2,95}$" },
+    "gate": {
+      "enum": [
+        "unauthorized_tool_denial",
+        "unconfirmed_side_effect_denial",
+        "zero_duplicate_side_effect",
+        "step_attempt_traceability",
+        "zero_credential_exposure",
+        "cancellation_late_result_precedence"
+      ]
+    },
+    "capability": {
+      "enum": [
+        "catalog_allowlist",
+        "immutable_tool_version",
+        "task_traceability",
+        "internal_read_adapters",
+        "deterministic_planning",
+        "current_policy_authorization",
+        "personal_confirmation",
+        "enterprise_approval",
+        "credential_boundary",
+        "side_effect_idempotency",
+        "response_loss_recovery",
+        "cancellation_precedence",
+        "result_usage_sse_audit",
+        "console_http_authorization",
+        "fault_drill_contract"
+      ]
+    },
+    "reason_code": {
+      "enum": [
+        null,
+        "command_unavailable",
+        "command_failed",
+        "runner_exception",
+        "runner_invalid_result",
+        "preflight_failed",
+        "manifest_changed",
+        "tool_drill_manifest_changed",
+        "junit_not_created",
+        "junit_invalid",
+        "junit_case_missing",
+        "junit_case_count_mismatch",
+        "junit_case_identity_mismatch",
+        "pytest_error",
+        "pytest_failure",
+        "pytest_skipped"
+      ]
+    },
+    "check_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "exit_code", "duration_seconds", "reason_code"],
+      "properties": {
+        "status": { "enum": ["passed", "failed"] },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "reason_code": { "$ref": "#/$defs/reason_code" }
+      }
+    },
+    "scenario_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "capability",
+        "verified_invariants",
+        "verified_gates",
+        "pytest_node",
+        "expected_case_count",
+        "observed_case_count",
+        "status",
+        "duration_seconds",
+        "reason_code"
+      ],
+      "properties": {
+        "scenario_id": { "type": "string", "pattern": "^p413-[a-z0-9-]+-[0-9]{3}$" },
+        "capability": { "$ref": "#/$defs/capability" },
+        "verified_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "verified_gates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/gate" }
+        },
+        "pytest_node": { "type": "string", "pattern": "^tests/(?:(?:integration|unit)/)?test_[a-z0-9_]+\\.py::test_[a-z0-9_]+$" },
+        "expected_case_count": { "const": 1 },
+        "observed_case_count": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "status": { "enum": ["passed", "failed", "error", "skipped", "not_run"] },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "reason_code": { "$ref": "#/$defs/reason_code" }
+      }
+    }
+  }
+}
