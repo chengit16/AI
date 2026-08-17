@@ -1,5 +1,17 @@
 """导出工作空间隔离领域事实与端口。"""
 
+from ai_platform_api.modules.isolation.domain.l3 import (
+    L3_CHECKPOINT_TYPES,
+    L3CheckpointEvidence,
+    L3ExecutionEvidence,
+    L3IsolationMigrationCheckpoint,
+    L3IsolationRecoveryRecord,
+    L3IsolationResourceProfile,
+    L3MigrationCommand,
+    L3MigrationExecutor,
+    L3MigrationVerification,
+    L3RecoveryEvidence,
+)
 from ai_platform_api.modules.isolation.domain.models import (
     ComplianceStatus,
     IsolationComplianceAssessment,
@@ -18,6 +30,7 @@ from ai_platform_api.modules.isolation.domain.models import (
 )
 
 __all__ = [
+    "L3_CHECKPOINT_TYPES",
     "ComplianceStatus",
     "IsolationComplianceAssessment",
     "IsolationComplianceSource",
@@ -27,6 +40,15 @@ __all__ = [
     "IsolationRepository",
     "IsolationUnitOfWork",
     "IsolationUpgradeResult",
+    "L3CheckpointEvidence",
+    "L3ExecutionEvidence",
+    "L3IsolationMigrationCheckpoint",
+    "L3IsolationRecoveryRecord",
+    "L3IsolationResourceProfile",
+    "L3MigrationCommand",
+    "L3MigrationExecutor",
+    "L3MigrationVerification",
+    "L3RecoveryEvidence",
     "MigrationStatus",
     "WorkspaceIsolationEntitlement",
     "WorkspaceIsolationMigrationPlan",

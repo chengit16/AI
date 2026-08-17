@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 14,
+  "registry_version": 15,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -20,6 +20,9 @@
     { "table": "workspace_feature_settings", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_isolation_policy_versions", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_isolation_migration_plans", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
+    { "table": "l3_isolation_resource_profiles", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
+    { "table": "l3_isolation_migration_checkpoints", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
+    { "table": "l3_isolation_recovery_records", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_isolation_route_versions", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
 
     { "table": "workspace_invitations", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

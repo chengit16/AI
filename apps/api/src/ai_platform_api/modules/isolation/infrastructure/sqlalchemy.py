@@ -17,6 +17,14 @@ from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ai_platform_api.modules.isolation.domain.l3 import (
+    L3CheckpointStatus,
+    L3CheckpointType,
+    L3IsolationMigrationCheckpoint,
+    L3IsolationRecoveryRecord,
+    L3IsolationResourceProfile,
+    L3RecoveryStatus,
+)
 from ai_platform_api.modules.isolation.domain.models import (
     ACTIVE_MIGRATION_STATUSES,
     ComplianceStatus,
@@ -32,6 +40,9 @@ from ai_platform_api.modules.isolation.domain.models import (
     WorkspaceType,
 )
 from ai_platform_api.persistence.tables import (
+    l3_isolation_migration_checkpoints,
+    l3_isolation_recovery_records,
+    l3_isolation_resource_profiles,
     workspace_entitlements,
     workspace_isolation_migration_plans,
     workspace_isolation_policy_versions,
@@ -277,6 +288,81 @@ class SqlAlchemyIsolationRepository:
         except IntegrityError as error:
             raise IsolationWriteConflictError from error
 
+    def add_l3_resource_profile(self, profile: L3IsolationResourceProfile) -> None:
+        """写入不含连接凭证的目标资源档案，重复或路由键冲突统一失败。"""
+
+        try:
+            self._session.execute(insert(l3_isolation_resource_profiles).values(**profile.__dict__))
+        except IntegrityError as error:
+            raise IsolationWriteConflictError from error
+
+    def get_l3_resource_profile(
+        self,
+        workspace_id: UUID,
+        migration_plan_id: UUID,
+    ) -> L3IsolationResourceProfile | None:
+        row = (
+            self._session.execute(
+                select(l3_isolation_resource_profiles).where(
+                    l3_isolation_resource_profiles.c.workspace_id == workspace_id,
+                    l3_isolation_resource_profiles.c.migration_plan_id == migration_plan_id,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return _l3_profile(row) if row is not None else None
+
+    def add_l3_checkpoints(
+        self,
+        checkpoints: tuple[L3IsolationMigrationCheckpoint, ...],
+    ) -> None:
+        try:
+            self._session.execute(
+                insert(l3_isolation_migration_checkpoints),
+                [checkpoint.__dict__ for checkpoint in checkpoints],
+            )
+        except IntegrityError as error:
+            raise IsolationWriteConflictError from error
+
+    def list_l3_checkpoints(
+        self,
+        workspace_id: UUID,
+        migration_plan_id: UUID,
+    ) -> tuple[L3IsolationMigrationCheckpoint, ...]:
+        rows = (
+            self._session.execute(
+                select(l3_isolation_migration_checkpoints)
+                .where(
+                    l3_isolation_migration_checkpoints.c.workspace_id == workspace_id,
+                    l3_isolation_migration_checkpoints.c.migration_plan_id == migration_plan_id,
+                )
+                .order_by(l3_isolation_migration_checkpoints.c.position)
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(_l3_checkpoint(row) for row in rows)
+
+    def next_l3_recovery_attempt(
+        self,
+        workspace_id: UUID,
+        migration_plan_id: UUID,
+    ) -> int:
+        current = self._session.scalar(
+            select(func.max(l3_isolation_recovery_records.c.attempt_no)).where(
+                l3_isolation_recovery_records.c.workspace_id == workspace_id,
+                l3_isolation_recovery_records.c.migration_plan_id == migration_plan_id,
+            )
+        )
+        return int(current or 0) + 1
+
+    def add_l3_recovery_record(self, record: L3IsolationRecoveryRecord) -> None:
+        try:
+            self._session.execute(insert(l3_isolation_recovery_records).values(**record.__dict__))
+        except IntegrityError as error:
+            raise IsolationWriteConflictError from error
+
 
 class SqlAlchemyIsolationUnitOfWork:
     """为隔离控制面提供短事务及审计、Outbox 写入器。"""
@@ -388,4 +474,55 @@ def _route(row: RowMapping) -> WorkspaceIsolationRoute:
         route_digest=cast(str, row["route_digest"]),
         activated_by_actor_id=cast(UUID, row["activated_by_actor_id"]),
         activated_at=cast(datetime, row["activated_at"]),
+    )
+
+
+def _l3_profile(row: RowMapping) -> L3IsolationResourceProfile:
+    return L3IsolationResourceProfile(
+        resource_profile_id=cast(UUID, row["resource_profile_id"]),
+        workspace_id=cast(UUID, row["workspace_id"]),
+        migration_plan_id=cast(UUID, row["migration_plan_id"]),
+        database_route_key=cast(str, row["database_route_key"]),
+        object_storage_route_key=cast(str, row["object_storage_route_key"]),
+        encryption_key_route_key=cast(str, row["encryption_key_route_key"]),
+        search_namespace=cast(str, row["search_namespace"]),
+        database_identity_digest=cast(str, row["database_identity_digest"]),
+        object_storage_identity_digest=cast(str, row["object_storage_identity_digest"]),
+        encryption_key_fingerprint=cast(str, row["encryption_key_fingerprint"]),
+        configuration_digest=cast(str, row["configuration_digest"]),
+        created_by_actor_id=cast(UUID, row["created_by_actor_id"]),
+        created_at=cast(datetime, row["created_at"]),
+    )
+
+
+def _l3_checkpoint(row: RowMapping) -> L3IsolationMigrationCheckpoint:
+    return L3IsolationMigrationCheckpoint(
+        checkpoint_id=cast(UUID, row["checkpoint_id"]),
+        resource_profile_id=cast(UUID, row["resource_profile_id"]),
+        workspace_id=cast(UUID, row["workspace_id"]),
+        migration_plan_id=cast(UUID, row["migration_plan_id"]),
+        checkpoint_type=cast(L3CheckpointType, row["checkpoint_type"]),
+        position=cast(int, row["position"]),
+        status=cast(L3CheckpointStatus, row["status"]),
+        source_digest=cast(str, row["source_digest"]),
+        target_digest=cast(str, row["target_digest"]),
+        evidence_digest=cast(str, row["evidence_digest"]),
+        item_count=cast(int, row["item_count"]),
+        checked_at=cast(datetime, row["checked_at"]),
+    )
+
+
+def _l3_recovery(row: RowMapping) -> L3IsolationRecoveryRecord:
+    return L3IsolationRecoveryRecord(
+        recovery_record_id=cast(UUID, row["recovery_record_id"]),
+        workspace_id=cast(UUID, row["workspace_id"]),
+        migration_plan_id=cast(UUID, row["migration_plan_id"]),
+        attempt_no=cast(int, row["attempt_no"]),
+        status=cast(L3RecoveryStatus, row["status"]),
+        source_is_authoritative=cast(bool, row["source_is_authoritative"]),
+        target_writes_enabled=cast(bool, row["target_writes_enabled"]),
+        cleanup_digest=cast(str, row["cleanup_digest"]),
+        evidence_digest=cast(str, row["evidence_digest"]),
+        recovered_by_actor_id=cast(UUID, row["recovered_by_actor_id"]),
+        recovered_at=cast(datetime, row["recovered_at"]),
     )

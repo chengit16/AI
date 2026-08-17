@@ -31,3 +31,9 @@ class IsolationValidationError(PlatformError):
     """请求等级、状态转换或证据不符合冻结契约。"""
 
     error_code = "VALIDATION_ERROR"
+
+
+class IsolationDependencyError(PlatformError):
+    """L3 数据库、对象存储、派生索引或密钥执行器暂时不可用。"""
+
+    error_code = "DEPENDENCY_UNAVAILABLE"

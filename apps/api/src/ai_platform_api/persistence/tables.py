@@ -6497,6 +6497,154 @@ Index(
     ),
 )
 
+l3_isolation_resource_profiles = Table(
+    "l3_isolation_resource_profiles",
+    metadata,
+    Column("resource_profile_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("migration_plan_id", UUID(as_uuid=True), nullable=False),
+    Column("database_route_key", String(128), nullable=False, unique=True),
+    Column("object_storage_route_key", String(128), nullable=False, unique=True),
+    Column("encryption_key_route_key", String(128), nullable=False, unique=True),
+    Column("search_namespace", String(128), nullable=False),
+    Column("database_identity_digest", String(64), nullable=False),
+    Column("object_storage_identity_digest", String(64), nullable=False),
+    Column("encryption_key_fingerprint", String(64), nullable=False),
+    Column("configuration_digest", String(64), nullable=False),
+    Column("created_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "resource_profile_id",
+        "workspace_id",
+        "migration_plan_id",
+        name="uq_l3_isolation_profiles_identity",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "migration_plan_id",
+        name="uq_l3_isolation_profiles_plan",
+    ),
+    ForeignKeyConstraint(
+        ["migration_plan_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.workspace_isolation_migration_plans.migration_plan_id",
+            f"{SCHEMA_TOKEN}.workspace_isolation_migration_plans.workspace_id",
+        ],
+        name="fk_l3_isolation_profiles_migration",
+    ),
+    CheckConstraint(
+        "database_route_key = 'database.l3.' || replace(workspace_id::text, '-', '') "
+        "AND object_storage_route_key = 'objects.l3.' || replace(workspace_id::text, '-', '') "
+        "AND encryption_key_route_key = 'key.l3.' || replace(workspace_id::text, '-', '') "
+        "AND search_namespace = 'workspace.' || replace(workspace_id::text, '-', '')",
+        name="ck_l3_isolation_profiles_routes",
+    ),
+    CheckConstraint(
+        "database_identity_digest ~ '^[0-9a-f]{64}$' "
+        "AND object_storage_identity_digest ~ '^[0-9a-f]{64}$' "
+        "AND encryption_key_fingerprint ~ '^[0-9a-f]{64}$' "
+        "AND configuration_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_l3_isolation_profiles_digests",
+    ),
+)
+
+l3_isolation_migration_checkpoints = Table(
+    "l3_isolation_migration_checkpoints",
+    metadata,
+    Column("checkpoint_id", UUID(as_uuid=True), primary_key=True),
+    Column("resource_profile_id", UUID(as_uuid=True), nullable=False),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("migration_plan_id", UUID(as_uuid=True), nullable=False),
+    Column("checkpoint_type", String(32), nullable=False),
+    Column("position", Integer, nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("source_digest", String(64), nullable=False),
+    Column("target_digest", String(64), nullable=False),
+    Column("evidence_digest", String(64), nullable=False),
+    Column("item_count", Integer, nullable=False),
+    Column("checked_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "migration_plan_id",
+        "checkpoint_type",
+        name="uq_l3_isolation_checkpoints_type",
+    ),
+    UniqueConstraint(
+        "migration_plan_id",
+        "position",
+        name="uq_l3_isolation_checkpoints_position",
+    ),
+    ForeignKeyConstraint(
+        ["resource_profile_id", "workspace_id", "migration_plan_id"],
+        [
+            f"{SCHEMA_TOKEN}.l3_isolation_resource_profiles.resource_profile_id",
+            f"{SCHEMA_TOKEN}.l3_isolation_resource_profiles.workspace_id",
+            f"{SCHEMA_TOKEN}.l3_isolation_resource_profiles.migration_plan_id",
+        ],
+        name="fk_l3_isolation_checkpoints_profile",
+    ),
+    CheckConstraint(
+        "(checkpoint_type = 'source_snapshot' AND position = 1) "
+        "OR (checkpoint_type = 'database_copy' AND position = 2) "
+        "OR (checkpoint_type = 'object_copy' AND position = 3) "
+        "OR (checkpoint_type = 'derived_index_rebuild' AND position = 4) "
+        "OR (checkpoint_type = 'backup_restore' AND position = 5) "
+        "OR (checkpoint_type = 'deletion_propagation' AND position = 6)",
+        name="ck_l3_isolation_checkpoints_order",
+    ),
+    CheckConstraint(
+        "status IN ('passed', 'failed') AND item_count >= 0",
+        name="ck_l3_isolation_checkpoints_status",
+    ),
+    CheckConstraint(
+        "source_digest ~ '^[0-9a-f]{64}$' "
+        "AND target_digest ~ '^[0-9a-f]{64}$' "
+        "AND evidence_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_l3_isolation_checkpoints_digests",
+    ),
+)
+
+l3_isolation_recovery_records = Table(
+    "l3_isolation_recovery_records",
+    metadata,
+    Column("recovery_record_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("migration_plan_id", UUID(as_uuid=True), nullable=False),
+    Column("attempt_no", Integer, nullable=False),
+    Column("status", String(16), nullable=False),
+    Column("source_is_authoritative", Boolean, nullable=False),
+    Column("target_writes_enabled", Boolean, nullable=False),
+    Column("cleanup_digest", String(64), nullable=False),
+    Column("evidence_digest", String(64), nullable=False),
+    Column("recovered_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("recovered_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "migration_plan_id",
+        "attempt_no",
+        name="uq_l3_isolation_recovery_attempt",
+    ),
+    ForeignKeyConstraint(
+        ["migration_plan_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.workspace_isolation_migration_plans.migration_plan_id",
+            f"{SCHEMA_TOKEN}.workspace_isolation_migration_plans.workspace_id",
+        ],
+        name="fk_l3_isolation_recovery_migration",
+    ),
+    CheckConstraint(
+        "attempt_no >= 1 AND status IN ('passed', 'failed')",
+        name="ck_l3_isolation_recovery_status",
+    ),
+    CheckConstraint(
+        "cleanup_digest ~ '^[0-9a-f]{64}$' AND evidence_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_l3_isolation_recovery_digests",
+    ),
+    CheckConstraint(
+        "status <> 'passed' OR (source_is_authoritative AND NOT target_writes_enabled)",
+        name="ck_l3_isolation_recovery_single_writer",
+    ),
+)
+
 workspace_isolation_route_versions = Table(
     "workspace_isolation_route_versions",
     metadata,

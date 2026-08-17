@@ -56,7 +56,7 @@ def test_valid_manifest_matches_frozen_matrix() -> None:
 def test_current_database_revision_is_release_compatible() -> None:
     matrix = parse_matrix(load_json(MATRIX))
 
-    assert matrix.database_revisions[-1] == "20260817_0066"
+    assert matrix.database_revisions[-1] == "20260817_0067"
     assert len(matrix.database_revisions) == len(set(matrix.database_revisions))
     assert tuple(sorted(matrix.database_revisions)) == matrix.database_revisions
 
