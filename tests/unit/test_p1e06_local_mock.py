@@ -63,6 +63,7 @@ def provider(provider_id: UUID, provider_key: str) -> ModelProviderConfiguration
         provider_key=provider_key,
         display_name="合成供应商",
         adapter_kind="openai_compatible",
+        wire_api="chat_completions",
         base_url="https://synthetic.example/v1",
         probe_model_id="synthetic-model",
         location="private",

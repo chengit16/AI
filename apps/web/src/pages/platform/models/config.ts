@@ -27,6 +27,12 @@ export const capabilityLabels = {
   structured_output: "结构化输出",
 } as const;
 
+/** 模型供应商实际使用的 OpenAI 兼容线协议名称。 */
+export const wireApiLabels = {
+  chat_completions: "Chat Completions",
+  responses: "Responses",
+} as const;
+
 /** 使用当前浏览器时区格式化服务端 ISO 时间；空值显示占位符。 */
 export function formatTimestamp(value: string | null) {
   if (!value) return "-";

@@ -279,6 +279,7 @@ def _new_local_provider(now: datetime) -> ModelProviderConfiguration:
         provider_key=LOCAL_MOCK_PROVIDER_KEY,
         display_name=LOCAL_MOCK_PROVIDER_DISPLAY_NAME,
         adapter_kind="openai_compatible",
+        wire_api="chat_completions",
         base_url=LOCAL_MOCK_BASE_URL,
         probe_model_id="local-mock-v1",
         location="private",

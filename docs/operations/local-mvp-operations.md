@@ -109,12 +109,14 @@ Valkey、日志和 `runtime` 不作为业务事实备份；恢复后由平台重
 接入 GPT 中转或国内 OpenAI-compatible 供应商前：
 
 1. 在 `.env` 的 `MODEL_PROVIDER_ALLOWED_HOSTS` 中显式加入公网 HTTPS 域名，例如 `MODEL_PROVIDER_ALLOWED_HOSTS=["relay.example.com"]`。
-2. 执行 `./platform restart` 让网络白名单生效。
-3. 由平台管理员进入模型治理页，登记 `base_url`、模型标识、凭据、能力和数据政策。
-4. 先使用合成数据执行能力探测；数据政策未审核时禁止发送真实或敏感数据。
-5. 发布不可变运行配置后再切换业务调用；失败时回滚到上一运行配置版本。
+2. 如果本地 CC Switch、Clash 或 TUN DNS 把该域名解析为 `198.18.0.0/15` Fake-IP，再配置 `MODEL_PROVIDER_ALLOWED_RESOLVED_NETWORKS=["198.18.0.0/15"]`。该例外仅允许 `local/test`，生产环境或其他私网配置会在 API 启动时失败关闭。
+3. 执行 `./platform restart` 让网络白名单生效。
+4. 由平台管理员进入模型治理页，登记 Base URL、模型标识、凭据、能力和数据政策。Codex 类中转选择 `Responses（Codex）`；传统 OpenAI-compatible 中转选择 `Chat Completions`。
+5. Base URL 填写供应商配置中的根地址或 `/v1` 前缀，不要手工追加 `/responses` 或 `/chat/completions`。例如 Codex 配置中的 `base_url = "https://relay.example.com"` 在页面中仍填写 `https://relay.example.com`。
+6. 先使用合成数据执行能力探测；数据政策未审核时禁止发送真实或敏感数据。
+7. 发布不可变运行配置后再切换业务调用；失败时回滚到上一运行配置版本。
 
-平台拒绝 HTTP、内网地址、非 443 端口、混合 DNS、重定向和未登记域名。供应商 Key 只能通过服务端页面录入，不得写入 `.env`、源码、日志或 Git。
+平台拒绝 HTTP、内网地址、非 443 端口、未审核的混合 DNS、重定向和未登记域名。Fake-IP 例外仍要求域名白名单、TLS SNI 和连接地址钉住，只允许 RFC 2544 的 `198.18.0.0/15` 或其子网。供应商 Key 只能通过服务端页面录入，不得写入 `.env`、源码、日志或 Git。
 
 ## 7. 健康检查与日志定位
 

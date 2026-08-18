@@ -5,7 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { errorMessage } from "@/api/client";
+import { errorMessage, PlatformApiError } from "@/api/client";
 import {
   activatePlatformAiRuntimeConfig,
   activatePlatformModelProvider,
@@ -60,7 +60,13 @@ export function usePlatformModels() {
       await invalidateProviders();
       void message.success("模型供应商已创建，凭证仅保存加密事实");
     },
-    onError: notifyError,
+    onError: (error) => {
+      const messageText =
+        error instanceof PlatformApiError && error.code === "MODEL_PROVIDER_CONFIGURATION_INVALID"
+          ? "供应商配置无效：请确认 Base URL 域名已加入 MODEL_PROVIDER_ALLOWED_HOSTS，并选择与中转一致的调用协议"
+          : errorMessage(error);
+      void message.error(messageText);
+    },
   });
   const rotateCredential = useMutation({
     mutationFn: ({ providerId, apiKey }: { providerId: string; apiKey: string }) =>

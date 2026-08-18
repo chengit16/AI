@@ -28190,6 +28190,15 @@
             "title": "Adapter Kind",
             "default": "openai_compatible"
           },
+          "wire_api": {
+            "type": "string",
+            "enum": [
+              "chat_completions",
+              "responses"
+            ],
+            "title": "Wire Api",
+            "default": "chat_completions"
+          },
           "base_url": {
             "type": "string",
             "maxLength": 2048,
@@ -31816,6 +31825,15 @@
             "type": "string",
             "const": "openai_compatible",
             "title": "Adapter Kind"
+          },
+          "wire_api": {
+            "type": "string",
+            "enum": [
+              "chat_completions",
+              "responses"
+            ],
+            "title": "Wire Api",
+            "default": "chat_completions"
           },
           "base_url": {
             "type": "string",

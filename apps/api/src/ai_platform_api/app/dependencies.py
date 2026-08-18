@@ -423,7 +423,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     secret_cipher = EnvelopeSecretCipher(
         MasterKeyFile(settings.master_key_path, settings.master_key_version)
     )
-    provider_url_policy = StrictProviderBaseUrlPolicy(settings.model_provider_allowed_hosts)
+    provider_url_policy = StrictProviderBaseUrlPolicy(
+        settings.model_provider_allowed_hosts,
+        allowed_resolved_networks=settings.model_provider_allowed_resolved_networks,
+    )
     model_provider_configurations = ModelProviderConfigurationService(
         SqlAlchemyModelProviderUnitOfWork(database.sessions),
         secret_cipher,

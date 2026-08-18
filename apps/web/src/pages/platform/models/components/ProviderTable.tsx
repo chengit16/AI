@@ -6,7 +6,13 @@ import { MoreHorizontal } from "lucide-react";
 import type { ModelProvider } from "@/api/services/platformModels";
 import { StateView } from "@/components/StateView/StateView";
 
-import { capabilityLabels, policyStatus, probeStatus, providerStatus } from "../config";
+import {
+  capabilityLabels,
+  policyStatus,
+  probeStatus,
+  providerStatus,
+  wireApiLabels,
+} from "../config";
 
 interface ProviderTableProps {
   /** 服务端返回的脱敏供应商治理视图。 */
@@ -56,7 +62,7 @@ export function ProviderTable({
             {record.base_url}
           </span>
           <small className="max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
-            {record.probe_model_id}
+            {wireApiLabels[record.wire_api ?? "chat_completions"]} · {record.probe_model_id}
           </small>
         </div>
       ),

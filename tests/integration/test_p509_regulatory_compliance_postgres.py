@@ -532,7 +532,7 @@ def test_revision_0068_upgrades_existing_workspace_and_roundtrips(
 
     command.upgrade(config, "head")
     connection.commit()
-    assert _revision(connection, schema) == "20260817_0069"
+    assert _revision(connection, schema) == "20260818_0070"
     assert _owner_compliance_permission_count(connection, schema, workspace.workspace_id) == 4
     assert _registered_compliance_bindings(connection, schema) == COMPLIANCE_BINDINGS
 

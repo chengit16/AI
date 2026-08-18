@@ -4027,6 +4027,12 @@ export type components = {
       readonly probe_model_id: string;
       /** Provider Key */
       readonly provider_key: string;
+      /**
+       * Wire Api
+       * @default chat_completions
+       * @enum {string}
+       */
+      readonly wire_api: "chat_completions" | "responses";
     };
     /**
      * CreatePositionRequest
@@ -5718,6 +5724,12 @@ export type components = {
       readonly updated_at: string;
       /** Version */
       readonly version: number;
+      /**
+       * Wire Api
+       * @default chat_completions
+       * @enum {string}
+       */
+      readonly wire_api: "chat_completions" | "responses";
     };
     /**
      * MoveDepartmentRequest

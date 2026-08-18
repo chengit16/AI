@@ -18,6 +18,7 @@ class CreateModelProviderRequest(BaseModel):
     provider_key: str = Field(min_length=3, max_length=64, pattern=r"^[a-z][a-z0-9_]+$")
     display_name: str = Field(min_length=1, max_length=120)
     adapter_kind: Literal["openai_compatible"] = "openai_compatible"
+    wire_api: Literal["chat_completions", "responses"] = "chat_completions"
     base_url: str = Field(min_length=1, max_length=2048)
     probe_model_id: str = Field(min_length=1, max_length=255)
     location: Literal["external", "private"] = "external"
@@ -55,6 +56,7 @@ class ModelProviderConfigurationResponse(BaseModel):
     provider_key: str
     display_name: str
     adapter_kind: Literal["openai_compatible"]
+    wire_api: Literal["chat_completions", "responses"] = "chat_completions"
     base_url: str
     probe_model_id: str
     location: Literal["external", "private"]

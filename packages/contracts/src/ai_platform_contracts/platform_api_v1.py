@@ -515,6 +515,7 @@ class CreateModelProviderRequest(typing.TypedDict):
     location: typing.NotRequired[typing.Literal["external", "private"]]
     probe_model_id: str
     provider_key: str
+    wire_api: typing.NotRequired[typing.Literal["chat_completions", "responses"]]
 
 
 class CreatePositionRequest(typing.TypedDict):
@@ -1147,6 +1148,7 @@ class ModelProviderConfigurationResponse(typing.TypedDict):
     training_usage_allowed: bool
     updated_at: str
     version: int
+    wire_api: typing.NotRequired[typing.Literal["chat_completions", "responses"]]
 
 
 class MoveDepartmentRequest(typing.TypedDict):

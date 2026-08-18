@@ -25,6 +25,7 @@ from ai_platform_api.modules.model_gateway.domain.configuration import (
     ProbeStatus,
     ProviderAdapterKind,
     ProviderStatus,
+    ProviderWireApi,
 )
 from ai_platform_api.modules.model_gateway.domain.configuration_errors import (
     ModelProviderConflictError,
@@ -246,6 +247,7 @@ def _configuration(row: Row[Any]) -> ModelProviderConfiguration:
         provider_key=row.provider_key,
         display_name=row.display_name,
         adapter_kind=cast("ProviderAdapterKind", row.adapter_kind),
+        wire_api=cast("ProviderWireApi", row.wire_api),
         base_url=row.base_url,
         probe_model_id=row.probe_model_id,
         location=cast("ProviderLocation", row.location),
@@ -277,6 +279,7 @@ def _configuration_values(configuration: ModelProviderConfiguration) -> dict[str
         "provider_key": configuration.provider_key,
         "display_name": configuration.display_name,
         "adapter_kind": configuration.adapter_kind,
+        "wire_api": configuration.wire_api,
         "base_url": configuration.base_url,
         "probe_model_id": configuration.probe_model_id,
         "location": configuration.location,

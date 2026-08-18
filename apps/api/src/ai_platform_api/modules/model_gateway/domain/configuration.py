@@ -13,6 +13,7 @@ from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.model_gateway.domain.models import ModelCapability, ProviderLocation
 
 ProviderAdapterKind = Literal["openai_compatible"]
+ProviderWireApi = Literal["chat_completions", "responses"]
 ProviderStatus = Literal["draft", "active", "disabled"]
 PolicyReviewStatus = Literal["pending", "approved", "rejected"]
 ProbeStatus = Literal["not_run", "passed", "failed"]
@@ -27,6 +28,7 @@ class ModelProviderConfiguration:
     provider_key: str
     display_name: str
     adapter_kind: ProviderAdapterKind
+    wire_api: ProviderWireApi
     base_url: str
     probe_model_id: str
     location: ProviderLocation
@@ -161,6 +163,7 @@ class CapabilityProbe(Protocol):
         base_url: str,
         api_key: str,
         model_id: str,
+        wire_api: ProviderWireApi,
         capabilities: frozenset[ModelCapability],
     ) -> CapabilityProbeResult: ...
 

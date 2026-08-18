@@ -1,9 +1,10 @@
 /** @description 平台模型治理页面权限、供应商和运行配置交互测试。 */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelProvider } from "@/api/services/platformModels";
 
+import { ProviderDialogs } from "./components/ProviderDialogs";
 import { ProviderTable } from "./components/ProviderTable";
 
 const provider: ModelProvider = {
@@ -11,6 +12,7 @@ const provider: ModelProvider = {
   provider_key: "synthetic_primary",
   display_name: "合成 GPT 主模型",
   adapter_kind: "openai_compatible",
+  wire_api: "chat_completions",
   base_url: "https://gateway.synthetic.example/v1",
   probe_model_id: "synthetic-model",
   location: "external",
@@ -50,8 +52,52 @@ describe("P1D-07 平台模型配置表格", () => {
 
     expect(screen.getByText("已批准")).toBeInTheDocument();
     expect(screen.getByText("探测通过")).toBeInTheDocument();
+    expect(screen.getByText(/Chat Completions/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "打开 合成 GPT 主模型 操作菜单" }));
     fireEvent.click(await screen.findByText("启用供应商"));
     expect(onAction).toHaveBeenCalledWith(provider.provider_id, "activate");
+  });
+
+  it("创建 Codex 类中转时提交 Responses 协议事实", async () => {
+    const onCreate = vi.fn().mockResolvedValue(provider);
+    render(
+      <ProviderDialogs
+        createOpen
+        credentialProvider={null}
+        policyProvider={null}
+        isSubmitting={false}
+        onCloseCreate={vi.fn()}
+        onCloseCredential={vi.fn()}
+        onClosePolicy={vi.fn()}
+        onCreate={onCreate}
+        onRotateCredential={vi.fn()}
+        onReviewPolicy={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "合成 Codex 中转" } });
+    fireEvent.change(screen.getByLabelText("供应商标识"), { target: { value: "synthetic_codex" } });
+    fireEvent.change(screen.getByLabelText("自定义 Base URL"), {
+      target: { value: "https://gateway.synthetic.example" },
+    });
+    fireEvent.mouseDown(screen.getByLabelText("调用协议"));
+    fireEvent.click(await screen.findByText("Responses（Codex）"));
+    fireEvent.change(screen.getByLabelText("探测模型 ID"), {
+      target: { value: "synthetic-codex" },
+    });
+    fireEvent.change(screen.getByLabelText("API Key"), {
+      target: { value: "synthetic-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /创\s*建/ }));
+
+    await waitFor(() =>
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider_key: "synthetic_codex",
+          wire_api: "responses",
+          base_url: "https://gateway.synthetic.example",
+        }),
+      ),
+    );
   });
 });

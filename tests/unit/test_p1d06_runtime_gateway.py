@@ -14,6 +14,7 @@ from ai_platform_api.modules.model_gateway.application.runtime_gateway import (
 )
 from ai_platform_api.modules.model_gateway.domain.configuration import (
     ModelProviderConfiguration,
+    ProviderWireApi,
     RuntimeProviderAccess,
 )
 from ai_platform_api.modules.model_gateway.domain.configuration_errors import (
@@ -100,13 +101,19 @@ class MockFactory:
         return self.providers[str(access.configuration.provider_id)]
 
 
-def provider(provider_id: UUID) -> ModelProviderConfiguration:
+def provider(
+    provider_id: UUID,
+    *,
+    wire_api: ProviderWireApi = "chat_completions",
+    base_url: str = "https://api.synthetic.example/v1",
+) -> ModelProviderConfiguration:
     return ModelProviderConfiguration(
         provider_id=provider_id,
         provider_key=f"provider_{str(provider_id)[-3:]}",
         display_name="合成供应商",
         adapter_kind="openai_compatible",
-        base_url="https://api.synthetic.example/v1",
+        wire_api=wire_api,
+        base_url=base_url,
         probe_model_id="synthetic-model",
         location="external",
         declared_capabilities=frozenset({"generation"}),
@@ -380,3 +387,76 @@ def test_openai_compatible_runtime_adapter_parses_usage_and_rejects_redirects(
         adapter.invoke(request(), "synthetic-primary-model", 500)
     assert captured.value.kind == "invalid_response"
     assert captured.value.fallback_allowed is True
+
+
+class ResponsesTargetPolicy:
+    def resolve(self, value: str) -> ValidatedProviderTarget:
+        assert value == "https://api.synthetic.example"
+        return ValidatedProviderTarget(
+            value,
+            "api.synthetic.example",
+            443,
+            "",
+            ("93.184.216.34",),
+        )
+
+
+class ResponsesFakeHttpsConnection(FakeHttpsConnection):
+    response = FakeHttpResponse(
+        200,
+        json.dumps(
+            {
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "合成 Responses 回答"}],
+                    }
+                ],
+                "usage": {"input_tokens": 15, "output_tokens": 5, "total_tokens": 20},
+            }
+        ).encode(),
+    )
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        body: bytes,
+        headers: dict[str, str],
+    ) -> None:
+        assert method == "POST"
+        assert path == "/responses"
+        document = json.loads(body)
+        assert document["model"] == "synthetic-primary-model"
+        assert document["input"] == [{"role": "user", "content": "请回答合成问题"}]
+        assert document["store"] is False
+        assert "messages" not in document
+        type(self).last_headers = headers
+
+
+def test_responses_runtime_adapter_uses_wire_protocol_and_parses_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Codex 类中转使用 Responses 载荷和端点，不能退回 Chat Completions。"""
+
+    monkeypatch.setattr(provider_http, "_PinnedHttpsConnection", ResponsesFakeHttpsConnection)
+    access = RuntimeProviderAccess(
+        provider(
+            PRIMARY_ID,
+            wire_api="responses",
+            base_url="https://api.synthetic.example",
+        ),
+        "synthetic-secret",
+        7,
+    )
+    adapter = OpenAiCompatibleRuntimeProvider(access, ResponsesTargetPolicy())
+
+    response = adapter.invoke(request(), "synthetic-primary-model", 500)
+
+    assert response.content == "合成 Responses 回答"
+    assert response.finish_reason == "stop"
+    assert response.usage is not None and response.usage.total_tokens == 20
+    assert ResponsesFakeHttpsConnection.last_headers["Authorization"] == "Bearer synthetic-secret"

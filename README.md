@@ -57,4 +57,6 @@ Docker Desktop 运行后执行：
 ./platform admin revoke user@example.com
 ```
 
-接入 GPT 中转或国内 OpenAI-compatible 模型时，先在 `.env` 的 JSON 数组中显式配置允许访问的公网 HTTPS 域名，例如 `MODEL_PROVIDER_ALLOWED_HOSTS=["relay.example.com"]`。默认空数组会阻止所有真实供应商连接；`MODEL_PROVIDER_PROBE_TIMEOUT_SECONDS` 控制能力探测超时，允许范围为 1～30 秒，默认 10 秒。平台拒绝内网地址、混合 DNS、非 443 端口、重定向及未经数据政策审核的外发，不应通过放宽网络校验接入本地测试服务。
+接入 GPT 中转或国内 OpenAI-compatible 模型时，先在 `.env` 的 JSON 数组中显式配置允许访问的公网 HTTPS 域名，例如 `MODEL_PROVIDER_ALLOWED_HOSTS=["relay.example.com"]`。创建供应商时按中转实际协议选择 `Chat Completions` 或 `Responses（Codex）`；Base URL 可填写根地址或 `/v1` 前缀，平台会追加固定协议端点。默认空数组会阻止所有真实供应商连接；`MODEL_PROVIDER_PROBE_TIMEOUT_SECONDS` 控制能力探测超时，允许范围为 1～30 秒，默认 10 秒。
+
+当本地 CC Switch、Clash 或 TUN DNS 把已批准域名解析到 RFC 2544 Fake-IP 时，可仅在 `local/test` 环境配置 `MODEL_PROVIDER_ALLOWED_RESOLVED_NETWORKS=["198.18.0.0/15"]`。该例外不能用于生产环境，也不能包含 RFC1918、回环、链路本地或其他保留网段；域名白名单、TLS SNI、解析地址钉住、非 443 端口拒绝和不跟随重定向仍然生效。供应商 Key 只在服务端页面录入，不得写入 `.env`、源码、日志或 Git。

@@ -149,11 +149,13 @@
 - 运行与发布基础：干净提交 `e2ac430` 上再次执行 `./platform doctor`，Web、API、MinIO、Tika、PostgreSQL、Revision `20260817_0069`、Valkey、五个 Worker Lane 和 Scheduler 共 13 项全部通过。通用 `contracts/fixtures/release-manifest.v1.valid.json` 生成漂移检查通过。
 - 关闭制品：仓库只存在阶段 1～4 的正式本地 ReleaseManifest，不存在阶段 5 ReleaseManifest；`stage-5-complete` 标签不存在。这是当前正确状态，不以开发 Fixture 或 P5-12 镜像摘要冒充阶段关闭制品。
 - 外部门禁：`P5-04` 仍缺少已审核真实供应商、固定模型/参数/网络区域和足够授权样本；`P5-06` 仍缺少已审核真实价格，且预算、异常用量、成本预测和自动降级节点尚未实现。控制台冻结事实继续显示 `real_provider_not_configured`、`real_quality_samples_not_run`、`price_catalog_not_configured` 和 `supplier_statement_not_configured`。
+- 真实供应商接入准备：针对 Codex 类中转补充 `responses` 线协议事实、`/responses` 固定端点、请求/响应/Usage 解析和前端协议选择；旧供应商由 Revision `20260818_0070` 回填为 `chat_completions`。域名白名单继续失败关闭，本地 CC Switch/Clash Fake-IP 只允许显式配置 `198.18.0.0/15` 或其子网，且非 `local/test` 环境拒绝启动；RFC1918、回环、链路本地、其他保留地址、未登记域名、非 443 端口和重定向仍被拒绝。
+- 当前验证事实：Fake-IP 红灯复现最初为 `2 failed`，实现后专项 `2/2`、供应商配置 `7/7`、模型网关联合 `22/22`、React `59/59`、Ruff、mypy 定向检查、Web TypeScript、契约生成漂移和 Compose 配置解析通过。统一入口的 Secret Scanner、契约/权限/供应链/注释/架构、前端构建与测试、Ruff 及 mypy strict `751` 个源文件均通过；全量 pytest 在沙箱内得到 `691 passed`，另有 `226 errors` 与 8 个基础设施失败，首个错误明确为访问 `127.0.0.1:5432` 时 `Operation not permitted`，同组 PostgreSQL、MinIO、Tika 和 Valkey 均被沙箱网络隔离。沙箱外原样重跑和真实 DNS 验证申请又被审批服务自身访问 `https://ai.input.im/responses` 的 `503 Service Unavailable` 拒绝，因此没有形成本轮沙箱外统一门禁或真实连通性、协议、限流、质量和价格通过结论。
 - 审计结论：`blocked`。本地实现、统一门禁、Migration、L3/L4 合成恢复、浏览器和运行诊断已经具备后续联合验收基础，但“必需节点全部完成”条件不成立。依赖满足前不运行通过态 P5-13 联合验收、不生成阶段 5 ReleaseManifest、不形成关闭提交，也不创建 `stage-5-complete` 标签。
 
 ## 15. 当前限制与下一步
 
-- `P5-04` 本地机制和当前树统一门禁已通过，但真实质量结论仍缺少已审核真实供应商、固定模型/参数/网络区域和足够授权样本，因此节点保持受阻。
+- `P5-04` 本地机制和当前树统一门禁已通过；Responses 与本地 Fake-IP 接入准备已经补齐，但真实供应商尚未成功探测和完成数据政策审核，真实质量结论仍缺少固定模型/参数/网络区域和足够授权样本，因此节点保持受阻。
 - `P5-04` 的真实质量结论仍需要已审核真实供应商、固定模型/参数/网络区域/窗口和达到下限的授权样本；未配置前不能标记真实质量目标通过。
 - 真实线上反馈和真实模型质量仍为 `not_run`；本地全合成样本只证明采集、版本与隔离机制，不提供真实模型质量结论。
 - 真实模型质量与成本节点不能仅靠代码完成。需要用户或项目方提供经过审核的供应商配置、数据政策、固定模型与价格版本，并积累足够的合成/真实授权样本后再验收。

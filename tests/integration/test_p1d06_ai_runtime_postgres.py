@@ -90,11 +90,13 @@ class PassingProbe:
         base_url: str,
         api_key: str,
         model_id: str,
+        wire_api: str,
         capabilities: frozenset[ModelCapability],
     ) -> CapabilityProbeResult:
         assert base_url == "https://api.synthetic.example/v1"
         assert api_key.startswith("synthetic-runtime-secret")
         assert model_id.startswith("synthetic-probe")
+        assert wire_api == "chat_completions"
         return CapabilityProbeResult("passed", capabilities)
 
 

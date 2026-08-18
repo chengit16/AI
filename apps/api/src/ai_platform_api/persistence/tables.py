@@ -90,6 +90,7 @@ model_provider_configurations = Table(
     Column("provider_key", String(64), nullable=False, unique=True),
     Column("display_name", String(120), nullable=False),
     Column("adapter_kind", String(32), nullable=False),
+    Column("wire_api", String(32), nullable=False),
     Column("base_url", String(2048), nullable=False),
     Column("probe_model_id", String(255), nullable=False),
     Column("location", String(32), nullable=False),
@@ -128,6 +129,10 @@ model_provider_configurations = Table(
         name="fk_model_provider_configurations_updater",
     ),
     CheckConstraint("adapter_kind = 'openai_compatible'", name="ck_model_providers_adapter"),
+    CheckConstraint(
+        "wire_api IN ('chat_completions', 'responses')",
+        name="ck_model_providers_wire_api",
+    ),
     CheckConstraint("location IN ('external', 'private')", name="ck_model_providers_location"),
     CheckConstraint(
         "policy_review_status IN ('pending', 'approved', 'rejected')",

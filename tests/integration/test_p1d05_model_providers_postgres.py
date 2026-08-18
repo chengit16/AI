@@ -62,11 +62,13 @@ class PassingProbe:
         base_url: str,
         api_key: str,
         model_id: str,
+        wire_api: str,
         capabilities: frozenset[ModelCapability],
     ) -> CapabilityProbeResult:
         assert base_url == "https://api.synthetic.example/v1"
         assert api_key.startswith("synthetic-provider-secret")
         assert model_id == "synthetic-chat"
+        assert wire_api == "chat_completions"
         return CapabilityProbeResult("passed", capabilities)
 
 
@@ -177,6 +179,7 @@ def test_platform_admin_provider_lifecycle_is_encrypted_audited_and_policy_gated
         declared_capabilities=frozenset({"generation", "structured_output"}),
         api_key=plaintext_v1,
     )
+    assert created.wire_api == "chat_completions"
     with provider_database.sessions() as session:
         credential = session.execute(
             select(model_provider_credentials).where(
@@ -201,6 +204,7 @@ def test_platform_admin_provider_lifecycle_is_encrypted_audited_and_policy_gated
     provider_database.providers.probe(platform_context(admin_id), created.provider_id)
     active = provider_database.providers.activate(platform_context(admin_id), created.provider_id)
     assert active.status == "active"
+    assert active.wire_api == "chat_completions"
     assert (
         provider_database.providers.require_export_allowed(
             created.provider_id, security_level="INTERNAL"

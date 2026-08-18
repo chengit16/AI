@@ -18,6 +18,7 @@ from ai_platform_api.modules.model_gateway.domain.configuration import (
     ModelProviderUnitOfWork,
     ProviderAdapterKind,
     ProviderBaseUrlPolicy,
+    ProviderWireApi,
     RuntimeProviderAccess,
 )
 from ai_platform_api.modules.model_gateway.domain.configuration_errors import (
@@ -76,6 +77,7 @@ class ModelProviderConfigurationService:
         provider_key: str,
         display_name: str,
         adapter_kind: ProviderAdapterKind,
+        wire_api: ProviderWireApi = "chat_completions",
         base_url: str,
         probe_model_id: str,
         location: ProviderLocation,
@@ -93,6 +95,7 @@ class ModelProviderConfigurationService:
             or not normalized_name
             or len(normalized_name) > 120
             or adapter_kind != "openai_compatible"
+            or wire_api not in {"chat_completions", "responses"}
             or not normalized_model
             or len(normalized_model) > 255
             or not api_key.strip()
@@ -112,6 +115,7 @@ class ModelProviderConfigurationService:
             provider_key=normalized_key,
             display_name=normalized_name,
             adapter_kind=adapter_kind,
+            wire_api=wire_api,
             base_url=normalized_url,
             probe_model_id=normalized_model,
             location=location,
@@ -296,6 +300,7 @@ class ModelProviderConfigurationService:
             base_url=current.base_url,
             api_key=api_key,
             model_id=current.probe_model_id,
+            wire_api=current.wire_api,
             capabilities=current.declared_capabilities,
         )
         now = datetime.now(UTC)

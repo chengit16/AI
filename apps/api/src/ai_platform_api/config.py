@@ -1,5 +1,6 @@
 """加载 API 进程配置并在启动前关闭不安全的生产默认值。"""
 
+import ipaddress
 from functools import lru_cache
 from urllib.parse import urlparse
 
@@ -43,6 +44,7 @@ class Settings(BaseSettings):
     ingestion_max_attempts: int = 3
     tika_url: str = "http://127.0.0.1:9998"
     model_provider_allowed_hosts: tuple[str, ...] = ()
+    model_provider_allowed_resolved_networks: tuple[str, ...] = ()
     model_provider_probe_timeout_seconds: int = 10
     stream_retention_seconds: int = 24 * 60 * 60
     stream_replay_limit_events: int = 5_000
@@ -124,6 +126,22 @@ class Settings(BaseSettings):
         if any(not host or "/" in host or ":" in host for host in normalized_hosts):
             raise ValueError("模型供应商允许列表只能包含不带端口和路径的域名")
         self.model_provider_allowed_hosts = tuple(sorted(set(normalized_hosts)))
+        # 4. Clash Fake-IP 例外仅用于本地网络代理，且不能扩展到任意私网或生产环境。
+        benchmark_network = ipaddress.IPv4Network("198.18.0.0/15")
+        normalized_networks: list[str] = []
+        for value in self.model_provider_allowed_resolved_networks:
+            try:
+                network = ipaddress.ip_network(value.strip(), strict=True)
+            except ValueError as error:
+                raise ValueError("模型供应商解析地址例外必须是规范 CIDR") from error
+            if not isinstance(network, ipaddress.IPv4Network) or not network.subnet_of(
+                benchmark_network
+            ):
+                raise ValueError("模型供应商解析地址例外只能包含 198.18.0.0/15 或其子网")
+            normalized_networks.append(str(network))
+        if normalized_networks and self.environment not in {"local", "test"}:
+            raise ValueError("模型供应商解析地址例外只能在 local 或 test 环境启用")
+        self.model_provider_allowed_resolved_networks = tuple(sorted(set(normalized_networks)))
         return self
 
 

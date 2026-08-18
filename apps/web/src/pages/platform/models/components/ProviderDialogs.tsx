@@ -87,6 +87,7 @@ export function ProviderDialogs({
           requiredMark={false}
           initialValues={{
             adapter_kind: "openai_compatible",
+            wire_api: "chat_completions",
             location: "external",
             declared_capabilities: ["generation", "streaming"],
           }}
@@ -110,6 +111,14 @@ export function ProviderDialogs({
           </Form.Item>
           <Form.Item label="自定义 Base URL" name="base_url" rules={[{ required: true }]}>
             <Input placeholder="https://approved-gateway.example/v1" />
+          </Form.Item>
+          <Form.Item label="调用协议" name="wire_api" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: "chat_completions", label: "Chat Completions" },
+                { value: "responses", label: "Responses（Codex）" },
+              ]}
+            />
           </Form.Item>
           <Form.Item label="探测模型 ID" name="probe_model_id" rules={[{ required: true }]}>
             <Input placeholder="gpt-5-mini" />

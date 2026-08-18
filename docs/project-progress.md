@@ -9,7 +9,7 @@
 | 整体状态 | 受阻 |
 | 当前架构版本 | V2.8 |
 | 容量认证 | `not_run`，不阻塞规划与本地机制建设，不代表生产容量 |
-| 真实模型供应商 | `not_configured`，模型网关门禁使用 Mock Provider，索引使用本地确定性 Adapter |
+| 真实模型供应商 | `not_configured`，已补齐 Responses 与本地 Fake-IP 接入准备，尚未成功完成真实探测和审核 |
 | 最近更新时间 | 2026-08-18 |
 
 ## 2. 阶段总览
@@ -182,11 +182,11 @@
 | `P5-10` | 建立 L4 私有化/独立实例交付、升级与恢复 | 已完成 | 2026-08-18：冻结 `p5-10-v1` 独立实例、离线依赖、外部状态、升级前备份和恢复回滚契约；动态 doctor 从代码树读取唯一 Alembic head。当前实例从 `0061` 实际升级到 `0068` 并重建镜像；加密备份恢复前后对象引用 `10/10` 完整、恢复包 Revision `0068`、13 项 doctor 通过。专项 `6/6`，原样统一门禁 React `58/58`、Python `911/911`、Ruff、mypy strict `744` 个源文件及全部工程检查通过；客户环境、生产 KMS/Vault、证书、对象存储、镜像扫描和容量保持 `not_configured/not_run` | `36838d8` |
 | `P5-11` | 审计服务拆分和 Go 演进量化触发条件 | 已完成 | 2026-08-18：冻结 `p5-11-v1` 五项服务拆分与四项 Go 条件；容量、生产负载画像、团队所有权和 Go 运维能力保持 `not_run/not_configured`，没有条件被推断为触发。ADR-015 决定保留模块化单体，禁止提前创建 Go 服务、第二套 Migration 或长期双写；专项 `7/7`、与 P5-10/Worker 边界联合 `17/17`、原样统一门禁 React `58/58`、Python `918/918`、mypy strict `746` 个源文件及全部工程检查通过 | `fe0a946` |
 | `P5-12` | 建设质量、成本、隔离和合规运营控制台 | 已完成 | 2026-08-18：冻结 `p5-12-v1` 五域低敏状态契约，新增工作空间级只读 API、`operations.control_tower.read` 和 `/workspace/control-tower`；Revision `20260817_0069` 为 Owner 追加读取权、API 绑定与 Registry `v24` 菜单发布。专项 `2/2`、Migration/菜单/Registry/ReleaseManifest `22/22`、受影响联合回归 `28/28`；最终镜像、Revision `0069`、13 项 doctor、`1440×900`/`390×844` 无页面级溢出与零控制台错误通过；原样统一门禁 React `58/58`、Python `920/920`、mypy strict `750` 个源文件及全部工程检查通过。真实外部状态继续保持 `not_configured/not_run` | `e2ac430` |
-| `P5-13` | 完成联合验收、ReleaseManifest、阶段关闭提交和标签 | 受阻 | 2026-08-18：前置审计确认 P5-01～P5-05、P5-07～P5-12 提交可追溯，P5-06 无提交；通用 ReleaseManifest 漂移和 Revision `0069` 的 13 项 doctor 通过。真实供应商/质量样本与真实价格仍为 `not_configured/not_run`，阶段 5 ReleaseManifest 和 `stage-5-complete` 标签均未生成；依赖满足前不得运行通过态联合验收或关闭阶段 | 待提交 |
+| `P5-13` | 完成联合验收、ReleaseManifest、阶段关闭提交和标签 | 受阻 | 2026-08-18：前置审计确认 P5-01～P5-05、P5-07～P5-12 提交可追溯，P5-06 无提交；通用 ReleaseManifest 漂移和 Revision `0069` 的 13 项 doctor 通过。已补齐 Responses 与仅限本地的 CC Switch/Clash Fake-IP 接入准备，但 `ai.input.im` 的沙箱外验证被审批服务自身 `503` 阻断，真实供应商/质量样本与真实价格仍为 `not_configured/not_run`；阶段 5 ReleaseManifest 和 `stage-5-complete` 标签均未生成 | 待提交 |
 
 ## 9. 当前限制
 
-- 当前没有真实模型供应商配置，`provider_integration` 和 `ai_quality` 暂不判定通过。
+- 当前已具备 Chat Completions、Responses 和仅限 `local/test` 的 `198.18.0.0/15` Fake-IP 接入机制，但真实供应商尚未成功探测和审核，`provider_integration` 和 `ai_quality` 暂不判定通过。
 - P5-07 当前树已原样通过 `./scripts/verify`，此前 P5-04/P5-05 的审批服务 `502 Bad Gateway` 工程阻塞已解除；P5-04 仍因已审核真实供应商、固定模型/参数/网络区域和足够授权样本缺失而保持受阻。
 - P5-05 机制节点已完成，但真实价格与供应商账单继续为 `not_configured`，因此 P5-06 的真实价格依赖尚未满足。
 - P5-08 本地合成 L3 迁移、恢复与统一门禁已通过；真实客户目标环境、生产 KMS/Vault、生产对象存储和容量认证仍为 `not_configured/not_run`。

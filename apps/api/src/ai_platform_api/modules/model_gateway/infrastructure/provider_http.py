@@ -14,6 +14,7 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from ai_platform_api.modules.model_gateway.domain.configuration import (
     CapabilityProbeResult,
+    ProviderWireApi,
     RuntimeProviderAccess,
 )
 from ai_platform_api.modules.model_gateway.domain.configuration_errors import (
@@ -43,22 +44,25 @@ class ValidatedProviderTarget:
 
 
 class ProviderTargetResolver(Protocol):
-    """规范化供应商 URL 并解析主机地址，私网或保留地址一律拒绝。"""
+    """规范化供应商 URL 并解析主机地址，非审核地址一律拒绝。"""
 
     def resolve(self, value: str) -> ValidatedProviderTarget: ...
 
 
 class StrictProviderBaseUrlPolicy:
-    """仅允许运维显式批准的公网 HTTPS 域名，阻止内网探测与重定向绕过。"""
+    """仅允许显式批准的 HTTPS 域名和地址范围，阻止内网探测与重定向绕过。"""
 
     def __init__(
         self,
         allowed_hosts: tuple[str, ...],
         resolver: DnsResolver | None = None,
+        *,
+        allowed_resolved_networks: tuple[str, ...] = (),
     ) -> None:
         self._allowed_hosts = frozenset(
             host.strip().casefold().rstrip(".") for host in allowed_hosts
         )
+        self._allowed_resolved_networks = _validated_fake_ip_networks(allowed_resolved_networks)
         self._resolver = resolver or cast("DnsResolver", socket.getaddrinfo)
 
     def normalize_and_validate(self, value: str) -> str:
@@ -86,7 +90,9 @@ class StrictProviderBaseUrlPolicy:
             addresses = tuple(sorted({str(answer[4][0]) for answer in answers}))
         except (OSError, UnicodeError, ValueError) as error:
             raise ModelProviderConfigurationInvalidError from error
-        if not addresses or any(not _public_address(address) for address in addresses):
+        if not addresses or any(
+            not _allowed_address(address, self._allowed_resolved_networks) for address in addresses
+        ):
             raise ModelProviderConfigurationInvalidError
         base_url = urlunsplit(SplitResult("https", hostname, path, "", ""))
         return ValidatedProviderTarget(base_url, hostname, 443, path, addresses)
@@ -112,18 +118,22 @@ class OpenAiCompatibleCapabilityProbe:
         base_url: str,
         api_key: str,
         model_id: str,
+        wire_api: ProviderWireApi,
         capabilities: frozenset[ModelCapability],
     ) -> CapabilityProbeResult:
         try:
+            # 1. 每轮探测先重新校验域名并固定地址，避免配置后发生 DNS 换址。
             target = self._base_url_policy.resolve(base_url)
             address = target.addresses[0]
             confirmed: set[ModelCapability] = set()
+            # 2. 能力逐项验证并保留已确认集合，首个稳定错误立即终止后续外发。
             for capability in sorted(capabilities):
                 status, content_type = self._probe_capability(
                     target,
                     address=address,
                     api_key=api_key,
                     model_id=model_id,
+                    wire_api=wire_api,
                     capability=capability,
                 )
                 if status == 401 or status == 403:
@@ -156,38 +166,11 @@ class OpenAiCompatibleCapabilityProbe:
         address: str,
         api_key: str,
         model_id: str,
+        wire_api: ProviderWireApi,
         capability: ModelCapability,
     ) -> tuple[int, str]:
         # 1. 根据能力构造最小合成请求，探测内容不包含任何用户或工作空间数据。
-        payload: dict[str, object] = {
-            "model": model_id,
-            "messages": [
-                {"role": "system", "content": "这是平台连通性探测。内容不包含用户数据。"},
-                {"role": "user", "content": "仅回复 OK。"},
-            ],
-            "max_tokens": 8,
-            "temperature": 0,
-        }
-        if capability == "streaming":
-            payload["stream"] = True
-        elif capability == "tools":
-            payload["tools"] = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "synthetic_probe",
-                        "description": "固定能力探测",
-                        "parameters": {"type": "object", "properties": {}},
-                    },
-                }
-            ]
-            payload["tool_choice"] = "required"
-        elif capability == "structured_output":
-            payload["response_format"] = {"type": "json_object"}
-            payload["messages"] = [
-                {"role": "system", "content": "输出 JSON。内容不包含用户数据。"},
-                {"role": "user", "content": '{"status":"ok"}'},
-            ]
+        payload = _probe_payload(model_id, wire_api=wire_api, capability=capability)
 
         # 2. 使用已验证并钉住的目标地址发起请求，同时限制响应大小并确保连接关闭。
         connection = _PinnedHttpsConnection(
@@ -198,7 +181,7 @@ class OpenAiCompatibleCapabilityProbe:
             context=self._ssl_context,
         )
         try:
-            endpoint = f"{target.path_prefix}/chat/completions"
+            endpoint = _wire_endpoint(target.path_prefix, wire_api)
             connection.request(
                 "POST",
                 endpoint,
@@ -251,6 +234,7 @@ class OpenAiCompatibleRuntimeProvider:
         # 1. 重新执行 URL 策略并钉住首个审核地址，运行调用不接受重定向或动态换址。
         try:
             target = self._base_url_policy.resolve(self._access.configuration.base_url)
+            wire_api = self._access.configuration.wire_api
             connection = _PinnedHttpsConnection(
                 target.hostname,
                 target.addresses[0],
@@ -261,17 +245,9 @@ class OpenAiCompatibleRuntimeProvider:
             try:
                 connection.request(
                     "POST",
-                    f"{target.path_prefix}/chat/completions",
+                    _wire_endpoint(target.path_prefix, wire_api),
                     body=json.dumps(
-                        {
-                            "model": model_id,
-                            "messages": [
-                                {"role": message.role, "content": message.content}
-                                for message in request.messages
-                            ],
-                            "max_tokens": request.max_output_tokens,
-                            "stream": False,
-                        },
+                        _runtime_payload(request, model_id=model_id, wire_api=wire_api),
                         ensure_ascii=False,
                     ).encode(),
                     headers={
@@ -297,7 +273,10 @@ class OpenAiCompatibleRuntimeProvider:
             raise ProviderInvocationError("timeout", True, True) from error
         except (OSError, ssl.SSLError, http.client.HTTPException, ValueError) as error:
             raise ProviderInvocationError("unavailable", True, True) from error
-        return self._parse_response(payload, response.getheader("x-request-id"))
+        provider_request_id = response.getheader("x-request-id")
+        if wire_api == "responses":
+            return self._parse_responses_response(payload, provider_request_id)
+        return self._parse_chat_completions_response(payload, provider_request_id)
 
     @staticmethod
     def _raise_for_status(status: int, provider_request_id: str | None) -> None:
@@ -319,7 +298,9 @@ class OpenAiCompatibleRuntimeProvider:
         raise ProviderInvocationError("invalid_response", False, True, provider_request_id)
 
     @staticmethod
-    def _parse_response(payload: bytes, provider_request_id: str | None) -> ProviderResponse:
+    def _parse_chat_completions_response(
+        payload: bytes, provider_request_id: str | None
+    ) -> ProviderResponse:
         try:
             document = json.loads(payload)
             choice = document["choices"][0]
@@ -343,6 +324,174 @@ class OpenAiCompatibleRuntimeProvider:
         if finish_reason == "content_filter":
             raise ProviderInvocationError("content_policy", False, False, provider_request_id)
         return ProviderResponse(content, finish_reason, usage, provider_request_id)
+
+    @staticmethod
+    def _parse_responses_response(
+        payload: bytes, provider_request_id: str | None
+    ) -> ProviderResponse:
+        """从原始 Responses 对象提取文本和用量，不依赖 SDK 的 `output_text` 辅助属性。"""
+
+        try:
+            # 1. 只接受消息中的文本输出；供应商拒绝内容必须映射为稳定策略错误。
+            document = json.loads(payload)
+            output = document["output"]
+            if not isinstance(output, list):
+                raise TypeError
+            text_parts: list[str] = []
+            for item in output:
+                if not isinstance(item, dict) or item.get("type") != "message":
+                    continue
+                content = item.get("content")
+                if not isinstance(content, list):
+                    raise TypeError
+                for part in content:
+                    if not isinstance(part, dict):
+                        raise TypeError
+                    if part.get("type") == "refusal":
+                        raise ProviderInvocationError(
+                            "content_policy", False, False, provider_request_id
+                        )
+                    if part.get("type") == "output_text" and isinstance(part.get("text"), str):
+                        text_parts.append(cast(str, part["text"]))
+            if not text_parts:
+                raise TypeError
+            # 2. 将 Responses 状态和用量归一到内部模型，缺失关键状态时拒绝响应。
+            status = document.get("status")
+            if not isinstance(status, str):
+                raise TypeError
+            incomplete_details = document.get("incomplete_details")
+            finish_reason = (
+                "stop"
+                if status == "completed"
+                else str(incomplete_details.get("reason", status))
+                if isinstance(incomplete_details, dict)
+                else status
+            )
+            usage_document = document.get("usage")
+            usage = (
+                TokenUsage(
+                    input_tokens=int(usage_document["input_tokens"]),
+                    output_tokens=int(usage_document["output_tokens"]),
+                )
+                if isinstance(usage_document, dict)
+                else None
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ProviderInvocationError(
+                "invalid_response", False, True, provider_request_id
+            ) from error
+        return ProviderResponse("".join(text_parts), finish_reason, usage, provider_request_id)
+
+
+def _wire_endpoint(path_prefix: str, wire_api: ProviderWireApi) -> str:
+    """把已校验 Base URL 前缀与固定协议端点组合，调用方不能注入任意路径。"""
+
+    suffix = "responses" if wire_api == "responses" else "chat/completions"
+    return f"{path_prefix}/{suffix}"
+
+
+def _runtime_payload(
+    request: ModelRequest,
+    *,
+    model_id: str,
+    wire_api: ProviderWireApi,
+) -> dict[str, object]:
+    """按供应商协议生成最小运行载荷，并在 Responses 模式关闭服务端持久化。"""
+
+    messages = [{"role": message.role, "content": message.content} for message in request.messages]
+    if wire_api == "responses":
+        return {
+            "model": model_id,
+            "input": messages,
+            "max_output_tokens": request.max_output_tokens,
+            "stream": False,
+            "store": False,
+        }
+    return {
+        "model": model_id,
+        "messages": messages,
+        "max_tokens": request.max_output_tokens,
+        "stream": False,
+    }
+
+
+def _probe_payload(
+    model_id: str,
+    *,
+    wire_api: ProviderWireApi,
+    capability: ModelCapability,
+) -> dict[str, object]:
+    """生成不含用户数据的协议专用能力探测载荷。"""
+
+    # 1. Responses 使用独立输入、工具和结构化输出字段，并明确关闭服务端持久化。
+    if wire_api == "responses":
+        payload: dict[str, object] = {
+            "model": model_id,
+            "instructions": "这是平台连通性探测。内容不包含用户数据。",
+            "input": "仅回复 OK。",
+            "max_output_tokens": 8,
+            "store": False,
+        }
+        if capability == "streaming":
+            payload["stream"] = True
+        elif capability == "tools":
+            payload["tools"] = [
+                {
+                    "type": "function",
+                    "name": "synthetic_probe",
+                    "description": "固定能力探测",
+                    "parameters": {"type": "object", "properties": {}},
+                    "strict": True,
+                }
+            ]
+            payload["tool_choice"] = {"type": "function", "name": "synthetic_probe"}
+        elif capability == "structured_output":
+            payload["text"] = {
+                "format": {
+                    "type": "json_schema",
+                    "name": "synthetic_probe",
+                    "schema": {
+                        "type": "object",
+                        "properties": {"status": {"type": "string"}},
+                        "required": ["status"],
+                        "additionalProperties": False,
+                    },
+                    "strict": True,
+                }
+            }
+        return payload
+
+    # 2. Chat Completions 保持既有消息格式，避免旧供应商因协议事实新增而漂移。
+    payload = {
+        "model": model_id,
+        "messages": [
+            {"role": "system", "content": "这是平台连通性探测。内容不包含用户数据。"},
+            {"role": "user", "content": "仅回复 OK。"},
+        ],
+        "max_tokens": 8,
+        "temperature": 0,
+    }
+    if capability == "streaming":
+        payload["stream"] = True
+    elif capability == "tools":
+        payload["tools"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "synthetic_probe",
+                    "description": "固定能力探测",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        ]
+        payload["tool_choice"] = "required"
+    elif capability == "structured_output":
+        payload["response_format"] = {"type": "json_object"}
+        payload["messages"] = [
+            {"role": "system", "content": "输出 JSON。内容不包含用户数据。"},
+            {"role": "user", "content": '{"status":"ok"}'},
+        ]
+    return payload
 
 
 class _PinnedHttpsConnection(http.client.HTTPSConnection):
@@ -379,9 +528,45 @@ def _normalized_path(parsed: SplitResult) -> str:
     return "/" + "/".join(segments) if segments else ""
 
 
-def _public_address(value: str) -> bool:
+def _validated_fake_ip_networks(
+    values: tuple[str, ...],
+) -> tuple[ipaddress.IPv4Network, ...]:
+    """限制例外为 RFC 2544 基准网段，避免直接构造策略时绕过 Settings 校验。"""
+
+    benchmark_network = ipaddress.IPv4Network("198.18.0.0/15")
+    networks: list[ipaddress.IPv4Network] = []
+    for value in values:
+        try:
+            network = ipaddress.ip_network(value.strip(), strict=True)
+        except ValueError as error:
+            raise ValueError("模型供应商解析地址例外必须是规范 CIDR") from error
+        if not isinstance(network, ipaddress.IPv4Network) or not network.subnet_of(
+            benchmark_network
+        ):
+            raise ValueError("模型供应商解析地址例外只能包含 198.18.0.0/15 或其子网")
+        networks.append(network)
+    return tuple(
+        sorted(set(networks), key=lambda item: (int(item.network_address), item.prefixlen))
+    )
+
+
+def _allowed_address(
+    value: str,
+    allowed_resolved_networks: tuple[ipaddress.IPv4Network, ...],
+) -> bool:
     try:
         address = ipaddress.ip_address(value)
     except ValueError:
         return False
-    return bool(address.is_global and not address.is_multicast and not address.is_unspecified)
+    if (
+        address.is_multicast
+        or address.is_unspecified
+        or address.is_loopback
+        or address.is_link_local
+    ):
+        return False
+    if address.is_global:
+        return True
+    return isinstance(address, ipaddress.IPv4Address) and any(
+        address in network for network in allowed_resolved_networks
+    )
