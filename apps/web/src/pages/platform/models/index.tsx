@@ -111,6 +111,7 @@ export default function PlatformModelsPage() {
                 ) : (
                   <RuntimeTable
                     items={model.runtimeConfigs.data ?? []}
+                    providers={model.providers.data ?? []}
                     currentId={model.currentRuntime.data?.runtime_config_version_id ?? null}
                     isLoading={model.runtimeConfigs.isLoading || model.currentRuntime.isLoading}
                     isActivating={model.activateRuntime.isPending}

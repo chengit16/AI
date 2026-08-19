@@ -146,6 +146,7 @@ export function AppShell() {
         </div>
         <div
           className={cn(
+            "min-h-0 flex-1 overflow-y-auto overscroll-contain",
             "[&_.navigation-copy]:[transition:opacity_var(--motion-fast)]",
             collapsed && "[&_.navigation-copy]:pointer-events-none [&_.navigation-copy]:opacity-0",
           )}

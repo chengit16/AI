@@ -187,7 +187,6 @@ class SqlAlchemyRuntimeConfigurationRepository:
             )
             .order_by(ai_runtime_model_routes.c.priority)
         )
-        components = cast("dict[str, str]", row.component_versions)
         return AiRuntimeConfigVersion(
             runtime_config_version_id=row.runtime_config_version_id,
             version_number=row.version_number,
@@ -195,7 +194,7 @@ class SqlAlchemyRuntimeConfigurationRepository:
             content_hash=row.content_hash,
             system_prompt_template=row.system_prompt_template,
             system_prompt_hash=row.system_prompt_hash,
-            components=RuntimeComponentVersions(**components),
+            components=_runtime_component_versions(row.component_versions),
             policy=_policy(row),
             routes=tuple(_route(route_row) for route_row in route_rows),
             created_by_account_id=row.created_by_account_id,
@@ -384,6 +383,17 @@ def _policy(row: Row[Any]) -> GatewayPolicy:
         rule_degradation_message=row.rule_degradation_message,
         max_estimated_cost_microunits=row.max_estimated_cost_microunits,
     )
+
+
+def _runtime_component_versions(value: object) -> RuntimeComponentVersions:
+    components = cast("dict[str, str]", value)
+    # 早期本地快照没有冻结后置接口版本；使用显式未知值保真，避免读取列表时伪造具体版本。
+    legacy_interfaces = {
+        "data_source_interface": "legacy-unversioned",
+        "relevance_grader_interface": "legacy-unversioned",
+        "multimodal_router_interface": "legacy-unversioned",
+    }
+    return RuntimeComponentVersions(**(legacy_interfaces | components))
 
 
 def _policy_values(policy: GatewayPolicy) -> dict[str, object]:

@@ -204,6 +204,15 @@ describe("平台路由与运行状态", () => {
       "href",
       "#main-content",
     );
+    const desktopNavigationScrollRegion = screen.getByRole("navigation", {
+      name: "空间管理",
+    }).parentElement;
+    expect(desktopNavigationScrollRegion).toHaveClass(
+      "min-h-0",
+      "flex-1",
+      "overflow-y-auto",
+      "overscroll-contain",
+    );
 
     // 4. 下拉选项必须暴露业务名称，不能把内部 UUID 当成辅助技术可读标签。
     const workspaceSelect = screen.getByRole("combobox", { name: "切换工作空间" });

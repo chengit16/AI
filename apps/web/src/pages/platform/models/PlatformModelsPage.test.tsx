@@ -1,11 +1,12 @@
 /** @description 平台模型治理页面权限、供应商和运行配置交互测试。 */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ModelProvider } from "@/api/services/platformModels";
+import type { AiRuntimeConfig, ModelProvider } from "@/api/services/platformModels";
 
 import { ProviderDialogs } from "./components/ProviderDialogs";
 import { ProviderTable } from "./components/ProviderTable";
+import { RuntimeTable } from "./components/RuntimeTable";
 
 const provider: ModelProvider = {
   provider_id: "90000000-0000-4000-8000-000000000701",
@@ -32,6 +33,55 @@ const provider: ModelProvider = {
   created_at: "2026-08-14T09:00:00Z",
   updated_at: "2026-08-14T10:01:00Z",
   version: 3,
+};
+
+const runtime: AiRuntimeConfig = {
+  runtime_config_version_id: "90000000-0000-4000-8000-000000000702",
+  version_number: 2,
+  display_name: "P5-04 质量配置",
+  content_hash: "a".repeat(64),
+  system_prompt_template: "只依据已授权证据回答。",
+  system_prompt_hash: "b".repeat(64),
+  components: {
+    chunking: "recursive-cjk-v1",
+    embedding: "deterministic-hash-1024-v1",
+    index_schema: "index-v1",
+    reranker: "bge-reranker-v1",
+    retrieval: "hybrid-rrf-v1",
+    source_ranking: "source-priority-v1",
+    safety: "rag-safety-v2",
+    data_source_interface: "data-source-v1",
+    relevance_grader_interface: "relevance-grader-v1",
+    multimodal_router_interface: "multimodal-router-v1",
+  },
+  policy: {
+    attempt_timeout_ms: 60_000,
+    total_timeout_ms: 120_000,
+    max_attempts_per_route: 1,
+    max_prompt_characters: 32_000,
+    max_output_tokens: 2_048,
+    max_response_characters: 64_000,
+    circuit_failure_threshold: 3,
+    circuit_recovery_ms: 30_000,
+    rule_degradation_message: "当前模型暂不可用，请稍后重试",
+    max_estimated_cost_microunits: 5_000_000,
+  },
+  routes: [
+    {
+      route_id: "90000000-0000-4000-8000-000000000703",
+      provider_id: provider.provider_id,
+      provider_configuration_version: provider.version,
+      priority: 1,
+      model_id: "gpt-5.6-sol",
+      location: "external",
+      capabilities: ["generation", "streaming"],
+      input_price_microunits_per_million_tokens: 0,
+      output_price_microunits_per_million_tokens: 0,
+      currency: "CNY",
+    },
+  ],
+  created_by_account_id: "90000000-0000-4000-8000-000000000704",
+  created_at: "2026-08-19T08:00:00Z",
 };
 
 describe("P1D-07 平台模型配置表格", () => {
@@ -99,5 +149,27 @@ describe("P1D-07 平台模型配置表格", () => {
         }),
       ),
     );
+  });
+
+  it("从只读详情核对运行配置身份、路由和零价格边界", async () => {
+    render(
+      <RuntimeTable
+        items={[runtime]}
+        providers={[{ ...provider, status: "active" }]}
+        currentId={runtime.runtime_config_version_id}
+        isLoading={false}
+        isActivating={false}
+        onActivate={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "查看 P5-04 质量配置 详情" }));
+    const dialog = await screen.findByRole("dialog", { name: "运行配置详情" });
+
+    expect(within(dialog).getByText("gpt-5.6-sol")).toBeInTheDocument();
+    expect(within(dialog).getByText("合成 GPT 主模型")).toBeInTheDocument();
+    expect(within(dialog).getByText("synthetic_primary")).toBeInTheDocument();
+    expect(within(dialog).getByText("存在价格为 0 的路由")).toBeInTheDocument();
+    expect(within(dialog).queryByText(runtime.system_prompt_template)).not.toBeInTheDocument();
   });
 });
