@@ -182,6 +182,7 @@ def _insert_provider_credential(
                 provider_key=f"p1g03_{provider_id.hex}",
                 display_name="P1G-03 合成供应商",
                 adapter_kind="openai_compatible",
+                wire_api="chat_completions",
                 base_url="https://api.synthetic.example/v1",
                 probe_model_id="synthetic-model",
                 location="external",

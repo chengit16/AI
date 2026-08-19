@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from html import unescape
+from html.entities import html5
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
@@ -21,6 +24,37 @@ from ai_platform_worker.modules.ingestion.domain.errors import (
 
 XHTML_NAMESPACE = "{http://www.w3.org/1999/xhtml}"
 TIKA_NULL_REFERENCE = b"&#0;"
+NAMED_ENTITY_PATTERN = re.compile(rb"&([A-Za-z][A-Za-z0-9._:-]*);")
+XML_ENTITY_NAMES = frozenset({b"amp", b"apos", b"gt", b"lt", b"quot"})
+
+
+def content_disposition(file_name: str) -> str:
+    """生成仅含 ASCII 的 Header，并通过 RFC 5987 保留 UTF-8 文件名。"""
+
+    base_name = Path(file_name.replace("\\", "/")).name or "document"
+    fallback = "".join(
+        character
+        if character.isascii() and 0x20 <= ord(character) < 0x7F and character not in {'"', "\\"}
+        else "_"
+        for character in base_name
+    )
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(base_name, safe='')}"
+
+
+def normalize_named_entities(payload: bytes) -> bytes:
+    """将 HTML5 命名 Entity 转为 UTF-8，同时保持严格 XML 解析边界。"""
+
+    def replacement(match: re.Match[bytes]) -> bytes:
+        name = match.group(1)
+        if name in XML_ENTITY_NAMES:
+            return match.group(0)
+        decoded = html5.get(f"{name.decode('ascii')};")
+        if decoded is not None:
+            return decoded.encode("utf-8")
+        # 未知 Entity 经过 XML 与文本规范化各解码一次后仍保持原始字面值。
+        return b"&amp;amp;" + name + b";"
+
+    return NAMED_ENTITY_PATTERN.sub(replacement, payload)
 
 
 def local_name(element: ElementTree.Element) -> str:
@@ -100,8 +134,8 @@ def append_element(
 def parse_xhtml(payload: bytes, fallback_media_type: str) -> ParsedDocument:
     """解析XHTML，在基础设施边界维持稳定领域对象映射。"""
 
-    # 1. Tika 3.2.3 会用 XML 禁止的 &#0; 表示空标题，先移除占位再严格解析结构。
-    payload = payload.replace(TIKA_NULL_REFERENCE, b"")
+    # 1. Tika 3.2.3 会混用 HTML Entity 和 XML 禁止的 &#0;，先规范化再严格解析结构。
+    payload = normalize_named_entities(payload.replace(TIKA_NULL_REFERENCE, b""))
     try:
         root = ElementTree.fromstring(payload)
     except ElementTree.ParseError as error:
@@ -173,12 +207,11 @@ class TikaDocumentParser:
     ) -> ParsedDocument:
         """通过受限 Tika 请求解析 Office 文档，超时或异常响应失败关闭。"""
 
-        # 1. 文件名只进入受控 Header，路径和引号必须移除以避免协议注入。
-        safe_file_name = Path(file_name).name.replace('"', "")
+        # 1. 文件名只进入受控 Header，路径、控制字符和非 ASCII 字符在协议边界统一编码。
         headers = {
             "Accept": "text/html",
             "Content-Type": declared_media_type or "application/octet-stream",
-            "Content-Disposition": f'attachment; filename="{safe_file_name}"',
+            "Content-Disposition": content_disposition(file_name),
         }
         if self._ocr_language is not None:
             # 语言选择只在 Tika Adapter 边缘传递，任务层不依赖 Tesseract 专有参数。

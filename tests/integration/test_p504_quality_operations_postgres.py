@@ -99,6 +99,7 @@ def _seed_dataset_and_release(
                 provider_key=f"synthetic-p504-{provider_id.hex}",
                 display_name="合成 P5-04 供应商",
                 adapter_kind="openai_compatible",
+                wire_api="chat_completions",
                 base_url="https://synthetic.invalid/v1",
                 probe_model_id="synthetic-quality-model",
                 location="external",

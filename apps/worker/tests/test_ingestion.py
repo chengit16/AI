@@ -1,5 +1,8 @@
 """验证 Worker 文档解析、结构化切片和稳定标识。"""
 
+from types import TracebackType
+from typing import Self
+from urllib.request import Request
 from uuid import UUID
 
 import pytest
@@ -15,7 +18,41 @@ from ai_platform_worker.modules.ingestion.domain.documents import (
 )
 from ai_platform_worker.modules.ingestion.domain.errors import IngestionError
 from ai_platform_worker.modules.ingestion.infrastructure.parsers import DefaultParserRouter
-from ai_platform_worker.modules.ingestion.infrastructure.tika import parse_xhtml
+from ai_platform_worker.modules.ingestion.infrastructure.tika import (
+    TikaDocumentParser,
+    parse_xhtml,
+)
+
+
+class StubTikaHeaders:
+    """为 Tika HTTP 边界测试提供最小响应头接口。"""
+
+    def get_content_type(self) -> str:
+        return "text/html"
+
+
+class StubTikaResponse:
+    """返回固定 XHTML，避免回归测试依赖真实 Tika 服务。"""
+
+    headers = StubTikaHeaders()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return (
+            b'<html xmlns="http://www.w3.org/1999/xhtml"><head>'
+            b'<meta name="Content-Type" content="application/pdf"/></head>'
+            b"<body><p>Synthetic content</p></body></html>"
+        )
 
 
 class FailingTikaParser:
@@ -207,3 +244,45 @@ def test_tika_null_title_reference_does_not_break_structured_parse() -> None:
     assert document.media_type == "application/pdf"
     assert document.blocks[0].text == "Synthetic content"
     assert document.blocks[0].source_position.page_number == 1
+
+
+def test_tika_html_named_entities_are_normalized_before_xml_parse() -> None:
+    """Tika 输出的标准 HTML Entity 不应破坏严格 XHTML 解析。"""
+
+    document = parse_xhtml(
+        b'<html xmlns="http://www.w3.org/1999/xhtml"><head>'
+        b'<meta name="Content-Type" content="application/pdf"/></head>'
+        b"<body><p>Rule &ldquo;A&rdquo; &rarr; done &bull; next &hellip;</p>"
+        b"<p>Unknown &not-a-tika-entity;</p></body></html>",
+        "application/pdf",
+    )
+
+    assert document.blocks[0].text == "Rule \u201cA\u201d \u2192 done \u2022 next \u2026"
+    assert document.blocks[1].text == "Unknown &not-a-tika-entity;"
+
+
+def test_tika_request_encodes_non_ascii_file_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """中文文件名必须形成 ASCII Header，同时保留标准 UTF-8 文件名参数。"""
+
+    def fake_urlopen(request: Request, timeout: float) -> StubTikaResponse:
+        assert timeout == 30
+        content_disposition = request.get_header("Content-disposition")
+        assert content_disposition is not None
+        content_disposition.encode("latin-1")
+        assert "filename*=UTF-8''Harness%20%E5%9B%A2%E9%98%9F.pdf" in content_disposition
+        return StubTikaResponse()
+
+    monkeypatch.setattr(
+        "ai_platform_worker.modules.ingestion.infrastructure.tika.urlopen",
+        fake_urlopen,
+    )
+
+    document = TikaDocumentParser("http://tika:9998").parse(
+        content=b"%PDF-synthetic",
+        file_name="Harness 团队.pdf",
+        declared_media_type="application/pdf",
+    )
+
+    assert document.blocks[0].text == "Synthetic content"
