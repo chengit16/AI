@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextvars import ContextVar
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from datetime import UTC, datetime
 from types import TracebackType
 from typing import Any, cast
@@ -386,14 +386,16 @@ def _policy(row: Row[Any]) -> GatewayPolicy:
 
 
 def _runtime_component_versions(value: object) -> RuntimeComponentVersions:
-    components = cast("dict[str, str]", value)
-    # 早期本地快照没有冻结后置接口版本；使用显式未知值保真，避免读取列表时伪造具体版本。
-    legacy_interfaces = {
-        "data_source_interface": "legacy-unversioned",
-        "relevance_grader_interface": "legacy-unversioned",
-        "multimodal_router_interface": "legacy-unversioned",
-    }
-    return RuntimeComponentVersions(**(legacy_interfaces | components))
+    if not isinstance(value, dict):
+        raise TypeError("运行配置组件快照必须是对象")
+    # 历史本地库可能缺少当前字段或保留废弃键；只投影已知字段，缺失项使用明确未知值保真。
+    components: dict[str, str] = {}
+    for component_field in fields(RuntimeComponentVersions):
+        component_value = value.get(component_field.name, "legacy-unversioned")
+        if not isinstance(component_value, str) or not component_value.strip():
+            raise TypeError(f"运行配置组件版本无效: {component_field.name}")
+        components[component_field.name] = component_value
+    return RuntimeComponentVersions(**components)
 
 
 def _policy_values(policy: GatewayPolicy) -> dict[str, object]:
