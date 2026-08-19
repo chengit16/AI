@@ -152,12 +152,14 @@
 - 真实供应商接入准备：针对 Codex 类中转补充 `responses` 线协议事实、`/responses` 固定端点、请求/响应/Usage 解析和前端协议选择；旧供应商由 Revision `20260818_0070` 回填为 `chat_completions`。域名白名单继续失败关闭，本地 CC Switch/Clash Fake-IP 只允许显式配置 `198.18.0.0/15` 或其子网，且非 `local/test` 环境拒绝启动；RFC1918、回环、链路本地、其他保留地址、未登记域名、非 443 端口和重定向仍被拒绝。
 - 当前验证事实：Fake-IP 红灯复现最初为 `2 failed`，实现后专项 `2/2`、供应商配置 `7/7`、模型网关联合 `22/22`、React `59/59`、Ruff、mypy 定向检查、Web TypeScript、契约生成漂移和 Compose 配置解析通过。统一入口的 Secret Scanner、契约/权限/供应链/注释/架构、前端构建与测试、Ruff 及 mypy strict `751` 个源文件均通过；全量 pytest 在沙箱内得到 `691 passed`，另有 `226 errors` 与 8 个基础设施失败，首个错误明确为访问 `127.0.0.1:5432` 时 `Operation not permitted`，同组 PostgreSQL、MinIO、Tika 和 Valkey 均被沙箱网络隔离。沙箱外原样重跑和真实 DNS 验证申请又被审批服务自身访问 `https://ai.input.im/responses` 的 `503 Service Unavailable` 拒绝，因此没有形成本轮沙箱外统一门禁或真实连通性、协议、限流、质量和价格通过结论。
 - 2026-08-19 续验：当前提交 `c91b42b` 的工作树干净，`./platform doctor` 再次确认 Web、API、MinIO、Tika、PostgreSQL、Revision `20260818_0070`、Valkey、五个 Worker Lane 和 Scheduler 共 13 项全部通过。原样执行 `./scripts/verify` 时，Secret Scanner、契约、Registry、SBOM、许可证、ReleaseManifest、供应链、注释、架构、React `59/59`、生产构建、Ruff 和 mypy strict `751` 个源文件均通过；全量 pytest 为 `691 passed`，另有 `226 errors` 与 `8 failed`，首个错误仍为沙箱访问 `127.0.0.1:5432` 时 `Operation not permitted`，MinIO、Tika 和 Valkey 同样受本机网络隔离。已确认目标账号存在且为 `active`，但仓库唯一提权入口 `./platform admin grant <login_name>` 在命令启动前被外部审批服务访问 `https://ai.input.im/responses` 的 `502 Bad Gateway` 拒绝；内置浏览器访问本地模型治理页也被 URL 安全策略拒绝。为避免绕过安全边界，本轮不改用数据库直写或其他浏览器通道，平台管理员生效、供应商创建、数据政策审核和能力探测仍等待用户在本机终端及页面完成。
+- 管理员授权续验：用户随后在本机仓库根目录通过唯一提权入口执行授权，命令明确返回目标合成账号 `-> active`，平台管理员外部门禁已满足。内置浏览器 URL 安全策略仍不允许代理操作本地模型治理页，且 API Key 不应经对话、日志或 Git 传递；因此供应商创建、真实数据政策审核和能力探测继续由用户在本地页面完成，管理员授权成功本身不等同于供应商审核或探测通过。
+- 管理员账号切换：用户已指定另一个既有账号作为后续平台管理员；自动执行本地授权命令仍在启动前被外部审批服务访问 `https://ai.input.im/responses` 的 `502 Bad Gateway` 拒绝，Docker 和 PostgreSQL 未收到本次命令。个人登录名不写入报告，账号切换等待用户在本机执行仓库唯一提权入口，并在新账号成功登录后再撤销旧合成管理员，避免管理入口被同时撤销。
 - 审计结论：`blocked`。本地实现、统一门禁、Migration、L3/L4 合成恢复、浏览器和运行诊断已经具备后续联合验收基础，但“必需节点全部完成”条件不成立。依赖满足前不运行通过态 P5-13 联合验收、不生成阶段 5 ReleaseManifest、不形成关闭提交，也不创建 `stage-5-complete` 标签。
 
 ## 15. 当前限制与下一步
 
 - `P5-04` 本地机制和当前树统一门禁已通过；Responses 与本地 Fake-IP 接入准备已经补齐，但真实供应商尚未成功探测和完成数据政策审核，真实质量结论仍缺少固定模型/参数/网络区域和足够授权样本，因此节点保持受阻。
-- 下一项可执行交接为用户在仓库根目录运行 `./platform admin grant <login_name>`，确认输出以 `-> active` 结束，再以该账号刷新 `/platform/models`。授权完成后才进入供应商创建、审核和能力探测；API Key 仅由用户在本地页面输入，不进入日志、文档或 Git。
+- 下一项可执行交接为用户以已授权账号刷新 `/platform/models`，完成供应商创建、真实数据政策审核和能力探测；API Key 仅由用户在本地页面输入，不进入对话、日志、文档或 Git。
 - `P5-04` 的真实质量结论仍需要已审核真实供应商、固定模型/参数/网络区域/窗口和达到下限的授权样本；未配置前不能标记真实质量目标通过。
 - 真实线上反馈和真实模型质量仍为 `not_run`；本地全合成样本只证明采集、版本与隔离机制，不提供真实模型质量结论。
 - 真实模型质量与成本节点不能仅靠代码完成。需要用户或项目方提供经过审核的供应商配置、数据政策、固定模型与价格版本，并积累足够的合成/真实授权样本后再验收。
