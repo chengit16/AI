@@ -1,5 +1,5 @@
 /** @description 平台模型治理页面编排，组合供应商生命周期和不可变运行配置发布入口。 */
-import { Button, Tabs } from "antd";
+import { Alert, Button, Tabs } from "antd";
 import { Cpu, Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -99,27 +99,39 @@ export default function PlatformModelsPage() {
             {
               key: "runtime",
               label: `运行配置 ${model.runtimeConfigs.data?.length ?? 0}`,
-              children:
-                model.runtimeConfigs.isError || model.currentRuntime.isError ? (
-                  <StateView
-                    kind="error"
-                    title="运行配置未能加载"
-                    description={errorMessage(
-                      model.runtimeConfigs.error ?? model.currentRuntime.error,
-                    )}
-                  />
-                ) : (
+              children: model.runtimeConfigs.isError ? (
+                <StateView
+                  kind="error"
+                  title="运行配置未能加载"
+                  description={errorMessage(model.runtimeConfigs.error)}
+                />
+              ) : (
+                <div className="grid gap-4">
+                  {model.currentRuntime.isError && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="当前发布状态未能加载"
+                      description="已创建的配置仍可查看；可重试读取，或重新发布目标版本以恢复当前指针。"
+                      action={
+                        <Button size="small" onClick={() => void model.currentRuntime.refetch()}>
+                          重试发布状态
+                        </Button>
+                      }
+                    />
+                  )}
                   <RuntimeTable
                     items={model.runtimeConfigs.data ?? []}
                     providers={model.providers.data ?? []}
                     currentId={model.currentRuntime.data?.runtime_config_version_id ?? null}
-                    isLoading={model.runtimeConfigs.isLoading || model.currentRuntime.isLoading}
+                    isLoading={model.runtimeConfigs.isLoading}
                     isActivating={model.activateRuntime.isPending}
                     onActivate={(runtimeConfigVersionId) =>
                       model.activateRuntime.mutate(runtimeConfigVersionId)
                     }
                   />
-                ),
+                </div>
+              ),
             },
           ]}
         />

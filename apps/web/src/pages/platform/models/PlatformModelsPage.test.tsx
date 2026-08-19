@@ -1,4 +1,5 @@
 /** @description 平台模型治理页面权限、供应商和运行配置交互测试。 */
+import { App } from "antd";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +8,10 @@ import type { AiRuntimeConfig, ModelProvider } from "@/api/services/platformMode
 import { ProviderDialogs } from "./components/ProviderDialogs";
 import { ProviderTable } from "./components/ProviderTable";
 import { RuntimeTable } from "./components/RuntimeTable";
+import PlatformModelsPage from ".";
+import { usePlatformModels } from "./usePlatformModels";
+
+vi.mock("./usePlatformModels", () => ({ usePlatformModels: vi.fn() }));
 
 const provider: ModelProvider = {
   provider_id: "90000000-0000-4000-8000-000000000701",
@@ -171,5 +176,42 @@ describe("P1D-07 平台模型配置表格", () => {
     expect(within(dialog).getByText("synthetic_primary")).toBeInTheDocument();
     expect(within(dialog).getByText("存在价格为 0 的路由")).toBeInTheDocument();
     expect(within(dialog).queryByText(runtime.system_prompt_template)).not.toBeInTheDocument();
+  });
+
+  it("当前发布指针失败时仍展示已创建的运行配置", async () => {
+    const query = (data: unknown, overrides: Record<string, unknown> = {}) => ({
+      data,
+      error: null,
+      isError: false,
+      isLoading: false,
+      refetch: vi.fn(),
+      ...overrides,
+    });
+    const mutation = () => ({ isPending: false, mutate: vi.fn(), mutateAsync: vi.fn() });
+    vi.mocked(usePlatformModels).mockReturnValue({
+      providers: query([{ ...provider, status: "active" }]),
+      runtimeConfigs: query([runtime]),
+      currentRuntime: query(undefined, {
+        error: new Error("synthetic current failure"),
+        isError: true,
+      }),
+      createProvider: mutation(),
+      rotateCredential: mutation(),
+      reviewPolicy: mutation(),
+      providerAction: mutation(),
+      createRuntime: mutation(),
+      activateRuntime: mutation(),
+    } as never);
+
+    render(
+      <App>
+        <PlatformModelsPage />
+      </App>,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "运行配置 1" }));
+
+    expect(await screen.findByText("当前发布状态未能加载")).toBeInTheDocument();
+    expect(screen.getByText("P5-04 质量配置")).toBeInTheDocument();
+    expect(screen.queryByText("运行配置未能加载")).not.toBeInTheDocument();
   });
 });
