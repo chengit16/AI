@@ -162,7 +162,7 @@ def components() -> RuntimeComponentVersions:
         chunking="recursive-cjk-v1",
         embedding="deterministic-hash-1024-v1",
         index_schema="index-v1",
-        reranker="bge-reranker-v1",
+        reranker="deterministic-lexical-reranker-v1",
         retrieval="hybrid-rrf-v1",
         source_ranking="source-priority-v1",
         safety="rag-safety-v2",
@@ -297,6 +297,21 @@ def test_stale_rag_safety_component_is_rejected() -> None:
             display_name="旧安全门配置",
             system_prompt_template="合成提示",
             components=replace(components(), safety="rag-safety-v1"),
+            policy=policy(),
+            routes=routes(),
+        )
+
+
+def test_unavailable_local_retrieval_component_is_rejected() -> None:
+    """运行配置不能冻结当前进程无法执行的检索组件版本。"""
+
+    service = AiRuntimeConfigurationService(MemoryUnitOfWork())
+    with pytest.raises(AiRuntimeConfigInvalidError):
+        service.create(
+            context(),
+            display_name="不可执行的重排配置",
+            system_prompt_template="合成提示",
+            components=replace(components(), reranker="bge-reranker-v1"),
             policy=policy(),
             routes=routes(),
         )

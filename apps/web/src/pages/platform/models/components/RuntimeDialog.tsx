@@ -34,7 +34,7 @@ const initialComponents: RuntimeComponents = {
   chunking: "recursive-cjk-v1",
   embedding: "deterministic-hash-1024-v1",
   index_schema: "index-v1",
-  reranker: "bge-reranker-v1",
+  reranker: "deterministic-lexical-reranker-v1",
   retrieval: "hybrid-rrf-v1",
   source_ranking: "source-priority-v1",
   safety: "rag-safety-v2",

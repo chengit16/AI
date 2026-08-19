@@ -33,6 +33,14 @@ VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 SUPPORTED_CAPABILITIES: frozenset[str] = frozenset(
     {"generation", "streaming", "tools", "structured_output"}
 )
+EXECUTABLE_KNOWLEDGE_COMPONENTS: dict[str, frozenset[str]] = {
+    "chunking": frozenset({"recursive-cjk-v1"}),
+    "embedding": frozenset({"deterministic-hash-1024-v1"}),
+    "index_schema": frozenset({"index-v1"}),
+    "reranker": frozenset({"deterministic-lexical-reranker-v1"}),
+    "retrieval": frozenset({"hybrid-rrf-v1"}),
+    "source_ranking": frozenset({"source-priority-v1"}),
+}
 
 __all__ = [
     "AiRuntimeConfigVersion",
@@ -229,10 +237,12 @@ class AiRuntimeConfigurationService:
         routes: tuple[RuntimeRouteDraft, ...],
     ) -> None:
         # 1. 校验全局结构、连续优先级、组件版本和网关安全上限。
-        version_values = asdict(components).values()
+        component_values = asdict(components)
+        version_values = component_values.values()
         priorities = sorted(route.priority for route in routes)
         route_keys = {(route.provider_id, route.model_id.strip()) for route in routes}
-        # 安全门版本必须与当前后端实现一致，旧配置不能绕过最新的模型前置防护。
+        # 模型路由只负责生成，不会为 API 进程安装检索 Adapter；因此发布快照必须匹配
+        # 当前进程真实装配的知识组件，避免配置成功后在证据重排阶段才失败关闭。
         if (
             not display_name
             or len(display_name) > 120
@@ -242,6 +252,11 @@ class AiRuntimeConfigurationService:
                 not isinstance(value, str) or VERSION_PATTERN.fullmatch(value) is None
                 for value in version_values
             )
+            or any(
+                component_values[name] not in supported_versions
+                for name, supported_versions in EXECUTABLE_KNOWLEDGE_COMPONENTS.items()
+            )
+            # 安全门版本必须与当前后端实现一致，旧配置不能绕过最新的模型前置防护。
             or components.safety != RAG_SAFETY_VERSION
             or not 1 <= len(routes) <= 8
             or priorities != list(range(1, len(routes) + 1))

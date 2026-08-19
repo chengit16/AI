@@ -180,7 +180,7 @@ def components() -> RuntimeComponentVersions:
         "recursive-cjk-v1",
         "deterministic-hash-1024-v1",
         "index-v1",
-        "bge-reranker-v1",
+        "deterministic-lexical-reranker-v1",
         "hybrid-rrf-v1",
         "source-priority-v1",
         "rag-safety-v2",
