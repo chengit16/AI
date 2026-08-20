@@ -25300,6 +25300,13 @@
           },
           "draft": {
             "$ref": "#/components/schemas/AgentDraftResponse"
+          },
+          "knowledge_scope_versions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentKnowledgeScopeVersionResponse"
+            },
+            "type": "array",
+            "title": "Knowledge Scope Versions"
           }
         },
         "additionalProperties": false,
@@ -25309,7 +25316,7 @@
           "draft"
         ],
         "title": "AgentDetailResponse",
-        "description": "组合 Agent 定义与当前草稿。"
+        "description": "组合 Agent 定义、当前草稿及其不可变知识范围。"
       },
       "AgentDraftResponse": {
         "properties": {
@@ -25484,6 +25491,74 @@
         ],
         "title": "AgentEvaluationResponse",
         "description": "表示候选最近一次不可变确定性评估。"
+      },
+      "AgentKnowledgeScopeSelectionRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "knowledge_base_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Knowledge Base Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "knowledge_base_ids"
+        ],
+        "title": "AgentKnowledgeScopeSelectionRequest",
+        "description": "定义随草稿原子冻结的知识库集合。"
+      },
+      "AgentKnowledgeScopeVersionResponse": {
+        "properties": {
+          "knowledge_scope_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Knowledge Scope Version Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "knowledge_base_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Knowledge Base Ids"
+          },
+          "scope_hash": {
+            "type": "string",
+            "title": "Scope Hash"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "knowledge_scope_version_id",
+          "name",
+          "knowledge_base_ids",
+          "scope_hash",
+          "created_at"
+        ],
+        "title": "AgentKnowledgeScopeVersionResponse",
+        "description": "返回草稿引用的不可变知识范围，不包含文档或知识正文。"
       },
       "AgentListResponse": {
         "properties": {
@@ -35218,6 +35293,16 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Configuration"
+          },
+          "knowledge_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentKnowledgeScopeSelectionRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -35227,7 +35312,7 @@
           "configuration"
         ],
         "title": "UpdateAgentDraftRequest",
-        "description": "按乐观锁替换当前草稿配置。"
+        "description": "按乐观锁替换当前草稿配置，可同时冻结新的知识范围。"
       },
       "UpdateServiceRequest": {
         "properties": {

@@ -19,8 +19,10 @@ import {
   requestAgentRelease,
   runAgentEvaluation,
   updateAgentDraft,
+  type AgentKnowledgeScopeSelection,
   type CreateAgentRequest,
 } from "@/api/services/agents";
+import { getKnowledgeBases } from "@/api/services/knowledge";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 
 /** 更新草稿 Mutation 的乐观锁输入。 */
@@ -31,13 +33,21 @@ export interface UpdateAgentDraftInput {
   configuration: Record<string, unknown>;
 }
 
+/** 冻结知识范围并保存草稿的乐观锁输入。 */
+export interface BindAgentKnowledgeScopeInput extends UpdateAgentDraftInput {
+  /** 服务端用于审计和版本识别的范围名称。 */
+  name: string;
+  /** 当前用户明确选择的知识库集合；空集合表示禁用知识检索。 */
+  knowledgeBaseIds: string[];
+}
+
 /**
  * 返回 Agent 控制台三组查询和完整发布流水命令。
  *
  * 候选审批处于活动状态时每 3 秒刷新一次，用于恢复通用审批页面产生的终态；
  * 所有写命令成功后只失效受影响的 Agent 查询，避免刷新无关空间缓存。
  */
-export function useAgentControl(agentId: string | null) {
+export function useAgentControl(agentId: string | null, canReadKnowledgeBases: boolean) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const { workspaceId } = useCurrentWorkspace();
@@ -67,6 +77,12 @@ export function useAgentControl(agentId: string | null) {
     enabled: Boolean(workspaceId && agentId),
     retry: false,
   });
+  const knowledgeBases = useQuery({
+    queryKey: ["knowledge-bases", workspaceId],
+    queryFn: ({ signal }) => getKnowledgeBases(workspaceId!, signal),
+    enabled: Boolean(workspaceId && canReadKnowledgeBases),
+    retry: false,
+  });
 
   // 2. 草稿与 Agent 定义共用列表聚合；发布流水会同时改变候选和 Release。
   const refreshAgent = () => queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
@@ -94,6 +110,26 @@ export function useAgentControl(agentId: string | null) {
     onSuccess: async () => {
       await refreshPipeline();
       void message.success("草稿已保存，旧候选资格已按服务端规则重新计算");
+    },
+    onError: notifyError,
+  });
+  const bindKnowledgeScope = useMutation({
+    mutationFn: (input: BindAgentKnowledgeScopeInput) => {
+      const knowledgeScope: AgentKnowledgeScopeSelection = {
+        name: input.name,
+        knowledge_base_ids: input.knowledgeBaseIds,
+      };
+      return updateAgentDraft(
+        workspaceId!,
+        agentId!,
+        input.expectedRevision,
+        input.configuration,
+        knowledgeScope,
+      );
+    },
+    onSuccess: async () => {
+      await refreshPipeline();
+      void message.success("知识范围已冻结并保存到新草稿");
     },
     onError: notifyError,
   });
@@ -144,8 +180,10 @@ export function useAgentControl(agentId: string | null) {
     agents,
     candidates,
     releases,
+    knowledgeBases,
     create,
     saveDraft,
+    bindKnowledgeScope,
     archive,
     requestRelease,
     evaluate,

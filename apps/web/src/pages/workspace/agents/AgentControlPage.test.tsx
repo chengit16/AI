@@ -1,9 +1,10 @@
-/** @description P3-11 Agent 控制台错误清空、草稿校验和候选动作测试。 */
+/** @description Agent 控制台错误清空、知识范围绑定、草稿校验和候选动作测试。 */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AgentCandidateControl, AgentDetail } from "@/api/services/agents";
+import type { KnowledgeBaseSummary } from "@/api/services/knowledge";
 import { useWorkspaceMenuNavigation } from "@/hooks/useWorkspaceMenuNavigation";
 
 import AgentControlPage from ".";
@@ -39,7 +40,27 @@ const detail: AgentDetail = {
     config_hash: "a".repeat(64),
     updated_at: "2026-08-16T08:00:00Z",
   },
+  knowledge_scope_versions: [
+    {
+      knowledge_scope_version_id: "a5000000-0000-4000-8000-000000000001",
+      name: "合成制度知识范围",
+      knowledge_base_ids: ["d1000000-0000-4000-8000-000000000001"],
+      scope_hash: "d".repeat(64),
+      created_at: "2026-08-16T08:00:00Z",
+    },
+  ],
 };
+
+const knowledgeBases: KnowledgeBaseSummary[] = [
+  {
+    knowledge_base_id: "d1000000-0000-4000-8000-000000000001",
+    name: "合成制度知识库",
+    description: "仅用于 Agent 页面测试",
+    default_visibility: "workspace",
+    default_security_level: "INTERNAL",
+    updated_at: "2026-08-16T08:00:00Z",
+  },
+];
 
 const failedCandidate: AgentCandidateControl = {
   candidate: {
@@ -91,8 +112,10 @@ function pageModel(overrides: Record<string, unknown> = {}) {
     agents: query([detail]),
     candidates: query([failedCandidate]),
     releases: query([]),
+    knowledgeBases: query(knowledgeBases),
     create: mutation(),
     saveDraft: mutation(),
+    bindKnowledgeScope: mutation(),
     archive: mutation(),
     requestRelease: mutation(),
     evaluate: mutation(),
@@ -157,8 +180,14 @@ describe("P3-11 Agent 控制台", () => {
         detail={detail}
         canUpdate
         canArchive={false}
+        canReadKnowledgeBases
+        knowledgeBases={knowledgeBases}
+        isKnowledgeLoading={false}
+        isKnowledgeError={false}
         isMutating={false}
         onSave={vi.fn()}
+        onBindKnowledgeScope={vi.fn()}
+        onReloadKnowledgeBases={vi.fn()}
         onArchive={vi.fn()}
       />,
     );
@@ -166,6 +195,35 @@ describe("P3-11 Agent 控制台", () => {
     fireEvent.change(screen.getByLabelText("完整配置 JSON"), { target: { value: "[]" } });
     expect(screen.getByRole("button", { name: "保存草稿" })).toBeDisabled();
     expect(screen.getByText("配置必须是有效 JSON 对象后才能保存。")).toBeInTheDocument();
+  });
+
+  it("从当前冻结版本还原知识库并提交下一草稿 revision", () => {
+    const onBindKnowledgeScope = vi.fn();
+    render(
+      <AgentDraftEditor
+        detail={detail}
+        canUpdate
+        canArchive={false}
+        canReadKnowledgeBases
+        knowledgeBases={knowledgeBases}
+        isKnowledgeLoading={false}
+        isKnowledgeError={false}
+        isMutating={false}
+        onSave={vi.fn()}
+        onBindKnowledgeScope={onBindKnowledgeScope}
+        onReloadKnowledgeBases={vi.fn()}
+        onArchive={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("1 个知识库")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "冻结并保存范围" }));
+    expect(onBindKnowledgeScope).toHaveBeenCalledWith(
+      "合成制度 Agent 知识范围 r3",
+      [knowledgeBases[0].knowledge_base_id],
+      detail.draft.configuration,
+      detail.draft.revision,
+    );
   });
 
   it("新空间默认使用基础配置创建首个 Agent", async () => {

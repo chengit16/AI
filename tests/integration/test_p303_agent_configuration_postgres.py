@@ -243,6 +243,81 @@ def test_valid_configuration_checks_all_published_references(
     ]
 
 
+def test_draft_update_atomically_freezes_visible_knowledge_scope(
+    configuration_database: ConfigurationHarness,
+) -> None:
+    """正式草稿入口保存可见范围，跨空间成员失败时不留下半成品版本。"""
+
+    owner = register(configuration_database, "scope-binding-owner")
+    outsider = register(configuration_database, "scope-binding-outsider")
+    owner_context = context(owner)
+    owner_facts = _seed_cross_module_facts(configuration_database.sessions, owner)
+    outsider_facts = _seed_cross_module_facts(configuration_database.sessions, outsider)
+    configuration = _configuration(
+        configuration_database,
+        owner_context,
+        owner_facts,
+        "scope-binding",
+    )
+    agent, draft = configuration_database.agents.create_agent(
+        owner_context,
+        name="合成知识范围绑定 Agent",
+        description=None,
+        configuration=configuration,
+        idempotency_key="synthetic-agent-scope-create-0303",
+    )
+
+    updated = configuration_database.agents.update_draft(
+        owner_context,
+        agent_id=agent.agent_id,
+        expected_revision=draft.revision,
+        configuration=configuration,
+        knowledge_scope_name="合成正式知识范围",
+        knowledge_base_ids=(owner_facts.knowledge_base_id,),
+        idempotency_key="synthetic-agent-scope-bind-0303",
+    )
+    listed = configuration_database.agents.list_agents(owner_context)
+
+    assert updated.revision == 2
+    assert len(listed) == 1
+    assert listed[0][2][0].knowledge_base_ids == (owner_facts.knowledge_base_id,)
+    assert updated.configuration["knowledge_scope_version_ids"] == [
+        str(listed[0][2][0].knowledge_scope_version_id)
+    ]
+
+    with configuration_database.sessions() as session:
+        version_count = session.scalar(
+            select(func.count())
+            .select_from(agent_knowledge_scope_versions)
+            .where(agent_knowledge_scope_versions.c.workspace_id == owner.workspace_id)
+        )
+    with pytest.raises(AgentConfigurationInvalidError):
+        configuration_database.agents.update_draft(
+            owner_context,
+            agent_id=agent.agent_id,
+            expected_revision=updated.revision,
+            configuration=updated.configuration,
+            knowledge_scope_name="合成跨空间知识范围",
+            knowledge_base_ids=(outsider_facts.knowledge_base_id,),
+            idempotency_key="synthetic-agent-scope-cross-workspace-0303",
+        )
+    with configuration_database.sessions() as session:
+        assert (
+            session.scalar(
+                select(agent_drafts.c.revision).where(agent_drafts.c.agent_id == agent.agent_id)
+            )
+            == 2
+        )
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(agent_knowledge_scope_versions)
+                .where(agent_knowledge_scope_versions.c.workspace_id == owner.workspace_id)
+            )
+            == version_count
+        )
+
+
 def test_invalid_update_and_stale_candidate_do_not_advance_facts(
     configuration_database: ConfigurationHarness,
 ) -> None:

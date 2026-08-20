@@ -337,6 +337,21 @@ class MemoryConfigurationRepository:
         value = self.scopes.get(knowledge_scope_version_id)
         return value if value is not None and value.workspace_id == workspace_id else None
 
+    def get_knowledge_scope_versions(
+        self,
+        workspace_id: UUID,
+        knowledge_scope_version_ids: tuple[UUID, ...],
+        *,
+        for_share: bool = False,
+    ) -> tuple[AgentKnowledgeScopeVersion, ...]:
+        del for_share
+        return tuple(
+            value
+            for scope_id in knowledge_scope_version_ids
+            if (value := self.scopes.get(scope_id)) is not None
+            and value.workspace_id == workspace_id
+        )
+
     def get_knowledge_bases(
         self,
         workspace_id: UUID,

@@ -28,13 +28,23 @@ class CreateAgentRequest(BaseModel):
         return self
 
 
+class AgentKnowledgeScopeSelectionRequest(BaseModel):
+    """定义随草稿原子冻结的知识库集合。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    knowledge_base_ids: list[UUID] = Field(max_length=50)
+
+
 class UpdateAgentDraftRequest(BaseModel):
-    """按乐观锁替换当前草稿配置。"""
+    """按乐观锁替换当前草稿配置，可同时冻结新的知识范围。"""
 
     model_config = ConfigDict(extra="forbid")
 
     expected_revision: int = Field(ge=1)
     configuration: dict[str, object]
+    knowledge_scope: AgentKnowledgeScopeSelectionRequest | None = None
 
 
 class ArchiveAgentRequest(BaseModel):
@@ -84,13 +94,26 @@ class AgentDraftResponse(BaseModel):
     updated_at: datetime
 
 
+class AgentKnowledgeScopeVersionResponse(BaseModel):
+    """返回草稿引用的不可变知识范围，不包含文档或知识正文。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    knowledge_scope_version_id: UUID
+    name: str
+    knowledge_base_ids: list[UUID]
+    scope_hash: str
+    created_at: datetime
+
+
 class AgentDetailResponse(BaseModel):
-    """组合 Agent 定义与当前草稿。"""
+    """组合 Agent 定义、当前草稿及其不可变知识范围。"""
 
     model_config = ConfigDict(extra="forbid")
 
     agent: AgentResponse
     draft: AgentDraftResponse
+    knowledge_scope_versions: list[AgentKnowledgeScopeVersionResponse] = Field(default_factory=list)
 
 
 class AgentListResponse(BaseModel):

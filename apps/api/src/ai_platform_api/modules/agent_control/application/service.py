@@ -82,6 +82,7 @@ __all__ = [
     "AgentDraft",
     "AgentEvaluationReport",
     "AgentIdempotencyConflictError",
+    "AgentKnowledgeScopeVersion",
     "AgentLifecycleConflictError",
     "AgentNotFoundError",
     "AgentRelease",
@@ -184,8 +185,8 @@ class AgentControlService:
         context: RequestContext,
         *,
         limit: int = 100,
-    ) -> tuple[tuple[Agent, AgentDraft], ...]:
-        """列出当前空间可管理的自定义 Agent 及其当前草稿。"""
+    ) -> tuple[tuple[Agent, AgentDraft, tuple[AgentKnowledgeScopeVersion, ...]], ...]:
+        """列出当前空间可管理的自定义 Agent、草稿和知识范围。"""
 
         return list_agents(self._unit_of_work, context, limit=limit)
 
@@ -206,6 +207,8 @@ class AgentControlService:
         agent_id: UUID,
         expected_revision: int,
         configuration: dict[str, object],
+        knowledge_scope_name: str | None = None,
+        knowledge_base_ids: tuple[UUID, ...] | None = None,
         idempotency_key: str,
     ) -> AgentDraft:
         """用乐观锁写入新草稿 revision，并保留旧修订的完整可追溯事实。"""
@@ -216,6 +219,8 @@ class AgentControlService:
             agent_id=agent_id,
             expected_revision=expected_revision,
             configuration=configuration,
+            knowledge_scope_name=knowledge_scope_name,
+            knowledge_base_ids=knowledge_base_ids,
             idempotency_key=idempotency_key,
         )
 

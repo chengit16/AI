@@ -16,6 +16,7 @@ from ai_platform_api.modules.agent_control.api.schemas import (
     AgentDraftResponse,
     AgentEvaluationCheckResponse,
     AgentEvaluationResponse,
+    AgentKnowledgeScopeVersionResponse,
     AgentListResponse,
     AgentReleaseListResponse,
     AgentReleaseResponse,
@@ -33,6 +34,7 @@ from ai_platform_api.modules.agent_control.application.service import (
     AgentControlService,
     AgentDraft,
     AgentEvaluationReport,
+    AgentKnowledgeScopeVersion,
     AgentRelease,
     AgentReleaseCandidate,
 )
@@ -66,7 +68,10 @@ def list_agents(
 
     _require_workspace_path(context, workspace_id)
     return AgentListResponse(
-        items=[_detail(agent, draft) for agent, draft in service.list_agents(context, limit=limit)]
+        items=[
+            _detail(agent, draft, scopes)
+            for agent, draft, scopes in service.list_agents(context, limit=limit)
+        ]
     )
 
 
@@ -115,12 +120,17 @@ def update_agent_draft(
     """按 revision 写入新草稿，旧候选和审批资格由应用层同步失效。"""
 
     _require_workspace_path(context, workspace_id)
+    knowledge_scope = body.knowledge_scope
     return _draft(
         service.update_draft(
             context,
             agent_id=agent_id,
             expected_revision=body.expected_revision,
             configuration=body.configuration,
+            knowledge_scope_name=knowledge_scope.name if knowledge_scope is not None else None,
+            knowledge_base_ids=(
+                tuple(knowledge_scope.knowledge_base_ids) if knowledge_scope is not None else None
+            ),
             idempotency_key=idempotency_key,
         )
     )
@@ -325,8 +335,28 @@ def _require_workspace_path(context: RequestContext, workspace_id: UUID) -> None
         raise AgentDeniedError
 
 
-def _detail(agent: Agent, draft: AgentDraft) -> AgentDetailResponse:
-    return AgentDetailResponse(agent=_agent(agent), draft=_draft(draft))
+def _detail(
+    agent: Agent,
+    draft: AgentDraft,
+    knowledge_scopes: tuple[AgentKnowledgeScopeVersion, ...] = (),
+) -> AgentDetailResponse:
+    return AgentDetailResponse(
+        agent=_agent(agent),
+        draft=_draft(draft),
+        knowledge_scope_versions=[_knowledge_scope(value) for value in knowledge_scopes],
+    )
+
+
+def _knowledge_scope(value: AgentKnowledgeScopeVersion) -> AgentKnowledgeScopeVersionResponse:
+    """投影范围身份与知识库集合，不返回文档或检索正文。"""
+
+    return AgentKnowledgeScopeVersionResponse(
+        knowledge_scope_version_id=value.knowledge_scope_version_id,
+        name=value.name,
+        knowledge_base_ids=list(value.knowledge_base_ids),
+        scope_hash=value.scope_hash,
+        created_at=value.created_at,
+    )
 
 
 def _agent(value: Agent) -> AgentResponse:

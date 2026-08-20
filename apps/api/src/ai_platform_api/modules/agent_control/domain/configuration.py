@@ -137,6 +137,14 @@ class AgentConfigurationRepository(Protocol):
         for_share: bool = False,
     ) -> AgentKnowledgeScopeVersion | None: ...
 
+    def get_knowledge_scope_versions(
+        self,
+        workspace_id: UUID,
+        knowledge_scope_version_ids: tuple[UUID, ...],
+        *,
+        for_share: bool = False,
+    ) -> tuple[AgentKnowledgeScopeVersion, ...]: ...
+
     def get_knowledge_bases(
         self,
         workspace_id: UUID,

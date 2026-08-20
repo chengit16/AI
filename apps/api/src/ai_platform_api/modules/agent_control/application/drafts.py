@@ -6,8 +6,13 @@ from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.agent_control.application.configuration import (
+    AgentConfigurationDocument,
     parse_agent_configuration,
     validate_configuration_references,
+)
+from ai_platform_api.modules.agent_control.application.configuration_resources import (
+    persist_knowledge_scope_version,
+    prepare_knowledge_scope_version,
 )
 from ai_platform_api.modules.agent_control.application.errors import (
     AgentLifecycleConflictError,
@@ -28,6 +33,7 @@ from ai_platform_api.modules.agent_control.application.support import (
     require_resource_scope,
     revision_from_draft,
 )
+from ai_platform_api.modules.agent_control.domain.configuration import AgentKnowledgeScopeVersion
 from ai_platform_api.modules.agent_control.domain.models import (
     AgentControlUnitOfWork,
     AgentDraft,
@@ -43,6 +49,8 @@ def update_draft(
     agent_id: UUID,
     expected_revision: int,
     configuration: dict[str, object],
+    knowledge_scope_name: str | None = None,
+    knowledge_base_ids: tuple[UUID, ...] | None = None,
     idempotency_key: str,
 ) -> AgentDraft:
     """用乐观锁写入新草稿 revision，并保留旧修订的完整可追溯事实。"""
@@ -52,7 +60,12 @@ def update_draft(
     require_resource_scope(context, agent_id)
     if expected_revision < 1:
         raise AgentValidationError
-    parsed, normalized_configuration, config_hash = parse_agent_configuration(configuration)
+    parsed, normalized_configuration, config_hash, knowledge_scope = _prepare_draft_configuration(
+        context,
+        configuration=configuration,
+        knowledge_scope_name=knowledge_scope_name,
+        knowledge_base_ids=knowledge_base_ids,
+    )
     require_idempotency_key(idempotency_key)
     request_hash = request_digest(
         {
@@ -76,6 +89,8 @@ def update_draft(
                 require_request_hash(request, request_hash)
                 return replay_draft(unit_of_work, context.workspace_id, request)
 
+            if knowledge_scope is not None:
+                persist_knowledge_scope_version(unit_of_work, context, knowledge_scope)
             validate_configuration_references(unit_of_work.configuration, context, parsed)
 
             agent = require_custom_agent(
@@ -145,7 +160,7 @@ def update_draft(
             )
             unit_of_work.commit()
             return updated
-    except AgentLifecycleConflictError:
+    except (AgentLifecycleConflictError, AgentWriteConflictError) as error:
         replayed = _recover_draft(
             unit_of_work_factory,
             context,
@@ -154,17 +169,41 @@ def update_draft(
         )
         if replayed is not None:
             return replayed
+        if isinstance(error, AgentWriteConflictError):
+            raise_write_conflict(error)
         raise
-    except AgentWriteConflictError as error:
-        replayed = _recover_draft(
-            unit_of_work_factory,
+
+
+def _prepare_draft_configuration(
+    context: RequestContext,
+    *,
+    configuration: dict[str, object],
+    knowledge_scope_name: str | None,
+    knowledge_base_ids: tuple[UUID, ...] | None,
+) -> tuple[
+    AgentConfigurationDocument,
+    dict[str, object],
+    str,
+    AgentKnowledgeScopeVersion | None,
+]:
+    """把可选知识库选择固化为范围身份，再执行完整配置规范化。"""
+
+    if (knowledge_scope_name is None) != (knowledge_base_ids is None):
+        raise AgentValidationError
+    knowledge_scope = (
+        prepare_knowledge_scope_version(
             context,
-            idempotency_key=idempotency_key,
-            request_hash=request_hash,
+            name=knowledge_scope_name,
+            knowledge_base_ids=knowledge_base_ids,
         )
-        if replayed is not None:
-            return replayed
-        raise_write_conflict(error)
+        if knowledge_scope_name is not None and knowledge_base_ids is not None
+        else None
+    )
+    requested = dict(configuration)
+    if knowledge_scope is not None:
+        requested["knowledge_scope_version_ids"] = [str(knowledge_scope.knowledge_scope_version_id)]
+    parsed, normalized, config_hash = parse_agent_configuration(requested)
+    return parsed, normalized, config_hash, knowledge_scope
 
 
 def list_draft_revisions(

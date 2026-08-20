@@ -99,7 +99,26 @@ def create_knowledge_scope_version(
 ) -> AgentKnowledgeScopeVersion:
     """冻结已授权知识库集合；空集合可表达明确不检索知识。"""
 
-    # 1. 排序后计算集合身份，调用方提交顺序不会改变版本摘要。
+    version = prepare_knowledge_scope_version(
+        context,
+        name=name,
+        knowledge_base_ids=knowledge_base_ids,
+    )
+    with unit_of_work_factory as unit_of_work:
+        persisted = persist_knowledge_scope_version(unit_of_work, context, version)
+        unit_of_work.commit()
+        return persisted
+
+
+def prepare_knowledge_scope_version(
+    context: RequestContext,
+    *,
+    name: str,
+    knowledge_base_ids: tuple[UUID, ...],
+) -> AgentKnowledgeScopeVersion:
+    """规范化知识库集合并生成内容寻址版本，尚不写入数据库。"""
+
+    # 排序后计算集合身份，调用方提交顺序不会改变版本摘要。
     normalized_name = _resource_name(name)
     if len(knowledge_base_ids) > 50 or len(knowledge_base_ids) != len(set(knowledge_base_ids)):
         raise AgentConfigurationInvalidError
@@ -116,37 +135,45 @@ def create_knowledge_scope_version(
         created_by_account_id=_configuration_account(context),
         created_at=now,
     )
-    # 2. 共享锁下复核每个知识库的状态、密级与可见范围，防止越权集合被固化。
-    with unit_of_work_factory as unit_of_work:
-        knowledge_bases = unit_of_work.configuration.get_knowledge_bases(
-            context.workspace_id,
-            normalized_ids,
-            for_share=True,
+    return version
+
+
+def persist_knowledge_scope_version(
+    unit_of_work: AgentControlUnitOfWork,
+    context: RequestContext,
+    version: AgentKnowledgeScopeVersion,
+) -> AgentKnowledgeScopeVersion:
+    """在调用方事务中复核并写入范围，使草稿更新可以保持原子性。"""
+
+    # 共享锁下复核每个知识库的状态、密级与可见范围，防止越权集合被固化。
+    knowledge_bases = unit_of_work.configuration.get_knowledge_bases(
+        context.workspace_id,
+        version.knowledge_base_ids,
+        for_share=True,
+    )
+    if len(knowledge_bases) != len(version.knowledge_base_ids) or any(
+        not knowledge_base_is_accessible(context, value) for value in knowledge_bases
+    ):
+        raise AgentConfigurationInvalidError
+    # 版本和条目一次插入；重复内容返回原版本并保持审计幂等。
+    if unit_of_work.configuration.add_knowledge_scope_version(version):
+        _record_configuration_version(
+            unit_of_work,
+            context,
+            action="agent.knowledge_scope_version.created",
+            resource_type="agent_knowledge_scope_version",
+            resource_id=version.knowledge_scope_version_id,
+            content_hash=version.scope_hash,
+            occurred_at=version.created_at,
         )
-        if len(knowledge_bases) != len(normalized_ids) or any(
-            not knowledge_base_is_accessible(context, value) for value in knowledge_bases
-        ):
-            raise AgentConfigurationInvalidError
-        # 3. 版本和条目一次插入；重复内容返回原版本并保持审计幂等。
-        if unit_of_work.configuration.add_knowledge_scope_version(version):
-            _record_configuration_version(
-                unit_of_work,
-                context,
-                action="agent.knowledge_scope_version.created",
-                resource_type="agent_knowledge_scope_version",
-                resource_id=version_id,
-                content_hash=content_hash,
-                occurred_at=now,
-            )
-            unit_of_work.commit()
-            return version
-        existing = unit_of_work.configuration.get_knowledge_scope_version(
-            context.workspace_id,
-            version_id,
-        )
-        if existing is None:
-            raise AgentConfigurationInvalidError
-        return existing
+        return version
+    existing = unit_of_work.configuration.get_knowledge_scope_version(
+        context.workspace_id,
+        version.knowledge_scope_version_id,
+    )
+    if existing is None:
+        raise AgentConfigurationInvalidError
+    return existing
 
 
 def create_output_schema_version(

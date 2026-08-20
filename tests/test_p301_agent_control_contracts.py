@@ -19,6 +19,7 @@ BASELINE_PATH = CONTRACT_DIR / "agent-control-baseline.v1.json"
 SCENARIO_SCHEMA_PATH = CONTRACT_DIR / "agent-control-scenarios.v1.schema.json"
 SCENARIO_PATH = ROOT / "tests" / "fixtures" / "agent-control" / "p3-01-v1.json"
 ERROR_CATALOG_PATH = ROOT / "contracts" / "errors" / "catalog.v1.json"
+OPENAPI_PATH = ROOT / "contracts" / "openapi" / "platform-api.v1.json"
 
 EXPECTED_CATEGORIES = {
     "lifecycle",
@@ -290,6 +291,33 @@ def test_p301_error_catalog_definitions_are_stable() -> None:
     for code, (status, retryable) in EXPECTED_ERROR_DEFINITIONS.items():
         assert errors[code]["http_status"] == status
         assert errors[code]["retryable"] is retryable
+
+
+def test_agent_draft_contract_supports_atomic_knowledge_scope_binding() -> None:
+    """草稿更新只接受知识库标识，并以脱敏版本摘要恢复当前选择。"""
+
+    openapi = load_object(OPENAPI_PATH)
+    schemas = openapi["components"]["schemas"]
+    update_schema = schemas["UpdateAgentDraftRequest"]
+    scope_request = schemas["AgentKnowledgeScopeSelectionRequest"]
+    scope_response = schemas["AgentKnowledgeScopeVersionResponse"]
+
+    assert update_schema["properties"]["knowledge_scope"] == {
+        "anyOf": [
+            {"$ref": "#/components/schemas/AgentKnowledgeScopeSelectionRequest"},
+            {"type": "null"},
+        ]
+    }
+    assert update_schema["required"] == ["expected_revision", "configuration"]
+    assert scope_request["properties"]["knowledge_base_ids"]["maxItems"] == 50
+    assert set(scope_response["properties"]) == {
+        "knowledge_scope_version_id",
+        "name",
+        "knowledge_base_ids",
+        "scope_hash",
+        "created_at",
+    }
+    assert "knowledge_scope_versions" not in schemas["AgentDetailResponse"].get("required", [])
 
 
 def test_p301_fixtures_contain_no_real_credentials() -> None:

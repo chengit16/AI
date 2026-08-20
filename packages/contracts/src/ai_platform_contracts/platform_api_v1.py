@@ -37,6 +37,7 @@ class AgentCandidateResponse(typing.TypedDict):
 class AgentDetailResponse(typing.TypedDict):
     agent: AgentResponse
     draft: AgentDraftResponse
+    knowledge_scope_versions: typing.NotRequired[list[AgentKnowledgeScopeVersionResponse]]
 
 
 class AgentDraftResponse(typing.TypedDict):
@@ -71,6 +72,19 @@ class AgentEvaluationResponse(typing.TypedDict):
     status: typing.Literal["passed", "failed"]
     timeout_cases: int
     total_cases: int
+
+
+class AgentKnowledgeScopeSelectionRequest(typing.TypedDict):
+    knowledge_base_ids: list[str]
+    name: str
+
+
+class AgentKnowledgeScopeVersionResponse(typing.TypedDict):
+    created_at: str
+    knowledge_base_ids: list[str]
+    knowledge_scope_version_id: str
+    name: str
+    scope_hash: str
 
 
 class AgentListResponse(typing.TypedDict):
@@ -1718,6 +1732,7 @@ class TransferApprovalRequest(typing.TypedDict):
 class UpdateAgentDraftRequest(typing.TypedDict):
     configuration: dict[str, object]
     expected_revision: int
+    knowledge_scope: typing.NotRequired[AgentKnowledgeScopeSelectionRequest | None]
 
 
 class UpdateServiceRequest(typing.TypedDict):

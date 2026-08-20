@@ -33,9 +33,10 @@ export default function AgentControlPage() {
   const selectedId = searchParams.get("agent");
   const view = resolveView(searchParams.get("view"));
   const [createOpen, setCreateOpen] = useState(false);
-  const model = useAgentControl(selectedId);
   const { visiblePermissionCodes } = useWorkspaceMenuNavigation();
   const has = (code: string) => visiblePermissionCodes.has(code);
+  const canReadKnowledgeBases = has("knowledge.base.read");
+  const model = useAgentControl(selectedId, canReadKnowledgeBases);
 
   // 1. Agent 选择和 Tab 都进入 URL；首次加载只选择服务端当前返回的第一项。
   const updateParams = (values: { agent?: string; view?: AgentView }) => {
@@ -82,10 +83,27 @@ export default function AgentControlPage() {
               detail={selected}
               canUpdate={has("agent.definition.update")}
               canArchive={has("agent.definition.archive")}
-              isMutating={model.saveDraft.isPending || model.archive.isPending}
+              canReadKnowledgeBases={canReadKnowledgeBases}
+              knowledgeBases={model.knowledgeBases.isError ? [] : (model.knowledgeBases.data ?? [])}
+              isKnowledgeLoading={model.knowledgeBases.isLoading}
+              isKnowledgeError={model.knowledgeBases.isError}
+              isMutating={
+                model.saveDraft.isPending ||
+                model.bindKnowledgeScope.isPending ||
+                model.archive.isPending
+              }
               onSave={(configuration, expectedRevision) =>
                 model.saveDraft.mutate({ configuration, expectedRevision })
               }
+              onBindKnowledgeScope={(name, knowledgeBaseIds, configuration, expectedRevision) =>
+                model.bindKnowledgeScope.mutate({
+                  name,
+                  knowledgeBaseIds,
+                  configuration,
+                  expectedRevision,
+                })
+              }
+              onReloadKnowledgeBases={() => void model.knowledgeBases.refetch()}
               onArchive={(expectedVersion) => model.archive.mutate(expectedVersion)}
             />
           ),

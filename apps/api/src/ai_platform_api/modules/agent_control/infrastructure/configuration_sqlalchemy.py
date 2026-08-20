@@ -128,32 +128,66 @@ class SqlAlchemyAgentConfigurationRepository(AgentConfigurationRepository):
         *,
         for_share: bool = False,
     ) -> AgentKnowledgeScopeVersion | None:
-        statement = select(agent_knowledge_scope_versions).where(
-            agent_knowledge_scope_versions.c.workspace_id == workspace_id,
-            agent_knowledge_scope_versions.c.knowledge_scope_version_id
-            == knowledge_scope_version_id,
+        versions = self.get_knowledge_scope_versions(
+            workspace_id,
+            (knowledge_scope_version_id,),
+            for_share=for_share,
         )
-        row = self._session.execute(_share(statement, for_share)).one_or_none()
-        if row is None:
-            return None
+        return versions[0] if versions else None
+
+    def get_knowledge_scope_versions(
+        self,
+        workspace_id: UUID,
+        knowledge_scope_version_ids: tuple[UUID, ...],
+        *,
+        for_share: bool = False,
+    ) -> tuple[AgentKnowledgeScopeVersion, ...]:
+        """批量读取版本与成员，避免 Agent 列表按范围数量放大 SQL。"""
+
+        if not knowledge_scope_version_ids:
+            return ()
+        # 1. 一次锁定当前空间请求的全部版本，缺失项留给应用层按完整性失败关闭。
+        version_statement = select(agent_knowledge_scope_versions).where(
+            agent_knowledge_scope_versions.c.workspace_id == workspace_id,
+            agent_knowledge_scope_versions.c.knowledge_scope_version_id.in_(
+                knowledge_scope_version_ids
+            ),
+        )
+        version_rows = self._session.execute(_share(version_statement, for_share)).all()
+        # 2. 按版本和固定 position 批量读取成员，再恢复调用方提交的版本顺序。
         item_statement = (
-            select(agent_knowledge_scope_items.c.knowledge_base_id)
+            select(
+                agent_knowledge_scope_items.c.knowledge_scope_version_id,
+                agent_knowledge_scope_items.c.knowledge_base_id,
+            )
             .where(
                 agent_knowledge_scope_items.c.workspace_id == workspace_id,
-                agent_knowledge_scope_items.c.knowledge_scope_version_id
-                == knowledge_scope_version_id,
+                agent_knowledge_scope_items.c.knowledge_scope_version_id.in_(
+                    knowledge_scope_version_ids
+                ),
             )
-            .order_by(agent_knowledge_scope_items.c.position)
+            .order_by(
+                agent_knowledge_scope_items.c.knowledge_scope_version_id,
+                agent_knowledge_scope_items.c.position,
+            )
         )
-        knowledge_base_ids = tuple(self._session.scalars(_share(item_statement, for_share)).all())
-        return AgentKnowledgeScopeVersion(
-            row.knowledge_scope_version_id,
-            row.workspace_id,
-            row.name,
-            knowledge_base_ids,
-            row.scope_hash,
-            row.created_by_account_id,
-            row.created_at,
+        members: dict[UUID, list[UUID]] = {}
+        for scope_id, knowledge_base_id in self._session.execute(_share(item_statement, for_share)):
+            members.setdefault(scope_id, []).append(knowledge_base_id)
+        versions = {
+            row.knowledge_scope_version_id: AgentKnowledgeScopeVersion(
+                row.knowledge_scope_version_id,
+                row.workspace_id,
+                row.name,
+                tuple(members.get(row.knowledge_scope_version_id, [])),
+                row.scope_hash,
+                row.created_by_account_id,
+                row.created_at,
+            )
+            for row in version_rows
+        }
+        return tuple(
+            versions[scope_id] for scope_id in knowledge_scope_version_ids if scope_id in versions
         )
 
     def get_knowledge_bases(

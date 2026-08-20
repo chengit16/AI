@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.agent_control.application.configuration import (
+    parse_agent_configuration,
+)
 from ai_platform_api.modules.agent_control.application.errors import (
+    AgentConfigurationInvalidError,
     AgentNotFoundError,
     AgentValidationError,
 )
@@ -16,6 +20,7 @@ from ai_platform_api.modules.agent_control.application.support import (
     require_resource_scope,
 )
 from ai_platform_api.modules.agent_control.domain.approval import AgentApprovalDecision
+from ai_platform_api.modules.agent_control.domain.configuration import AgentKnowledgeScopeVersion
 from ai_platform_api.modules.agent_control.domain.evaluation import AgentEvaluationReport
 from ai_platform_api.modules.agent_control.domain.models import (
     Agent,
@@ -40,18 +45,30 @@ def list_agents(
     context: RequestContext,
     *,
     limit: int,
-) -> tuple[tuple[Agent, AgentDraft], ...]:
-    """列出当前空间自定义 Agent 及当前草稿，系统助手不会进入控制台。"""
+) -> tuple[tuple[Agent, AgentDraft, tuple[AgentKnowledgeScopeVersion, ...]], ...]:
+    """列出自定义 Agent、当前草稿和引用范围，系统助手不会进入控制台。"""
 
     browser_account(context)
     if not context.authorized_workspace or not 1 <= limit <= 200:
         raise AgentValidationError
     with unit_of_work_factory as unit_of_work:
-        result: list[tuple[Agent, AgentDraft]] = []
+        definitions: list[tuple[Agent, AgentDraft, tuple[UUID, ...]]] = []
         for agent in unit_of_work.agents.list_agents(context.workspace_id, limit=limit):
             draft = require_draft(unit_of_work, context.workspace_id, agent.agent_id)
-            result.append((agent, draft))
-        return tuple(result)
+            parsed, _, _ = parse_agent_configuration(draft.configuration)
+            definitions.append((agent, draft, parsed.knowledge_scope_version_ids))
+        scope_ids = tuple(dict.fromkeys(scope_id for _, _, ids in definitions for scope_id in ids))
+        scopes = unit_of_work.configuration.get_knowledge_scope_versions(
+            context.workspace_id,
+            scope_ids,
+        )
+        scope_by_id = {scope.knowledge_scope_version_id: scope for scope in scopes}
+        if len(scope_by_id) != len(scope_ids):
+            raise AgentConfigurationInvalidError
+        return tuple(
+            (agent, draft, tuple(scope_by_id[scope_id] for scope_id in ids))
+            for agent, draft, ids in definitions
+        )
 
 
 def list_candidate_controls(

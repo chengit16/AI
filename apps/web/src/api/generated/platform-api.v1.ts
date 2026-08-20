@@ -2755,11 +2755,13 @@ export type components = {
     };
     /**
      * AgentDetailResponse
-     * @description 组合 Agent 定义与当前草稿。
+     * @description 组合 Agent 定义、当前草稿及其不可变知识范围。
      */
     readonly AgentDetailResponse: {
       readonly agent: components["schemas"]["AgentResponse"];
       readonly draft: components["schemas"]["AgentDraftResponse"];
+      /** Knowledge Scope Versions */
+      readonly knowledge_scope_versions?: readonly components["schemas"]["AgentKnowledgeScopeVersionResponse"][];
     };
     /**
      * AgentDraftResponse
@@ -2857,6 +2859,38 @@ export type components = {
       readonly timeout_cases: number;
       /** Total Cases */
       readonly total_cases: number;
+    };
+    /**
+     * AgentKnowledgeScopeSelectionRequest
+     * @description 定义随草稿原子冻结的知识库集合。
+     */
+    readonly AgentKnowledgeScopeSelectionRequest: {
+      /** Knowledge Base Ids */
+      readonly knowledge_base_ids: readonly string[];
+      /** Name */
+      readonly name: string;
+    };
+    /**
+     * AgentKnowledgeScopeVersionResponse
+     * @description 返回草稿引用的不可变知识范围，不包含文档或知识正文。
+     */
+    readonly AgentKnowledgeScopeVersionResponse: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** Knowledge Base Ids */
+      readonly knowledge_base_ids: readonly string[];
+      /**
+       * Knowledge Scope Version Id
+       * Format: uuid
+       */
+      readonly knowledge_scope_version_id: string;
+      /** Name */
+      readonly name: string;
+      /** Scope Hash */
+      readonly scope_hash: string;
     };
     /**
      * AgentListResponse
@@ -7155,7 +7189,7 @@ export type components = {
     };
     /**
      * UpdateAgentDraftRequest
-     * @description 按乐观锁替换当前草稿配置。
+     * @description 按乐观锁替换当前草稿配置，可同时冻结新的知识范围。
      */
     readonly UpdateAgentDraftRequest: {
       /** Configuration */
@@ -7164,6 +7198,8 @@ export type components = {
       };
       /** Expected Revision */
       readonly expected_revision: number;
+      readonly knowledge_scope?:
+        components["schemas"]["AgentKnowledgeScopeSelectionRequest"] | null;
     };
     /**
      * UpdateServiceRequest

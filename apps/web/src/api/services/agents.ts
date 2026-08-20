@@ -12,6 +12,9 @@ export type AgentDetail = components["schemas"]["AgentDetailResponse"];
 export type AgentCandidateControl = components["schemas"]["AgentCandidateControlResponse"];
 /** 不可变 Agent Release 摘要。 */
 export type AgentRelease = components["schemas"]["AgentReleaseResponse"];
+/** 随草稿原子冻结的知识库选择。 */
+export type AgentKnowledgeScopeSelection =
+  components["schemas"]["AgentKnowledgeScopeSelectionRequest"];
 /** 创建 Agent 的完整定义与版本引用配置。 */
 export type CreateAgentRequest = components["schemas"]["CreateAgentRequest"];
 
@@ -39,13 +42,18 @@ export function updateAgentDraft(
   agentId: string,
   expectedRevision: number,
   configuration: Record<string, unknown>,
+  knowledgeScope?: AgentKnowledgeScopeSelection,
 ) {
   return apiRequest<components["schemas"]["AgentDraftResponse"]>(
     `/api/v1/workspaces/${workspaceId}/agents/${agentId}/draft`,
     {
       method: "PUT",
       headers: { "Idempotency-Key": `agent-draft-${crypto.randomUUID()}` },
-      body: { expected_revision: expectedRevision, configuration },
+      body: {
+        expected_revision: expectedRevision,
+        configuration,
+        ...(knowledgeScope ? { knowledge_scope: knowledgeScope } : {}),
+      },
     },
   );
 }
