@@ -8,6 +8,7 @@ from uuid import UUID
 import pytest
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
+from ai_platform_api.modules.agent_control.application.releases import release_snapshot_digest
 from ai_platform_api.modules.authorization.domain.fields import FieldPolicyRegistry, FieldRule
 from ai_platform_api.modules.authorization.domain.policy import (
     PolicyDecision,
@@ -31,6 +32,7 @@ from ai_platform_api.modules.retrieval.domain.planning import (
     RetrievalPlannerBudget,
     RetrievalPlanSnapshot,
     RetrievalRunInput,
+    release_knowledge_scope_version_ids,
 )
 from ai_platform_backend.indexing.embeddings import DeterministicHashEmbeddingAdapter
 
@@ -260,6 +262,85 @@ def test_rewriter_rejects_empty_or_oversized_query() -> None:
         rewriter.rewrite("   ", RetrievalPlannerBudget())
     with pytest.raises(RetrievalConfigurationError):
         rewriter.rewrite("a" * 5, RetrievalPlannerBudget(max_query_characters=4))
+
+
+def test_release_knowledge_scope_parser_accepts_system_and_valid_custom_snapshot() -> None:
+    """系统助手保留全空间兼容语义，自定义 Release 返回冻结范围版本。"""
+
+    runtime_config_version_id = UUID(int=11)
+    first_scope_id = UUID(int=12)
+    second_scope_id = UUID(int=13)
+    snapshot: dict[str, object] = {
+        "snapshot_schema_version": 1,
+        "configuration": {
+            "runtime_config_version_id": str(runtime_config_version_id),
+            "knowledge_scope_version_ids": [str(first_scope_id), str(second_scope_id)],
+        },
+    }
+
+    assert (
+        release_knowledge_scope_version_ids(
+            release_kind="system",
+            release_snapshot=None,
+            release_snapshot_hash=None,
+            runtime_config_version_id=runtime_config_version_id,
+        )
+        is None
+    )
+    assert release_knowledge_scope_version_ids(
+        release_kind="custom",
+        release_snapshot=snapshot,
+        release_snapshot_hash=release_snapshot_digest(snapshot),
+        runtime_config_version_id=runtime_config_version_id,
+    ) == (first_scope_id, second_scope_id)
+
+
+@pytest.mark.parametrize(
+    ("release_kind", "snapshot_mutation", "snapshot_hash"),
+    (
+        ("unknown", {}, None),
+        ("custom", {"snapshot_schema_version": 2}, "digest"),
+        (
+            "custom",
+            {
+                "snapshot_schema_version": 1,
+                "configuration": {
+                    "runtime_config_version_id": str(UUID(int=99)),
+                    "knowledge_scope_version_ids": [],
+                },
+            },
+            "computed",
+        ),
+        (
+            "custom",
+            {
+                "snapshot_schema_version": 1,
+                "configuration": {
+                    "runtime_config_version_id": str(UUID(int=11)),
+                    "knowledge_scope_version_ids": [str(UUID(int=12)), str(UUID(int=12))],
+                },
+            },
+            "computed",
+        ),
+    ),
+)
+def test_release_knowledge_scope_parser_fails_closed(
+    release_kind: str,
+    snapshot_mutation: dict[str, object],
+    snapshot_hash: str | None,
+) -> None:
+    """未知类型、损坏版本、运行配置漂移和重复范围都不能进入检索。"""
+
+    resolved_hash = (
+        release_snapshot_digest(snapshot_mutation) if snapshot_hash == "computed" else snapshot_hash
+    )
+    with pytest.raises(ValueError):
+        release_knowledge_scope_version_ids(
+            release_kind=release_kind,
+            release_snapshot=snapshot_mutation,
+            release_snapshot_hash=resolved_hash,
+            runtime_config_version_id=UUID(int=11),
+        )
 
 
 def test_planning_is_bounded_and_idempotent_without_storing_content() -> None:

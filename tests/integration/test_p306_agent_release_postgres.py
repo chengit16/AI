@@ -56,10 +56,17 @@ def approve_candidate(
     harness: ApprovalHarness,
     owner: RegisteredAccount,
     suffix: str,
+    *,
+    knowledge_base_ids: tuple[UUID, ...] = (),
 ) -> tuple[AgentControlService, UUID]:
     """创建并批准个人空间候选，返回可进入发布门禁的合成事实。"""
 
-    agents, candidate_id = prepare_candidate(harness, owner, suffix)
+    agents, candidate_id = prepare_candidate(
+        harness,
+        owner,
+        suffix,
+        knowledge_base_ids=knowledge_base_ids,
+    )
     requested = agents.request_approval(
         context(owner),
         candidate_id=candidate_id,

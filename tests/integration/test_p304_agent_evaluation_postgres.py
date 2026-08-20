@@ -372,6 +372,8 @@ def create_candidate_and_dataset(
     agents: AgentControlService,
     owner: RegisteredAccount,
     suffix: str,
+    *,
+    knowledge_base_ids: tuple[UUID, ...] = (),
 ) -> tuple[AgentReleaseCandidate, AgentEvaluationDatasetVersion]:
     """创建评估所需的模型配置、Agent 候选和固定测试集。"""
 
@@ -385,7 +387,7 @@ def create_candidate_and_dataset(
     scope = agents.create_knowledge_scope_version(
         owner_context,
         name=f"合成评估知识范围 {suffix}",
-        knowledge_base_ids=(),
+        knowledge_base_ids=knowledge_base_ids,
     )
     output_schema = agents.create_output_schema_version(
         owner_context,
@@ -447,7 +449,13 @@ def ensure_runtime_configuration(
                 content_hash="c" * 64,
                 system_prompt_template="只使用合成资料。",
                 system_prompt_hash="d" * 64,
-                component_versions={"safety": "rag-safety-v2"},
+                component_versions={
+                    "embedding": "deterministic-hash-1024-v1",
+                    "retrieval": "hybrid-rrf-v1",
+                    "reranker": "deterministic-lexical-reranker-v1",
+                    "source_ranking": "source-priority-v1",
+                    "safety": "rag-safety-v2",
+                },
                 attempt_timeout_ms=1_000,
                 total_timeout_ms=120_000,
                 max_attempts_per_route=1,

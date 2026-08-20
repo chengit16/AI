@@ -6,6 +6,7 @@ import os
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 from uuid import UUID, uuid4
@@ -20,6 +21,9 @@ from ai_platform_api.modules.assistant.application.service import AssistantConve
 from ai_platform_api.modules.assistant.infrastructure.sqlalchemy import (
     SqlAlchemyAssistantUnitOfWork,
 )
+from ai_platform_api.modules.authorization.application.field_registry import (
+    load_field_policy_registry,
+)
 from ai_platform_api.modules.identity.api.dependencies import trusted_request_context
 from ai_platform_api.modules.identity.application.entitlement_errors import QuotaExceededError
 from ai_platform_api.modules.identity.application.organization import OrganizationService
@@ -28,6 +32,16 @@ from ai_platform_api.modules.identity.infrastructure.entitlements_sqlalchemy imp
 )
 from ai_platform_api.modules.identity.infrastructure.organization_sqlalchemy import (
     SqlAlchemyOrganizationUnitOfWork,
+)
+from ai_platform_api.modules.knowledge.application.facts import KnowledgeFactService
+from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
+    SqlAlchemyKnowledgeUnitOfWork,
+)
+from ai_platform_api.modules.retrieval.application.planning import (
+    BoundedRetrievalPlanningService,
+)
+from ai_platform_api.modules.retrieval.infrastructure.planning_sqlalchemy import (
+    SqlAlchemyRetrievalPlanningUnitOfWork,
 )
 from ai_platform_api.modules.service_delivery.api.routes import router as service_delivery_router
 from ai_platform_api.modules.service_delivery.application.errors import (
@@ -74,11 +88,17 @@ from ai_platform_api.persistence.tables import (
     workspace_entitlements,
     workspace_usage_records,
 )
+from ai_platform_backend.indexing.embeddings import DeterministicHashEmbeddingAdapter
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session, sessionmaker
 
+from tests.integration.test_p1e02_retrieval_planning_postgres import (
+    AllowInternalWorkspacePolicy,
+    create_indexed_document,
+)
 from tests.integration.test_p304_agent_evaluation_postgres import RegisteredAccount, context
 from tests.integration.test_p305_agent_approval_postgres import (
     ApprovalHarness,
@@ -175,8 +195,16 @@ class ServiceDeliveryHarness:
     runtime: RuntimeReleaseLoader
     invocations: ServiceInvocationService
     assistant: AssistantConversationService
+    knowledge: KnowledgeFactService
+    planning: BoundedRetrievalPlanningService
     streams: TransactionalStreamService
     organization: OrganizationService
+
+    @property
+    def sessions(self) -> sessionmaker[Session]:
+        """向跨节点索引夹具暴露同一临时 Schema 的事务工厂。"""
+
+        return self.approval.sessions
 
 
 @pytest.fixture(scope="module")
@@ -208,6 +236,21 @@ def service_delivery_database() -> Iterator[ServiceDeliveryHarness]:
                     AllowRateLimiter(),
                 ),
                 assistant=AssistantConversationService(unit_of_work),
+                knowledge=KnowledgeFactService(
+                    SqlAlchemyKnowledgeUnitOfWork(
+                        approval.sessions,
+                        SqlAlchemyEntitlementRepository,
+                    )
+                ),
+                planning=BoundedRetrievalPlanningService(
+                    SqlAlchemyRetrievalPlanningUnitOfWork(approval.sessions),
+                    AllowInternalWorkspacePolicy(),
+                    load_field_policy_registry(
+                        Path(__file__).parents[2]
+                        / "contracts/authorization/field-policy-registry.v1.json"
+                    ),
+                    DeterministicHashEmbeddingAdapter(),
+                ),
                 streams=streams,
                 organization=OrganizationService(
                     SqlAlchemyOrganizationUnitOfWork(approval.sessions)
@@ -216,6 +259,99 @@ def service_delivery_database() -> Iterator[ServiceDeliveryHarness]:
         finally:
             streams.close()
             runtime.close()
+
+
+def test_custom_agent_retrieval_is_limited_to_release_knowledge_scope(
+    service_delivery_database: ServiceDeliveryHarness,
+) -> None:
+    """自定义 Agent 只能检索 Release 冻结知识库，同空间其他资料不得进入候选。"""
+
+    harness = service_delivery_database
+    owner = register(harness.approval, "delivery-knowledge-scope")
+    owner_context = context(owner)
+    target_base = harness.knowledge.create_knowledge_base(
+        owner_context,
+        name="合成目标知识库",
+        default_visibility="workspace",
+        default_security_level="INTERNAL",
+    )
+    other_base = harness.knowledge.create_knowledge_base(
+        owner_context,
+        name="合成范围外知识库",
+        default_visibility="workspace",
+        default_security_level="INTERNAL",
+    )
+    target_document_id = create_indexed_document(
+        harness,
+        owner,
+        target_base.knowledge_base_id,
+        title="目标模块颗粒度",
+        content="模块颗粒度可通过职责内聚和变更影响范围两个方法判断。",
+        visibility="workspace",
+        security_level="INTERNAL",
+    )
+    other_document_id = create_indexed_document(
+        harness,
+        owner,
+        other_base.knowledge_base_id,
+        title="范围外模块颗粒度",
+        content="模块颗粒度可通过职责内聚和变更影响范围两个方法判断。",
+        visibility="workspace",
+        security_level="INTERNAL",
+    )
+    release = published_release(
+        harness.approval,
+        owner,
+        "delivery-knowledge-scope",
+        knowledge_base_ids=(target_base.knowledge_base_id,),
+    )
+    deployment = _governance(harness).create_service(
+        owner_context,
+        name="合成知识范围服务",
+        release_id=release.release_id,
+        service_type="custom_knowledge_agent",
+        visibility="workspace",
+        idempotency_key="synthetic-p310-knowledge-scope-service",
+    )
+    submission = harness.invocations.invoke(
+        _browser_context(owner),
+        service_id=deployment.service.service_id,
+        texts=("模块颗粒度有哪些判断方法?",),
+        idempotency_key="synthetic-p310-knowledge-scope-invoke",
+    )
+
+    plan = harness.planning.retrieve(_browser_context(owner), submission.run.run_id)
+    candidate_document_ids = {candidate.document_id for candidate in plan.candidates}
+
+    assert candidate_document_ids == {target_document_id}
+    assert other_document_id not in candidate_document_ids
+
+    empty_release = published_release(
+        harness.approval,
+        owner,
+        "delivery-empty-knowledge-scope",
+    )
+    empty_deployment = _governance(harness).create_service(
+        owner_context,
+        name="合成空知识范围服务",
+        release_id=empty_release.release_id,
+        service_type="custom_knowledge_agent",
+        visibility="workspace",
+        idempotency_key="synthetic-p310-empty-knowledge-scope-service",
+    )
+    empty_submission = harness.invocations.invoke(
+        _browser_context(owner),
+        service_id=empty_deployment.service.service_id,
+        texts=("空知识范围不能召回同空间资料",),
+        idempotency_key="synthetic-p310-empty-knowledge-scope-invoke",
+    )
+
+    empty_plan = harness.planning.retrieve(
+        _browser_context(owner),
+        empty_submission.run.run_id,
+    )
+
+    assert empty_plan.candidates == ()
 
 
 def test_three_surfaces_share_postgres_route_policy_and_quota_chain(

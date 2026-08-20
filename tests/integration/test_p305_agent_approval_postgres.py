@@ -173,11 +173,19 @@ def prepare_candidate(
     harness: ApprovalHarness,
     owner: RegisteredAccount,
     suffix: str,
+    *,
+    knowledge_base_ids: tuple[UUID, ...] = (),
 ) -> tuple[AgentControlService, UUID]:
     """创建候选并完成确定性评估，使其进入待申请审批状态。"""
 
     agents = service(harness, SyntheticEvaluationExecutor())
-    candidate, dataset = create_candidate_and_dataset(harness, agents, owner, suffix)
+    candidate, dataset = create_candidate_and_dataset(
+        harness,
+        agents,
+        owner,
+        suffix,
+        knowledge_base_ids=knowledge_base_ids,
+    )
     report = agents.run_evaluation(
         context(owner),
         candidate_id=candidate.candidate_id,

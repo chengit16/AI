@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from types import TracebackType
@@ -48,7 +50,7 @@ class RetrievalPlannerBudget:
 
 @dataclass(frozen=True)
 class RetrievalRunInput:
-    """保存排队 Run、原始用户问题和冻结运行组件版本。"""
+    """保存排队 Run、原始用户问题、冻结组件和 Release 知识范围。"""
 
     run_id: UUID
     workspace_id: UUID
@@ -61,6 +63,57 @@ class RetrievalRunInput:
     tokenizer_version: str
     reranker_model_version: str = ""
     source_ranking_version: str = ""
+    knowledge_base_ids: frozenset[UUID] | None = None
+
+
+def release_knowledge_scope_version_ids(
+    *,
+    release_kind: str,
+    release_snapshot: object,
+    release_snapshot_hash: str | None,
+    runtime_config_version_id: UUID,
+) -> tuple[UUID, ...] | None:
+    """从不可变 Release 解析知识范围版本；系统助手以 ``None`` 保留兼容语义。"""
+
+    if release_kind == "system":
+        if release_snapshot is not None or release_snapshot_hash is not None:
+            raise ValueError("系统 Release 不得携带自定义快照")
+        return None
+    if release_kind != "custom" or not isinstance(release_snapshot, dict):
+        raise ValueError("自定义 Release 快照不存在或类型不受支持")
+    if release_snapshot.get("snapshot_schema_version") != 1:
+        raise ValueError("自定义 Release 快照版本不受支持")
+    if release_snapshot_hash != _snapshot_digest(release_snapshot):
+        raise ValueError("自定义 Release 快照摘要不匹配")
+
+    configuration = release_snapshot.get("configuration")
+    if not isinstance(configuration, dict) or configuration.get("runtime_config_version_id") != str(
+        runtime_config_version_id
+    ):
+        raise ValueError("自定义 Release 运行配置身份不匹配")
+    raw_scope_ids = configuration.get("knowledge_scope_version_ids")
+    if not isinstance(raw_scope_ids, list) or len(raw_scope_ids) > 20:
+        raise ValueError("自定义 Release 知识范围版本列表不合法")
+    try:
+        scope_ids = tuple(UUID(value) for value in raw_scope_ids if isinstance(value, str))
+    except ValueError as error:
+        raise ValueError("自定义 Release 知识范围版本身份不合法") from error
+    if len(scope_ids) != len(raw_scope_ids) or len(set(scope_ids)) != len(scope_ids):
+        raise ValueError("自定义 Release 知识范围版本身份不完整或重复")
+    return scope_ids
+
+
+def _snapshot_digest(document: object) -> str:
+    """按 Agent Release 的规范 JSON 规则复算摘要，避免信任数据库中的派生值。"""
+
+    encoded = json.dumps(
+        document,
+        allow_nan=False,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 @dataclass(frozen=True)

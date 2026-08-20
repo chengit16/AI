@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable
 from contextvars import ContextVar
 from types import TracebackType
@@ -13,6 +15,7 @@ from sqlalchemy import and_, select, text
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
+from ai_platform_api.modules.retrieval.domain.errors import RetrievalConfigurationError
 from ai_platform_api.modules.retrieval.domain.models import (
     AuthorizedSearchScope,
     SearchIndex,
@@ -28,9 +31,13 @@ from ai_platform_api.modules.retrieval.domain.planning import (
     RetrievalPlanningUnitOfWork,
     RetrievalPlanSnapshot,
     RetrievalRunInput,
+    release_knowledge_scope_version_ids,
 )
 from ai_platform_api.modules.retrieval.infrastructure.sqlalchemy import SqlAlchemySearchIndex
 from ai_platform_api.persistence.tables import (
+    agent_knowledge_scope_items,
+    agent_knowledge_scope_versions,
+    agent_releases,
     ai_runtime_config_versions,
     assistant_runs,
     document_index_publications,
@@ -59,8 +66,24 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             {"run_id": str(run_id)},
         )
         row = self._session.execute(
-            select(assistant_runs, messages.c.message_id.label("input_message_id"))
+            select(
+                assistant_runs,
+                messages.c.message_id.label("input_message_id"),
+                agent_releases.c.release_kind,
+                agent_releases.c.runtime_config_version_id.label(
+                    "release_runtime_config_version_id"
+                ),
+                agent_releases.c.snapshot.label("release_snapshot"),
+                agent_releases.c.snapshot_hash.label("release_snapshot_hash"),
+            )
             .join(messages, messages.c.message_id == assistant_runs.c.user_message_id)
+            .join(
+                agent_releases,
+                and_(
+                    agent_releases.c.workspace_id == assistant_runs.c.workspace_id,
+                    agent_releases.c.release_id == assistant_runs.c.agent_release_id,
+                ),
+            )
             .where(assistant_runs.c.run_id == run_id)
             .with_for_update(of=assistant_runs)
         ).one_or_none()
@@ -89,6 +112,7 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             .where(assistant_runs.c.run_id == run_id)
         ).one()
         components = cast("dict[str, str]", runtime.component_versions)
+        knowledge_base_ids = self._resolve_release_knowledge_base_ids(row)
         return RetrievalRunInput(
             run_id=row.run_id,
             workspace_id=row.workspace_id,
@@ -101,6 +125,69 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             tokenizer_version=TOKENIZER_VERSION,
             reranker_model_version=components.get("reranker", ""),
             source_ranking_version=components.get("source_ranking", ""),
+            knowledge_base_ids=knowledge_base_ids,
+        )
+
+    def _resolve_release_knowledge_base_ids(self, row: Row[Any]) -> frozenset[UUID] | None:
+        """复核 Run 绑定 Release 及不可变范围版本，损坏或跨空间引用一律失败关闭。"""
+
+        # 1. 先复核 Release 快照及运行配置身份，系统助手才允许保留全空间兼容语义。
+        if row.release_runtime_config_version_id != row.runtime_config_version_id:
+            raise RetrievalConfigurationError
+        try:
+            scope_ids = release_knowledge_scope_version_ids(
+                release_kind=row.release_kind,
+                release_snapshot=row.release_snapshot,
+                release_snapshot_hash=row.release_snapshot_hash,
+                runtime_config_version_id=row.runtime_config_version_id,
+            )
+        except (TypeError, ValueError) as error:
+            raise RetrievalConfigurationError from error
+        if scope_ids is None:
+            return None
+
+        # 2. 再从当前工作空间恢复版本与有序条目，并复算摘要阻断跨空间或篡改范围。
+        version_rows = tuple(
+            self._session.execute(
+                select(
+                    agent_knowledge_scope_versions.c.knowledge_scope_version_id,
+                    agent_knowledge_scope_versions.c.scope_hash,
+                ).where(
+                    agent_knowledge_scope_versions.c.workspace_id == row.workspace_id,
+                    agent_knowledge_scope_versions.c.knowledge_scope_version_id.in_(scope_ids),
+                )
+            )
+        )
+        if len(version_rows) != len(scope_ids):
+            raise RetrievalConfigurationError
+        item_rows = tuple(
+            self._session.execute(
+                select(
+                    agent_knowledge_scope_items.c.knowledge_scope_version_id,
+                    agent_knowledge_scope_items.c.knowledge_base_id,
+                    agent_knowledge_scope_items.c.position,
+                )
+                .where(
+                    agent_knowledge_scope_items.c.workspace_id == row.workspace_id,
+                    agent_knowledge_scope_items.c.knowledge_scope_version_id.in_(scope_ids),
+                )
+                .order_by(
+                    agent_knowledge_scope_items.c.knowledge_scope_version_id,
+                    agent_knowledge_scope_items.c.position,
+                )
+            )
+        )
+        items_by_scope: dict[UUID, list[UUID]] = {scope_id: [] for scope_id in scope_ids}
+        for item in item_rows:
+            items_by_scope[item.knowledge_scope_version_id].append(item.knowledge_base_id)
+        scope_hashes = {item.knowledge_scope_version_id: item.scope_hash for item in version_rows}
+        for scope_id, knowledge_base_ids in items_by_scope.items():
+            if scope_hashes[scope_id] != _knowledge_scope_digest(knowledge_base_ids):
+                raise RetrievalConfigurationError
+        return frozenset(
+            knowledge_base_id
+            for knowledge_base_ids in items_by_scope.values()
+            for knowledge_base_id in knowledge_base_ids
         )
 
     def get_plan(self, run_id: UUID) -> RetrievalPlanSnapshot | None:
@@ -177,6 +264,8 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
         allowed_security_levels = tuple(
             level for level, rank in security_ranks.items() if rank <= maximum_rank
         )
+        if run.knowledge_base_ids == frozenset():
+            return None
         statement = (
             select(
                 index_versions.c.index_version_id,
@@ -212,6 +301,10 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
                 documents.c.status == "active",
             )
         )
+        if run.knowledge_base_ids is not None:
+            statement = statement.where(
+                index_versions.c.knowledge_base_id.in_(run.knowledge_base_ids)
+            )
         # 2. 先按工作空间、活动索引、模型版本、密级和文档状态收敛候选索引。
         rows = list(self._session.execute(statement))
         if authorization.workspace_wide:
@@ -235,7 +328,7 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
         return AuthorizedSearchScope(
             workspace_id=run.workspace_id,
             index_version_ids=index_ids,
-            knowledge_base_ids=None,
+            knowledge_base_ids=run.knowledge_base_ids,
             document_ids=None,
             department_ids=department_ids,
             visibilities=cast(frozenset[Visibility], visibilities),
@@ -407,3 +500,15 @@ def _candidate(row: Row[Any]) -> RetrievalCandidateSnapshot:
         keyword_hit_count=row.keyword_hit_count,
         vector_hit_count=row.vector_hit_count,
     )
+
+
+def _knowledge_scope_digest(knowledge_base_ids: list[UUID]) -> str:
+    """按范围版本的稳定位置顺序复算知识库集合摘要。"""
+
+    encoded = json.dumps(
+        [str(value) for value in knowledge_base_ids],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from ai_platform_api.modules.agent_control.domain.models import AgentRelease
@@ -53,10 +53,17 @@ def published_release(
     harness: ApprovalHarness,
     owner: RegisteredAccount,
     suffix: str,
+    *,
+    knowledge_base_ids: tuple[UUID, ...] = (),
 ) -> AgentRelease:
     """创建经过测试、审批和快照校验的自定义 Release。"""
 
-    agents, candidate_id = approve_candidate(harness, owner, suffix)
+    agents, candidate_id = approve_candidate(
+        harness,
+        owner,
+        suffix,
+        knowledge_base_ids=knowledge_base_ids,
+    )
     return agents.publish_release(
         context(owner),
         candidate_id=candidate_id,

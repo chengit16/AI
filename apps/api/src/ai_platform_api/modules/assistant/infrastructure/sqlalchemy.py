@@ -15,7 +15,7 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
 )
-from sqlalchemy import CursorResult, func, insert, select, text, update
+from sqlalchemy import CursorResult, case, func, insert, select, text, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
@@ -296,13 +296,20 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         *,
         limit: int,
     ) -> tuple[Message, ...]:
+        # 同一轮用户与助手消息共享创建时间，角色序保证因果顺序，UUID 仅处理同角色并列。
+        role_order = case(
+            (messages.c.role == "system", 0),
+            (messages.c.role == "user", 1),
+            (messages.c.role == "assistant", 2),
+            else_=3,
+        )
         rows = self._session.execute(
             select(messages)
             .where(
                 messages.c.workspace_id == workspace_id,
                 messages.c.conversation_id == conversation_id,
             )
-            .order_by(messages.c.created_at, messages.c.message_id)
+            .order_by(messages.c.created_at, role_order, messages.c.message_id)
             .limit(limit)
         )
         return tuple(self._message(row) for row in rows)

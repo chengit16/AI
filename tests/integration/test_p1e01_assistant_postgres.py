@@ -49,6 +49,7 @@ from ai_platform_api.persistence.tables import (
     audit_records,
     message_feedbacks,
     message_parts,
+    messages,
     outbox_events,
     service_route_publications,
     service_routes,
@@ -396,6 +397,90 @@ def test_message_run_freezes_release_and_runtime_config(
             .where(agent_releases.c.release_id == first.run.agent_release_id)
             .values(config_hash="f" * 64)
         )
+
+
+def test_messages_keep_user_before_assistant_when_created_at_is_equal(
+    assistant_database: AssistantHarness,
+) -> None:
+    """同一轮消息共享创建时间时，列表仍必须保持用户提问先于助手回答。"""
+
+    owner = register(assistant_database, "stable-message-order-owner")
+    owner_context = context(owner)
+    publish_runtime_config(assistant_database, owner.account_id, version=7)
+    conversation = assistant_database.assistant.create_conversation(
+        owner_context,
+        title="合成稳定消息顺序会话",
+    )
+    created_at = datetime(2026, 8, 20, 12, tzinfo=UTC)
+    assistant_message_id = UUID("00000000-0000-0000-0000-000000000001")
+    user_message_id = UUID("00000000-0000-0000-0000-000000000002")
+
+    with assistant_database.sessions.begin() as session:
+        session.execute(
+            insert(messages),
+            (
+                {
+                    "message_id": user_message_id,
+                    "workspace_id": owner.workspace_id,
+                    "conversation_id": conversation.conversation_id,
+                    "role": "user",
+                    "status": "completed",
+                    "created_by_account_id": owner.account_id,
+                    "created_at": created_at,
+                    "updated_at": created_at,
+                    "version": 1,
+                },
+                {
+                    "message_id": assistant_message_id,
+                    "workspace_id": owner.workspace_id,
+                    "conversation_id": conversation.conversation_id,
+                    "role": "assistant",
+                    "status": "completed",
+                    "created_by_account_id": owner.account_id,
+                    "created_at": created_at,
+                    "updated_at": created_at,
+                    "version": 1,
+                },
+            ),
+        )
+        session.execute(
+            insert(message_parts),
+            (
+                {
+                    "part_id": UUID("00000000-0000-0000-0000-000000000102"),
+                    "workspace_id": owner.workspace_id,
+                    "message_id": user_message_id,
+                    "sequence_no": 1,
+                    "part_type": "text",
+                    "text_content": "你是谁",
+                    "object_ref": None,
+                    "media_type": None,
+                    "created_at": created_at,
+                },
+                {
+                    "part_id": UUID("00000000-0000-0000-0000-000000000101"),
+                    "workspace_id": owner.workspace_id,
+                    "message_id": assistant_message_id,
+                    "sequence_no": 1,
+                    "part_type": "text",
+                    "text_content": "我是本平台的知识问答助手。",
+                    "object_ref": None,
+                    "media_type": None,
+                    "created_at": created_at,
+                },
+            ),
+        )
+
+    listed = assistant_database.assistant.list_messages(
+        owner_context,
+        conversation_id=conversation.conversation_id,
+        limit=100,
+    )
+
+    assert [(message.role, message.message_id) for message in listed] == [
+        ("user", user_message_id),
+        ("assistant", assistant_message_id),
+    ]
 
 
 def test_conversation_privacy_archive_and_http_contract(

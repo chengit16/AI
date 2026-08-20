@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 from uuid import UUID, uuid4
 
 import pytest
@@ -81,6 +82,26 @@ TRACE = TraceContext.continue_from("00-e523456789abcdef0123456789abcdef-e5234567
 class RegisteredAccount:
     account_id: UUID
     workspace_id: UUID
+
+
+class AccountIdentity(Protocol):
+    """限定检索测试构造器所需的最小账号身份。"""
+
+    @property
+    def account_id(self) -> UUID: ...
+
+    @property
+    def workspace_id(self) -> UUID: ...
+
+
+class IndexedDocumentHarness(Protocol):
+    """限定合成索引文档构造器所需的服务与事务入口。"""
+
+    @property
+    def sessions(self) -> sessionmaker[Session]: ...
+
+    @property
+    def knowledge(self) -> KnowledgeFactService: ...
 
 
 @dataclass(frozen=True)
@@ -182,7 +203,7 @@ def register(harness: RetrievalHarness, identity: str) -> RegisteredAccount:
     return RegisteredAccount(result.account_id, result.personal_workspace_id)
 
 
-def context(account: RegisteredAccount) -> RequestContext:
+def context(account: AccountIdentity) -> RequestContext:
     return RequestContext.trusted(
         actor_id=account.account_id,
         user_id=account.account_id,
@@ -241,8 +262,8 @@ def publish_runtime_config(harness: RetrievalHarness, account_id: UUID) -> None:
 
 
 def create_indexed_document(
-    harness: RetrievalHarness,
-    account: RegisteredAccount,
+    harness: IndexedDocumentHarness,
+    account: AccountIdentity,
     knowledge_base_id: UUID,
     *,
     title: str,
