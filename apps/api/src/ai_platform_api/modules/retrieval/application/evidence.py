@@ -83,7 +83,12 @@ class RetrievalEvidenceService:
         # 1. 锁定冻结 Run、检索计划和当前权限，禁止调用方替换组件版本或沿用旧字段授权。
         with self._unit_of_work as unit_of_work:
             run = unit_of_work.planning.lock_run(run_id)
-            if run is None or not same_retrieval_requester(context, run):
+            # 完成态只允许重新授权既有证据，不能借来源读取入口补生成缺失证据。
+            if run is None or not same_retrieval_requester(
+                context,
+                run,
+                allowed_statuses=frozenset({"queued", "running", "completed"}),
+            ):
                 raise RetrievalScopeDeniedError
             self._require_runtime_compatibility(
                 run.reranker_model_version, run.source_ranking_version
@@ -109,6 +114,8 @@ class RetrievalEvidenceService:
                 ):
                     raise RetrievalScopeDeniedError
                 return existing
+            if run.status == "completed":
+                raise RetrievalScopeDeniedError
 
             # 2. 候选必须按当前活动索引和资源范围重新加载；撤权、旧版本或 Hash 漂移均被拒绝。
             started = monotonic()

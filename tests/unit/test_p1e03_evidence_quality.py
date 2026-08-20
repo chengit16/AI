@@ -1,6 +1,6 @@
 """验证 P1E-03 FastPass、重排、来源排序、受控精读和降级规则。"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from types import TracebackType
 from uuid import UUID
@@ -15,7 +15,10 @@ from ai_platform_api.modules.authorization.domain.policy import (
     ResourceScope,
 )
 from ai_platform_api.modules.retrieval.application.evidence import RetrievalEvidenceService
-from ai_platform_api.modules.retrieval.domain.errors import RetrievalConfigurationError
+from ai_platform_api.modules.retrieval.domain.errors import (
+    RetrievalConfigurationError,
+    RetrievalScopeDeniedError,
+)
 from ai_platform_api.modules.retrieval.domain.evidence import (
     EvidenceCandidateSource,
     EvidenceProcessingBudget,
@@ -403,6 +406,28 @@ def test_fastpass_still_reads_and_verifies_citation() -> None:
     assert result.items[0].content_hash == chunk.content_hash
     assert reranker.calls == []
     assert unit_of_work.commits == 1
+
+
+def test_completed_run_can_only_reauthorize_existing_evidence() -> None:
+    chunk = stored_chunk()
+    snapshot = candidate(chunk, rank=1, score=0.05)
+    unit_of_work = harness((chunk,), plan(snapshot), {chunk.chunk_id: source(chunk, snapshot)})
+    service = RetrievalEvidenceService(
+        unit_of_work,
+        AllowPolicy(),
+        field_registry(),
+        FixedReranker((0.1,)),
+    )
+    existing = service.prepare(request_context(), RUN_ID)
+
+    # 来源接口在 Run 完成后只复核首次证据；删除既有证据不能触发补生成。
+    unit_of_work.planning.run = replace(unit_of_work.planning.run, status="completed")
+    unit_of_work.evidence.existing = existing
+    assert service.prepare(request_context(), RUN_ID) == existing
+
+    unit_of_work.evidence.existing = None
+    with pytest.raises(RetrievalScopeDeniedError):
+        service.prepare(request_context(), RUN_ID)
 
 
 def test_reranker_and_source_policy_control_final_order() -> None:

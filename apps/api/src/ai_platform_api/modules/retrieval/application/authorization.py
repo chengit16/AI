@@ -62,15 +62,20 @@ def resolve_retrieval_authorization(
     )
 
 
-def same_retrieval_requester(context: RequestContext, run: RetrievalRunInput) -> bool:
-    """确认运行仍属于当前浏览器主体和工作空间，且尚可继续处理。"""
+def same_retrieval_requester(
+    context: RequestContext,
+    run: RetrievalRunInput,
+    *,
+    allowed_statuses: frozenset[str] = frozenset({"queued", "running"}),
+) -> bool:
+    """确认运行属于当前浏览器主体，并且处于调用方明确允许的状态。"""
 
     return (
         context.workspace_id == run.workspace_id
         and context.user_id == run.requested_by_account_id
         and context.actor_id == run.requested_by_account_id
         and context.authentication_method == "browser_session"
-        and run.status in {"queued", "running"}
+        and run.status in allowed_statuses
     )
 
 

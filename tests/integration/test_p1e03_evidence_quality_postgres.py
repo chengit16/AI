@@ -80,8 +80,19 @@ def test_current_evidence_revocation_and_immutable_snapshots(
     )
     retrieval_database.planning.retrieve(owner_context, first_submission.run.run_id)
     first = evidence_service.prepare(owner_context, first_submission.run.run_id)
+    claimed = retrieval_database.assistant.claim_run(
+        owner_context,
+        run_id=first_submission.run.run_id,
+    )
+    assert claimed is not None
+    retrieval_database.assistant.complete_run(
+        owner_context,
+        run_id=first_submission.run.run_id,
+        text="合成回答",
+    )
     repeated = evidence_service.prepare(owner_context, first_submission.run.run_id)
 
+    # 完成态来源读取只能重新授权既有快照，不能被生成阶段的状态门禁误拒绝。
     assert repeated == first
     assert first.status == "sufficient"
     assert first.items[0].document_id == document_id
