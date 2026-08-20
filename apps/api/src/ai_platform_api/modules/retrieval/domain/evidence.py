@@ -11,6 +11,7 @@ from uuid import UUID
 from ai_platform_api.modules.retrieval.domain.models import (
     AuthorizedSearchScope,
     SearchIndex,
+    SecurityLevel,
     StoredChunk,
 )
 from ai_platform_api.modules.retrieval.domain.planning import (
@@ -110,6 +111,7 @@ class EvidenceItemSnapshot:
     document_title: str
     source_kind: SourceKind
     source_name: str
+    security_level: SecurityLevel
     retrieval_score: float
     relevance_score: float
     authority_score: float

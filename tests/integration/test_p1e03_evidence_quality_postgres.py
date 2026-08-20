@@ -85,6 +85,7 @@ def test_current_evidence_revocation_and_immutable_snapshots(
     assert repeated == first
     assert first.status == "sufficient"
     assert first.items[0].document_id == document_id
+    assert first.items[0].security_level == "INTERNAL"
     assert first.items[0].quote in first.items[0].context_text
     assert first.items[0].source_position == {}
     with pytest.raises(RetrievalScopeDeniedError):

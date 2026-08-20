@@ -5831,6 +5831,7 @@ retrieval_evidence_items = Table(
     Column("document_title", String(255), nullable=False),
     Column("source_kind", String(32), nullable=False),
     Column("source_name", String(255), nullable=False),
+    Column("security_level", String(32), nullable=False),
     Column("retrieval_score", Float, nullable=False),
     Column("relevance_score", Float, nullable=False),
     Column("authority_score", Float, nullable=False),
@@ -5857,6 +5858,10 @@ retrieval_evidence_items = Table(
     CheckConstraint(
         "source_kind IN ('manual', 'upload', 'web', 'data_source')",
         name="ck_retrieval_evidence_items_source_kind",
+    ),
+    CheckConstraint(
+        "security_level IN ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED')",
+        name="ck_retrieval_evidence_items_security_level",
     ),
     CheckConstraint(
         "retrieval_score >= 0 AND relevance_score BETWEEN 0 AND 1 "

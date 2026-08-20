@@ -31,6 +31,7 @@ from ai_platform_api.modules.retrieval.application.planning import (
     BoundedRetrievalPlanningService,
 )
 from ai_platform_api.modules.retrieval.domain.evidence import EvidenceSetSnapshot
+from ai_platform_api.modules.retrieval.domain.models import SecurityLevel
 from ai_platform_api.modules.retrieval.domain.planning import RetrievalPlanSnapshot
 from ai_platform_api.modules.service_runtime.application import RuntimeReleaseLoader
 from ai_platform_api.modules.service_runtime.application.errors import (
@@ -170,7 +171,7 @@ class AssistantRunExecutor:
             required_capabilities=frozenset({"generation"}),
             max_output_tokens=configuration.policy.max_output_tokens,
             external_data_allowed=True,
-            security_level=plan.maximum_security_level,
+            security_level=_maximum_evidence_security_level(evidence),
         )
         result = self._model_runtime.invoke(
             request,
@@ -300,6 +301,21 @@ class AssistantRunExecutor:
     ) -> AssistantRunExecutionResult:
         failed = self._conversations.fail_run(context, run_id=run_id, error_code=error_code)
         return AssistantRunExecutionResult(True, failed.status, error_code)
+
+
+def _maximum_evidence_security_level(evidence: EvidenceSetSnapshot) -> SecurityLevel:
+    """按实际进入模型上下文的证据计算密级，不能用调用者授权上限替代。"""
+
+    ranks: dict[SecurityLevel, int] = {
+        "PUBLIC": 0,
+        "INTERNAL": 1,
+        "CONFIDENTIAL": 2,
+        "RESTRICTED": 3,
+    }
+    if not evidence.items:
+        # sufficient 证据集按领域规则必须包含证据；异常空集不能被降级成 PUBLIC 外发。
+        return "RESTRICTED"
+    return max((item.security_level for item in evidence.items), key=ranks.__getitem__)
 
 
 def _model_messages(

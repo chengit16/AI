@@ -297,6 +297,7 @@ class RetrievalEvidenceService:
                     document_title=candidate.source.document_title,
                     source_kind=candidate.source.source_kind,
                     source_name=candidate.source.source_name,
+                    security_level=candidate.source.chunk.security_level,
                     retrieval_score=candidate.source.candidate.score,
                     relevance_score=candidate.relevance_score,
                     authority_score=candidate.authority_score,

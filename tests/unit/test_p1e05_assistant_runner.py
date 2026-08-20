@@ -265,7 +265,7 @@ def test_executor_uses_frozen_configuration_and_duplicate_schedule_does_not_gene
         SimpleNamespace(
             variants=(SimpleNamespace(text="合成问题"),),
             candidates=(),
-            maximum_security_level="INTERNAL",
+            maximum_security_level="RESTRICTED",
             field_mask=frozenset(),
         ),
     )
@@ -279,6 +279,7 @@ def test_executor_uses_frozen_configuration_and_duplicate_schedule_does_not_gene
         context_text="合成证据正文",
         source_position={"page": 1},
         document_title="合成制度",
+        security_level="INTERNAL",
     )
     evidence = cast(
         EvidenceSetSnapshot,
@@ -328,6 +329,7 @@ def test_executor_uses_frozen_configuration_and_duplicate_schedule_does_not_gene
         (WORKSPACE_ID, SERVICE_ID, ROUTE_ID, 1, conversations.run.agent_release_id)
     ]
     assert model_runtime.configuration_ids == [CONFIG_ID]
+    assert model_runtime.requests[0].security_level == "INTERNAL"
     assert conversations.answer == "合成模型回答"
     assert streams.started == 1
     assert [event_type for event_type, _ in streams.events] == [
