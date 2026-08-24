@@ -68,6 +68,7 @@ class FakeStore:
     claimed: ClaimedIngestionJob | None
     completed: ParsedArtifact | None = None
     failure: tuple[IngestionFailureStage, str, str, bool, datetime] | None = None
+    succeeds: bool = True
 
     def claim_next(self, **_: object) -> ClaimedIngestionJob | None:
         claimed, self.claimed = self.claimed, None
@@ -82,7 +83,7 @@ class FakeStore:
     ) -> bool:
         assert completed_at == NOW
         self.completed = artifact
-        return True
+        return self.succeeds
 
     def mark_failed(
         self,
@@ -106,6 +107,7 @@ class FakeStorage:
     fail_read: bool = False
     fail_write: bool = False
     artifacts: list[ParsedArtifact] = field(default_factory=list)
+    deleted_artifacts: list[ParsedArtifact] = field(default_factory=list)
 
     def read_source(self, _: ClaimedIngestionJob) -> bytes:
         if self.fail_read:
@@ -116,6 +118,9 @@ class FakeStorage:
         if self.fail_write:
             raise IngestionStorageUnavailableError
         self.artifacts.append(artifact)
+
+    def delete_artifact(self, _: ClaimedIngestionJob, artifact: ParsedArtifact) -> None:
+        self.deleted_artifacts.append(artifact)
 
 
 def job(*, source_hash: str | None = None, attempt_count: int = 1) -> ClaimedIngestionJob:
@@ -172,6 +177,18 @@ def test_success_writes_deterministic_private_artifact() -> None:
     assert payload["schema_version"] == 1
     assert payload["blocks"][0]["text"] == "合成入库内容"
     assert "source_object_key" not in payload
+
+
+def test_lost_claim_removes_just_written_artifact() -> None:
+    """永久删除或租约回收并发发生时，迟到 Worker 不得留下孤立解析产物。"""
+
+    store = FakeStore(job(), succeeds=False)
+    storage = FakeStorage()
+
+    result = processor(store, storage).run_batch(limit=1, now=NOW)
+
+    assert (result.claimed, result.lost_claims) == (1, 1)
+    assert storage.deleted_artifacts == storage.artifacts
 
 
 def test_source_hash_mismatch_is_terminal_before_parser_or_artifact() -> None:

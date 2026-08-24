@@ -32,6 +32,8 @@ from ai_platform_api.modules.authorization.domain.policy import (
     PolicyRequest,
     ResourceScope,
 )
+from ai_platform_api.modules.authorization.domain.resources import ApiResource
+from ai_platform_api.modules.identity.api.dependencies import _resource_reference
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
@@ -46,6 +48,8 @@ from ai_platform_api.modules.identity.infrastructure.security import EnvelopeSec
 from ai_platform_api.modules.identity.infrastructure.session import ValkeySessionStore
 from ai_platform_api.persistence.database import PlatformDatabase
 from fastapi.testclient import TestClient
+from starlette.requests import Request
+from starlette.types import Scope
 
 from test_support.authorization import AllowRegisteredPolicy
 
@@ -419,6 +423,40 @@ def test_direct_api_access_is_denied_before_service_execution() -> None:
 
     assert response.status_code == 403
     assert response.json()["code"] == "POLICY_DENIED"
+
+
+def test_knowledge_folder_and_tag_paths_keep_resource_identity() -> None:
+    """目录和标签资源级策略必须接收路径中的真实资源 ID。"""
+
+    context = RequestContext.trusted(
+        actor_id=ACCOUNT_ID,
+        user_id=ACCOUNT_ID,
+        workspace_id=WORKSPACE_ID,
+        trace=TraceContext("a" * 32, "b" * 16),
+        authentication_method="browser_session",
+    )
+    for path_name, resource_type, permission_code in (
+        ("folder_id", "knowledge_folder", "knowledge.folder.update"),
+        ("tag_id", "knowledge_tag", "knowledge.tag.update"),
+    ):
+        resource_id = uuid4()
+        request = Request(cast("Scope", {"type": "http", "path_params": {path_name: resource_id}}))
+        api_resource = ApiResource(
+            uuid4(),
+            f"synthetic.{path_name}",
+            f"synthetic{path_name}",
+            "PATCH",
+            f"/api/v1/workspaces/{{workspace_id}}/{path_name}/{{{path_name}}}",
+            "authorized",
+            permission_code,
+            "high",
+            "active",
+        )
+
+        reference = _resource_reference(request, context, api_resource, resource_type)
+
+        assert reference.resource_id == resource_id
+        assert reference.attributes[path_name] == resource_id
 
 
 def test_stale_policy_cache_returns_retryable_service_unavailable() -> None:

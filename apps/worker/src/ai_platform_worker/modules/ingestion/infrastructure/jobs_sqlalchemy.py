@@ -11,6 +11,7 @@ from ai_platform_backend.ingestion.persistence import (
     ingestion_job_stages,
     ingestion_jobs,
 )
+from ai_platform_backend.knowledge.persistence import documents
 from sqlalchemy import CursorResult, Row, and_, insert, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -267,6 +268,11 @@ def _select_claimable_job(
 ) -> Row[Any] | None:
     return session.execute(
         select(ingestion_jobs)
+        .join(
+            documents,
+            (documents.c.workspace_id == ingestion_jobs.c.workspace_id)
+            & (documents.c.document_id == ingestion_jobs.c.document_id),
+        )
         .where(
             and_(
                 or_(
@@ -276,6 +282,8 @@ def _select_claimable_job(
                 ),
                 ingestion_jobs.c.attempt_count < ingestion_jobs.c.max_attempts,
                 ingestion_jobs.c.processing_lane == lane,
+                # 回收站文档不再产生新的解析副作用；已经持有的租约仍按失租规则收敛。
+                documents.c.status == "active",
             )
         )
         .order_by(ingestion_jobs.c.available_at, ingestion_jobs.c.created_at)

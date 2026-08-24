@@ -141,8 +141,10 @@ class IngestionJob:
         if self.status == "succeeded":
             if (
                 self.completed_at is None
-                or self.artifact_object_key is None
-                or not self.artifact_object_key.startswith(artifact_prefix)
+                or (
+                    self.artifact_object_key is not None
+                    and not self.artifact_object_key.startswith(artifact_prefix)
+                )
                 or not _is_sha256(self.parsed_content_hash)
                 or not self.parser_name
                 or self.ocr_used is None

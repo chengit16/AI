@@ -85,8 +85,10 @@ class IngestionJobStore(Protocol):
 
 
 class IngestionObjectStorage(Protocol):
-    """读取来源对象并写入内容寻址解析产物，摘要不匹配时拒绝处理。"""
+    """读取来源对象，并以可补偿语义写入或删除确定性解析产物。"""
 
     def read_source(self, job: ClaimedIngestionJob) -> bytes: ...
 
     def write_artifact(self, job: ClaimedIngestionJob, artifact: ParsedArtifact) -> None: ...
+
+    def delete_artifact(self, job: ClaimedIngestionJob, artifact: ParsedArtifact) -> None: ...

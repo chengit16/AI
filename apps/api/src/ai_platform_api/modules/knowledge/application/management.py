@@ -77,6 +77,7 @@ class KnowledgeManagementService:
             return unit_of_work.knowledge.list_document_summaries(
                 context.workspace_id,
                 knowledge_base_id,
+                viewer_account_id=account_id,
                 limit=limit,
                 authorized_workspace=context.authorized_workspace,
                 department_ids=context.authorized_department_ids,

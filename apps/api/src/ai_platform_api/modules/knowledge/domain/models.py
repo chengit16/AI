@@ -124,6 +124,21 @@ class Document:
             version=self.version + 1,
         )
 
+    def restore(self, *, occurred_at: datetime) -> Document:
+        """恢复回收站文档；恢复不改变版本内容，只递增元数据版本。"""
+
+        if self.status != "deleted":
+            raise InvalidKnowledgeFactError
+        candidate = replace(
+            self,
+            status="active",
+            deleted_at=None,
+            updated_at=occurred_at,
+            version=self.version + 1,
+        )
+        candidate.assert_valid()
+        return candidate
+
 
 @dataclass(frozen=True)
 class DocumentVersion:
@@ -290,6 +305,7 @@ class KnowledgeRepository(Protocol):
         workspace_id: UUID,
         knowledge_base_id: UUID,
         *,
+        viewer_account_id: UUID,
         limit: int,
         authorized_workspace: bool,
         department_ids: frozenset[UUID],
@@ -405,7 +421,7 @@ class KnowledgeUnitOfWork(Protocol):
 
 @dataclass(frozen=True)
 class KnowledgeDocumentSummary:
-    """汇总文档与最新版本，供列表查询避免暴露内容正文。"""
+    """汇总文档、最新版本和组织关系，供列表查询避免暴露内容正文。"""
 
     document: Document
     latest_version: DocumentVersion
@@ -413,3 +429,6 @@ class KnowledgeDocumentSummary:
     source_kind: DocumentSourceKind
     source_name: str
     current_document_version_id: UUID | None
+    folder_id: UUID
+    tag_ids: tuple[UUID, ...]
+    is_favorite: bool

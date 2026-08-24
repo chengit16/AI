@@ -33,12 +33,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 24
-    assert len(resource_registry.permissions) == 115
+    assert resource_registry.registry_version == 25
+    assert len(resource_registry.permissions) == 132
     assert len(resource_registry.page_resources) == 15
-    assert len(resource_registry.api_resources) == 152
-    assert len(resource_registry.menus) == 138
-    assert len(resource_registry.menu_api_bindings) == 145
+    assert len(resource_registry.api_resources) == 173
+    assert len(resource_registry.menus) == 159
+    assert len(resource_registry.menu_api_bindings) == 166
     assert registry_openapi_violations() == ()
 
 
@@ -66,6 +66,27 @@ def test_new_workspace_owner_gets_operations_permissions_but_member_does_not() -
     assert "service.definition.read" in MEMBER_PERMISSION_CODES
     assert "agent.operations.read" in OWNER_PERMISSION_CODES
     assert "agent.operations.read" not in MEMBER_PERMISSION_CODES
+    assert {
+        "knowledge.document.folder.bind",
+        "knowledge.document.tag.bind",
+        "knowledge.document.favorite",
+        "knowledge.folder.create",
+        "knowledge.folder.delete",
+        "knowledge.folder.purge",
+        "knowledge.folder.read",
+        "knowledge.folder.restore",
+        "knowledge.folder.update",
+        "knowledge.tag.create",
+        "knowledge.tag.delete",
+        "knowledge.tag.read",
+        "knowledge.tag.restore",
+        "knowledge.tag.update",
+        "knowledge.trash.purge",
+        "knowledge.trash.read",
+        "knowledge.trash.restore",
+    }.issubset(OWNER_PERMISSION_CODES)
+    assert len(OWNER_PERMISSION_CODES) == len(set(OWNER_PERMISSION_CODES))
+    assert len(MEMBER_PERMISSION_CODES) == len(set(MEMBER_PERMISSION_CODES))
     assert {
         "tool.page.access",
         "tool.catalog.read",

@@ -66,6 +66,15 @@ class MinioIngestionObjectStorage:
         except Exception as error:
             raise IngestionStorageUnavailableError from error
 
+    def delete_artifact(self, job: ClaimedIngestionJob, artifact: ParsedArtifact) -> None:
+        """幂等删除失租任务刚写出的产物，避免永久删除后遗留不可追踪对象。"""
+
+        self._assert_key(job, artifact.object_key, area="parsed")
+        try:
+            self._client.remove_object(self._bucket, artifact.object_key)
+        except Exception as error:
+            raise IngestionStorageUnavailableError from error
+
     def _ensure_bucket(self) -> None:
         if self._client.bucket_exists(self._bucket):
             return

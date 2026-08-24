@@ -19,7 +19,10 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    false,
     func,
+    text,
+    true,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 
@@ -1252,6 +1255,206 @@ Index(
     documents.c.workspace_id,
     documents.c.knowledge_base_id,
     documents.c.status,
+)
+
+knowledge_folders = Table(
+    "knowledge_folders",
+    metadata,
+    Column("folder_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("parent_folder_id", UUID(as_uuid=True), nullable=True),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    Column("is_default", Boolean, nullable=False, server_default=false()),
+    UniqueConstraint("workspace_id", "folder_id", name="uq_knowledge_folders_workspace_folder"),
+    UniqueConstraint(
+        "workspace_id",
+        "parent_folder_id",
+        "folder_id",
+        name="uq_knowledge_folders_parent_folder",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_knowledge_folders_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "parent_folder_id"],
+        [
+            f"{SCHEMA_TOKEN}.knowledge_folders.workspace_id",
+            f"{SCHEMA_TOKEN}.knowledge_folders.folder_id",
+        ],
+        name="fk_knowledge_folders_parent",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_knowledge_folders_creator",
+    ),
+    CheckConstraint("status IN ('active', 'deleted')", name="ck_knowledge_folders_status"),
+    CheckConstraint(
+        "(status = 'deleted' AND deleted_at IS NOT NULL) OR "
+        "(status = 'active' AND deleted_at IS NULL)",
+        name="ck_knowledge_folders_deleted_at",
+    ),
+    CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 120", name="ck_knowledge_folders_name"),
+    CheckConstraint("version >= 1", name="ck_knowledge_folders_version"),
+    CheckConstraint(
+        "NOT is_default OR (name = '全部文件' AND parent_folder_id IS NULL "
+        "AND status = 'active' AND deleted_at IS NULL)",
+        name="ck_knowledge_folders_default_shape",
+    ),
+)
+Index(
+    "uq_knowledge_folders_active_name",
+    knowledge_folders.c.workspace_id,
+    func.coalesce(
+        knowledge_folders.c.parent_folder_id, text("'00000000-0000-0000-0000-000000000000'::uuid")
+    ),
+    func.lower(knowledge_folders.c.name),
+    unique=True,
+    postgresql_where=knowledge_folders.c.status == "active",
+)
+Index(
+    "uq_knowledge_folders_default",
+    knowledge_folders.c.workspace_id,
+    unique=True,
+    postgresql_where=knowledge_folders.c.is_default.is_(true()),
+)
+Index(
+    "ix_knowledge_folders_workspace_parent_status",
+    knowledge_folders.c.workspace_id,
+    knowledge_folders.c.parent_folder_id,
+    knowledge_folders.c.status,
+)
+
+knowledge_tags = Table(
+    "knowledge_tags",
+    metadata,
+    Column("tag_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(80), nullable=False),
+    Column("color", String(32), nullable=True),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint("workspace_id", "tag_id", name="uq_knowledge_tags_workspace_tag"),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_knowledge_tags_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_knowledge_tags_creator",
+    ),
+    CheckConstraint("status IN ('active', 'deleted')", name="ck_knowledge_tags_status"),
+    CheckConstraint(
+        "(status = 'deleted' AND deleted_at IS NOT NULL) OR "
+        "(status = 'active' AND deleted_at IS NULL)",
+        name="ck_knowledge_tags_deleted_at",
+    ),
+    CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 80", name="ck_knowledge_tags_name"),
+    CheckConstraint("version >= 1", name="ck_knowledge_tags_version"),
+)
+Index(
+    "uq_knowledge_tags_active_name",
+    knowledge_tags.c.workspace_id,
+    func.lower(knowledge_tags.c.name),
+    unique=True,
+    postgresql_where=knowledge_tags.c.status == "active",
+)
+
+document_folder_bindings = Table(
+    "document_folder_bindings",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("document_id", UUID(as_uuid=True), primary_key=True),
+    Column("folder_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id"],
+        [f"{SCHEMA_TOKEN}.documents.workspace_id", f"{SCHEMA_TOKEN}.documents.document_id"],
+        name="fk_document_folder_bindings_document",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "folder_id"],
+        [
+            f"{SCHEMA_TOKEN}.knowledge_folders.workspace_id",
+            f"{SCHEMA_TOKEN}.knowledge_folders.folder_id",
+        ],
+        name="fk_document_folder_bindings_folder",
+        ondelete="CASCADE",
+    ),
+)
+Index(
+    "ix_document_folder_bindings_workspace_folder",
+    document_folder_bindings.c.workspace_id,
+    document_folder_bindings.c.folder_id,
+)
+
+document_tag_bindings = Table(
+    "document_tag_bindings",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("document_id", UUID(as_uuid=True), primary_key=True),
+    Column("tag_id", UUID(as_uuid=True), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id"],
+        [f"{SCHEMA_TOKEN}.documents.workspace_id", f"{SCHEMA_TOKEN}.documents.document_id"],
+        name="fk_document_tag_bindings_document",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "tag_id"],
+        [f"{SCHEMA_TOKEN}.knowledge_tags.workspace_id", f"{SCHEMA_TOKEN}.knowledge_tags.tag_id"],
+        name="fk_document_tag_bindings_tag",
+        ondelete="CASCADE",
+    ),
+)
+Index(
+    "ix_document_tag_bindings_workspace_tag",
+    document_tag_bindings.c.workspace_id,
+    document_tag_bindings.c.tag_id,
+)
+
+document_favorites = Table(
+    "document_favorites",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("account_id", UUID(as_uuid=True), primary_key=True),
+    Column("document_id", UUID(as_uuid=True), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id"],
+        [f"{SCHEMA_TOKEN}.documents.workspace_id", f"{SCHEMA_TOKEN}.documents.document_id"],
+        name="fk_document_favorites_document",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_document_favorites_account",
+    ),
+)
+Index(
+    "ix_document_favorites_workspace_account_created",
+    document_favorites.c.workspace_id,
+    document_favorites.c.account_id,
+    document_favorites.c.created_at,
 )
 
 document_versions = Table(

@@ -22,6 +22,8 @@ import {
 } from "@/api/services/knowledge";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 
+import { knowledgeQueryKeys } from "./queryKeys";
+
 /** 文档上传表单在进入 API Service 前的完整值。 */
 export interface UploadDocumentValues {
   /** 文档在知识库中的展示标题。 */
@@ -46,19 +48,19 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
   const { workspaceId } = useCurrentWorkspace();
   // 1. 三组 Query 分别缓存空间知识库、选中文档和异步任务事实。
   const bases = useQuery({
-    queryKey: ["knowledge-bases", workspaceId],
+    queryKey: knowledgeQueryKeys.bases(workspaceId),
     queryFn: ({ signal }) => getKnowledgeBases(workspaceId!, signal),
     enabled: Boolean(workspaceId),
     retry: false,
   });
   const documents = useQuery({
-    queryKey: ["knowledge-documents", workspaceId, knowledgeBaseId],
+    queryKey: knowledgeQueryKeys.documents(workspaceId, knowledgeBaseId),
     queryFn: ({ signal }) => getKnowledgeDocuments(workspaceId!, knowledgeBaseId!, signal),
     enabled: Boolean(workspaceId && knowledgeBaseId),
     retry: false,
   });
   const jobs = useQuery({
-    queryKey: ["knowledge-ingestion-jobs", workspaceId, knowledgeBaseId],
+    queryKey: knowledgeQueryKeys.jobs(workspaceId, knowledgeBaseId),
     queryFn: ({ signal }) => getKnowledgeIngestionJobs(workspaceId!, knowledgeBaseId!, signal),
     enabled: Boolean(workspaceId && knowledgeBaseId),
     retry: false,
@@ -74,19 +76,19 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
     }
     // Worker 独立更新任务与文档事实；每个任务快照都刷新文档，避免展示可点击的过期状态。
     void queryClient.invalidateQueries({
-      queryKey: ["knowledge-documents", workspaceId, knowledgeBaseId],
+      queryKey: knowledgeQueryKeys.documents(workspaceId, knowledgeBaseId),
     });
   }, [jobs.data, jobs.dataUpdatedAt, knowledgeBaseId, queryClient, workspaceId]);
 
   // 2. 文档写操作会同时改变知识库统计、版本摘要和任务状态，必须整体刷新。
   const refreshBase = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["knowledge-bases", workspaceId] }),
+      queryClient.invalidateQueries({ queryKey: knowledgeQueryKeys.bases(workspaceId) }),
       queryClient.invalidateQueries({
-        queryKey: ["knowledge-documents", workspaceId, knowledgeBaseId],
+        queryKey: knowledgeQueryKeys.documents(workspaceId, knowledgeBaseId),
       }),
       queryClient.invalidateQueries({
-        queryKey: ["knowledge-ingestion-jobs", workspaceId, knowledgeBaseId],
+        queryKey: knowledgeQueryKeys.jobs(workspaceId, knowledgeBaseId),
       }),
     ]);
   };
@@ -95,7 +97,7 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
   const createBase = useMutation({
     mutationFn: (body: CreateKnowledgeBaseRequest) => createKnowledgeBase(workspaceId!, body),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["knowledge-bases", workspaceId] });
+      await queryClient.invalidateQueries({ queryKey: knowledgeQueryKeys.bases(workspaceId) });
       void message.success("知识库已创建");
     },
     onError: notifyError,

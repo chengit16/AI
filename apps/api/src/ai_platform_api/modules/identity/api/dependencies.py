@@ -233,6 +233,7 @@ def _resource_reference(
     api_resource: ApiResource,
     resource_type: str,
 ) -> ResourceReference:
+    # 1. 只从已匹配路由的路径参数选择资源主键，无资源级参数时回落工作空间本身。
     values = request.path_params
     resource_id = next(
         (
@@ -242,6 +243,8 @@ def _resource_reference(
                 "department_id",
                 "position_id",
                 "role_id",
+                "folder_id",
+                "tag_id",
                 "binding_id",
                 "invitation_id",
                 "document_version_id",
@@ -265,6 +268,7 @@ def _resource_reference(
         context.workspace_id,
     )
     trusted_id = resource_id if isinstance(resource_id, UUID) else UUID(str(resource_id))
+    # 2. 冻结 PDP 需要的相关资源属性，调用方提交的查询和正文不能扩展可信关系。
     attributes: dict[str, object] = {
         key: value
         for key in (
@@ -272,6 +276,8 @@ def _resource_reference(
             "department_id",
             "position_id",
             "role_id",
+            "folder_id",
+            "tag_id",
             "knowledge_base_id",
             "document_id",
             "document_version_id",
@@ -290,6 +296,7 @@ def _resource_reference(
         )
         if (value := values.get(key)) is not None
     }
+    # 3. 风险等级来自冻结注册表，并与可信工作空间和真实资源 ID 一起形成策略输入。
     attributes["risk_level"] = api_resource.risk_level
     return ResourceReference(
         resource_type=resource_type,

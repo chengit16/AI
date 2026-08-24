@@ -36,6 +36,7 @@ celery_app.conf.update(
         "platform.indexing.commit.v1": {"queue": "platform.indexing"},
         "platform.indexing.inspect.v1": {"queue": "platform.indexing"},
         "platform.indexing.maintenance_commands.v1": {"queue": "platform.indexing"},
+        "platform.knowledge.trash_retention.v1": {"queue": "platform.control"},
     },
     worker_concurrency=settings.worker_concurrency,
     beat_schedule={
@@ -66,6 +67,12 @@ celery_app.conf.update(
         "process-index-maintenance-commands": {
             "task": "platform.indexing.maintenance_commands.v1",
             "schedule": settings.indexing_dispatch_interval_seconds,
+        },
+        "purge-knowledge-trash": {
+            "task": "platform.knowledge.trash_retention.v1",
+            "schedule": settings.knowledge_trash_retention_interval_seconds,
+            # 生产调度器可覆盖 workspace_id；空值表示逐条按事实表中的 workspace_id 处理。
+            "kwargs": {"workspace_id": None},
         },
     },
 )

@@ -29,6 +29,7 @@ from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
 from ai_platform_api.persistence.database import create_platform_engine, create_session_factory
 from ai_platform_api.persistence.tables import (
     audit_records,
+    documents,
     ingestion_job_attempts,
     ingestion_job_stages,
     ingestion_jobs,
@@ -109,6 +110,15 @@ def p202_database() -> Iterator[P202Harness]:
         trace=TRACE,
         authentication_method="browser_session",
     )
+    # 本模块按测试场景创建多个知识库；提升合成空间额度，避免用量事实把租约测试顺序耦合在默认套餐上。
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                f'UPDATE "{schema}".workspace_entitlements '
+                "SET max_knowledge_bases = 100 WHERE workspace_id = :workspace_id"
+            ),
+            {"workspace_id": registered.personal_workspace_id},
+        )
     unit_of_work = SqlAlchemyKnowledgeUnitOfWork(sessions, SqlAlchemyEntitlementRepository)
     try:
         yield P202Harness(
@@ -219,6 +229,69 @@ def test_parsing_and_ocr_lanes_never_claim_each_others_jobs(
             )
             == "failed"
         )
+
+
+def test_deleted_document_job_is_not_claimed_when_another_document_is_active(
+    p202_database: P202Harness,
+) -> None:
+    deleted_job_id, _ = create_job(p202_database, "deleted-document")
+    active_job_id, _ = create_job(p202_database, "active-document")
+    now = datetime.now(UTC) + timedelta(seconds=1)
+
+    # 只有按任务所属文档做复合关联，其他活动文档才不会错误放行回收站任务。
+    with p202_database.engine.begin() as connection:
+        deleted_document_id = connection.scalar(
+            select(ingestion_jobs.c.document_id).where(
+                ingestion_jobs.c.ingestion_job_id == deleted_job_id
+            )
+        )
+        assert isinstance(deleted_document_id, UUID)
+        connection.execute(
+            update(documents)
+            .where(
+                documents.c.workspace_id == p202_database.workspace_id,
+                documents.c.document_id == deleted_document_id,
+            )
+            .values(status="deleted", deleted_at=now)
+        )
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.ingestion_job_id == deleted_job_id)
+            .values(available_at=now - timedelta(seconds=1))
+        )
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.ingestion_job_id == active_job_id)
+            .values(available_at=now + timedelta(minutes=1))
+        )
+
+    assert (
+        p202_database.store.claim_next(
+            worker_id="p202-document-status-worker",
+            now=now,
+            lease_seconds=60,
+        )
+        is None
+    )
+
+    active_claim = p202_database.store.claim_next(
+        worker_id="p202-document-status-worker",
+        now=now + timedelta(minutes=1),
+        lease_seconds=60,
+    )
+    assert active_claim is not None and active_claim.ingestion_job_id == active_job_id
+    assert (
+        p202_database.store.mark_failed(
+            active_claim,
+            stage="parse",
+            error_code="INGESTION_SYNTHETIC_STOP",
+            error_message="合成文档状态隔离测试已结束",
+            retryable=False,
+            failed_at=now + timedelta(minutes=1),
+            next_attempt_at=now + timedelta(minutes=1),
+        )
+        == "failed"
+    )
 
 
 def artifact(harness: P202Harness, job_id: UUID, version_id: UUID) -> ParsedArtifact:

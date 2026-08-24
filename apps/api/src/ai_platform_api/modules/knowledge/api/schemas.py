@@ -149,7 +149,7 @@ class DocumentVersionResponse(BaseModel):
 
 
 class KnowledgeDocumentSummaryResponse(BaseModel):
-    """定义知识文档摘要操作的稳定响应结构。"""
+    """定义知识文档及当前成员组织视图的稳定响应结构。"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -163,6 +163,10 @@ class KnowledgeDocumentSummaryResponse(BaseModel):
     source_kind: Literal["manual", "upload", "web", "data_source"]
     source_name: str
     current_document_version_id: UUID | None
+    # 组织字段是 v1 响应的向后兼容扩展；默认值只用于旧快照解析，当前读模型始终显式返回真实事实。
+    folder_id: UUID | None = None
+    tag_ids: list[UUID] = Field(default_factory=list)
+    is_favorite: bool = False
 
 
 class KnowledgeDocumentListResponse(BaseModel):
@@ -276,3 +280,154 @@ class DocumentVersionUploadResponse(DocumentVersionCreatedResponse):
     """定义文档版本上传操作的稳定响应结构。"""
 
     upload: UploadMetadataResponse
+
+
+class CreateKnowledgeFolderRequest(BaseModel):
+    """定义创建目录请求；父目录必须属于当前工作空间。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    parent_folder_id: UUID | None = None
+
+
+class UpdateKnowledgeFolderRequest(BaseModel):
+    """定义目录改名请求。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+
+
+class MoveKnowledgeFolderRequest(BaseModel):
+    """定义目录移动请求；传入 null 表示移动到根目录。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    parent_folder_id: UUID | None = None
+
+
+class KnowledgeFolderResponse(BaseModel):
+    """定义目录事实的稳定响应结构。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    folder_id: UUID
+    workspace_id: UUID
+    name: str
+    parent_folder_id: UUID | None
+    created_by_account_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    status: Literal["active", "deleted"]
+    deleted_at: datetime | None
+    version: int
+    is_default: bool
+
+
+class KnowledgeFolderListResponse(BaseModel):
+    """定义目录列表响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[KnowledgeFolderResponse]
+
+
+class CreateKnowledgeTagRequest(BaseModel):
+    """定义创建标签请求。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=80)
+    color: str | None = Field(default=None, max_length=32)
+
+
+class UpdateKnowledgeTagRequest(BaseModel):
+    """定义标签改名或改色请求。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=80)
+    color: str | None = Field(default=None, max_length=32)
+
+
+class KnowledgeTagResponse(BaseModel):
+    """定义标签事实的稳定响应结构。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tag_id: UUID
+    workspace_id: UUID
+    name: str
+    color: str | None
+    created_by_account_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    status: Literal["active", "deleted"]
+    deleted_at: datetime | None
+    version: int
+
+
+class KnowledgeTagListResponse(BaseModel):
+    """定义标签列表响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[KnowledgeTagResponse]
+
+
+class KnowledgeDocumentBindingsRequest(BaseModel):
+    """定义文档目录或标签的批量绑定请求。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ids: list[UUID] = Field(default_factory=list, max_length=100)
+
+
+class KnowledgeDocumentFolderBindingResponse(BaseModel):
+    """定义文档目录绑定响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[KnowledgeFolderResponse]
+
+
+class KnowledgeDocumentTagBindingResponse(BaseModel):
+    """定义文档标签绑定响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[KnowledgeTagResponse]
+
+
+class KnowledgeFavoriteRequest(BaseModel):
+    """定义收藏切换请求。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    favorite: bool
+
+
+class KnowledgeFavoriteResponse(BaseModel):
+    """定义收藏切换响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: UUID
+    favorite: bool
+
+
+class KnowledgeFavoriteListResponse(BaseModel):
+    """定义当前用户收藏文档 ID 列表响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    document_ids: list[UUID]
+
+
+class KnowledgeTrashListResponse(BaseModel):
+    """定义回收站文档列表响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[DocumentResponse]

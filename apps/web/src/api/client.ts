@@ -93,7 +93,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     body: requestBody,
   });
   const contentType = response.headers.get("content-type") ?? "";
-  const payload: unknown = contentType.includes("application/json") ? await response.json() : null;
+  // 204/205 按协议没有响应体；部分框架仍会保留 JSON Content-Type，不能据此强行解析空体。
+  const payload: unknown =
+    response.status === 204 || response.status === 205
+      ? undefined
+      : contentType.includes("application/json")
+        ? await response.json()
+        : null;
   if (!response.ok) {
     if (response.status === 401) handleUnauthorized();
     if (isErrorResponse(payload)) {

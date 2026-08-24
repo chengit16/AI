@@ -123,7 +123,8 @@ ingestion_jobs = Table(
     ),
     CheckConstraint(
         "(status = 'succeeded' AND completed_at IS NOT NULL "
-        "AND artifact_object_key IS NOT NULL "
+        # 产物键可能因 Worker 在对象写入后失租而暂未回写，清理链按任务身份推导该键。
+        "AND (artifact_object_key IS NULL OR char_length(btrim(artifact_object_key)) > 0) "
         "AND parsed_content_hash ~ '^[0-9a-f]{64}$' AND parser_name IS NOT NULL "
         "AND ocr_used IS NOT NULL AND page_count >= 1 AND block_count >= 1) OR "
         "(status <> 'succeeded' AND artifact_object_key IS NULL "

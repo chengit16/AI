@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from ai_platform_backend.integration.consumer import IdempotentProjectionConsumer
+from ai_platform_backend.integration.domain import IntegrationEvent
 from ai_platform_backend.integration.envelope import (
     HmacTaskEnvelopeSigner,
     InvalidTaskEnvelopeError,
@@ -13,10 +15,17 @@ from ai_platform_backend.integration.envelope import (
 from ai_platform_backend.integration.trace import TraceContext
 from ai_platform_backend.observability.runtime import trace_context_from_span
 from celery import Task, shared_task
+from sqlalchemy.exc import SQLAlchemyError
 
-from ai_platform_worker.app.runtime import build_worker_runtime
+from ai_platform_worker.app.runtime import WorkerRuntime, build_worker_runtime
 from ai_platform_worker.config import get_worker_settings
+from ai_platform_worker.modules.knowledge.domain.object_cleanup import (
+    TRASH_PURGE_REQUESTED_EVENT,
+    ObjectCleanupUnavailableError,
+)
 from ai_platform_worker.observability import get_worker_observability
+
+_OBJECT_CLEANUP_CONSUMER = "knowledge-object-cleanup-v1"
 
 
 def _queue_name() -> str:
@@ -186,12 +195,45 @@ def process_index_maintenance_commands() -> dict[str, int]:
             runtime.close()
 
 
+@shared_task(name="platform.knowledge.trash_retention.v1", ignore_result=True)
+def purge_knowledge_trash(*, workspace_id: str | None = None) -> dict[str, int]:
+    """清理超过保留期的回收站文档，并为对象/索引清理登记待处理事件。"""
+
+    settings = get_worker_settings()
+    observability = get_worker_observability()
+    with observability.task(
+        task_name="platform.knowledge.trash_retention.v1",
+        queue=_queue_name(),
+    ):
+        parsed_workspace_id = UUID(workspace_id) if workspace_id else None
+        cutoff = datetime.now(UTC) - timedelta(days=settings.knowledge_trash_retention_days)
+        runtime = build_worker_runtime(settings)
+        try:
+            result = runtime.trash_retention.run(
+                workspace_id=parsed_workspace_id,
+                cutoff=cutoff,
+                batch_size=settings.knowledge_trash_retention_batch_size,
+            )
+            return {
+                "scanned": result.scanned,
+                "purged": result.purged,
+                "external_cleanup_requested": result.external_cleanup_requested,
+            }
+        finally:
+            runtime.close()
+
+
 @shared_task(
     name="platform.integration.consume.v1",
     bind=True,
     ignore_result=True,
     acks_late=True,
     reject_on_worker_lost=True,
+    autoretry_for=(ObjectCleanupUnavailableError, SQLAlchemyError),
+    retry_backoff=5,
+    retry_backoff_max=60,
+    retry_jitter=False,
+    max_retries=3,
 )
 def consume_integration_event(self: Task, *, envelope: object) -> bool:
     """处理消费集成事件，遵守任务幂等、有限重试和提交时机约束。"""
@@ -225,11 +267,21 @@ def consume_integration_event(self: Task, *, envelope: object) -> bool:
             try:
                 runtime = build_worker_runtime(settings)
                 try:
+                    current_trace = trace_context_from_span(span)
+                    if signed.event.event_type == TRASH_PURGE_REQUESTED_EVENT:
+                        # 外部副作用成功后才写回执；进程中断会重放幂等删除，不会提前吞掉事件。
+                        runtime.object_cleanup.handle(signed.event)
+                        return _record_object_cleanup_receipt(
+                            runtime,
+                            signed.event,
+                            task_id=signed.task_id,
+                            trace_id=current_trace.trace_id,
+                            traceparent=current_trace.traceparent,
+                        )
                     consumer = IdempotentProjectionConsumer(
                         "workspace-resource-projection-v1",
                         runtime.consumers,
                     )
-                    current_trace = trace_context_from_span(span)
                     return consumer.handle(
                         signed.event,
                         task_id=signed.task_id,
@@ -241,3 +293,26 @@ def consume_integration_event(self: Task, *, envelope: object) -> bool:
                     runtime.close()
             finally:
                 observability.reset(token)
+
+
+def _record_object_cleanup_receipt(
+    runtime: WorkerRuntime,
+    event: IntegrationEvent,
+    *,
+    task_id: UUID,
+    trace_id: str,
+    traceparent: str,
+) -> bool:
+    """对象删除成功后提交专用回执，避免为已删除文档重新创建通用投影。"""
+
+    with runtime.consumers as unit_of_work:
+        claimed = unit_of_work.claim(
+            _OBJECT_CLEANUP_CONSUMER,
+            event,
+            task_id=task_id,
+            trace_id=trace_id,
+            traceparent=traceparent,
+            processed_at=datetime.now(UTC),
+        )
+        unit_of_work.commit()
+        return claimed

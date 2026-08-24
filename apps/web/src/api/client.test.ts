@@ -35,4 +35,17 @@ describe("平台 API Client", () => {
     expect(headers.get("X-Workspace-ID")).toBe("workspace-id");
     expect(headers.get("X-CSRF-Token")).toBe("synthetic-csrf");
   });
+
+  it("204 响应即使保留 JSON Content-Type 也不解析空响应体", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 204,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(
+      apiRequest<void>("/api/v1/synthetic-resource", { method: "DELETE" }),
+    ).resolves.toBe(undefined);
+  });
 });

@@ -14,6 +14,8 @@ from ai_platform_api.modules.knowledge.api.schemas import (
     CreateDocumentRequest,
     CreateDocumentVersionRequest,
     CreateKnowledgeBaseRequest,
+    CreateKnowledgeFolderRequest,
+    CreateKnowledgeTagRequest,
     DocumentCreatedResponse,
     DocumentResponse,
     DocumentSourceResponse,
@@ -26,9 +28,23 @@ from ai_platform_api.modules.knowledge.api.schemas import (
     KnowledgeBaseListResponse,
     KnowledgeBaseResponse,
     KnowledgeBaseSummaryResponse,
+    KnowledgeDocumentBindingsRequest,
+    KnowledgeDocumentFolderBindingResponse,
     KnowledgeDocumentListResponse,
     KnowledgeDocumentSummaryResponse,
+    KnowledgeDocumentTagBindingResponse,
+    KnowledgeFavoriteListResponse,
+    KnowledgeFavoriteRequest,
+    KnowledgeFavoriteResponse,
+    KnowledgeFolderListResponse,
+    KnowledgeFolderResponse,
+    KnowledgeTagListResponse,
+    KnowledgeTagResponse,
+    KnowledgeTrashListResponse,
     MarkDocumentVersionReadyRequest,
+    MoveKnowledgeFolderRequest,
+    UpdateKnowledgeFolderRequest,
+    UpdateKnowledgeTagRequest,
     UploadMetadataResponse,
 )
 from ai_platform_api.modules.knowledge.application.facts import (
@@ -43,6 +59,11 @@ from ai_platform_api.modules.knowledge.application.management import (
     IngestionJob,
     KnowledgeDocumentSummary,
     KnowledgeManagementService,
+)
+from ai_platform_api.modules.knowledge.application.organization import (
+    KnowledgeFolder,
+    KnowledgeOrganizationService,
+    KnowledgeTag,
 )
 from ai_platform_api.modules.knowledge.application.uploads import (
     KnowledgeUploadService,
@@ -77,6 +98,440 @@ def knowledge_management_service(request: Request) -> KnowledgeManagementService
     if not isinstance(service, KnowledgeManagementService):
         raise RuntimeError("知识管理服务尚未完成装配")
     return service
+
+
+def knowledge_organization_service(request: Request) -> KnowledgeOrganizationService:
+    """获取目录、标签、收藏和回收站服务；路由不直接访问 Repository。"""
+
+    service = getattr(request.app.state, "knowledge_organization_service", None)
+    if not isinstance(service, KnowledgeOrganizationService):
+        raise RuntimeError("知识组织服务尚未完成装配")
+    return service
+
+
+@router.get(
+    "/knowledge-folders",
+    response_model=KnowledgeFolderListResponse,
+    operation_id="listKnowledgeFolders",
+    responses=error_responses(400, 401, 403, 422, 500),
+)
+def list_knowledge_folders(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+    include_deleted: Annotated[bool, Query()] = False,
+) -> KnowledgeFolderListResponse:
+    """列出工作空间目录；删除目录只在显式查询时返回。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeFolderListResponse(
+        items=[
+            _folder(item) for item in service.list_folders(context, include_deleted=include_deleted)
+        ]
+    )
+
+
+@router.post(
+    "/knowledge-folders",
+    response_model=KnowledgeFolderResponse,
+    status_code=status.HTTP_201_CREATED,
+    operation_id="createKnowledgeFolder",
+    responses=error_responses(400, 401, 403, 409, 422, 500),
+)
+def create_knowledge_folder(
+    workspace_id: UUID,
+    body: CreateKnowledgeFolderRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeFolderResponse:
+    """创建工作空间目录。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _folder(
+        service.create_folder(context, name=body.name, parent_folder_id=body.parent_folder_id)
+    )
+
+
+@router.patch(
+    "/knowledge-folders/{folder_id}",
+    response_model=KnowledgeFolderResponse,
+    operation_id="renameKnowledgeFolder",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def rename_knowledge_folder(
+    workspace_id: UUID,
+    folder_id: UUID,
+    body: UpdateKnowledgeFolderRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeFolderResponse:
+    """重命名工作空间目录。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _folder(service.rename_folder(context, folder_id=folder_id, name=body.name))
+
+
+@router.post(
+    "/knowledge-folders/{folder_id}/move",
+    response_model=KnowledgeFolderResponse,
+    operation_id="moveKnowledgeFolder",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def move_knowledge_folder(
+    workspace_id: UUID,
+    folder_id: UUID,
+    body: MoveKnowledgeFolderRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeFolderResponse:
+    """移动目录并拒绝跨空间或循环父子关系。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _folder(
+        service.move_folder(context, folder_id=folder_id, parent_folder_id=body.parent_folder_id)
+    )
+
+
+@router.delete(
+    "/knowledge-folders/{folder_id}",
+    response_model=KnowledgeFolderResponse,
+    operation_id="deleteKnowledgeFolder",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def delete_knowledge_folder(
+    workspace_id: UUID,
+    folder_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeFolderResponse:
+    """软删除空目录，保留恢复入口。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _folder(service.delete_folder(context, folder_id=folder_id))
+
+
+@router.post(
+    "/knowledge-folders/{folder_id}/restore",
+    response_model=KnowledgeFolderResponse,
+    operation_id="restoreKnowledgeFolder",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def restore_knowledge_folder(
+    workspace_id: UUID,
+    folder_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeFolderResponse:
+    """恢复目录；父目录必须仍处于活动状态。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _folder(service.restore_folder(context, folder_id=folder_id))
+
+
+@router.delete(
+    "/knowledge-folders/{folder_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="purgeKnowledgeFolder",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def purge_knowledge_folder(
+    workspace_id: UUID,
+    folder_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> None:
+    """永久删除已进入回收站且没有子项或文档绑定的目录。"""
+
+    _require_workspace_path(context, workspace_id)
+    service.permanently_delete_folder(context, folder_id=folder_id)
+
+
+@router.get(
+    "/knowledge-tags",
+    response_model=KnowledgeTagListResponse,
+    operation_id="listKnowledgeTags",
+    responses=error_responses(400, 401, 403, 422, 500),
+)
+def list_knowledge_tags(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+    include_deleted: Annotated[bool, Query()] = False,
+) -> KnowledgeTagListResponse:
+    """列出工作空间标签。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeTagListResponse(
+        items=[_tag(item) for item in service.list_tags(context, include_deleted=include_deleted)]
+    )
+
+
+@router.post(
+    "/knowledge-tags",
+    response_model=KnowledgeTagResponse,
+    status_code=status.HTTP_201_CREATED,
+    operation_id="createKnowledgeTag",
+    responses=error_responses(400, 401, 403, 409, 422, 500),
+)
+def create_knowledge_tag(
+    workspace_id: UUID,
+    body: CreateKnowledgeTagRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeTagResponse:
+    """创建工作空间标签。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _tag(service.create_tag(context, name=body.name, color=body.color))
+
+
+@router.patch(
+    "/knowledge-tags/{tag_id}",
+    response_model=KnowledgeTagResponse,
+    operation_id="updateKnowledgeTag",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def update_knowledge_tag(
+    workspace_id: UUID,
+    tag_id: UUID,
+    body: UpdateKnowledgeTagRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeTagResponse:
+    """更新标签名称和展示颜色。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _tag(service.rename_tag(context, tag_id=tag_id, name=body.name, color=body.color))
+
+
+@router.delete(
+    "/knowledge-tags/{tag_id}",
+    response_model=KnowledgeTagResponse,
+    operation_id="deleteKnowledgeTag",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def delete_knowledge_tag(
+    workspace_id: UUID,
+    tag_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeTagResponse:
+    """软删除标签，已有绑定在读取时隐藏。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _tag(service.delete_tag(context, tag_id=tag_id))
+
+
+@router.post(
+    "/knowledge-tags/{tag_id}/restore",
+    response_model=KnowledgeTagResponse,
+    operation_id="restoreKnowledgeTag",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def restore_knowledge_tag(
+    workspace_id: UUID,
+    tag_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeTagResponse:
+    """恢复标签；同名活动标签存在时拒绝恢复。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _tag(service.restore_tag(context, tag_id=tag_id))
+
+
+@router.post(
+    "/documents/{document_id}/folders",
+    response_model=KnowledgeDocumentFolderBindingResponse,
+    operation_id="bindKnowledgeDocumentFolders",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def bind_document_folders(
+    workspace_id: UUID,
+    document_id: UUID,
+    body: KnowledgeDocumentBindingsRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeDocumentFolderBindingResponse:
+    """幂等绑定文档目录。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeDocumentFolderBindingResponse(
+        items=[
+            _folder(item)
+            for item in service.bind_folder(context, document_id=document_id, folder_ids=body.ids)
+        ]
+    )
+
+
+@router.delete(
+    "/documents/{document_id}/folders/{folder_id}",
+    response_model=KnowledgeDocumentFolderBindingResponse,
+    operation_id="unbindKnowledgeDocumentFolder",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def unbind_document_folder(
+    workspace_id: UUID,
+    document_id: UUID,
+    folder_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeDocumentFolderBindingResponse:
+    """幂等解绑文档目录。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeDocumentFolderBindingResponse(
+        items=[
+            _folder(item)
+            for item in service.unbind_folder(context, document_id=document_id, folder_id=folder_id)
+        ]
+    )
+
+
+@router.post(
+    "/documents/{document_id}/tags",
+    response_model=KnowledgeDocumentTagBindingResponse,
+    operation_id="bindKnowledgeDocumentTags",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def bind_document_tags(
+    workspace_id: UUID,
+    document_id: UUID,
+    body: KnowledgeDocumentBindingsRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeDocumentTagBindingResponse:
+    """幂等绑定文档标签。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeDocumentTagBindingResponse(
+        items=[
+            _tag(item)
+            for item in service.bind_tag(context, document_id=document_id, tag_ids=body.ids)
+        ]
+    )
+
+
+@router.delete(
+    "/documents/{document_id}/tags/{tag_id}",
+    response_model=KnowledgeDocumentTagBindingResponse,
+    operation_id="unbindKnowledgeDocumentTag",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def unbind_document_tag(
+    workspace_id: UUID,
+    document_id: UUID,
+    tag_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeDocumentTagBindingResponse:
+    """幂等解绑文档标签。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeDocumentTagBindingResponse(
+        items=[
+            _tag(item)
+            for item in service.unbind_tag(context, document_id=document_id, tag_id=tag_id)
+        ]
+    )
+
+
+@router.put(
+    "/documents/{document_id}/favorite",
+    response_model=KnowledgeFavoriteResponse,
+    operation_id="setKnowledgeDocumentFavorite",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def set_document_favorite(
+    workspace_id: UUID,
+    document_id: UUID,
+    body: KnowledgeFavoriteRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> KnowledgeFavoriteResponse:
+    """幂等设置文档收藏状态。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeFavoriteResponse(
+        document_id=document_id,
+        favorite=service.set_favorite(context, document_id=document_id, favorite=body.favorite),
+    )
+
+
+@router.get(
+    "/favorites",
+    response_model=KnowledgeFavoriteListResponse,
+    operation_id="listKnowledgeFavorites",
+    responses=error_responses(400, 401, 403, 422, 500),
+)
+def list_document_favorites(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+) -> KnowledgeFavoriteListResponse:
+    """列出当前用户的活动文档收藏。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeFavoriteListResponse(
+        document_ids=list(service.list_favorites(context, limit=limit))
+    )
+
+
+@router.get(
+    "/trash",
+    response_model=KnowledgeTrashListResponse,
+    operation_id="listKnowledgeTrash",
+    responses=error_responses(400, 401, 403, 422, 500),
+)
+def list_knowledge_trash(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+) -> KnowledgeTrashListResponse:
+    """列出工作空间回收站文档。"""
+
+    _require_workspace_path(context, workspace_id)
+    return KnowledgeTrashListResponse(
+        items=[_document(item) for item in service.list_trash(context, limit=limit)]
+    )
+
+
+@router.post(
+    "/trash/documents/{document_id}/restore",
+    response_model=DocumentResponse,
+    operation_id="restoreKnowledgeDocument",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def restore_knowledge_document(
+    workspace_id: UUID,
+    document_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> DocumentResponse:
+    """恢复回收站文档。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _document(service.restore_document(context, document_id=document_id))
+
+
+@router.delete(
+    "/trash/documents/{document_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="purgeKnowledgeDocument",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def purge_knowledge_document(
+    workspace_id: UUID,
+    document_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeOrganizationService, Depends(knowledge_organization_service)],
+) -> None:
+    """永久清理已删除文档的数据库事实，并由 Outbox 驱动外部清理。"""
+
+    _require_workspace_path(context, workspace_id)
+    service.permanently_delete_document(context, document_id=document_id)
 
 
 @router.get(
@@ -486,6 +941,41 @@ def publish_document_version(
     )
 
 
+def _folder(value: KnowledgeFolder) -> KnowledgeFolderResponse:
+    """将目录领域对象映射为不暴露持久化细节的响应。"""
+
+    return KnowledgeFolderResponse(
+        folder_id=value.folder_id,
+        workspace_id=value.workspace_id,
+        name=value.name,
+        parent_folder_id=value.parent_folder_id,
+        created_by_account_id=value.created_by_account_id,
+        created_at=value.created_at,
+        updated_at=value.updated_at,
+        status=value.status,
+        deleted_at=value.deleted_at,
+        version=value.version,
+        is_default=value.is_default,
+    )
+
+
+def _tag(value: KnowledgeTag) -> KnowledgeTagResponse:
+    """将标签领域对象映射为稳定响应。"""
+
+    return KnowledgeTagResponse(
+        tag_id=value.tag_id,
+        workspace_id=value.workspace_id,
+        name=value.name,
+        color=value.color,
+        created_by_account_id=value.created_by_account_id,
+        created_at=value.created_at,
+        updated_at=value.updated_at,
+        status=value.status,
+        deleted_at=value.deleted_at,
+        version=value.version,
+    )
+
+
 def _knowledge_base(value: KnowledgeBase) -> KnowledgeBaseResponse:
     return KnowledgeBaseResponse(
         knowledge_base_id=value.knowledge_base_id,
@@ -561,6 +1051,9 @@ def _document_summary(value: KnowledgeDocumentSummary) -> KnowledgeDocumentSumma
         source_kind=value.source_kind,
         source_name=value.source_name,
         current_document_version_id=value.current_document_version_id,
+        folder_id=value.folder_id,
+        tag_ids=list(value.tag_ids),
+        is_favorite=value.is_favorite,
     )
 
 

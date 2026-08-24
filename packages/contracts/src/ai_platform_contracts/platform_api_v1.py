@@ -513,6 +513,16 @@ class CreateKnowledgeBaseRequest(typing.TypedDict):
     name: str
 
 
+class CreateKnowledgeFolderRequest(typing.TypedDict):
+    name: str
+    parent_folder_id: typing.NotRequired[str | None]
+
+
+class CreateKnowledgeTagRequest(typing.TypedDict):
+    color: typing.NotRequired[str | None]
+    name: str
+
+
 class CreateMessagePartRequest(typing.TypedDict):
     text: str
     type: str
@@ -887,6 +897,14 @@ class KnowledgeBaseSummaryResponse(typing.TypedDict):
     updated_at: str
 
 
+class KnowledgeDocumentBindingsRequest(typing.TypedDict):
+    ids: typing.NotRequired[list[str]]
+
+
+class KnowledgeDocumentFolderBindingResponse(typing.TypedDict):
+    items: list[KnowledgeFolderResponse]
+
+
 class KnowledgeDocumentListResponse(typing.TypedDict):
     items: list[KnowledgeDocumentSummaryResponse]
 
@@ -894,14 +912,73 @@ class KnowledgeDocumentListResponse(typing.TypedDict):
 class KnowledgeDocumentSummaryResponse(typing.TypedDict):
     current_document_version_id: str | None
     document_id: str
+    folder_id: typing.NotRequired[str | None]
+    is_favorite: typing.NotRequired[bool]
     latest_version: DocumentVersionResponse
     security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
     source_id: str
     source_kind: typing.Literal["manual", "upload", "web", "data_source"]
     source_name: str
+    tag_ids: typing.NotRequired[list[str]]
     title: str
     updated_at: str
     visibility: typing.Literal["private", "workspace", "departments"]
+
+
+class KnowledgeDocumentTagBindingResponse(typing.TypedDict):
+    items: list[KnowledgeTagResponse]
+
+
+class KnowledgeFavoriteListResponse(typing.TypedDict):
+    document_ids: list[str]
+
+
+class KnowledgeFavoriteRequest(typing.TypedDict):
+    favorite: bool
+
+
+class KnowledgeFavoriteResponse(typing.TypedDict):
+    document_id: str
+    favorite: bool
+
+
+class KnowledgeFolderListResponse(typing.TypedDict):
+    items: list[KnowledgeFolderResponse]
+
+
+class KnowledgeFolderResponse(typing.TypedDict):
+    created_at: str
+    created_by_account_id: str
+    deleted_at: str | None
+    folder_id: str
+    is_default: bool
+    name: str
+    parent_folder_id: str | None
+    status: typing.Literal["active", "deleted"]
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
+class KnowledgeTagListResponse(typing.TypedDict):
+    items: list[KnowledgeTagResponse]
+
+
+class KnowledgeTagResponse(typing.TypedDict):
+    color: str | None
+    created_at: str
+    created_by_account_id: str
+    deleted_at: str | None
+    name: str
+    status: typing.Literal["active", "deleted"]
+    tag_id: str
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
+class KnowledgeTrashListResponse(typing.TypedDict):
+    items: list[DocumentResponse]
 
 
 class LegalHoldBody(typing.TypedDict):
@@ -1167,6 +1244,10 @@ class ModelProviderConfigurationResponse(typing.TypedDict):
 
 class MoveDepartmentRequest(typing.TypedDict):
     parent_department_id: typing.NotRequired[str | None]
+
+
+class MoveKnowledgeFolderRequest(typing.TypedDict):
+    parent_folder_id: typing.NotRequired[str | None]
 
 
 class OpenApiFeatureRequest(typing.TypedDict):
@@ -1733,6 +1814,15 @@ class UpdateAgentDraftRequest(typing.TypedDict):
     configuration: dict[str, object]
     expected_revision: int
     knowledge_scope: typing.NotRequired[AgentKnowledgeScopeSelectionRequest | None]
+
+
+class UpdateKnowledgeFolderRequest(typing.TypedDict):
+    name: str
+
+
+class UpdateKnowledgeTagRequest(typing.TypedDict):
+    color: typing.NotRequired[str | None]
+    name: str
 
 
 class UpdateServiceRequest(typing.TypedDict):

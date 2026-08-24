@@ -7,8 +7,19 @@ import { apiRequest } from "@/api/client";
 
 /** 知识库列表使用的服务端范围化摘要。 */
 export type KnowledgeBaseSummary = components["schemas"]["KnowledgeBaseSummaryResponse"];
-/** 文档及其最新版本、发布状态和可执行动作摘要。 */
-export type KnowledgeDocumentSummary = components["schemas"]["KnowledgeDocumentSummaryResponse"];
+type KnowledgeDocumentSummaryResponse = components["schemas"]["KnowledgeDocumentSummaryResponse"];
+/** 页面使用的文档摘要；Service 将兼容契约的可选组织字段收敛为确定结构。 */
+export type KnowledgeDocumentSummary = Omit<
+  KnowledgeDocumentSummaryResponse,
+  "folder_id" | "tag_ids" | "is_favorite"
+> & {
+  /** 服务端当前读模型返回的唯一主目录；空字符串只兼容尚未升级的旧响应。 */
+  folder_id: string;
+  /** 当前仍活动的标签绑定。 */
+  tag_ids: readonly string[];
+  /** 当前账号的收藏投影。 */
+  is_favorite: boolean;
+};
 /** 文档解析、OCR 和索引前处理任务的可见状态。 */
 export type IngestionJob = components["schemas"]["IngestionJobResponse"];
 /** 新建知识库时允许提交的契约字段。 */
@@ -35,7 +46,13 @@ export async function getKnowledgeDocuments(
     `/api/v1/workspaces/${workspaceId}/knowledge-bases/${knowledgeBaseId}/documents`,
     { signal },
   );
-  return response.items;
+  // 新字段在 v1 契约中保持可选以兼容旧客户端，页面层只消费这里归一化后的确定结构。
+  return response.items.map((document) => ({
+    ...document,
+    folder_id: document.folder_id ?? "",
+    tag_ids: document.tag_ids ?? [],
+    is_favorite: document.is_favorite ?? false,
+  }));
 }
 
 /** 查询知识库入库任务，供页面轮询活动任务及展示稳定失败码。 */
@@ -95,6 +112,18 @@ export function uploadKnowledgeDocumentVersion(
   return apiRequest<components["schemas"]["DocumentVersionUploadResponse"]>(
     `/api/v1/workspaces/${workspaceId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/versions/upload`,
     { method: "POST", body },
+  );
+}
+
+/** 将活动文档移入回收站；服务端负责资源授权、索引退出和审计。 */
+export function deleteKnowledgeDocument(
+  workspaceId: string,
+  knowledgeBaseId: string,
+  documentId: string,
+) {
+  return apiRequest<components["schemas"]["DocumentResponse"]>(
+    `/api/v1/workspaces/${workspaceId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`,
+    { method: "DELETE" },
   );
 }
 

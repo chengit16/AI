@@ -9,6 +9,11 @@ from types import TracebackType
 from typing import Any, cast
 from uuid import UUID
 
+from ai_platform_backend.indexing.persistence import (
+    document_index_publications,
+    index_versions,
+    retrieval_chunks,
+)
 from ai_platform_backend.indexing.sqlalchemy import (
     deactivate_document_indexes,
     switch_active_document_index,
@@ -22,7 +27,9 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
 )
-from sqlalchemy import false, func, insert, or_, select, true, update
+from ai_platform_backend.knowledge.object_keys import parsed_artifact_object_key
+from sqlalchemy import delete, false, func, insert, or_, select, text, true, update
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.engine import CursorResult, Row
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -41,16 +48,30 @@ from ai_platform_api.modules.knowledge.domain.models import (
     KnowledgeDocumentSummary,
     KnowledgeWriteConflictError,
 )
+from ai_platform_api.modules.knowledge.domain.organization import (
+    DEFAULT_FOLDER_NAME,
+    InvalidOrganizationError,
+    KnowledgeFolder,
+    KnowledgeOrganizationRepository,
+    KnowledgeTag,
+    OrganizationWriteConflictError,
+    default_folder_id,
+)
 from ai_platform_api.persistence.tables import (
     department_closure,
+    document_favorites,
+    document_folder_bindings,
     document_publications,
     document_sources,
+    document_tag_bindings,
     document_versions,
     documents,
     ingestion_job_attempts,
     ingestion_job_stages,
     ingestion_jobs,
     knowledge_bases,
+    knowledge_folders,
+    knowledge_tags,
     workspace_memberships,
 )
 
@@ -71,6 +92,589 @@ class SqlAlchemyKnowledgeRepository:
             )
         ).one_or_none()
         return tuple(row) if row is not None else None
+
+    # 目录、标签和收藏与文档事实共用此 Repository，所有方法都把工作空间条件写入 SQL。
+    def list_folders(
+        self, workspace_id: UUID, *, include_deleted: bool = False
+    ) -> tuple[KnowledgeFolder, ...]:
+        statement = select(knowledge_folders).where(
+            knowledge_folders.c.workspace_id == workspace_id
+        )
+        if not include_deleted:
+            statement = statement.where(knowledge_folders.c.status == "active")
+        rows = self._session.execute(
+            statement.order_by(
+                knowledge_folders.c.parent_folder_id,
+                func.lower(knowledge_folders.c.name),
+                knowledge_folders.c.folder_id,
+            )
+        )
+        return tuple(_knowledge_folder(row) for row in rows)
+
+    def get_folder(
+        self, workspace_id: UUID, folder_id: UUID, *, for_update: bool = False
+    ) -> KnowledgeFolder | None:
+        statement = select(knowledge_folders).where(
+            knowledge_folders.c.workspace_id == workspace_id,
+            knowledge_folders.c.folder_id == folder_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
+        return _knowledge_folder(row) if row is not None else None
+
+    def get_default_folder(
+        self, workspace_id: UUID, *, for_update: bool = False
+    ) -> KnowledgeFolder | None:
+        """读取空间唯一默认根目录，并沿用工作空间条件做资源隔离。"""
+
+        statement = select(knowledge_folders).where(
+            knowledge_folders.c.workspace_id == workspace_id,
+            knowledge_folders.c.is_default.is_(true()),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
+        return _knowledge_folder(row) if row is not None else None
+
+    def add_folder(self, folder: KnowledgeFolder) -> None:
+        self._session.execute(insert(knowledge_folders).values(**_knowledge_folder_values(folder)))
+
+    def ensure_default_folder(
+        self, workspace_id: UUID, created_by_account_id: UUID, *, occurred_at: datetime
+    ) -> KnowledgeFolder:
+        """幂等创建默认根目录，兼容迁移前已存在的工作空间。"""
+
+        existing = self.get_default_folder(workspace_id)
+        if existing is not None:
+            try:
+                existing.assert_valid()
+            except InvalidOrganizationError as error:
+                raise OrganizationWriteConflictError from error
+            return existing
+        folder = KnowledgeFolder(
+            folder_id=default_folder_id(workspace_id),
+            workspace_id=workspace_id,
+            name=DEFAULT_FOLDER_NAME,
+            parent_folder_id=None,
+            created_by_account_id=created_by_account_id,
+            created_at=occurred_at,
+            updated_at=occurred_at,
+            is_default=True,
+        )
+        folder.assert_valid()
+        self._session.execute(
+            postgres_insert(knowledge_folders)
+            .values(**_knowledge_folder_values(folder))
+            .on_conflict_do_nothing(index_elements=[knowledge_folders.c.folder_id])
+        )
+        persisted = self.get_default_folder(workspace_id)
+        if persisted is None:
+            raise OrganizationWriteConflictError
+        return persisted
+
+    def save_folder(self, folder: KnowledgeFolder) -> None:
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(knowledge_folders)
+                .where(
+                    knowledge_folders.c.workspace_id == folder.workspace_id,
+                    knowledge_folders.c.folder_id == folder.folder_id,
+                    knowledge_folders.c.version == folder.version - 1,
+                )
+                .values(**_knowledge_folder_values(folder))
+            ),
+        )
+        if result.rowcount != 1:
+            raise OrganizationWriteConflictError
+
+    def folder_name_exists(
+        self,
+        workspace_id: UUID,
+        parent_folder_id: UUID | None,
+        name: str,
+        *,
+        exclude_folder_id: UUID | None = None,
+    ) -> bool:
+        conditions = [
+            knowledge_folders.c.workspace_id == workspace_id,
+            knowledge_folders.c.status == "active",
+            func.lower(knowledge_folders.c.name) == name.strip().lower(),
+        ]
+        if parent_folder_id is None:
+            conditions.append(knowledge_folders.c.parent_folder_id.is_(None))
+        else:
+            conditions.append(knowledge_folders.c.parent_folder_id == parent_folder_id)
+        if exclude_folder_id is not None:
+            conditions.append(knowledge_folders.c.folder_id != exclude_folder_id)
+        return bool(
+            self._session.scalar(
+                select(func.count()).select_from(knowledge_folders).where(*conditions)
+            )
+        )
+
+    def folder_has_children(self, workspace_id: UUID, folder_id: UUID) -> bool:
+        return bool(
+            self._session.scalar(
+                select(func.count())
+                .select_from(knowledge_folders)
+                .where(
+                    knowledge_folders.c.workspace_id == workspace_id,
+                    knowledge_folders.c.parent_folder_id == folder_id,
+                    knowledge_folders.c.status.in_(("active", "deleted")),
+                )
+            )
+        )
+
+    def folder_has_documents(self, workspace_id: UUID, folder_id: UUID) -> bool:
+        return bool(
+            self._session.scalar(
+                select(func.count())
+                .select_from(document_folder_bindings.join(documents))
+                .where(
+                    document_folder_bindings.c.workspace_id == workspace_id,
+                    document_folder_bindings.c.folder_id == folder_id,
+                    documents.c.workspace_id == workspace_id,
+                    documents.c.status.in_(("active", "deleted")),
+                )
+            )
+        )
+
+    def list_tags(
+        self, workspace_id: UUID, *, include_deleted: bool = False
+    ) -> tuple[KnowledgeTag, ...]:
+        statement = select(knowledge_tags).where(knowledge_tags.c.workspace_id == workspace_id)
+        if not include_deleted:
+            statement = statement.where(knowledge_tags.c.status == "active")
+        rows = self._session.execute(
+            statement.order_by(func.lower(knowledge_tags.c.name), knowledge_tags.c.tag_id)
+        )
+        return tuple(_knowledge_tag(row) for row in rows)
+
+    def get_tag(
+        self, workspace_id: UUID, tag_id: UUID, *, for_update: bool = False
+    ) -> KnowledgeTag | None:
+        statement = select(knowledge_tags).where(
+            knowledge_tags.c.workspace_id == workspace_id,
+            knowledge_tags.c.tag_id == tag_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
+        return _knowledge_tag(row) if row is not None else None
+
+    def add_tag(self, tag: KnowledgeTag) -> None:
+        self._session.execute(insert(knowledge_tags).values(**_knowledge_tag_values(tag)))
+
+    def save_tag(self, tag: KnowledgeTag) -> None:
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(knowledge_tags)
+                .where(
+                    knowledge_tags.c.workspace_id == tag.workspace_id,
+                    knowledge_tags.c.tag_id == tag.tag_id,
+                    knowledge_tags.c.version == tag.version - 1,
+                )
+                .values(**_knowledge_tag_values(tag))
+            ),
+        )
+        if result.rowcount != 1:
+            raise OrganizationWriteConflictError
+
+    def tag_name_exists(
+        self, workspace_id: UUID, name: str, *, exclude_tag_id: UUID | None = None
+    ) -> bool:
+        conditions = [
+            knowledge_tags.c.workspace_id == workspace_id,
+            knowledge_tags.c.status == "active",
+            func.lower(knowledge_tags.c.name) == name.strip().lower(),
+        ]
+        if exclude_tag_id is not None:
+            conditions.append(knowledge_tags.c.tag_id != exclude_tag_id)
+        return bool(
+            self._session.scalar(
+                select(func.count()).select_from(knowledge_tags).where(*conditions)
+            )
+        )
+
+    def bind_document_folder(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        folder_id: UUID,
+        *,
+        occurred_at: datetime,
+    ) -> None:
+        """以替换语义写入主目录，避免一个文档出现多个活动归属。"""
+
+        self._session.execute(
+            delete(document_folder_bindings).where(
+                document_folder_bindings.c.workspace_id == workspace_id,
+                document_folder_bindings.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            insert(document_folder_bindings).values(
+                workspace_id=workspace_id,
+                document_id=document_id,
+                folder_id=folder_id,
+                created_at=occurred_at,
+            )
+        )
+
+    def unbind_document_folder(
+        self, workspace_id: UUID, document_id: UUID, folder_id: UUID
+    ) -> None:
+        self._session.execute(
+            delete(document_folder_bindings).where(
+                document_folder_bindings.c.workspace_id == workspace_id,
+                document_folder_bindings.c.document_id == document_id,
+                document_folder_bindings.c.folder_id == folder_id,
+            )
+        )
+
+    def list_document_folders(
+        self, workspace_id: UUID, document_id: UUID
+    ) -> tuple[KnowledgeFolder, ...]:
+        rows = self._session.execute(
+            select(knowledge_folders)
+            .join(
+                document_folder_bindings,
+                (document_folder_bindings.c.workspace_id == knowledge_folders.c.workspace_id)
+                & (document_folder_bindings.c.folder_id == knowledge_folders.c.folder_id),
+            )
+            .where(
+                document_folder_bindings.c.workspace_id == workspace_id,
+                document_folder_bindings.c.document_id == document_id,
+                knowledge_folders.c.status == "active",
+            )
+            .order_by(func.lower(knowledge_folders.c.name))
+        )
+        return tuple(_knowledge_folder(row) for row in rows)
+
+    def get_document_folder(self, workspace_id: UUID, document_id: UUID) -> KnowledgeFolder | None:
+        """读取文档主目录，包含已删除目录以支持恢复回落判断。"""
+
+        row = self._session.execute(
+            select(knowledge_folders)
+            .join(
+                document_folder_bindings,
+                (document_folder_bindings.c.workspace_id == knowledge_folders.c.workspace_id)
+                & (document_folder_bindings.c.folder_id == knowledge_folders.c.folder_id),
+            )
+            .where(
+                document_folder_bindings.c.workspace_id == workspace_id,
+                document_folder_bindings.c.document_id == document_id,
+            )
+        ).one_or_none()
+        return _knowledge_folder(row) if row is not None else None
+
+    def bind_document_tag(self, workspace_id: UUID, document_id: UUID, tag_id: UUID) -> None:
+        existing = self._session.scalar(
+            select(func.count())
+            .select_from(document_tag_bindings)
+            .where(
+                document_tag_bindings.c.workspace_id == workspace_id,
+                document_tag_bindings.c.document_id == document_id,
+                document_tag_bindings.c.tag_id == tag_id,
+            )
+        )
+        if not existing:
+            from datetime import UTC, datetime
+
+            self._session.execute(
+                insert(document_tag_bindings).values(
+                    workspace_id=workspace_id,
+                    document_id=document_id,
+                    tag_id=tag_id,
+                    created_at=datetime.now(UTC),
+                )
+            )
+
+    def unbind_document_tag(self, workspace_id: UUID, document_id: UUID, tag_id: UUID) -> None:
+        self._session.execute(
+            delete(document_tag_bindings).where(
+                document_tag_bindings.c.workspace_id == workspace_id,
+                document_tag_bindings.c.document_id == document_id,
+                document_tag_bindings.c.tag_id == tag_id,
+            )
+        )
+
+    def unbind_tag_documents(self, workspace_id: UUID, tag_id: UUID) -> None:
+        """删除标签时清空本空间绑定，避免恢复标签后旧关系隐式复活。"""
+
+        self._session.execute(
+            delete(document_tag_bindings).where(
+                document_tag_bindings.c.workspace_id == workspace_id,
+                document_tag_bindings.c.tag_id == tag_id,
+            )
+        )
+
+    def list_document_tags(self, workspace_id: UUID, document_id: UUID) -> tuple[KnowledgeTag, ...]:
+        rows = self._session.execute(
+            select(knowledge_tags)
+            .join(
+                document_tag_bindings,
+                (document_tag_bindings.c.workspace_id == knowledge_tags.c.workspace_id)
+                & (document_tag_bindings.c.tag_id == knowledge_tags.c.tag_id),
+            )
+            .where(
+                document_tag_bindings.c.workspace_id == workspace_id,
+                document_tag_bindings.c.document_id == document_id,
+                knowledge_tags.c.status == "active",
+            )
+            .order_by(func.lower(knowledge_tags.c.name))
+        )
+        return tuple(_knowledge_tag(row) for row in rows)
+
+    def add_favorite(
+        self, workspace_id: UUID, account_id: UUID, document_id: UUID, *, occurred_at: datetime
+    ) -> None:
+        if self._session.scalar(
+            select(func.count())
+            .select_from(document_favorites)
+            .where(
+                document_favorites.c.workspace_id == workspace_id,
+                document_favorites.c.account_id == account_id,
+                document_favorites.c.document_id == document_id,
+            )
+        ):
+            return
+        self._session.execute(
+            insert(document_favorites).values(
+                workspace_id=workspace_id,
+                account_id=account_id,
+                document_id=document_id,
+                created_at=occurred_at,
+            )
+        )
+
+    def remove_favorite(self, workspace_id: UUID, account_id: UUID, document_id: UUID) -> None:
+        self._session.execute(
+            delete(document_favorites).where(
+                document_favorites.c.workspace_id == workspace_id,
+                document_favorites.c.account_id == account_id,
+                document_favorites.c.document_id == document_id,
+            )
+        )
+
+    def list_favorite_document_ids(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        *,
+        limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> tuple[UUID, ...]:
+        rows = self._session.execute(
+            select(document_favorites.c.document_id)
+            .join(
+                documents,
+                (documents.c.workspace_id == document_favorites.c.workspace_id)
+                & (documents.c.document_id == document_favorites.c.document_id),
+            )
+            .where(
+                document_favorites.c.workspace_id == workspace_id,
+                document_favorites.c.account_id == account_id,
+                documents.c.status == "active",
+                _document_scope(
+                    authorized_workspace=authorized_workspace,
+                    department_ids=department_ids,
+                    account_ids=account_ids,
+                    resource_ids=resource_ids,
+                ),
+            )
+            .order_by(document_favorites.c.created_at.desc())
+            .limit(limit)
+        )
+        return tuple(row.document_id for row in rows)
+
+    def list_trash_documents(self, workspace_id: UUID, *, limit: int) -> tuple[Document, ...]:
+        rows = self._session.execute(
+            select(documents)
+            .where(
+                documents.c.workspace_id == workspace_id,
+                documents.c.status == "deleted",
+            )
+            .order_by(documents.c.deleted_at.desc(), documents.c.document_id)
+            .limit(limit)
+        )
+        return tuple(_document(row) for row in rows)
+
+    def permanently_delete_folder(self, workspace_id: UUID, folder_id: UUID) -> None:
+        self._session.execute(
+            delete(document_folder_bindings).where(
+                document_folder_bindings.c.workspace_id == workspace_id,
+                document_folder_bindings.c.folder_id == folder_id,
+            )
+        )
+        self._session.execute(
+            delete(knowledge_folders).where(
+                knowledge_folders.c.workspace_id == workspace_id,
+                knowledge_folders.c.folder_id == folder_id,
+            )
+        )
+
+    def has_running_ingestion_jobs(self, workspace_id: UUID, document_id: UUID) -> bool:
+        """判断文档是否仍有可能在事务外写入解析产物的活动租约。"""
+
+        return bool(
+            self._session.scalar(
+                select(func.count())
+                .select_from(ingestion_jobs)
+                .where(
+                    ingestion_jobs.c.workspace_id == workspace_id,
+                    ingestion_jobs.c.document_id == document_id,
+                    ingestion_jobs.c.status == "running",
+                )
+            )
+        )
+
+    def permanently_delete_document(self, workspace_id: UUID, document_id: UUID) -> tuple[str, ...]:
+        """收集外部对象键后按依赖顺序清理文档数据库事实。"""
+
+        # 1. 删除前收集原文件、解析产物和索引产物对象键；事件必须与数据库删除同事务形成。
+        version_ids = select(document_versions.c.document_version_id).where(
+            document_versions.c.workspace_id == workspace_id,
+            document_versions.c.document_id == document_id,
+        )
+        ingestion_ids = select(ingestion_jobs.c.ingestion_job_id).where(
+            ingestion_jobs.c.workspace_id == workspace_id,
+            ingestion_jobs.c.document_id == document_id,
+        )
+        source_keys = tuple(
+            self._session.execute(
+                select(document_sources.c.original_object_key).where(
+                    document_sources.c.workspace_id == workspace_id,
+                    document_sources.c.document_version_id.in_(version_ids),
+                    document_sources.c.original_object_key.is_not(None),
+                )
+            ).scalars()
+        )
+        ingestion_keys = tuple(
+            self._session.execute(
+                select(
+                    ingestion_jobs.c.document_version_id,
+                    ingestion_jobs.c.ingestion_job_id,
+                    ingestion_jobs.c.source_object_key,
+                    ingestion_jobs.c.artifact_object_key,
+                ).where(
+                    ingestion_jobs.c.workspace_id == workspace_id,
+                    ingestion_jobs.c.document_id == document_id,
+                )
+            )
+        )
+        index_keys = tuple(
+            self._session.execute(
+                select(index_versions.c.artifact_object_key).where(
+                    index_versions.c.workspace_id == workspace_id,
+                    index_versions.c.document_id == document_id,
+                )
+            ).scalars()
+        )
+        object_keys = {key for key in source_keys if key}
+        for row in ingestion_keys:
+            object_keys.add(row.source_object_key)
+            if row.artifact_object_key:
+                object_keys.add(row.artifact_object_key)
+            # 产物键由任务身份确定；即使 Worker 尚未回写数据库，也必须进入清理意图。
+            object_keys.add(
+                parsed_artifact_object_key(
+                    workspace_id,
+                    row.document_version_id,
+                    row.ingestion_job_id,
+                )
+            )
+        object_keys.update(key for key in index_keys if key)
+
+        # 2. Attempt 历史默认不可变；仅在当前已授权清理事务内开启既有删除旁路。
+        self._session.execute(text("SET LOCAL ai_platform.lifecycle_purge = 'on'"))
+        # 3. 按索引、任务、组织关系、版本和文档的外键依赖顺序删除派生事实。
+        self._session.execute(
+            delete(retrieval_chunks).where(
+                retrieval_chunks.c.document_id == document_id,
+                retrieval_chunks.c.workspace_id == workspace_id,
+            )
+        )
+        self._session.execute(
+            delete(document_index_publications).where(
+                document_index_publications.c.workspace_id == workspace_id,
+                document_index_publications.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            delete(index_versions).where(
+                index_versions.c.workspace_id == workspace_id,
+                index_versions.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            delete(ingestion_job_attempts).where(
+                ingestion_job_attempts.c.workspace_id == workspace_id,
+                ingestion_job_attempts.c.ingestion_job_id.in_(ingestion_ids),
+            )
+        )
+        self._session.execute(
+            delete(ingestion_job_stages).where(
+                ingestion_job_stages.c.workspace_id == workspace_id,
+                ingestion_job_stages.c.ingestion_job_id.in_(ingestion_ids),
+            )
+        )
+        self._session.execute(
+            delete(ingestion_jobs).where(
+                ingestion_jobs.c.workspace_id == workspace_id,
+                ingestion_jobs.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            delete(document_favorites).where(
+                document_favorites.c.workspace_id == workspace_id,
+                document_favorites.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            delete(document_tag_bindings).where(
+                document_tag_bindings.c.workspace_id == workspace_id,
+                document_tag_bindings.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            delete(document_folder_bindings).where(
+                document_folder_bindings.c.workspace_id == workspace_id,
+                document_folder_bindings.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            delete(document_publications).where(
+                document_publications.c.workspace_id == workspace_id,
+                document_publications.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            delete(document_sources).where(
+                document_sources.c.workspace_id == workspace_id,
+                document_sources.c.document_version_id.in_(version_ids),
+            )
+        )
+        # 4. 最后删除来源、版本和文档主事实，保留外部清理由 Outbox 接管。
+        self._session.execute(
+            delete(document_versions).where(
+                document_versions.c.workspace_id == workspace_id,
+                document_versions.c.document_id == document_id,
+            )
+        )
+        self._session.execute(
+            delete(documents).where(
+                documents.c.workspace_id == workspace_id, documents.c.document_id == document_id
+            )
+        )
+        # 5. 稳定排序让 Outbox 载荷可比较、可重放，实际对象删除由 Worker 接管。
+        return tuple(sorted(object_keys))
 
     def departments_exist(self, workspace_id: UUID, department_ids: frozenset[UUID]) -> bool:
         if not department_ids:
@@ -167,18 +771,31 @@ class SqlAlchemyKnowledgeRepository:
 
     def add_document(self, document: Document) -> None:
         self._session.execute(insert(documents).values(**_document_values(document)))
+        default_folder = self.ensure_default_folder(
+            document.workspace_id,
+            document.created_by_account_id,
+            occurred_at=document.created_at,
+        )
+        self.bind_document_folder(
+            document.workspace_id,
+            document.document_id,
+            default_folder.folder_id,
+            occurred_at=document.created_at,
+        )
 
     def list_document_summaries(
         self,
         workspace_id: UUID,
         knowledge_base_id: UUID,
         *,
+        viewer_account_id: UUID,
         limit: int,
         authorized_workspace: bool,
         department_ids: frozenset[UUID],
         account_ids: frozenset[UUID],
         resource_ids: frozenset[UUID],
     ) -> tuple[KnowledgeDocumentSummary, ...]:
+        # 1. 先构造服务端授权条件，目录与标签筛选不能替代文档资源范围。
         scope = _document_scope(
             authorized_workspace=authorized_workspace,
             department_ids=department_ids,
@@ -195,6 +812,42 @@ class SqlAlchemyKnowledgeRepository:
             .group_by(document_versions.c.workspace_id, document_versions.c.document_id)
             .subquery()
         )
+        # 2. 组织关系通过空间化相关子查询投影，避免多标签 JOIN 放大文档列表行数。
+        folder_id = (
+            select(document_folder_bindings.c.folder_id)
+            .where(
+                document_folder_bindings.c.workspace_id == documents.c.workspace_id,
+                document_folder_bindings.c.document_id == documents.c.document_id,
+            )
+            .scalar_subquery()
+        )
+        tag_ids = (
+            select(func.array_agg(document_tag_bindings.c.tag_id))
+            .select_from(
+                document_tag_bindings.join(
+                    knowledge_tags,
+                    (knowledge_tags.c.workspace_id == document_tag_bindings.c.workspace_id)
+                    & (knowledge_tags.c.tag_id == document_tag_bindings.c.tag_id),
+                )
+            )
+            .where(
+                document_tag_bindings.c.workspace_id == documents.c.workspace_id,
+                document_tag_bindings.c.document_id == documents.c.document_id,
+                knowledge_tags.c.status == "active",
+            )
+            .scalar_subquery()
+        )
+        favorite_count = (
+            select(func.count())
+            .select_from(document_favorites)
+            .where(
+                document_favorites.c.workspace_id == documents.c.workspace_id,
+                document_favorites.c.document_id == documents.c.document_id,
+                document_favorites.c.account_id == viewer_account_id,
+            )
+            .scalar_subquery()
+        )
+        # 3. 最终查询同时应用工作空间、知识库、活动状态和资源授权，再生成页面摘要。
         rows = self._session.execute(
             select(
                 documents,
@@ -210,6 +863,9 @@ class SqlAlchemyKnowledgeRepository:
                 document_sources.c.source_kind.label("latest_source_kind"),
                 document_sources.c.source_name.label("latest_source_name"),
                 document_publications.c.current_document_version_id,
+                func.coalesce(folder_id, default_folder_id(workspace_id)).label("folder_id"),
+                tag_ids.label("tag_ids"),
+                (favorite_count > 0).label("is_favorite"),
             )
             .join(
                 latest_versions,
@@ -580,6 +1236,7 @@ class SqlAlchemyKnowledgeUnitOfWork:
             tuple[
                 Session,
                 SqlAlchemyKnowledgeRepository,
+                SqlAlchemyKnowledgeRepository,
                 UsageRepository,
                 SqlAlchemyAuditWriter,
                 SqlAlchemyOutboxWriter,
@@ -595,6 +1252,7 @@ class SqlAlchemyKnowledgeUnitOfWork:
             (
                 session,
                 SqlAlchemyKnowledgeRepository(session),
+                SqlAlchemyKnowledgeRepository(session),
                 self._usage_repository_factory(session),
                 SqlAlchemyAuditWriter(session),
                 SqlAlchemyOutboxWriter(session),
@@ -606,6 +1264,7 @@ class SqlAlchemyKnowledgeUnitOfWork:
         self,
     ) -> tuple[
         Session,
+        SqlAlchemyKnowledgeRepository,
         SqlAlchemyKnowledgeRepository,
         UsageRepository,
         SqlAlchemyAuditWriter,
@@ -621,16 +1280,20 @@ class SqlAlchemyKnowledgeUnitOfWork:
         return self._current()[1]
 
     @property
-    def usage(self) -> UsageRepository:
+    def organization(self) -> KnowledgeOrganizationRepository:
         return self._current()[2]
 
     @property
-    def audit(self) -> SqlAlchemyAuditWriter:
+    def usage(self) -> UsageRepository:
         return self._current()[3]
 
     @property
-    def outbox(self) -> SqlAlchemyOutboxWriter:
+    def audit(self) -> SqlAlchemyAuditWriter:
         return self._current()[4]
+
+    @property
+    def outbox(self) -> SqlAlchemyOutboxWriter:
+        return self._current()[5]
 
     def __exit__(
         self,
@@ -675,6 +1338,68 @@ def _knowledge_base_values(value: KnowledgeBase) -> dict[str, object]:
         "deleted_at": value.deleted_at,
         "version": value.version,
     }
+
+
+def _knowledge_folder_values(value: KnowledgeFolder) -> dict[str, object]:
+    return {
+        "folder_id": value.folder_id,
+        "workspace_id": value.workspace_id,
+        "name": value.name,
+        "parent_folder_id": value.parent_folder_id,
+        "created_by_account_id": value.created_by_account_id,
+        "created_at": value.created_at,
+        "updated_at": value.updated_at,
+        "status": value.status,
+        "deleted_at": value.deleted_at,
+        "version": value.version,
+        "is_default": value.is_default,
+    }
+
+
+def _knowledge_folder(value: Row[Any]) -> KnowledgeFolder:
+    return KnowledgeFolder(
+        value.folder_id,
+        value.workspace_id,
+        value.name,
+        value.parent_folder_id,
+        value.created_by_account_id,
+        value.created_at,
+        value.updated_at,
+        value.status,
+        value.deleted_at,
+        value.version,
+        value.is_default,
+    )
+
+
+def _knowledge_tag_values(value: KnowledgeTag) -> dict[str, object]:
+    return {
+        "tag_id": value.tag_id,
+        "workspace_id": value.workspace_id,
+        "name": value.name,
+        "color": value.color,
+        "created_by_account_id": value.created_by_account_id,
+        "created_at": value.created_at,
+        "updated_at": value.updated_at,
+        "status": value.status,
+        "deleted_at": value.deleted_at,
+        "version": value.version,
+    }
+
+
+def _knowledge_tag(value: Row[Any]) -> KnowledgeTag:
+    return KnowledgeTag(
+        value.tag_id,
+        value.workspace_id,
+        value.name,
+        value.color,
+        value.created_by_account_id,
+        value.created_at,
+        value.updated_at,
+        value.status,
+        value.deleted_at,
+        value.version,
+    )
 
 
 def _document_values(value: Document) -> dict[str, object]:
@@ -891,6 +1616,9 @@ def _document_summary(value: Row[Any]) -> KnowledgeDocumentSummary:
         source_kind=cast(DocumentSourceKind, value.latest_source_kind),
         source_name=value.latest_source_name,
         current_document_version_id=value.current_document_version_id,
+        folder_id=value.folder_id,
+        tag_ids=tuple(value.tag_ids or ()),
+        is_favorite=value.is_favorite,
     )
 
 

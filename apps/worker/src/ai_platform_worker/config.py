@@ -60,6 +60,9 @@ class WorkerSettings(BaseSettings):
     indexing_max_chunk_chars: int = 1_500
     indexing_chunk_overlap_chars: int = 150
     indexing_chunker_version: str = "structural-char-v1"
+    knowledge_trash_retention_days: int = 30
+    knowledge_trash_retention_batch_size: int = 50
+    knowledge_trash_retention_interval_seconds: float = 3600.0
 
     @field_validator("observability_otlp_endpoint", mode="before")
     @classmethod
@@ -124,6 +127,12 @@ class WorkerSettings(BaseSettings):
             raise ValueError("Chunk 重叠必须小于最大字符数")
         if not self.indexing_chunker_version.strip():
             raise ValueError("Chunker 版本不能为空")
+        if not 1 <= self.knowledge_trash_retention_days <= 3650:
+            raise ValueError("回收站保留天数必须位于 1 到 3650 天之间")
+        if not 1 <= self.knowledge_trash_retention_batch_size <= 500:
+            raise ValueError("回收站清理批次必须位于 1 到 500 之间")
+        if not 60 <= self.knowledge_trash_retention_interval_seconds <= 86_400:
+            raise ValueError("回收站清理间隔必须位于 60 到 86400 秒之间")
         # 3. 每个 Lane 保持至少一个消费者且不超过本地安全上限，防止配置错误耗尽主机。
         concurrency_values = (
             self.control_worker_concurrency,

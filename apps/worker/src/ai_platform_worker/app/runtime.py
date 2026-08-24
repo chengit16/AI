@@ -57,6 +57,18 @@ from ai_platform_worker.modules.ingestion.infrastructure.tika import (
     TikaChineseOcrAdapter,
     TikaDocumentParser,
 )
+from ai_platform_worker.modules.knowledge.application.object_cleanup import (
+    ObjectCleanupService,
+)
+from ai_platform_worker.modules.knowledge.application.trash_retention import (
+    TrashRetentionService,
+)
+from ai_platform_worker.modules.knowledge.infrastructure.object_storage import (
+    MinioObjectCleanupStorage,
+)
+from ai_platform_worker.modules.knowledge.infrastructure.trash_retention_sqlalchemy import (
+    SqlAlchemyTrashRetentionStore,
+)
 
 
 @dataclass(frozen=True)
@@ -71,6 +83,8 @@ class WorkerRuntime:
     indexing: IndexCommitProcessor
     index_maintenance: IndexMaintenanceProcessor
     index_maintenance_commands: IndexMaintenanceCommandProcessor
+    trash_retention: TrashRetentionService
+    object_cleanup: ObjectCleanupService
 
     def close(self) -> None:
         self.database.close()
@@ -168,5 +182,19 @@ def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntim
             index_maintenance,
             worker_id=worker_id,
             lease_seconds=resolved.indexing_lease_seconds,
+        ),
+        trash_retention=TrashRetentionService(
+            SqlAlchemyTrashRetentionStore(
+                database.sessions,
+                worker_id=worker_id,
+            )
+        ),
+        object_cleanup=ObjectCleanupService(
+            MinioObjectCleanupStorage(
+                endpoint=resolved.minio_endpoint,
+                access_key=resolved.minio_access_key,
+                secret_key=resolved.minio_secret_key.get_secret_value(),
+                bucket=resolved.minio_bucket,
+            )
         ),
     )

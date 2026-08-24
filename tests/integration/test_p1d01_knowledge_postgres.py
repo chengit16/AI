@@ -38,6 +38,11 @@ from ai_platform_api.modules.knowledge.application.facts import (
     KnowledgeValidationError,
 )
 from ai_platform_api.modules.knowledge.application.management import KnowledgeManagementService
+from ai_platform_api.modules.knowledge.application.organization import (
+    KnowledgeOrganizationConflictError,
+    KnowledgeOrganizationService,
+)
+from ai_platform_api.modules.knowledge.domain.organization import default_folder_id
 from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
     SqlAlchemyKnowledgeUnitOfWork,
 )
@@ -46,8 +51,10 @@ from ai_platform_api.persistence.tables import (
     audit_records,
     document_publications,
     document_sources,
+    document_tag_bindings,
     document_versions,
     documents,
+    ingestion_job_attempts,
     ingestion_jobs,
     knowledge_bases,
     outbox_events,
@@ -89,6 +96,7 @@ class KnowledgeHarness:
     organization: OrganizationService
     knowledge: KnowledgeFactService
     management: KnowledgeManagementService
+    knowledge_organization: KnowledgeOrganizationService
 
 
 @pytest.fixture(scope="module")
@@ -129,6 +137,9 @@ def knowledge_database() -> Iterator[KnowledgeHarness]:
             organization=OrganizationService(SqlAlchemyOrganizationUnitOfWork(sessions)),
             knowledge=KnowledgeFactService(knowledge_unit_of_work),
             management=KnowledgeManagementService(
+                SqlAlchemyKnowledgeUnitOfWork(sessions, SqlAlchemyEntitlementRepository)
+            ),
+            knowledge_organization=KnowledgeOrganizationService(
                 SqlAlchemyKnowledgeUnitOfWork(sessions, SqlAlchemyEntitlementRepository)
             ),
         )
@@ -422,6 +433,7 @@ def test_ingestion_job_lease_and_retry_are_bounded(
             .values(available_at=datetime(2026, 1, 1, tzinfo=UTC))
         )
 
+    claimed_job_id: UUID | None = None
     for attempt in range(1, 4):
         claimed = store.claim_next(
             worker_id="synthetic-worker",
@@ -432,6 +444,7 @@ def test_ingestion_job_lease_and_retry_are_bounded(
         assert claimed.document_id == document.document_id
         assert claimed.document_version_id == version.document_version_id
         assert claimed.attempt_count == attempt
+        claimed_job_id = claimed.ingestion_job_id
         status = store.mark_failed(
             claimed,
             stage="parse",
@@ -464,6 +477,30 @@ def test_ingestion_job_lease_and_retry_are_bounded(
         knowledge_base_id=knowledge_base.knowledge_base_id,
         document_id=document.document_id,
     )
+    knowledge_database.knowledge_organization.permanently_delete_document(
+        owner_context,
+        document_id=document.document_id,
+    )
+    assert claimed_job_id is not None
+    with knowledge_database.engine.connect() as connection:
+        remaining_attempt_count = connection.scalar(
+            select(func.count())
+            .select_from(ingestion_job_attempts)
+            .where(
+                ingestion_job_attempts.c.workspace_id == owner.personal_workspace_id,
+                ingestion_job_attempts.c.ingestion_job_id == claimed_job_id,
+            )
+        )
+        remaining_document_count = connection.scalar(
+            select(func.count())
+            .select_from(documents)
+            .where(
+                documents.c.workspace_id == owner.personal_workspace_id,
+                documents.c.document_id == document.document_id,
+            )
+        )
+    assert remaining_attempt_count == 0
+    assert remaining_document_count == 0
     deleted_base = knowledge_database.knowledge.delete_knowledge_base(
         owner_context,
         knowledge_base_id=knowledge_base.knowledge_base_id,
@@ -544,6 +581,9 @@ def test_p1d07_management_queries_and_manual_retry_are_scoped_and_audited(
     )
     assert knowledge_base.knowledge_base_id in {item.knowledge_base_id for item in bases}
     assert summaries[0].document.document_id == document.document_id
+    assert summaries[0].folder_id == default_folder_id(owner.personal_workspace_id)
+    assert summaries[0].tag_ids == ()
+    assert summaries[0].is_favorite is False
     assert jobs[0].ingestion_job_id == job_id
     assert jobs[0].can_retry_manually is True
 
@@ -600,6 +640,10 @@ def test_p1d07_management_queries_and_manual_retry_are_scoped_and_audited(
         knowledge_base_id=knowledge_base.knowledge_base_id,
         document_id=document.document_id,
     )
+    artifact_object_key = (
+        f"workspaces/{owner.personal_workspace_id}/parsed/{version.document_version_id}/"
+        f"{job_id}.json"
+    )
     with knowledge_database.engine.begin() as connection:
         connection.execute(
             update(ingestion_jobs)
@@ -614,6 +658,155 @@ def test_p1d07_management_queries_and_manual_retry_are_scoped_and_audited(
             authorized_context,
             ingestion_job_id=job_id,
         )
+
+    with knowledge_database.engine.begin() as connection:
+        # 运行中 Worker 可能仍写解析产物，永久删除必须等待租约完成或失效。
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.ingestion_job_id == job_id)
+            .values(
+                status="running",
+                claimed_by="synthetic-running-worker",
+                claim_until=failed_at + timedelta(minutes=5),
+                active_attempt_id=uuid4(),
+                started_at=failed_at,
+                completed_at=None,
+                failure_stage=None,
+                error_code=None,
+                error_message=None,
+                updated_at=failed_at,
+            )
+        )
+    with pytest.raises(KnowledgeOrganizationConflictError):
+        knowledge_database.knowledge_organization.permanently_delete_document(
+            owner_context,
+            document_id=document.document_id,
+        )
+
+    with knowledge_database.engine.begin() as connection:
+        # 租约结束但对象键尚未回写时，永久删除仍须按任务身份推导预期解析产物键。
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.ingestion_job_id == job_id)
+            .values(
+                status="succeeded",
+                completed_at=failed_at,
+                failure_stage=None,
+                error_code=None,
+                error_message=None,
+                artifact_object_key=None,
+                parsed_content_hash=CONTENT_HASH_2,
+                parser_name="synthetic-parser-v1",
+                ocr_used=False,
+                page_count=1,
+                block_count=1,
+                claimed_by=None,
+                claim_until=None,
+                active_attempt_id=None,
+                updated_at=failed_at,
+            )
+        )
+
+    knowledge_database.knowledge_organization.permanently_delete_document(
+        owner_context,
+        document_id=document.document_id,
+    )
+    with knowledge_database.engine.connect() as connection:
+        event_payload = connection.scalar(
+            select(outbox_events.c.payload).where(
+                outbox_events.c.workspace_id == owner.personal_workspace_id,
+                outbox_events.c.event_type == "knowledge.document.trash_purge_requested",
+                outbox_events.c.aggregate_id == document.document_id,
+            )
+        )
+        remaining_document_count = connection.scalar(
+            select(func.count())
+            .select_from(documents)
+            .where(
+                documents.c.workspace_id == owner.personal_workspace_id,
+                documents.c.document_id == document.document_id,
+            )
+        )
+    assert isinstance(event_payload, dict)
+    assert event_payload["external_object_keys"] == sorted(
+        [
+            artifact_object_key,
+            (
+                f"workspaces/{owner.personal_workspace_id}/uploads/"
+                "00000000000000000000000000000007.txt"
+            ),
+        ]
+    )
+    assert event_payload["database_facts_purged"] is True
+    assert remaining_document_count == 0
+
+
+def test_tag_delete_unbinds_documents_and_restore_does_not_rebind(
+    knowledge_database: KnowledgeHarness,
+) -> None:
+    owner = register(knowledge_database, identity="tag-delete-owner")
+    owner_context = context(owner)
+    knowledge_base = knowledge_database.knowledge.create_knowledge_base(
+        owner_context,
+        name="合成标签删除知识库",
+        default_visibility="workspace",
+    )
+    document, _, _ = knowledge_database.knowledge.create_document(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        title="合成标签删除文档",
+        source_kind="manual",
+        source_name="合成标签删除来源",
+    )
+    tag = knowledge_database.knowledge_organization.create_tag(
+        owner_context,
+        name="合成待解绑标签",
+        color="#1677ff",
+    )
+    bound_tags = knowledge_database.knowledge_organization.bind_tag(
+        owner_context,
+        document_id=document.document_id,
+        tag_ids=(tag.tag_id,),
+    )
+    assert bound_tags == (tag,)
+
+    deleted = knowledge_database.knowledge_organization.delete_tag(
+        owner_context,
+        tag_id=tag.tag_id,
+    )
+    restored = knowledge_database.knowledge_organization.restore_tag(
+        owner_context,
+        tag_id=tag.tag_id,
+    )
+
+    summaries = knowledge_database.management.list_documents(
+        replace(owner_context, authorized_workspace=True),
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        limit=100,
+    )
+    with knowledge_database.engine.connect() as connection:
+        binding_count = connection.scalar(
+            select(func.count())
+            .select_from(document_tag_bindings)
+            .where(
+                document_tag_bindings.c.workspace_id == owner.personal_workspace_id,
+                document_tag_bindings.c.tag_id == tag.tag_id,
+            )
+        )
+        document_count = connection.scalar(
+            select(func.count())
+            .select_from(documents)
+            .where(
+                documents.c.workspace_id == owner.personal_workspace_id,
+                documents.c.document_id == document.document_id,
+            )
+        )
+    assert deleted.status == "deleted"
+    assert restored.status == "active"
+    assert binding_count == 0
+    assert document_count == 1
+    assert summaries[0].document.document_id == document.document_id
+    assert summaries[0].tag_ids == ()
 
 
 def test_enterprise_owner_department_scope_and_member_denial(

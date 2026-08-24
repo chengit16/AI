@@ -123,6 +123,9 @@ class SqlAlchemyIndexVersionStore:
             )
             .where(
                 ingestion_jobs.c.status == "succeeded",
+                # 尚未回写解析产物键的任务不能进入索引队列，避免向非空 Artifact 字段写入空值。
+                # 回收链仍可独立清理这类任务，确保解析和清理的最终一致性不互相阻断。
+                ingestion_jobs.c.artifact_object_key.is_not(None),
                 documents.c.status == "active",
                 ~exists().where(
                     index_versions.c.ingestion_job_id == ingestion_jobs.c.ingestion_job_id,

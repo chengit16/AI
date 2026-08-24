@@ -7,6 +7,8 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from ai_platform_backend.knowledge.object_keys import parsed_artifact_object_key
+
 from ai_platform_worker.modules.ingestion.application.ingest import ParseDocument
 from ai_platform_worker.modules.ingestion.domain.documents import (
     IngestionLimits,
@@ -134,11 +136,11 @@ class IngestionJobProcessor:
                     retryable=True,
                     stage="artifact",
                 ) from error
-            return (
-                "succeeded"
-                if self._store.mark_succeeded(job, artifact, completed_at=now)
-                else "lost"
-            )
+            if self._store.mark_succeeded(job, artifact, completed_at=now):
+                return "succeeded"
+            # 删除或租约回收可能发生在对象写入后；失租方必须补偿自己刚写出的确定性产物。
+            self._storage.delete_artifact(job, artifact)
+            return "lost"
         except IngestionError as error:
             return self._record_failure(
                 job,
@@ -215,9 +217,10 @@ def _artifact(job: ClaimedIngestionJob, document: ParsedDocument) -> ParsedArtif
         separators=(",", ":"),
     ).encode()
     return ParsedArtifact(
-        object_key=(
-            f"workspaces/{job.workspace_id}/parsed/"
-            f"{job.document_version_id}/{job.ingestion_job_id}.json"
+        object_key=parsed_artifact_object_key(
+            job.workspace_id,
+            job.document_version_id,
+            job.ingestion_job_id,
         ),
         payload=payload,
         content_hash=hashlib.sha256(payload).hexdigest(),

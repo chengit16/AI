@@ -116,6 +116,7 @@ def create_app(
     application.state.knowledge_fact_service = dependencies.knowledge_facts
     application.state.knowledge_upload_service = dependencies.knowledge_uploads
     application.state.knowledge_management_service = dependencies.knowledge_management
+    application.state.knowledge_organization_service = dependencies.knowledge_organization
     application.state.model_provider_configuration_service = (
         dependencies.model_provider_configurations
     )
