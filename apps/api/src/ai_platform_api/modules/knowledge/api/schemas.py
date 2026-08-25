@@ -228,6 +228,76 @@ class IngestionJobListResponse(BaseModel):
     items: list[IngestionJobResponse]
 
 
+class DocumentIndexSummaryResponse(BaseModel):
+    """定义单个文档版本最新索引构建的可观测摘要。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    index_version_id: UUID
+    build_no: int
+    status: Literal[
+        "queued",
+        "embedding_running",
+        "embedding_retry_wait",
+        "index_queued",
+        "index_running",
+        "index_retry_wait",
+        "ready",
+        "active",
+        "retired",
+        "failed",
+        "dead_letter",
+    ]
+    chunk_count: int | None
+    staged_chunk_count: int | None
+    failure_stage: str | None
+    error_code: str | None
+    error_message: str | None
+    completed_at: datetime | None
+    activated_at: datetime | None
+    updated_at: datetime
+
+
+class DocumentSourceMetadataResponse(BaseModel):
+    """定义可展示的来源与上传安全元数据，明确排除对象键和外部定位凭证。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_id: UUID
+    source_kind: Literal["manual", "upload", "web", "data_source"]
+    source_name: str
+    media_type: str | None
+    size_bytes: int | None
+    scan_status: str | None
+    scanned_at: datetime | None
+    captured_at: datetime | None
+    download_available: bool
+
+
+class KnowledgeDocumentVersionDetailResponse(BaseModel):
+    """定义详情页单个不可变版本及其处理链状态。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: DocumentVersionResponse
+    source: DocumentSourceMetadataResponse
+    ingestion: IngestionJobResponse | None
+    index: DocumentIndexSummaryResponse | None
+
+
+class KnowledgeDocumentDetailResponse(BaseModel):
+    """定义文档详情、组织关系和完整版本历史的稳定聚合响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    document: DocumentResponse
+    current_document_version_id: UUID | None
+    folder_id: UUID
+    tag_ids: list[UUID]
+    is_favorite: bool
+    versions: list[KnowledgeDocumentVersionDetailResponse]
+
+
 class DocumentSourceResponse(BaseModel):
     """定义文档来源操作的稳定响应结构。"""
 

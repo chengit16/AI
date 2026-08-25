@@ -3,7 +3,7 @@
  * 只负责契约化请求与 multipart 组装，权限、状态机和上传安全由服务端执行。
  */
 import type { components } from "@/api/generated/platform-api.v1";
-import { apiRequest } from "@/api/client";
+import { apiDownloadRequest, apiRequest } from "@/api/client";
 
 /** 知识库列表使用的服务端范围化摘要。 */
 export type KnowledgeBaseSummary = components["schemas"]["KnowledgeBaseSummaryResponse"];
@@ -22,6 +22,8 @@ export type KnowledgeDocumentSummary = Omit<
 };
 /** 文档解析、OCR 和索引前处理任务的可见状态。 */
 export type IngestionJob = components["schemas"]["IngestionJobResponse"];
+/** 文档元数据、完整版本历史及每版处理状态的服务端聚合。 */
+export type KnowledgeDocumentDetail = components["schemas"]["KnowledgeDocumentDetailResponse"];
 /** 新建知识库时允许提交的契约字段。 */
 export type CreateKnowledgeBaseRequest = components["schemas"]["CreateKnowledgeBaseRequest"];
 /** 上传完成后返回的文档、版本和异步任务标识。 */
@@ -66,6 +68,31 @@ export async function getKnowledgeIngestionJobs(
     { signal },
   );
   return response.items;
+}
+
+/** 查询单篇文档详情；服务端按同一资源范围返回版本、解析与索引摘要。 */
+export function getKnowledgeDocumentDetail(
+  workspaceId: string,
+  knowledgeBaseId: string,
+  documentId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<KnowledgeDocumentDetail>(
+    `/api/v1/workspaces/${workspaceId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`,
+    { signal },
+  );
+}
+
+/** 下载指定不可变版本的原文件；对象存储定位信息不会到达浏览器。 */
+export function downloadKnowledgeDocumentVersion(
+  workspaceId: string,
+  knowledgeBaseId: string,
+  documentId: string,
+  documentVersionId: string,
+) {
+  return apiDownloadRequest(
+    `/api/v1/workspaces/${workspaceId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/versions/${documentVersionId}/download`,
+  );
 }
 
 /** 创建工作空间知识库；服务端负责名称、配额和写权限校验。 */

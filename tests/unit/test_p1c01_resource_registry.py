@@ -33,12 +33,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 25
-    assert len(resource_registry.permissions) == 132
+    assert resource_registry.registry_version == 26
+    assert len(resource_registry.permissions) == 133
     assert len(resource_registry.page_resources) == 15
-    assert len(resource_registry.api_resources) == 173
-    assert len(resource_registry.menus) == 159
-    assert len(resource_registry.menu_api_bindings) == 166
+    assert len(resource_registry.api_resources) == 175
+    assert len(resource_registry.menus) == 160
+    assert len(resource_registry.menu_api_bindings) == 168
     assert registry_openapi_violations() == ()
 
 
@@ -54,6 +54,7 @@ def test_new_workspace_owner_gets_operations_permissions_but_member_does_not() -
     }.issubset(OWNER_PERMISSION_CODES)
     assert {
         "knowledge.ingestion.cancel",
+        "knowledge.document.download",
         "operations.index.inspect",
         "operations.index.rebuild",
         "operations.index.cleanup",

@@ -57,6 +57,14 @@ export interface StreamRequestOptions {
   lastEventId?: string | null;
 }
 
+/** 同源文件下载返回浏览器 Blob 与服务端建议文件名，不暴露对象存储地址。 */
+export interface ApiDownload {
+  /** 原文件二进制内容。 */
+  blob: Blob;
+  /** 从标准 Content-Disposition 解码得到的安全文件名。 */
+  fileName: string;
+}
+
 function isErrorResponse(value: unknown): value is ErrorResponse {
   if (!value || typeof value !== "object") return false;
   const item = value as Record<string, unknown>;
@@ -161,6 +169,56 @@ export async function apiStreamRequest(
     `流式请求失败：HTTP ${response.status}`,
     false,
   );
+}
+
+/** 通过统一会话上下文下载同源文件，并沿用 JSON 接口的稳定错误契约。 */
+export async function apiDownloadRequest(path: string, signal?: AbortSignal): Promise<ApiDownload> {
+  const session = getApiSession();
+  const headers = new Headers({ Accept: "application/octet-stream" });
+  if (session.workspaceId) headers.set("X-Workspace-ID", session.workspaceId);
+  const response = await fetch(path, {
+    method: "GET",
+    headers,
+    credentials: "same-origin",
+    signal,
+  });
+  if (!response.ok) {
+    if (response.status === 401) handleUnauthorized();
+    const contentType = response.headers.get("content-type") ?? "";
+    const payload: unknown = contentType.includes("application/json")
+      ? await response.json()
+      : null;
+    if (isErrorResponse(payload)) {
+      throw new PlatformApiError(
+        response.status,
+        payload.code,
+        payload.message,
+        payload.retryable,
+        payload.trace_id,
+      );
+    }
+    throw new PlatformApiError(
+      response.status,
+      "HTTP_ERROR",
+      `文件下载失败：HTTP ${response.status}`,
+      false,
+    );
+  }
+  return {
+    blob: await response.blob(),
+    fileName: downloadFileName(response.headers.get("content-disposition")),
+  };
+}
+
+function downloadFileName(disposition: string | null): string {
+  const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (!encoded) return "download";
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    // 非法编码来自协议边缘，回退稳定文件名，避免阻断已成功取得的文件内容。
+    return "download";
+  }
 }
 
 /** 把未知请求失败收敛为可展示文案，不向界面泄露原始响应结构。 */

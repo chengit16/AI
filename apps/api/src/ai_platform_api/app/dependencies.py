@@ -394,23 +394,24 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         ),
         ingestion_max_attempts=settings.ingestion_max_attempts,
     )
+    object_storage = MinioObjectStorage(
+        endpoint=settings.minio_endpoint,
+        access_key=settings.minio_access_key,
+        secret_key=settings.minio_secret_key.get_secret_value(),
+        bucket=settings.minio_bucket,
+    )
     knowledge_management = KnowledgeManagementService(
         SqlAlchemyKnowledgeUnitOfWork(
             database.sessions,
             SqlAlchemyEntitlementRepository,
-        )
+        ),
+        object_storage,
     )
     knowledge_organization = KnowledgeOrganizationService(
         SqlAlchemyKnowledgeUnitOfWork(
             database.sessions,
             SqlAlchemyEntitlementRepository,
         )
-    )
-    object_storage = MinioObjectStorage(
-        endpoint=settings.minio_endpoint,
-        access_key=settings.minio_access_key,
-        secret_key=settings.minio_secret_key.get_secret_value(),
-        bucket=settings.minio_bucket,
     )
     lifecycle_cache = ValkeyWorkspaceCacheCleaner(settings.valkey_url)
     lifecycle = WorkspaceLifecycleService(

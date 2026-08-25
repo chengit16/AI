@@ -641,6 +641,32 @@ class DocumentCreatedResponse(typing.TypedDict):
     source: DocumentSourceResponse
 
 
+class DocumentIndexSummaryResponse(typing.TypedDict):
+    activated_at: str | None
+    build_no: int
+    chunk_count: int | None
+    completed_at: str | None
+    error_code: str | None
+    error_message: str | None
+    failure_stage: str | None
+    index_version_id: str
+    staged_chunk_count: int | None
+    status: typing.Literal[
+        "queued",
+        "embedding_running",
+        "embedding_retry_wait",
+        "index_queued",
+        "index_running",
+        "index_retry_wait",
+        "ready",
+        "active",
+        "retired",
+        "failed",
+        "dead_letter",
+    ]
+    updated_at: str
+
+
 class DocumentResponse(typing.TypedDict):
     created_at: str
     created_by_account_id: str
@@ -656,6 +682,18 @@ class DocumentResponse(typing.TypedDict):
     version: int
     visibility: typing.Literal["private", "workspace", "departments"]
     workspace_id: str
+
+
+class DocumentSourceMetadataResponse(typing.TypedDict):
+    captured_at: str | None
+    download_available: bool
+    media_type: str | None
+    scan_status: str | None
+    scanned_at: str | None
+    size_bytes: int | None
+    source_id: str
+    source_kind: typing.Literal["manual", "upload", "web", "data_source"]
+    source_name: str
 
 
 class DocumentSourceResponse(typing.TypedDict):
@@ -901,6 +939,15 @@ class KnowledgeDocumentBindingsRequest(typing.TypedDict):
     ids: typing.NotRequired[list[str]]
 
 
+class KnowledgeDocumentDetailResponse(typing.TypedDict):
+    current_document_version_id: str | None
+    document: DocumentResponse
+    folder_id: str
+    is_favorite: bool
+    tag_ids: list[str]
+    versions: list[KnowledgeDocumentVersionDetailResponse]
+
+
 class KnowledgeDocumentFolderBindingResponse(typing.TypedDict):
     items: list[KnowledgeFolderResponse]
 
@@ -927,6 +974,13 @@ class KnowledgeDocumentSummaryResponse(typing.TypedDict):
 
 class KnowledgeDocumentTagBindingResponse(typing.TypedDict):
     items: list[KnowledgeTagResponse]
+
+
+class KnowledgeDocumentVersionDetailResponse(typing.TypedDict):
+    index: DocumentIndexSummaryResponse | None
+    ingestion: IngestionJobResponse | None
+    source: DocumentSourceMetadataResponse
+    version: DocumentVersionResponse
 
 
 class KnowledgeFavoriteListResponse(typing.TypedDict):

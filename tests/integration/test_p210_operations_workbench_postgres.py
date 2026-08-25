@@ -114,7 +114,7 @@ def test_owner_keeps_workbench_permissions_after_current_menu_upgrade(
         )
 
     assert owner_permissions == WORKBENCH_PERMISSIONS
-    assert isinstance(snapshot, dict) and snapshot["registry_version"] == 25
+    assert isinstance(snapshot, dict) and snapshot["registry_version"] == 26
     assert {item["menu_id"] for item in snapshot["menus"]}.issuperset(
         {
             "82000000-0000-4000-8000-000000000194",

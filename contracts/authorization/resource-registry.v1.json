@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 25,
+  "registry_version": 26,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -50,6 +50,7 @@
     ,{ "code": "knowledge.document.version.publish", "resource_type": "document_version", "action": "publish", "scope": "resource", "status": "active" }
     ,{ "code": "knowledge.base.read", "resource_type": "knowledge_base", "action": "read", "scope": "workspace", "status": "active" }
     ,{ "code": "knowledge.document.read", "resource_type": "document", "action": "read", "scope": "resource", "status": "active" }
+    ,{ "code": "knowledge.document.download", "resource_type": "document", "action": "download", "scope": "resource", "status": "active" }
     ,{ "code": "knowledge.folder.read", "resource_type": "knowledge_folder", "action": "read", "scope": "workspace", "status": "active" }
     ,{ "code": "knowledge.folder.create", "resource_type": "knowledge_folder", "action": "create", "scope": "workspace", "status": "active" }
     ,{ "code": "knowledge.folder.update", "resource_type": "knowledge_folder", "action": "update", "scope": "resource", "status": "active" }
@@ -475,7 +476,9 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000170", "api_key": "knowledge.document.favorite.list", "operation_id": "listKnowledgeFavorites", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/favorites", "access_level": "authorized", "permission_code": "knowledge.document.favorite", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000171", "api_key": "knowledge.trash.list", "operation_id": "listKnowledgeTrash", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/trash", "access_level": "authorized", "permission_code": "knowledge.trash.read", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000172", "api_key": "knowledge.document.restore", "operation_id": "restoreKnowledgeDocument", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/trash/documents/{document_id}/restore", "access_level": "authorized", "permission_code": "knowledge.trash.restore", "risk_level": "high", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000173", "api_key": "knowledge.document.purge", "operation_id": "purgeKnowledgeDocument", "method": "DELETE", "path_pattern": "/api/v1/workspaces/{workspace_id}/trash/documents/{document_id}/permanent", "access_level": "authorized", "permission_code": "knowledge.trash.purge", "risk_level": "critical", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000173", "api_key": "knowledge.document.purge", "operation_id": "purgeKnowledgeDocument", "method": "DELETE", "path_pattern": "/api/v1/workspaces/{workspace_id}/trash/documents/{document_id}/permanent", "access_level": "authorized", "permission_code": "knowledge.trash.purge", "risk_level": "critical", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000174", "api_key": "knowledge.document.detail", "operation_id": "getKnowledgeDocumentDetail", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}", "access_level": "authorized", "permission_code": "knowledge.document.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000175", "api_key": "knowledge.document.download", "operation_id": "downloadKnowledgeDocumentVersion", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/{document_version_id}/download", "access_level": "authorized", "permission_code": "knowledge.document.download", "risk_level": "high", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
@@ -626,6 +629,7 @@
     { "menu_id": "82000000-0000-4000-8000-000000000252", "menu_key": "navigation.workspace.knowledge.trash_list", "parent_menu_key": "navigation.workspace.knowledge", "name": "查看回收站", "menu_type": "action", "page_resource_id": null, "permission_code": "knowledge.trash.read", "icon_key": null, "sort_order": 480, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000253", "menu_key": "navigation.workspace.knowledge.document_restore", "parent_menu_key": "navigation.workspace.knowledge", "name": "恢复回收站文档", "menu_type": "action", "page_resource_id": null, "permission_code": "knowledge.trash.restore", "icon_key": null, "sort_order": 490, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000254", "menu_key": "navigation.workspace.knowledge.document_purge", "parent_menu_key": "navigation.workspace.knowledge", "name": "永久清理回收站文档", "menu_type": "action", "page_resource_id": null, "permission_code": "knowledge.trash.purge", "icon_key": null, "sort_order": 500, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000255", "menu_key": "navigation.workspace.knowledge.document_download", "parent_menu_key": "navigation.workspace.knowledge", "name": "下载文档原文件", "menu_type": "action", "page_resource_id": null, "permission_code": "knowledge.document.download", "icon_key": null, "sort_order": 510, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000152", "menu_key": "navigation.platform.models.provider_query", "parent_menu_key": "navigation.platform.models", "name": "查看模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000153", "menu_key": "navigation.platform.models.provider_create", "parent_menu_key": "navigation.platform.models", "name": "创建模型供应商", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000154", "menu_key": "navigation.platform.models.credential_rotate", "parent_menu_key": "navigation.platform.models", "name": "轮换模型凭证", "menu_type": "action", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 120, "source": "system", "status": "active" },
@@ -804,6 +808,8 @@
     { "menu_id": "82000000-0000-4000-8000-000000000251", "api_resource_id": "81000000-0000-4000-8000-000000000170", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000252", "api_resource_id": "81000000-0000-4000-8000-000000000171", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000253", "api_resource_id": "81000000-0000-4000-8000-000000000172", "action_type": "mutation" },
-    { "menu_id": "82000000-0000-4000-8000-000000000254", "api_resource_id": "81000000-0000-4000-8000-000000000173", "action_type": "mutation" }
+    { "menu_id": "82000000-0000-4000-8000-000000000254", "api_resource_id": "81000000-0000-4000-8000-000000000173", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000147", "api_resource_id": "81000000-0000-4000-8000-000000000174", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000255", "api_resource_id": "81000000-0000-4000-8000-000000000175", "action_type": "query" }
   ]
 }

@@ -12,6 +12,8 @@ import { StateView } from "@/components/StateView/StateView";
 import { useWorkspaceMenuNavigation } from "@/hooks/useWorkspaceMenuNavigation";
 
 import { DocumentListToolbar } from "./components/DocumentListToolbar";
+import { DocumentCardGrid } from "./components/DocumentCardGrid";
+import { DocumentDetailDrawer } from "./components/DocumentDetailDrawer";
 import {
   DocumentOrganizationDialog,
   type DocumentOrganizationMode,
@@ -58,6 +60,8 @@ export default function KnowledgeProductionPage() {
   const selectedFolderId = searchParams.get("folder");
   const selectedTagId = searchParams.get("tag");
   const searchText = searchParams.get("q") ?? "";
+  const requestedDetailId = searchParams.get("document");
+  const documentViewMode = searchParams.get("layout") === "cards" ? "cards" : "list";
   const [createOpen, setCreateOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [versionDocument, setVersionDocument] = useState<KnowledgeDocumentSummary | null>(null);
@@ -69,9 +73,10 @@ export default function KnowledgeProductionPage() {
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<readonly string[]>([]);
   const { visiblePermissionCodes } = useWorkspaceMenuNavigation();
   const has = (permissionCode: string) => visiblePermissionCodes.has(permissionCode);
+  const detailDocumentId = has("knowledge.document.read") ? requestedDetailId : null;
 
   // 1. 页面 Query 只在对应菜单权限存在时启动，避免用失败请求猜测授权结果。
-  const model = useKnowledgeProduction(selectedBaseId);
+  const model = useKnowledgeProduction(selectedBaseId, detailDocumentId);
   const organization = useKnowledgeOrganization({
     canReadFolders: has("knowledge.folder.read"),
     canReadTags: has("knowledge.tag.read"),
@@ -192,7 +197,13 @@ export default function KnowledgeProductionPage() {
           canReadTags={has("knowledge.tag.read")}
           onSelectBase={(base) => {
             setSelectedDocumentIds([]);
-            updateSearch({ base, scope: "documents", folder: null, view: "documents" });
+            updateSearch({
+              base,
+              scope: "documents",
+              folder: null,
+              view: "documents",
+              document: null,
+            });
           }}
           onSelectFolder={(folderId) => {
             setSelectedDocumentIds([]);
@@ -290,12 +301,16 @@ export default function KnowledgeProductionPage() {
                         selectedTagId={selectedTagId}
                         tags={activeTags}
                         selectedCount={selectedDocuments.length}
+                        viewMode={documentViewMode}
                         canOrganize={
                           has("knowledge.document.folder.bind") ||
                           has("knowledge.document.tag.bind")
                         }
                         canDelete={has("knowledge.document.delete")}
                         onSearchChange={(q) => updateSearch({ q: q || null })}
+                        onViewModeChange={(layout) =>
+                          updateSearch({ layout: layout === "cards" ? "cards" : null })
+                        }
                         onTagChange={(tag) => updateSearch({ tag })}
                         onClearSelection={() => setSelectedDocumentIds([])}
                         onMoveSelected={() =>
@@ -311,50 +326,106 @@ export default function KnowledgeProductionPage() {
                           })
                         }
                       />
-                      <DocumentTable
-                        items={filteredDocuments}
-                        jobs={model.jobs.data ?? []}
-                        folders={activeFolders}
-                        tags={activeTags}
-                        selectedDocumentIds={selectedDocumentIds}
-                        isLoading={model.documents.isLoading}
-                        emptyTitle={documentEmptyState.title}
-                        emptyDescription={documentEmptyState.description}
-                        canUploadVersion={has("knowledge.document.version.create")}
-                        canMarkReady={has("knowledge.document.version.ready")}
-                        canPublish={has("knowledge.document.version.publish")}
-                        canOrganize={
-                          has("knowledge.document.folder.bind") ||
-                          has("knowledge.document.tag.bind")
-                        }
-                        canFavorite={has("knowledge.document.favorite")}
-                        canDelete={has("knowledge.document.delete")}
-                        isMutating={isDocumentMutating}
-                        onSelectionChange={setSelectedDocumentIds}
-                        onUploadVersion={setVersionDocument}
-                        onMarkReady={(document, contentHash) =>
-                          model.markReady.mutate({ document, contentHash })
-                        }
-                        onPublish={(document) => model.publish.mutate(document)}
-                        onMove={(document) =>
-                          setOrganizationDialog({ mode: "move", documents: [document] })
-                        }
-                        onSetTags={(document) =>
-                          setOrganizationDialog({ mode: "tags", documents: [document] })
-                        }
-                        onFavorite={(document) =>
-                          actions.favorite.mutate({
-                            documentId: document.document_id,
-                            favorite: !document.is_favorite,
-                          })
-                        }
-                        onDelete={(document) =>
-                          actions.deleteDocuments.mutate({
-                            knowledgeBaseId: selectedBaseId,
-                            documentIds: [document.document_id],
-                          })
-                        }
-                      />
+                      {documentViewMode === "cards" ? (
+                        <DocumentCardGrid
+                          items={filteredDocuments}
+                          jobs={model.jobs.data ?? []}
+                          folders={activeFolders}
+                          tags={activeTags}
+                          selectedDocumentIds={selectedDocumentIds}
+                          isLoading={model.documents.isLoading}
+                          emptyTitle={documentEmptyState.title}
+                          emptyDescription={documentEmptyState.description}
+                          permissions={{
+                            readDetails: has("knowledge.document.read"),
+                            uploadVersion: has("knowledge.document.version.create"),
+                            markReady: has("knowledge.document.version.ready"),
+                            publish: has("knowledge.document.version.publish"),
+                            organize:
+                              has("knowledge.document.folder.bind") ||
+                              has("knowledge.document.tag.bind"),
+                            favorite: has("knowledge.document.favorite"),
+                            delete: has("knowledge.document.delete"),
+                          }}
+                          isMutating={isDocumentMutating}
+                          onSelectionChange={setSelectedDocumentIds}
+                          onOpenDetails={(document) =>
+                            updateSearch({ document: document.document_id })
+                          }
+                          onUploadVersion={setVersionDocument}
+                          onMarkReady={(document, contentHash) =>
+                            model.markReady.mutate({ document, contentHash })
+                          }
+                          onPublish={(document) => model.publish.mutate(document)}
+                          onMove={(document) =>
+                            setOrganizationDialog({ mode: "move", documents: [document] })
+                          }
+                          onSetTags={(document) =>
+                            setOrganizationDialog({ mode: "tags", documents: [document] })
+                          }
+                          onFavorite={(document) =>
+                            actions.favorite.mutate({
+                              documentId: document.document_id,
+                              favorite: !document.is_favorite,
+                            })
+                          }
+                          onDelete={(document) =>
+                            actions.deleteDocuments.mutate({
+                              knowledgeBaseId: selectedBaseId,
+                              documentIds: [document.document_id],
+                            })
+                          }
+                        />
+                      ) : (
+                        <DocumentTable
+                          items={filteredDocuments}
+                          jobs={model.jobs.data ?? []}
+                          folders={activeFolders}
+                          tags={activeTags}
+                          selectedDocumentIds={selectedDocumentIds}
+                          isLoading={model.documents.isLoading}
+                          emptyTitle={documentEmptyState.title}
+                          emptyDescription={documentEmptyState.description}
+                          canReadDetails={has("knowledge.document.read")}
+                          canUploadVersion={has("knowledge.document.version.create")}
+                          canMarkReady={has("knowledge.document.version.ready")}
+                          canPublish={has("knowledge.document.version.publish")}
+                          canOrganize={
+                            has("knowledge.document.folder.bind") ||
+                            has("knowledge.document.tag.bind")
+                          }
+                          canFavorite={has("knowledge.document.favorite")}
+                          canDelete={has("knowledge.document.delete")}
+                          isMutating={isDocumentMutating}
+                          onSelectionChange={setSelectedDocumentIds}
+                          onOpenDetails={(document) =>
+                            updateSearch({ document: document.document_id })
+                          }
+                          onUploadVersion={setVersionDocument}
+                          onMarkReady={(document, contentHash) =>
+                            model.markReady.mutate({ document, contentHash })
+                          }
+                          onPublish={(document) => model.publish.mutate(document)}
+                          onMove={(document) =>
+                            setOrganizationDialog({ mode: "move", documents: [document] })
+                          }
+                          onSetTags={(document) =>
+                            setOrganizationDialog({ mode: "tags", documents: [document] })
+                          }
+                          onFavorite={(document) =>
+                            actions.favorite.mutate({
+                              documentId: document.document_id,
+                              favorite: !document.is_favorite,
+                            })
+                          }
+                          onDelete={(document) =>
+                            actions.deleteDocuments.mutate({
+                              knowledgeBaseId: selectedBaseId,
+                              documentIds: [document.document_id],
+                            })
+                          }
+                        />
+                      )}
                     </>
                   ),
                 },
@@ -441,6 +512,19 @@ export default function KnowledgeProductionPage() {
         onUpdate={(tagId, body) => actions.tagCommand.mutateAsync({ type: "update", tagId, body })}
         onDelete={(tagId) => actions.tagCommand.mutateAsync({ type: "delete", tagId })}
         onRestore={(tagId) => actions.tagCommand.mutateAsync({ type: "restore", tagId })}
+      />
+      <DocumentDetailDrawer
+        open={Boolean(detailDocumentId)}
+        detail={model.detail.data}
+        isLoading={model.detail.isLoading}
+        errorDescription={model.detail.isError ? errorMessage(model.detail.error) : null}
+        canDownload={has("knowledge.document.download")}
+        isDownloading={model.downloadVersion.isPending}
+        onClose={() => updateSearch({ document: null })}
+        onRetry={() => void model.detail.refetch()}
+        onDownload={(documentId, documentVersionId) =>
+          model.downloadVersion.mutate({ documentId, documentVersionId })
+        }
       />
     </>
   );

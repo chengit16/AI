@@ -39,13 +39,18 @@ from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.identity.domain.entitlements import UsageRepository
 from ai_platform_api.modules.knowledge.domain.models import (
     Document,
+    DocumentIndexStatus,
+    DocumentIndexSummary,
     DocumentSource,
     DocumentSourceKind,
     DocumentVersion,
     DocumentVersionStatus,
     DocumentVisibility,
     KnowledgeBase,
+    KnowledgeDocumentDetail,
+    KnowledgeDocumentDownload,
     KnowledgeDocumentSummary,
+    KnowledgeDocumentVersionDetail,
     KnowledgeWriteConflictError,
 )
 from ai_platform_api.modules.knowledge.domain.organization import (
@@ -918,6 +923,216 @@ class SqlAlchemyKnowledgeRepository:
         row = self._session.execute(statement).one_or_none()
         return _document(row) if row is not None else None
 
+    def get_document_detail(
+        self,
+        workspace_id: UUID,
+        knowledge_base_id: UUID,
+        document_id: UUID,
+        *,
+        viewer_account_id: UUID,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> KnowledgeDocumentDetail | None:
+        """按资源范围聚合版本、解析和索引事实，所有子查询都固定在同一工作空间。"""
+
+        # 1. 先建立文档资源授权条件和当前账号的组织投影，不允许目录或标签扩大资源范围。
+        scope = _document_scope(
+            authorized_workspace=authorized_workspace,
+            department_ids=department_ids,
+            account_ids=account_ids,
+            resource_ids=resource_ids,
+        )
+        folder_id = (
+            select(document_folder_bindings.c.folder_id)
+            .where(
+                document_folder_bindings.c.workspace_id == documents.c.workspace_id,
+                document_folder_bindings.c.document_id == documents.c.document_id,
+            )
+            .scalar_subquery()
+        )
+        tag_ids = (
+            select(func.array_agg(document_tag_bindings.c.tag_id))
+            .select_from(
+                document_tag_bindings.join(
+                    knowledge_tags,
+                    (knowledge_tags.c.workspace_id == document_tag_bindings.c.workspace_id)
+                    & (knowledge_tags.c.tag_id == document_tag_bindings.c.tag_id),
+                )
+            )
+            .where(
+                document_tag_bindings.c.workspace_id == documents.c.workspace_id,
+                document_tag_bindings.c.document_id == documents.c.document_id,
+                knowledge_tags.c.status == "active",
+            )
+            .scalar_subquery()
+        )
+        favorite_count = (
+            select(func.count())
+            .select_from(document_favorites)
+            .where(
+                document_favorites.c.workspace_id == documents.c.workspace_id,
+                document_favorites.c.document_id == documents.c.document_id,
+                document_favorites.c.account_id == viewer_account_id,
+            )
+            .scalar_subquery()
+        )
+        # 2. 主查询同时约束工作空间、知识库、活动状态和资源 ID，不可见与不存在返回同一结果。
+        document_row = self._session.execute(
+            select(
+                documents,
+                document_publications.c.current_document_version_id,
+                func.coalesce(folder_id, default_folder_id(workspace_id)).label("folder_id"),
+                tag_ids.label("tag_ids"),
+                (favorite_count > 0).label("is_favorite"),
+            )
+            .outerjoin(
+                document_publications,
+                (document_publications.c.workspace_id == documents.c.workspace_id)
+                & (document_publications.c.document_id == documents.c.document_id),
+            )
+            .where(
+                documents.c.workspace_id == workspace_id,
+                documents.c.knowledge_base_id == knowledge_base_id,
+                documents.c.document_id == document_id,
+                documents.c.status == "active",
+                scope,
+            )
+        ).one_or_none()
+        if document_row is None:
+            return None
+
+        # 3. 只有主文档通过授权后才读取其版本、解析和索引子事实，且每组查询重复空间条件。
+        version_rows = tuple(
+            self._session.execute(
+                select(document_versions, document_sources)
+                .join(
+                    document_sources,
+                    (document_sources.c.workspace_id == document_versions.c.workspace_id)
+                    & (
+                        document_sources.c.document_version_id
+                        == document_versions.c.document_version_id
+                    ),
+                )
+                .where(
+                    document_versions.c.workspace_id == workspace_id,
+                    document_versions.c.document_id == document_id,
+                )
+                .order_by(document_versions.c.version_number.desc())
+            )
+        )
+        job_by_version = {
+            row.document_version_id: _ingestion_job(row)
+            for row in self._session.execute(
+                select(ingestion_jobs).where(
+                    ingestion_jobs.c.workspace_id == workspace_id,
+                    ingestion_jobs.c.document_id == document_id,
+                )
+            )
+        }
+        index_by_version: dict[UUID, DocumentIndexSummary] = {}
+        for row in self._session.execute(
+            select(index_versions)
+            .where(
+                index_versions.c.workspace_id == workspace_id,
+                index_versions.c.document_id == document_id,
+            )
+            .order_by(
+                index_versions.c.document_version_id,
+                index_versions.c.build_no.desc(),
+                index_versions.c.updated_at.desc(),
+            )
+        ):
+            index_by_version.setdefault(row.document_version_id, _document_index_summary(row))
+        # 4. 每个版本只选择最新构建批次，并在领域结果中排除解析和索引对象键。
+        return KnowledgeDocumentDetail(
+            document=_document(document_row),
+            current_document_version_id=document_row.current_document_version_id,
+            folder_id=document_row.folder_id,
+            tag_ids=tuple(document_row.tag_ids or ()),
+            is_favorite=document_row.is_favorite,
+            versions=tuple(
+                KnowledgeDocumentVersionDetail(
+                    version=_version(row),
+                    source=_source(row),
+                    ingestion_job=job_by_version.get(row.document_version_id),
+                    index=index_by_version.get(row.document_version_id),
+                )
+                for row in version_rows
+            ),
+        )
+
+    def get_document_download(
+        self,
+        workspace_id: UUID,
+        knowledge_base_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        *,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> KnowledgeDocumentDownload | None:
+        """只为有原始上传对象的活动文档返回服务端下载定位描述。"""
+
+        # 1. 下载描述查询把文档资源范围和版本、来源归属放在同一 SQL 条件中。
+        row = self._session.execute(
+            select(
+                document_sources.c.source_id,
+                document_sources.c.source_name,
+                document_sources.c.media_type,
+                document_sources.c.size_bytes,
+                document_sources.c.original_object_key,
+            )
+            .select_from(documents)
+            .join(
+                document_versions,
+                (document_versions.c.workspace_id == documents.c.workspace_id)
+                & (document_versions.c.document_id == documents.c.document_id),
+            )
+            .join(
+                document_sources,
+                (document_sources.c.workspace_id == document_versions.c.workspace_id)
+                & (
+                    document_sources.c.document_version_id
+                    == document_versions.c.document_version_id
+                ),
+            )
+            .where(
+                documents.c.workspace_id == workspace_id,
+                documents.c.knowledge_base_id == knowledge_base_id,
+                documents.c.document_id == document_id,
+                documents.c.status == "active",
+                document_versions.c.document_version_id == document_version_id,
+                document_sources.c.source_kind == "upload",
+                document_sources.c.media_type.is_not(None),
+                document_sources.c.size_bytes.is_not(None),
+                document_sources.c.original_object_key.is_not(None),
+                _document_scope(
+                    authorized_workspace=authorized_workspace,
+                    department_ids=department_ids,
+                    account_ids=account_ids,
+                    resource_ids=resource_ids,
+                ),
+            )
+        ).one_or_none()
+        # 2. 非上传来源、元数据不完整、跨空间或越权版本统一表现为不可下载。
+        if row is None:
+            return None
+        return KnowledgeDocumentDownload(
+            workspace_id=workspace_id,
+            knowledge_base_id=knowledge_base_id,
+            document_id=document_id,
+            document_version_id=document_version_id,
+            source_id=row.source_id,
+            file_name=row.source_name,
+            media_type=cast(str, row.media_type),
+            size_bytes=cast(int, row.size_bytes),
+            object_key=cast(str, row.original_object_key),
+        )
+
     def save_document(self, document: Document) -> None:
         previous_version = document.version - 1
         result = cast(
@@ -1662,6 +1877,24 @@ def _ingestion_job(value: Row[Any]) -> IngestionJob:
         last_retried_at=value.last_retried_at,
         cancelled_by_actor_id=value.cancelled_by_actor_id,
         cancelled_at=value.cancelled_at,
+    )
+
+
+def _document_index_summary(value: Row[Any]) -> DocumentIndexSummary:
+    """把索引表限制为详情页所需状态，排除对象键、模型版本和权限副本。"""
+
+    return DocumentIndexSummary(
+        index_version_id=value.index_version_id,
+        build_no=value.build_no,
+        status=cast(DocumentIndexStatus, value.status),
+        chunk_count=value.chunk_count,
+        staged_chunk_count=value.staged_chunk_count,
+        failure_stage=value.failure_stage,
+        error_code=value.error_code,
+        error_message=value.error_message,
+        completed_at=value.completed_at,
+        activated_at=value.activated_at,
+        updated_at=value.updated_at,
     )
 
 

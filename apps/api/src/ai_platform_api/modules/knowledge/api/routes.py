@@ -1,9 +1,10 @@
 """映射知识库、文档版本、上传、发布和入库任务 HTTP 协议。"""
 
 from typing import Annotated, Literal
+from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 
 from ai_platform_api.common.api_errors import error_responses
@@ -17,7 +18,9 @@ from ai_platform_api.modules.knowledge.api.schemas import (
     CreateKnowledgeFolderRequest,
     CreateKnowledgeTagRequest,
     DocumentCreatedResponse,
+    DocumentIndexSummaryResponse,
     DocumentResponse,
+    DocumentSourceMetadataResponse,
     DocumentSourceResponse,
     DocumentUploadResponse,
     DocumentVersionCreatedResponse,
@@ -29,10 +32,12 @@ from ai_platform_api.modules.knowledge.api.schemas import (
     KnowledgeBaseResponse,
     KnowledgeBaseSummaryResponse,
     KnowledgeDocumentBindingsRequest,
+    KnowledgeDocumentDetailResponse,
     KnowledgeDocumentFolderBindingResponse,
     KnowledgeDocumentListResponse,
     KnowledgeDocumentSummaryResponse,
     KnowledgeDocumentTagBindingResponse,
+    KnowledgeDocumentVersionDetailResponse,
     KnowledgeFavoriteListResponse,
     KnowledgeFavoriteRequest,
     KnowledgeFavoriteResponse,
@@ -57,6 +62,7 @@ from ai_platform_api.modules.knowledge.application.facts import (
 )
 from ai_platform_api.modules.knowledge.application.management import (
     IngestionJob,
+    KnowledgeDocumentDetail,
     KnowledgeDocumentSummary,
     KnowledgeManagementService,
 )
@@ -582,6 +588,75 @@ def list_documents(
 
 
 @router.get(
+    "/knowledge-bases/{knowledge_base_id}/documents/{document_id}",
+    response_model=KnowledgeDocumentDetailResponse,
+    operation_id="getKnowledgeDocumentDetail",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def get_document_detail(
+    workspace_id: UUID,
+    knowledge_base_id: UUID,
+    document_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+) -> KnowledgeDocumentDetailResponse:
+    """返回范围化文档详情；对象键、解析产物键和内容正文不会进入响应。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _document_detail(
+        service.get_document_detail(
+            context,
+            knowledge_base_id=knowledge_base_id,
+            document_id=document_id,
+        )
+    )
+
+
+@router.get(
+    "/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/"
+    "{document_version_id}/download",
+    response_class=Response,
+    operation_id="downloadKnowledgeDocumentVersion",
+    responses={
+        200: {
+            "description": "授权返回文档版本原文件",
+            "content": {
+                "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+            },
+        },
+        **error_responses(400, 401, 403, 404, 422, 500, 503),
+    },
+)
+def download_document_version(
+    workspace_id: UUID,
+    knowledge_base_id: UUID,
+    document_id: UUID,
+    document_version_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+) -> Response:
+    """通过同源服务端代理返回原文件，浏览器永远不会接触对象存储定位信息。"""
+
+    _require_workspace_path(context, workspace_id)
+    downloaded = service.download_document_version(
+        context,
+        knowledge_base_id=knowledge_base_id,
+        document_id=document_id,
+        document_version_id=document_version_id,
+    )
+    encoded_name = quote(downloaded.file_name, safe="")
+    return Response(
+        content=downloaded.content,
+        media_type=downloaded.media_type,
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}",
+            "Content-Length": str(len(downloaded.content)),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get(
     "/knowledge-bases/{knowledge_base_id}/ingestion-jobs",
     response_model=IngestionJobListResponse,
     operation_id="listKnowledgeIngestionJobs",
@@ -1054,6 +1129,58 @@ def _document_summary(value: KnowledgeDocumentSummary) -> KnowledgeDocumentSumma
         folder_id=value.folder_id,
         tag_ids=list(value.tag_ids),
         is_favorite=value.is_favorite,
+    )
+
+
+def _document_detail(value: KnowledgeDocumentDetail) -> KnowledgeDocumentDetailResponse:
+    """映射详情聚合并在协议边缘移除全部服务端对象定位字段。"""
+
+    return KnowledgeDocumentDetailResponse(
+        document=_document(value.document),
+        current_document_version_id=value.current_document_version_id,
+        folder_id=value.folder_id,
+        tag_ids=list(value.tag_ids),
+        is_favorite=value.is_favorite,
+        versions=[
+            KnowledgeDocumentVersionDetailResponse(
+                version=_document_version(item.version),
+                source=DocumentSourceMetadataResponse(
+                    source_id=item.source.source_id,
+                    source_kind=item.source.source_kind,
+                    source_name=item.source.source_name,
+                    media_type=item.source.media_type,
+                    size_bytes=item.source.size_bytes,
+                    scan_status=item.source.scan_status,
+                    scanned_at=item.source.scanned_at,
+                    captured_at=item.source.captured_at,
+                    download_available=(
+                        item.source.source_kind == "upload"
+                        and item.source.original_object_key is not None
+                        and item.source.media_type is not None
+                        and item.source.size_bytes is not None
+                    ),
+                ),
+                ingestion=_ingestion_job(item.ingestion_job)
+                if item.ingestion_job is not None
+                else None,
+                index=DocumentIndexSummaryResponse(
+                    index_version_id=item.index.index_version_id,
+                    build_no=item.index.build_no,
+                    status=item.index.status,
+                    chunk_count=item.index.chunk_count,
+                    staged_chunk_count=item.index.staged_chunk_count,
+                    failure_stage=item.index.failure_stage,
+                    error_code=item.index.error_code,
+                    error_message=item.index.error_message,
+                    completed_at=item.index.completed_at,
+                    activated_at=item.index.activated_at,
+                    updated_at=item.index.updated_at,
+                )
+                if item.index is not None
+                else None,
+            )
+            for item in value.versions
+        ],
     )
 
 

@@ -7,6 +7,8 @@ export const knowledgeQueryKeys = {
     knowledgeBaseId === undefined
       ? (["knowledge-documents", workspaceId] as const)
       : (["knowledge-documents", workspaceId, knowledgeBaseId] as const),
+  detail: (workspaceId: string | null, knowledgeBaseId: string | null, documentId: string | null) =>
+    ["knowledge-document-detail", workspaceId, knowledgeBaseId, documentId] as const,
   jobs: (workspaceId: string | null, knowledgeBaseId?: string | null) =>
     knowledgeBaseId === undefined
       ? (["knowledge-ingestion-jobs", workspaceId] as const)

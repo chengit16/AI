@@ -1,7 +1,7 @@
 // 由 scripts/generate_resource_registry.py 自动生成, 请勿手工修改。
 export const resourceRegistry = {
   schema_version: 1,
-  registry_version: 25,
+  registry_version: 26,
   permissions: [
     {
       code: "workspace.overview.access",
@@ -336,6 +336,13 @@ export const resourceRegistry = {
       code: "knowledge.document.read",
       resource_type: "document",
       action: "read",
+      scope: "resource",
+      status: "active",
+    },
+    {
+      code: "knowledge.document.download",
+      resource_type: "document",
+      action: "download",
       scope: "resource",
       status: "active",
     },
@@ -3032,6 +3039,30 @@ export const resourceRegistry = {
       risk_level: "critical",
       status: "active",
     },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000174",
+      api_key: "knowledge.document.detail",
+      operation_id: "getKnowledgeDocumentDetail",
+      method: "GET",
+      path_pattern:
+        "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}",
+      access_level: "authorized",
+      permission_code: "knowledge.document.read",
+      risk_level: "normal",
+      status: "active",
+    },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000175",
+      api_key: "knowledge.document.download",
+      operation_id: "downloadKnowledgeDocumentVersion",
+      method: "GET",
+      path_pattern:
+        "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/{document_version_id}/download",
+      access_level: "authorized",
+      permission_code: "knowledge.document.download",
+      risk_level: "high",
+      status: "active",
+    },
   ],
   menus: [
     {
@@ -4959,6 +4990,19 @@ export const resourceRegistry = {
       status: "active",
     },
     {
+      menu_id: "82000000-0000-4000-8000-000000000255",
+      menu_key: "navigation.workspace.knowledge.document_download",
+      parent_menu_key: "navigation.workspace.knowledge",
+      name: "下载文档原文件",
+      menu_type: "action",
+      page_resource_id: null,
+      permission_code: "knowledge.document.download",
+      icon_key: null,
+      sort_order: 510,
+      source: "system",
+      status: "active",
+    },
+    {
       menu_id: "82000000-0000-4000-8000-000000000152",
       menu_key: "navigation.platform.models.provider_query",
       parent_menu_key: "navigation.platform.models",
@@ -5932,6 +5976,16 @@ export const resourceRegistry = {
       menu_id: "82000000-0000-4000-8000-000000000254",
       api_resource_id: "81000000-0000-4000-8000-000000000173",
       action_type: "mutation",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000147",
+      api_resource_id: "81000000-0000-4000-8000-000000000174",
+      action_type: "query",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000255",
+      api_resource_id: "81000000-0000-4000-8000-000000000175",
+      action_type: "query",
     },
   ],
 } as const;

@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -23,6 +24,7 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
 )
 from ai_platform_api.modules.knowledge.application.facts import KnowledgeFactService
 from ai_platform_api.modules.knowledge.application.management import KnowledgeManagementService
+from ai_platform_api.modules.knowledge.domain.uploads import ObjectStorage
 from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
     SqlAlchemyKnowledgeUnitOfWork,
 )
@@ -128,7 +130,7 @@ def p202_database() -> Iterator[P202Harness]:
             workspace_id=registered.personal_workspace_id,
             context=context,
             knowledge=KnowledgeFactService(unit_of_work),
-            management=KnowledgeManagementService(unit_of_work),
+            management=KnowledgeManagementService(unit_of_work, cast(ObjectStorage, object())),
             store=SqlAlchemyIngestionJobStore(sessions),
         )
     finally:

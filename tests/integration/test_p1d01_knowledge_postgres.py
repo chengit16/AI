@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -29,6 +29,7 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityReader,
     SqlAlchemyRegistrationUnitOfWork,
 )
+from ai_platform_api.modules.knowledge.api.routes import _document_detail
 from ai_platform_api.modules.knowledge.application.facts import (
     KnowledgeConflictError,
     KnowledgeDeniedError,
@@ -43,6 +44,12 @@ from ai_platform_api.modules.knowledge.application.organization import (
     KnowledgeOrganizationService,
 )
 from ai_platform_api.modules.knowledge.domain.organization import default_folder_id
+from ai_platform_api.modules.knowledge.domain.uploads import (
+    InspectedUpload,
+    ObjectStorageUnavailableError,
+    ScanResult,
+    WorkspaceObject,
+)
 from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
     SqlAlchemyKnowledgeUnitOfWork,
 )
@@ -54,6 +61,7 @@ from ai_platform_api.persistence.tables import (
     document_tag_bindings,
     document_versions,
     documents,
+    index_versions,
     ingestion_job_attempts,
     ingestion_jobs,
     knowledge_bases,
@@ -87,6 +95,29 @@ class RegisteredAccount:
     login_name: str
 
 
+@dataclass
+class SyntheticObjectStorage:
+    """保存合成原文件，供下载用例验证对象键隔离和审计时序。"""
+
+    objects: dict[str, bytes] = field(default_factory=dict)
+
+    def put(self, location: WorkspaceObject, upload: InspectedUpload, scan: ScanResult) -> None:
+        location.assert_valid()
+        scan.assert_clean()
+        self.objects[location.object_key] = upload.content
+
+    def get(self, location: WorkspaceObject) -> bytes:
+        location.assert_valid()
+        try:
+            return self.objects[location.object_key]
+        except KeyError as error:
+            raise ObjectStorageUnavailableError from error
+
+    def delete(self, location: WorkspaceObject) -> None:
+        location.assert_valid()
+        self.objects.pop(location.object_key, None)
+
+
 @dataclass(frozen=True)
 class KnowledgeHarness:
     engine: Engine
@@ -97,6 +128,7 @@ class KnowledgeHarness:
     knowledge: KnowledgeFactService
     management: KnowledgeManagementService
     knowledge_organization: KnowledgeOrganizationService
+    storage: SyntheticObjectStorage
 
 
 @pytest.fixture(scope="module")
@@ -125,6 +157,7 @@ def knowledge_database() -> Iterator[KnowledgeHarness]:
             sessions,
             SqlAlchemyEntitlementRepository,
         )
+        storage = SyntheticObjectStorage()
         yield KnowledgeHarness(
             engine=engine,
             sessions=sessions,
@@ -137,11 +170,13 @@ def knowledge_database() -> Iterator[KnowledgeHarness]:
             organization=OrganizationService(SqlAlchemyOrganizationUnitOfWork(sessions)),
             knowledge=KnowledgeFactService(knowledge_unit_of_work),
             management=KnowledgeManagementService(
-                SqlAlchemyKnowledgeUnitOfWork(sessions, SqlAlchemyEntitlementRepository)
+                SqlAlchemyKnowledgeUnitOfWork(sessions, SqlAlchemyEntitlementRepository),
+                storage,
             ),
             knowledge_organization=KnowledgeOrganizationService(
                 SqlAlchemyKnowledgeUnitOfWork(sessions, SqlAlchemyEntitlementRepository)
             ),
+            storage=storage,
         )
     finally:
         engine.dispose()
@@ -739,6 +774,168 @@ def test_p1d07_management_queries_and_manual_retry_are_scoped_and_audited(
     )
     assert event_payload["database_facts_purged"] is True
     assert remaining_document_count == 0
+
+
+def test_p6a03_detail_download_and_cross_workspace_isolation(
+    knowledge_database: KnowledgeHarness,
+) -> None:
+    """详情聚合完整处理链，下载复核对象关系并留下不含对象键的审计事实。"""
+
+    owner = register(knowledge_database, identity="document-detail-owner")
+    outsider = register(knowledge_database, identity="document-detail-outsider")
+    owner_context = replace(context(owner), authorized_workspace=True)
+    knowledge_base = knowledge_database.knowledge.create_knowledge_base(
+        owner_context,
+        name="合成文档详情知识库",
+        default_visibility="workspace",
+    )
+    content = "P6A-03 合成下载内容".encode()
+    object_key = f"workspaces/{owner.personal_workspace_id}/uploads/p6a03-detail.txt"
+    document, version, source = knowledge_database.knowledge.create_document(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        title="合成详情与下载文档",
+        source_kind="upload",
+        source_name="合成详情.txt",
+        original_object_key=object_key,
+        upload_media_type="text/plain",
+        upload_size_bytes=len(content),
+        upload_content_hash=CONTENT_HASH_1,
+        upload_scan_status="clean",
+        upload_scanner_version="synthetic-scanner-v1",
+        upload_scanned_at=NOW,
+    )
+    ready = knowledge_database.knowledge.mark_document_version_ready(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        document_id=document.document_id,
+        document_version_id=version.document_version_id,
+        content_hash=CONTENT_HASH_1,
+    )
+    completed_at = datetime.now(UTC)
+    with knowledge_database.engine.begin() as connection:
+        job_id = connection.scalar(
+            select(ingestion_jobs.c.ingestion_job_id).where(
+                ingestion_jobs.c.document_version_id == version.document_version_id
+            )
+        )
+        assert isinstance(job_id, UUID)
+        connection.execute(
+            update(ingestion_jobs)
+            .where(ingestion_jobs.c.ingestion_job_id == job_id)
+            .values(
+                status="succeeded",
+                attempt_count=1,
+                completed_at=completed_at,
+                artifact_object_key=(
+                    f"workspaces/{owner.personal_workspace_id}/parsed/"
+                    f"{version.document_version_id}/{job_id}.json"
+                ),
+                parsed_content_hash=CONTENT_HASH_1,
+                parser_name="synthetic-parser-v1",
+                ocr_used=False,
+                page_count=2,
+                block_count=6,
+                updated_at=completed_at,
+            )
+        )
+        connection.execute(
+            insert(index_versions).values(
+                index_version_id=uuid4(),
+                workspace_id=owner.personal_workspace_id,
+                knowledge_base_id=knowledge_base.knowledge_base_id,
+                document_id=document.document_id,
+                document_version_id=version.document_version_id,
+                ingestion_job_id=job_id,
+                source_id=source.source_id,
+                build_no=1,
+                artifact_object_key=(
+                    f"workspaces/{owner.personal_workspace_id}/parsed/"
+                    f"{version.document_version_id}/{job_id}.json"
+                ),
+                source_content_hash=CONTENT_HASH_1,
+                parsed_content_hash=CONTENT_HASH_1,
+                chunker_version="synthetic-chunker-v1",
+                embedding_model_version="synthetic-embedding-v1",
+                tokenizer_version="synthetic-tokenizer-v1",
+                department_ids=[],
+                visibility="workspace",
+                security_level="INTERNAL",
+                permission_labels=[],
+                status="ready",
+                processing_lane="indexing",
+                attempt_count=1,
+                embedding_attempt_count=1,
+                indexing_attempt_count=1,
+                max_attempts=3,
+                available_at=completed_at,
+                started_at=completed_at,
+                completed_at=completed_at,
+                chunk_count=6,
+                staged_chunk_count=6,
+                manual_recovery_count=0,
+                created_at=completed_at,
+                updated_at=completed_at,
+            )
+        )
+    published = knowledge_database.knowledge.publish_document_version(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        document_id=document.document_id,
+        document_version_id=ready.document_version_id,
+    )
+    knowledge_database.storage.objects[object_key] = content
+
+    detail = knowledge_database.management.get_document_detail(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        document_id=document.document_id,
+    )
+    downloaded = knowledge_database.management.download_document_version(
+        owner_context,
+        knowledge_base_id=knowledge_base.knowledge_base_id,
+        document_id=document.document_id,
+        document_version_id=version.document_version_id,
+    )
+
+    assert detail.current_document_version_id == published.document_version_id
+    assert detail.versions[0].source.original_object_key == object_key
+    assert detail.versions[0].ingestion_job is not None
+    assert detail.versions[0].ingestion_job.block_count == 6
+    assert detail.versions[0].index is not None
+    assert detail.versions[0].index.status == "active"
+    assert detail.versions[0].index.chunk_count == 6
+    detail_json = _document_detail(detail).model_dump_json()
+    assert "original_object_key" not in detail_json
+    assert object_key not in detail_json
+    assert downloaded.file_name == "合成详情.txt"
+    assert downloaded.content == content
+    with knowledge_database.engine.connect() as connection:
+        audit_attributes = connection.scalar(
+            select(audit_records.c.attributes).where(
+                audit_records.c.workspace_id == owner.personal_workspace_id,
+                audit_records.c.action == "knowledge.document.download",
+                audit_records.c.resource_id == version.document_version_id,
+            )
+        )
+    assert isinstance(audit_attributes, dict)
+    assert audit_attributes["size_bytes"] == len(content)
+    assert object_key not in str(audit_attributes)
+
+    outsider_context = replace(context(outsider), authorized_workspace=True)
+    with pytest.raises(KnowledgeNotFoundError):
+        knowledge_database.management.get_document_detail(
+            outsider_context,
+            knowledge_base_id=knowledge_base.knowledge_base_id,
+            document_id=document.document_id,
+        )
+    with pytest.raises(KnowledgeNotFoundError):
+        knowledge_database.management.download_document_version(
+            outsider_context,
+            knowledge_base_id=knowledge_base.knowledge_base_id,
+            document_id=document.document_id,
+            document_version_id=version.document_version_id,
+        )
 
 
 def test_tag_delete_unbinds_documents_and_restore_does_not_rebind(

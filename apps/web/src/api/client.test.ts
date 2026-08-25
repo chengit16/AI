@@ -1,7 +1,7 @@
 /** @description API Client 会话、错误转换与请求边界测试。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiRequest, configureApiClient } from "@/api/client";
+import { apiDownloadRequest, apiRequest, configureApiClient, PlatformApiError } from "@/api/client";
 
 describe("平台 API Client", () => {
   afterEach(() => {
@@ -47,5 +47,48 @@ describe("平台 API Client", () => {
     await expect(
       apiRequest<void>("/api/v1/synthetic-resource", { method: "DELETE" }),
     ).resolves.toBe(undefined);
+  });
+
+  it("文件下载附加工作空间并解码服务端文件名", async () => {
+    configureApiClient(
+      () => ({ workspaceId: "workspace-id", csrfToken: null }),
+      () => undefined,
+    );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("synthetic-content", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain",
+          "Content-Disposition": "attachment; filename*=UTF-8''%E5%90%88%E6%88%90.txt",
+        },
+      }),
+    );
+
+    const result = await apiDownloadRequest("/api/v1/synthetic-download");
+
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(headers.get("X-Workspace-ID")).toBe("workspace-id");
+    expect(result.fileName).toBe("合成.txt");
+    expect(await result.blob.text()).toBe("synthetic-content");
+  });
+
+  it("文件下载失败时保留后端稳定错误码", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: "RESOURCE_NOT_FOUND",
+          message: "资源不存在或不可见",
+          retryable: false,
+        }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(apiDownloadRequest("/api/v1/synthetic-download")).rejects.toEqual(
+      expect.objectContaining<Partial<PlatformApiError>>({
+        status: 404,
+        code: "RESOURCE_NOT_FOUND",
+      }),
+    );
   });
 });

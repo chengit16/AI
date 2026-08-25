@@ -19,6 +19,19 @@ KnowledgeStatus = Literal["active", "deleted"]
 DocumentVersionStatus = Literal["draft", "ready", "published", "superseded"]
 DocumentVisibility = Literal["private", "workspace", "departments"]
 DocumentSourceKind = Literal["manual", "upload", "web", "data_source"]
+DocumentIndexStatus = Literal[
+    "queued",
+    "embedding_running",
+    "embedding_retry_wait",
+    "index_queued",
+    "index_running",
+    "index_retry_wait",
+    "ready",
+    "active",
+    "retired",
+    "failed",
+    "dead_letter",
+]
 
 
 class InvalidKnowledgeFactError(Exception):
@@ -313,6 +326,32 @@ class KnowledgeRepository(Protocol):
         resource_ids: frozenset[UUID],
     ) -> tuple[KnowledgeDocumentSummary, ...]: ...
 
+    def get_document_detail(
+        self,
+        workspace_id: UUID,
+        knowledge_base_id: UUID,
+        document_id: UUID,
+        *,
+        viewer_account_id: UUID,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> KnowledgeDocumentDetail | None: ...
+
+    def get_document_download(
+        self,
+        workspace_id: UUID,
+        knowledge_base_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        *,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+    ) -> KnowledgeDocumentDownload | None: ...
+
     def get_document(
         self, workspace_id: UUID, document_id: UUID, *, for_update: bool = False
     ) -> Document | None: ...
@@ -432,3 +471,57 @@ class KnowledgeDocumentSummary:
     folder_id: UUID
     tag_ids: tuple[UUID, ...]
     is_favorite: bool
+
+
+@dataclass(frozen=True)
+class DocumentIndexSummary:
+    """汇总某一文档版本最新一次索引构建，不暴露内部产物对象键。"""
+
+    index_version_id: UUID
+    build_no: int
+    status: DocumentIndexStatus
+    chunk_count: int | None
+    staged_chunk_count: int | None
+    failure_stage: str | None
+    error_code: str | None
+    error_message: str | None
+    completed_at: datetime | None
+    activated_at: datetime | None
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class KnowledgeDocumentVersionDetail:
+    """组合不可变版本、来源、解析任务和最新索引构建事实。"""
+
+    version: DocumentVersion
+    source: DocumentSource
+    ingestion_job: IngestionJob | None
+    index: DocumentIndexSummary | None
+
+
+@dataclass(frozen=True)
+class KnowledgeDocumentDetail:
+    """提供详情抽屉使用的范围化文档聚合，不返回内容正文和存储定位信息。"""
+
+    document: Document
+    current_document_version_id: UUID | None
+    folder_id: UUID
+    tag_ids: tuple[UUID, ...]
+    is_favorite: bool
+    versions: tuple[KnowledgeDocumentVersionDetail, ...]
+
+
+@dataclass(frozen=True)
+class KnowledgeDocumentDownload:
+    """描述一次已授权原文件读取；对象键只允许在服务端内部流转。"""
+
+    workspace_id: UUID
+    knowledge_base_id: UUID
+    document_id: UUID
+    document_version_id: UUID
+    source_id: UUID
+    file_name: str
+    media_type: str
+    size_bytes: int
+    object_key: str

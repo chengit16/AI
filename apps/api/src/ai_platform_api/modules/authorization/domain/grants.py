@@ -62,6 +62,7 @@ OWNER_PERMISSION_CODES = (
     "knowledge.document.delete",
     "knowledge.document.folder.bind",
     "knowledge.document.tag.bind",
+    "knowledge.document.download",
     "knowledge.document.read",
     "knowledge.document.version.create",
     "knowledge.document.version.publish",

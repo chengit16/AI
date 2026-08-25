@@ -1,6 +1,6 @@
 /** @description 知识文档名称、标签筛选和批量操作工具栏。 */
-import { Button, Input, Popconfirm, Select } from "antd";
-import { FolderInput, Search, Tags, Trash2, X } from "lucide-react";
+import { Button, Input, Popconfirm, Segmented, Select, Tooltip } from "antd";
+import { FolderInput, Grid2X2, List, Search, Tags, Trash2, X } from "lucide-react";
 
 import type { KnowledgeTag } from "@/api/services/knowledgeOrganization";
 
@@ -13,12 +13,16 @@ interface DocumentListToolbarProps {
   tags: readonly KnowledgeTag[];
   /** 当前选中文档数量。 */
   selectedCount: number;
+  /** 当前文档集合的展示方式。 */
+  viewMode: DocumentViewMode;
   /** 只控制批量移动和标签入口，服务端仍逐篇授权。 */
   canOrganize: boolean;
   /** 只控制批量删除入口，服务端仍逐篇授权。 */
   canDelete: boolean;
   /** 更新名称搜索词。 */
   onSearchChange: (value: string) => void;
+  /** 切换列表或卡片视图。 */
+  onViewModeChange: (mode: DocumentViewMode) => void;
   /** 更新标签筛选。 */
   onTagChange: (tagId: string | null) => void;
   /** 清空当前批量选择。 */
@@ -30,6 +34,9 @@ interface DocumentListToolbarProps {
   /** 将选中文档移入回收站。 */
   onDeleteSelected: () => void;
 }
+
+/** 文档集合支持的稳定展示方式。 */
+export type DocumentViewMode = "list" | "cards";
 
 /** 提供不会改变服务端事实的筛选，并将批量命令交回页面状态层。 */
 export function DocumentListToolbar(props: DocumentListToolbarProps) {
@@ -84,6 +91,34 @@ export function DocumentListToolbar(props: DocumentListToolbarProps) {
           />
         </div>
       )}
+      <Segmented<DocumentViewMode>
+        className="ml-auto phone-down:ml-0"
+        aria-label="切换文档视图"
+        value={props.viewMode}
+        options={[
+          {
+            value: "list",
+            label: (
+              <Tooltip title="列表视图">
+                <span className="grid h-6 w-6 place-items-center" aria-label="列表视图">
+                  <List size={16} />
+                </span>
+              </Tooltip>
+            ),
+          },
+          {
+            value: "cards",
+            label: (
+              <Tooltip title="卡片视图">
+                <span className="grid h-6 w-6 place-items-center" aria-label="卡片视图">
+                  <Grid2X2 size={16} />
+                </span>
+              </Tooltip>
+            ),
+          },
+        ]}
+        onChange={props.onViewModeChange}
+      />
     </div>
   );
 }

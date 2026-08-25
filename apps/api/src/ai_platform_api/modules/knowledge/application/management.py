@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -12,6 +13,7 @@ from ai_platform_backend.ingestion.domain import (
 )
 from ai_platform_backend.integration.domain import AuditRecord
 
+from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.integration.domain.events import IntegrationEvent
 from ai_platform_api.modules.knowledge.application.facts import (
@@ -21,20 +23,49 @@ from ai_platform_api.modules.knowledge.application.facts import (
 )
 from ai_platform_api.modules.knowledge.domain.models import (
     KnowledgeBase,
+    KnowledgeDocumentDetail,
+    KnowledgeDocumentDownload,
     KnowledgeDocumentSummary,
     KnowledgeRepository,
     KnowledgeUnitOfWork,
     KnowledgeWriteConflictError,
 )
+from ai_platform_api.modules.knowledge.domain.uploads import (
+    ObjectStorage,
+    ObjectStorageUnavailableError,
+    WorkspaceObject,
+)
 
-__all__ = ["IngestionJob", "KnowledgeDocumentSummary", "KnowledgeManagementService"]
+__all__ = [
+    "IngestionJob",
+    "KnowledgeDocumentDetail",
+    "KnowledgeDocumentDownloadFile",
+    "KnowledgeDocumentSummary",
+    "KnowledgeManagementService",
+]
+
+
+class DocumentStorageUnavailableError(PlatformError):
+    """表示授权下载期间对象存储不可用或返回了不完整对象。"""
+
+    error_code = "OBJECT_STORAGE_UNAVAILABLE"
+
+
+@dataclass(frozen=True)
+class KnowledgeDocumentDownloadFile:
+    """返回路由所需文件名、媒体类型和已验证原文件内容。"""
+
+    file_name: str
+    media_type: str
+    content: bytes
 
 
 class KnowledgeManagementService:
     """提供知识生产页所需的范围化读模型与安全人工重试命令。"""
 
-    def __init__(self, unit_of_work: KnowledgeUnitOfWork) -> None:
+    def __init__(self, unit_of_work: KnowledgeUnitOfWork, storage: ObjectStorage) -> None:
         self._unit_of_work = unit_of_work
+        self._storage = storage
 
     def list_knowledge_bases(
         self,
@@ -112,6 +143,119 @@ class KnowledgeManagementService:
                 account_ids=context.authorized_account_ids,
                 resource_ids=context.authorized_resource_ids,
             )
+
+    def get_document_detail(
+        self,
+        context: RequestContext,
+        *,
+        knowledge_base_id: UUID,
+        document_id: UUID,
+    ) -> KnowledgeDocumentDetail:
+        """返回单篇活动文档的版本、解析和索引聚合，越权与不存在统一为不可见。"""
+
+        account_id = _browser_account(context)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work.knowledge, context.workspace_id, account_id)
+            _require_active_knowledge_base(
+                unit_of_work.knowledge,
+                context.workspace_id,
+                knowledge_base_id,
+            )
+            detail = unit_of_work.knowledge.get_document_detail(
+                context.workspace_id,
+                knowledge_base_id,
+                document_id,
+                viewer_account_id=account_id,
+                authorized_workspace=context.authorized_workspace,
+                department_ids=context.authorized_department_ids,
+                account_ids=context.authorized_account_ids,
+                resource_ids=context.authorized_resource_ids,
+            )
+            if detail is None:
+                raise KnowledgeNotFoundError
+            return detail
+
+    def download_document_version(
+        self,
+        context: RequestContext,
+        *,
+        knowledge_base_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+    ) -> KnowledgeDocumentDownloadFile:
+        """读取原文件并在响应前复核关系，避免数据库事务跨越外部对象读取。"""
+
+        account_id = _browser_account(context)
+        descriptor = self._get_download_descriptor(
+            context,
+            account_id=account_id,
+            knowledge_base_id=knowledge_base_id,
+            document_id=document_id,
+            document_version_id=document_version_id,
+        )
+        try:
+            content = self._storage.get(
+                WorkspaceObject(descriptor.workspace_id, descriptor.object_key)
+            )
+        except ObjectStorageUnavailableError as error:
+            raise DocumentStorageUnavailableError from error
+        if len(content) != descriptor.size_bytes:
+            raise DocumentStorageUnavailableError
+
+        # 外部读取期间成员、文档或来源可能改变；返回字节前必须重查且要求描述完全一致。
+        verified = self._get_download_descriptor(
+            context,
+            account_id=account_id,
+            knowledge_base_id=knowledge_base_id,
+            document_id=document_id,
+            document_version_id=document_version_id,
+            expected_descriptor=descriptor,
+            record_audit=True,
+        )
+        return KnowledgeDocumentDownloadFile(
+            file_name=verified.file_name,
+            media_type=verified.media_type,
+            content=content,
+        )
+
+    def _get_download_descriptor(
+        self,
+        context: RequestContext,
+        *,
+        account_id: UUID,
+        knowledge_base_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        expected_descriptor: KnowledgeDocumentDownload | None = None,
+        record_audit: bool = False,
+    ) -> KnowledgeDocumentDownload:
+        """在一个短事务内重新建立下载所需的完整可信关系。"""
+
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work.knowledge, context.workspace_id, account_id)
+            _require_active_knowledge_base(
+                unit_of_work.knowledge,
+                context.workspace_id,
+                knowledge_base_id,
+            )
+            descriptor = unit_of_work.knowledge.get_document_download(
+                context.workspace_id,
+                knowledge_base_id,
+                document_id,
+                document_version_id,
+                authorized_workspace=context.authorized_workspace,
+                department_ids=context.authorized_department_ids,
+                account_ids=context.authorized_account_ids,
+                resource_ids=context.authorized_resource_ids,
+            )
+            if descriptor is None:
+                raise KnowledgeNotFoundError
+            if expected_descriptor is not None and descriptor != expected_descriptor:
+                raise KnowledgeNotFoundError
+            if record_audit:
+                _record_download(unit_of_work, context, descriptor, datetime.now(UTC))
+                unit_of_work.commit()
+            return descriptor
 
     def retry_ingestion_job(
         self,
@@ -351,6 +495,38 @@ def _record_cancellation(
                 "ingestion_job_id": str(job.ingestion_job_id),
                 "document_version_id": str(job.document_version_id),
                 "previous_status": job.status,
+            },
+        )
+    )
+
+
+def _record_download(
+    unit_of_work: KnowledgeUnitOfWork,
+    context: RequestContext,
+    descriptor: KnowledgeDocumentDownload,
+    occurred_at: datetime,
+) -> None:
+    """记录下载成功事实；审计只保存业务标识和文件大小，不复制对象键。"""
+
+    unit_of_work.audit.add(
+        AuditRecord(
+            audit_id=uuid4(),
+            workspace_id=context.workspace_id,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            action="knowledge.document.download",
+            resource_type="document_version",
+            resource_id=descriptor.document_version_id,
+            outcome="succeeded",
+            occurred_at=occurred_at,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
+            attributes={
+                "document_id": str(descriptor.document_id),
+                "source_id": str(descriptor.source_id),
+                "size_bytes": descriptor.size_bytes,
             },
         )
     )

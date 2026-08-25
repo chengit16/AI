@@ -3,6 +3,7 @@ import { Button, Dropdown, Popconfirm, Table, Tag } from "antd";
 import type { MenuProps, TableColumnsType } from "antd";
 import {
   CheckCircle2,
+  Eye,
   FolderInput,
   MoreHorizontal,
   Send,
@@ -37,6 +38,8 @@ interface DocumentTableProps {
   emptyDescription?: string;
   /** 只控制上传新版本入口，服务端仍独立授权。 */
   canUploadVersion: boolean;
+  /** 只控制详情入口，服务端仍执行文档资源读取授权。 */
+  canReadDetails?: boolean;
   /** 只控制确认就绪入口，状态和摘要仍由服务端校验。 */
   canMarkReady: boolean;
   /** 只控制发布入口，服务端仍校验版本和资源范围。 */
@@ -51,6 +54,8 @@ interface DocumentTableProps {
   isMutating: boolean;
   /** 打开指定文档的新版本上传流程。 */
   onUploadVersion: (document: KnowledgeDocumentSummary) => void;
+  /** 打开指定文档详情。 */
+  onOpenDetails?: (document: KnowledgeDocumentSummary) => void;
   /** 以解析任务提供的内容摘要请求确认版本就绪。 */
   onMarkReady: (document: KnowledgeDocumentSummary, contentHash: string) => void;
   /** 请求发布指定文档的最新版本。 */
@@ -82,6 +87,7 @@ export function DocumentTable({
   emptyTitle = "还没有文档",
   emptyDescription = "上传首份文档后，可以在这里跟踪解析和发布状态。",
   canUploadVersion,
+  canReadDetails = false,
   canMarkReady,
   canPublish,
   canOrganize,
@@ -89,6 +95,7 @@ export function DocumentTable({
   canDelete,
   isMutating,
   onUploadVersion,
+  onOpenDetails = () => undefined,
   onMarkReady,
   onPublish,
   onSelectionChange,
@@ -106,9 +113,22 @@ export function DocumentTable({
       key: "document",
       render: (_, record) => (
         <div className="grid min-w-0 gap-[3px]">
-          <strong className="overflow-hidden text-ellipsis whitespace-nowrap">
-            {record.title}
-          </strong>
+          {canReadDetails ? (
+            <Button
+              type="link"
+              className="h-auto min-w-0 justify-start overflow-hidden p-0 font-semibold"
+              icon={<Eye size={15} />}
+              onClick={() => onOpenDetails(record)}
+            >
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                {record.title}
+              </span>
+            </Button>
+          ) : (
+            <strong className="overflow-hidden text-ellipsis whitespace-nowrap">
+              {record.title}
+            </strong>
+          )}
           <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
             {record.source_name}
           </span>

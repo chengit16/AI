@@ -9,7 +9,9 @@ import { useEffect } from "react";
 import { errorMessage } from "@/api/client";
 import {
   createKnowledgeBase,
+  downloadKnowledgeDocumentVersion,
   getKnowledgeBases,
+  getKnowledgeDocumentDetail,
   getKnowledgeDocuments,
   getKnowledgeIngestionJobs,
   markKnowledgeDocumentVersionReady,
@@ -42,7 +44,10 @@ export interface UploadDocumentValues {
  * 任务查询只在存在当前空间和知识库时启动，活动任务按 3 秒轮询；任何会改变文档
  * 或任务状态的命令成功后统一刷新知识库、文档和任务，避免跨列表状态不一致。
  */
-export function useKnowledgeProduction(knowledgeBaseId: string | null) {
+export function useKnowledgeProduction(
+  knowledgeBaseId: string | null,
+  detailDocumentId: string | null = null,
+) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const { workspaceId } = useCurrentWorkspace();
@@ -69,6 +74,13 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
         ? 3_000
         : false,
   });
+  const detail = useQuery({
+    queryKey: knowledgeQueryKeys.detail(workspaceId, knowledgeBaseId, detailDocumentId),
+    queryFn: ({ signal }) =>
+      getKnowledgeDocumentDetail(workspaceId!, knowledgeBaseId!, detailDocumentId!, signal),
+    enabled: Boolean(workspaceId && knowledgeBaseId && detailDocumentId),
+    retry: false,
+  });
 
   useEffect(() => {
     if (!jobs.dataUpdatedAt || !jobs.data?.length) {
@@ -78,7 +90,10 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
     void queryClient.invalidateQueries({
       queryKey: knowledgeQueryKeys.documents(workspaceId, knowledgeBaseId),
     });
-  }, [jobs.data, jobs.dataUpdatedAt, knowledgeBaseId, queryClient, workspaceId]);
+    void queryClient.invalidateQueries({
+      queryKey: knowledgeQueryKeys.detail(workspaceId, knowledgeBaseId, detailDocumentId),
+    });
+  }, [detailDocumentId, jobs.data, jobs.dataUpdatedAt, knowledgeBaseId, queryClient, workspaceId]);
 
   // 2. 文档写操作会同时改变知识库统计、版本摘要和任务状态，必须整体刷新。
   const refreshBase = async () => {
@@ -89,6 +104,9 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
       }),
       queryClient.invalidateQueries({
         queryKey: knowledgeQueryKeys.jobs(workspaceId, knowledgeBaseId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: knowledgeQueryKeys.detail(workspaceId, knowledgeBaseId, detailDocumentId),
       }),
     ]);
   };
@@ -164,16 +182,44 @@ export function useKnowledgeProduction(knowledgeBaseId: string | null) {
     },
     onError: notifyError,
   });
+  const downloadVersion = useMutation({
+    mutationFn: ({
+      documentId,
+      documentVersionId,
+    }: {
+      documentId: string;
+      documentVersionId: string;
+    }) =>
+      downloadKnowledgeDocumentVersion(
+        workspaceId!,
+        knowledgeBaseId!,
+        documentId,
+        documentVersionId,
+      ),
+    onSuccess: ({ blob, fileName }) => {
+      // 对象 URL 只存活于本次点击，避免把带权限的文件内容留在页面长期状态中。
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      void message.success("原文件已开始下载");
+    },
+    onError: notifyError,
+  });
 
   return {
     bases,
     documents,
     jobs,
+    detail,
     createBase,
     uploadDocument,
     uploadVersion,
     markReady,
     publish,
     retryJob,
+    downloadVersion,
   };
 }
