@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "p6a06-v1",
+  "status": "frozen",
+  "synthetic": true,
+  "description": "以全合成个人空间数据执行阶段 A 的组织、文件处理、索引、搜索、问答、权限和 Migration 联合验收。",
+  "execution_policy": {
+    "preflight_command": "./platform doctor",
+    "recovery_command": "./platform doctor",
+    "stop_scenarios_on_preflight_failure": true,
+    "always_run_recovery_check": true,
+    "failure_mode": "fail_closed",
+    "evidence_path": ".ai-platform/evidence/p6a06-latest.json"
+  },
+  "required_capabilities": ["organization_lifecycle", "document_publication", "ingestion_retry", "index_consistency", "retrieval_authorization", "workbench_search", "assistant_scope", "migration_roundtrip", "cross_workspace_isolation"],
+  "scenarios": [
+    { "scenario_id": "p6a06-organization-001", "title": "目录、标签、收藏和回收站生命周期", "capability": "organization_lifecycle", "pytest_node": "tests/integration/test_p1d01_knowledge_postgres.py::test_tag_delete_unbinds_documents_and_restore_does_not_rebind", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-publication-002", "title": "个人文档版本、发布和事务事实", "capability": "document_publication", "pytest_node": "tests/integration/test_p1d01_knowledge_postgres.py::test_personal_fact_lifecycle_publication_and_transaction_records", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-ingestion-003", "title": "解析任务租约、失败和有界重试", "capability": "ingestion_retry", "pytest_node": "tests/integration/test_p1d01_knowledge_postgres.py::test_ingestion_job_lease_and_retry_are_bounded", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-index-004", "title": "索引构建、发布、重建和撤销原子性", "capability": "index_consistency", "pytest_node": "tests/integration/test_p1d04_index_versions_postgres.py::test_index_build_publication_rebuild_and_revocation_are_atomic", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-retrieval-005", "title": "检索权限边界和不可变快照", "capability": "retrieval_authorization", "pytest_node": "tests/integration/test_p1e02_retrieval_planning_postgres.py::test_permissions_bounded_search_and_immutable_snapshot", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-workbench-006", "title": "工作台统计、搜索和最近访问授权交集", "capability": "workbench_search", "pytest_node": "tests/integration/test_p6a04_personal_workbench_postgres.py::test_workbench_search_and_access_share_authorized_published_scope", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-assistant-007", "title": "助手范围、附件冻结和会话归档", "capability": "assistant_scope", "pytest_node": "tests/integration/test_p6a05_assistant_experience_postgres.py::test_scope_attachment_http_freeze_and_archive_cleanup", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-assistant-008", "title": "标签收窄检索与空范围失败关闭", "capability": "assistant_scope", "pytest_node": "tests/integration/test_p6a05_assistant_experience_postgres.py::test_selected_tags_narrow_retrieval_and_empty_match_does_not_fallback", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-download-009", "title": "文档详情下载 Migration 往返和安全回滚", "capability": "migration_roundtrip", "pytest_node": "tests/integration/test_p6a03_document_download_postgres.py::test_revision_0073_upgrades_existing_workspace_and_roundtrips", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-workbench-migration-010", "title": "个人工作台 Migration 空库与存量往返", "capability": "migration_roundtrip", "pytest_node": "tests/integration/test_p6a04_personal_workbench_postgres.py::test_p6a04_empty_migration_roundtrip", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-assistant-migration-011", "title": "助手范围 Migration 空库与存量往返", "capability": "migration_roundtrip", "pytest_node": "tests/integration/test_p6a05_assistant_experience_postgres.py::test_p6a05_empty_migration_roundtrip", "expected_case_count": 1 },
+    { "scenario_id": "p6a06-isolation-012", "title": "个人空间与企业部门的跨空间授权拒绝", "capability": "cross_workspace_isolation", "pytest_node": "tests/integration/test_p1d01_knowledge_postgres.py::test_enterprise_owner_department_scope_and_member_denial", "expected_case_count": 1 }
+  ],
+  "manual_acceptance": {
+    "synthetic_data": true,
+    "browser_viewports": ["1440x900", "390x844"],
+    "evidence_document": "docs/stages/stage-6-report.md"
+  }
+}

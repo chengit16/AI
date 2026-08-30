@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-platform.local/contracts/acceptance/stage-6-a-acceptance.v1.schema.json",
+  "title": "阶段 A 联合验收清单 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "acceptance_id", "status", "synthetic", "description", "execution_policy", "required_capabilities", "scenarios", "manual_acceptance"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "acceptance_id": { "const": "p6a06-v1" },
+    "status": { "const": "frozen" },
+    "synthetic": { "const": true },
+    "description": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "execution_policy": { "$ref": "#/$defs/execution_policy" },
+    "required_capabilities": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 8,
+      "items": { "$ref": "#/$defs/scenario" }
+    },
+    "manual_acceptance": { "$ref": "#/$defs/manual_acceptance" }
+  },
+  "$defs": {
+    "capability": {
+      "enum": [
+        "organization_lifecycle",
+        "document_publication",
+        "ingestion_retry",
+        "index_consistency",
+        "retrieval_authorization",
+        "workbench_search",
+        "assistant_scope",
+        "migration_roundtrip",
+        "cross_workspace_isolation"
+      ]
+    },
+    "execution_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preflight_command", "recovery_command", "stop_scenarios_on_preflight_failure", "always_run_recovery_check", "failure_mode", "evidence_path"],
+      "properties": {
+        "preflight_command": { "const": "./platform doctor" },
+        "recovery_command": { "const": "./platform doctor" },
+        "stop_scenarios_on_preflight_failure": { "const": true },
+        "always_run_recovery_check": { "const": true },
+        "failure_mode": { "const": "fail_closed" },
+        "evidence_path": { "const": ".ai-platform/evidence/p6a06-latest.json" }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_id", "title", "capability", "pytest_node", "expected_case_count"],
+      "properties": {
+        "scenario_id": { "type": "string", "pattern": "^p6a06-[a-z0-9-]+-[0-9]{3}$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "capability": { "$ref": "#/$defs/capability" },
+        "pytest_node": { "type": "string", "pattern": "^tests/(?:integration|unit)/test_[a-z0-9_]+\\.py::test_[a-z0-9_]+$" },
+        "expected_case_count": { "const": 1 }
+      }
+    },
+    "manual_acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["synthetic_data", "browser_viewports", "evidence_document"],
+      "properties": {
+        "synthetic_data": { "const": true },
+        "browser_viewports": {
+          "type": "array",
+          "items": { "enum": ["1440x900", "390x844"] },
+          "minItems": 2,
+          "uniqueItems": true
+        },
+        "evidence_document": { "const": "docs/stages/stage-6-report.md" }
+      }
+    }
+  }
+}
