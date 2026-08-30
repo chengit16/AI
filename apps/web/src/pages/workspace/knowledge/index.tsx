@@ -61,6 +61,7 @@ export default function KnowledgeProductionPage() {
   const selectedTagId = searchParams.get("tag");
   const searchText = searchParams.get("q") ?? "";
   const requestedDetailId = searchParams.get("document");
+  const requestedAction = searchParams.get("action");
   const documentViewMode = searchParams.get("layout") === "cards" ? "cards" : "list";
   const [createOpen, setCreateOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -73,6 +74,8 @@ export default function KnowledgeProductionPage() {
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<readonly string[]>([]);
   const { visiblePermissionCodes } = useWorkspaceMenuNavigation();
   const has = (permissionCode: string) => visiblePermissionCodes.has(permissionCode);
+  const canCreateDocument = has("knowledge.document.create");
+  const canCreateFolder = has("knowledge.folder.create");
   const detailDocumentId = has("knowledge.document.read") ? requestedDetailId : null;
 
   // 1. 页面 Query 只在对应菜单权限存在时启动，避免用失败请求猜测授权结果。
@@ -120,6 +123,29 @@ export default function KnowledgeProductionPage() {
     }
   }, [model.bases.data, searchParams, selectedBaseId, setSearchParams]);
 
+  useEffect(() => {
+    // 工作台快捷入口只打开既有流程；URL 动作消费后立即移除，刷新不会重复弹窗。
+    const openUpload = requestedAction === "upload" && selectedBaseId && canCreateDocument;
+    const openFolder = requestedAction === "folder" && canCreateFolder;
+    if (!openUpload && !openFolder) return;
+    // URL 是外部路由状态，延迟到当前提交完成后再同步本地弹窗，避免 Effect 内级联渲染。
+    const timer = window.setTimeout(() => {
+      if (openUpload) setUploadOpen(true);
+      if (openFolder) setFolderDialog({ action: "create", folder: null });
+      const next = new URLSearchParams(searchParams);
+      next.delete("action");
+      setSearchParams(next, { replace: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    canCreateDocument,
+    canCreateFolder,
+    requestedAction,
+    searchParams,
+    selectedBaseId,
+    setSearchParams,
+  ]);
+
   // 2. URL 中的目录、收藏、标签和名称条件只过滤已授权摘要，不参与扩大服务端查询范围。
   const filteredDocuments = (model.documents.data ?? []).filter((document) => {
     const folderMatches = !selectedFolderId || document.folder_id === selectedFolderId;
@@ -166,7 +192,7 @@ export default function KnowledgeProductionPage() {
                 新建知识库
               </Button>
             )}
-            {selectedBaseId && scope !== "trash" && has("knowledge.document.create") && (
+            {selectedBaseId && scope !== "trash" && canCreateDocument && (
               <Button
                 type="primary"
                 icon={<Upload size={17} />}

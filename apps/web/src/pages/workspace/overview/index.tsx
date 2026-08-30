@@ -23,6 +23,8 @@ import { StateView } from "@/components/StateView/StateView";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 import { useSessionStore } from "@/store/session";
 
+import { PersonalKnowledgeWorkbench } from "./PersonalKnowledgeWorkbench";
+
 const quotaLabels = {
   members: "成员",
   storage_bytes: "存储空间",
@@ -46,13 +48,14 @@ export default function WorkspaceOverviewPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const { workspaceId, workspaces, currentWorkspace } = useCurrentWorkspace();
+  const isEnterprise = currentWorkspace?.workspace_type === "enterprise";
   const setWorkspaceId = useSessionStore((state) => state.setWorkspaceId);
   const [invitationOpen, setInvitationOpen] = useState(false);
   const [form] = Form.useForm<{ invitationId: string }>();
   const entitlement = useQuery({
     queryKey: ["entitlement", workspaceId],
     queryFn: ({ signal }) => getWorkspaceEntitlement(workspaceId!, signal),
-    enabled: Boolean(workspaceId),
+    enabled: Boolean(workspaceId && isEnterprise),
   });
   const toggleOpenApi = useMutation({
     mutationFn: (enabled: boolean) => setWorkspaceOpenApiFeature(workspaceId!, enabled),
@@ -76,20 +79,41 @@ export default function WorkspaceOverviewPage() {
     onError: (error) => void message.error(errorMessage(error)),
   });
 
-  if (workspaces.isLoading || entitlement.isLoading)
+  const invitationModal = (
+    <Modal
+      title="接受企业空间邀请"
+      open={invitationOpen}
+      okText="接受邀请"
+      cancelText="取消"
+      confirmLoading={acceptInvitation.isPending}
+      onCancel={() => setInvitationOpen(false)}
+      onOk={() => void form.validateFields().then((values) => acceptInvitation.mutate(values))}
+    >
+      <Form form={form} layout="vertical" requiredMark={false}>
+        <Form.Item
+          label="邀请 ID"
+          name="invitationId"
+          rules={[{ required: true, message: "请输入邀请 ID" }]}
+        >
+          <Input placeholder="由企业空间所有者提供" />
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+
+  if (workspaces.isLoading || (isEnterprise && entitlement.isLoading))
     return <Skeleton active paragraph={{ rows: 10 }} />;
-  if (workspaces.isError || entitlement.isError || !currentWorkspace || !entitlement.data) {
+  if (workspaces.isError || !currentWorkspace) {
     return (
       <StateView
         kind="error"
         headingLevel={1}
         title="空间信息未能加载"
-        description={errorMessage(workspaces.error ?? entitlement.error)}
+        description={errorMessage(workspaces.error)}
         action={
           <Button
             onClick={() => {
               void workspaces.refetch();
-              void entitlement.refetch();
             }}
           >
             重新加载
@@ -98,8 +122,26 @@ export default function WorkspaceOverviewPage() {
       />
     );
   }
+  if (!isEnterprise) {
+    return (
+      <>
+        <PersonalKnowledgeWorkbench onAcceptInvitation={() => setInvitationOpen(true)} />
+        {invitationModal}
+      </>
+    );
+  }
+  if (entitlement.isError || !entitlement.data) {
+    return (
+      <StateView
+        kind="error"
+        headingLevel={1}
+        title="企业权益未能加载"
+        description={errorMessage(entitlement.error)}
+        action={<Button onClick={() => void entitlement.refetch()}>重新加载</Button>}
+      />
+    );
+  }
   const isOwner = currentWorkspace.membership_type === "owner";
-  const isEnterprise = currentWorkspace.workspace_type === "enterprise";
 
   return (
     <>
@@ -220,25 +262,7 @@ export default function WorkspaceOverviewPage() {
         </span>
       </section>
 
-      <Modal
-        title="接受企业空间邀请"
-        open={invitationOpen}
-        okText="接受邀请"
-        cancelText="取消"
-        confirmLoading={acceptInvitation.isPending}
-        onCancel={() => setInvitationOpen(false)}
-        onOk={() => void form.validateFields().then((values) => acceptInvitation.mutate(values))}
-      >
-        <Form form={form} layout="vertical" requiredMark={false}>
-          <Form.Item
-            label="邀请 ID"
-            name="invitationId"
-            rules={[{ required: true, message: "请输入邀请 ID" }]}
-          >
-            <Input placeholder="由企业空间所有者提供" />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {invitationModal}
     </>
   );
 }

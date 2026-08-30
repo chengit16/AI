@@ -77,7 +77,7 @@ def test_revision_0073_upgrades_existing_workspace_and_roundtrips(
     config, connection, schema, _ = migration_database
     workspace = _seed_pre_0073_workspace(migration_database)
 
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260825_0073")
     connection.commit()
     assert _revision(connection, schema) == "20260825_0073"
     assert _owner_download_permission_count(connection, schema, workspace.workspace_id) == 1
@@ -118,7 +118,7 @@ def test_revision_0073_upgrades_existing_workspace_and_roundtrips(
         == 0
     )
 
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260825_0073")
     connection.commit()
     assert _revision(connection, schema) == "20260825_0073"
     assert _owner_download_permission_count(connection, schema, workspace.workspace_id) == 1
@@ -131,7 +131,7 @@ def test_revision_0073_blocks_destructive_downgrade(
 
     config, connection, schema, _ = migration_database
     workspace = _seed_pre_0073_workspace(migration_database)
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260825_0073")
     connection.commit()
 
     connection.execute(

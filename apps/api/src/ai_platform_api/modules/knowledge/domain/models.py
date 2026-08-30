@@ -32,6 +32,8 @@ DocumentIndexStatus = Literal[
     "failed",
     "dead_letter",
 ]
+KnowledgeSearchFilter = Literal["all", "title", "content"]
+KnowledgeSearchMatch = Literal["title", "content", "title_and_content"]
 
 
 class InvalidKnowledgeFactError(Exception):
@@ -352,6 +354,53 @@ class KnowledgeRepository(Protocol):
         resource_ids: frozenset[UUID],
     ) -> KnowledgeDocumentDownload | None: ...
 
+    def get_personal_workbench(
+        self,
+        workspace_id: UUID,
+        *,
+        viewer_account_id: UUID,
+        recent_limit: int,
+        favorite_limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
+    ) -> PersonalKnowledgeWorkbench: ...
+
+    def search_published_documents(
+        self,
+        workspace_id: UUID,
+        *,
+        viewer_account_id: UUID,
+        query: str,
+        knowledge_base_id: UUID | None,
+        match_type: KnowledgeSearchFilter,
+        favorite_only: bool,
+        include_content: bool,
+        limit: int,
+        offset: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
+    ) -> KnowledgeSearchPage: ...
+
+    def record_document_access(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        *,
+        viewer_account_id: UUID,
+        accessed_at: datetime,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
+    ) -> bool: ...
+
     def get_document(
         self, workspace_id: UUID, document_id: UUID, *, for_update: bool = False
     ) -> Document | None: ...
@@ -471,6 +520,69 @@ class KnowledgeDocumentSummary:
     folder_id: UUID
     tag_ids: tuple[UUID, ...]
     is_favorite: bool
+
+
+@dataclass(frozen=True)
+class PersonalWorkbenchDocument:
+    """表示个人工作台可展示的低敏文档活动摘要。"""
+
+    document_id: UUID
+    knowledge_base_id: UUID
+    knowledge_base_name: str
+    title: str
+    updated_at: datetime
+    published_at: datetime | None
+    last_accessed_at: datetime | None
+    is_favorite: bool
+    is_indexed: bool
+
+
+@dataclass(frozen=True)
+class PersonalWorkbenchStatistics:
+    """固定个人工作台统计口径，所有数量均来自同一授权文档集合。"""
+
+    knowledge_base_count: int
+    document_count: int
+    published_document_count: int
+    favorite_document_count: int
+    indexed_document_count: int
+    pending_index_document_count: int
+
+
+@dataclass(frozen=True)
+class PersonalKnowledgeWorkbench:
+    """聚合个人统计、最近文档和收藏文档，不包含跨模块会话私有事实。"""
+
+    statistics: PersonalWorkbenchStatistics
+    recent_documents: tuple[PersonalWorkbenchDocument, ...]
+    favorite_documents: tuple[PersonalWorkbenchDocument, ...]
+
+
+@dataclass(frozen=True)
+class KnowledgeSearchItem:
+    """表示名称或正文命中的已发布文档和最小引用摘要。"""
+
+    document_id: UUID
+    knowledge_base_id: UUID
+    knowledge_base_name: str
+    title: str
+    updated_at: datetime
+    published_at: datetime
+    is_favorite: bool
+    matched_by: KnowledgeSearchMatch
+    excerpt: str | None
+    chunk_id: UUID | None
+    sequence_no: int | None
+
+
+@dataclass(frozen=True)
+class KnowledgeSearchPage:
+    """返回授权搜索分页和索引覆盖状态，供页面呈现部分就绪提示。"""
+
+    items: tuple[KnowledgeSearchItem, ...]
+    total: int
+    unavailable_index_document_count: int
+    content_search_available: bool
 
 
 @dataclass(frozen=True)

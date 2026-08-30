@@ -7,19 +7,22 @@ const MAX_LENGTH = 100_000;
 
 /** 渲染有界文本输入、发送命令和活动 Run 的取消命令。 */
 export function AssistantComposer({
+  initialValue = "",
   disabled,
   sending,
   cancellable,
   onSend,
   onCancel,
 }: {
+  /** 工作台跳转时预填的提问草稿；组件不会自动发送。 */
+  initialValue?: string;
   disabled: boolean;
   sending: boolean;
   cancellable: boolean;
   onSend: (text: string) => void;
   onCancel: () => void;
 }) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue);
   const canSend = value.trim().length > 0 && value.length <= MAX_LENGTH && !disabled;
   function submit() {
     const text = value.trim();

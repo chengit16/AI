@@ -15,6 +15,7 @@ from ai_platform_backend.integration.domain import AuditRecord
 
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
+from ai_platform_api.modules.authorization.domain.fields import SECURITY_LEVEL_RANK
 from ai_platform_api.modules.integration.domain.events import IntegrationEvent
 from ai_platform_api.modules.knowledge.application.facts import (
     KnowledgeConflictError,
@@ -27,8 +28,12 @@ from ai_platform_api.modules.knowledge.domain.models import (
     KnowledgeDocumentDownload,
     KnowledgeDocumentSummary,
     KnowledgeRepository,
+    KnowledgeSearchFilter,
+    KnowledgeSearchPage,
     KnowledgeUnitOfWork,
     KnowledgeWriteConflictError,
+    PersonalKnowledgeWorkbench,
+    PersonalWorkbenchDocument,
 )
 from ai_platform_api.modules.knowledge.domain.uploads import (
     ObjectStorage,
@@ -42,6 +47,9 @@ __all__ = [
     "KnowledgeDocumentDownloadFile",
     "KnowledgeDocumentSummary",
     "KnowledgeManagementService",
+    "KnowledgeSearchPage",
+    "PersonalKnowledgeWorkbench",
+    "PersonalWorkbenchDocument",
 ]
 
 
@@ -174,6 +182,109 @@ class KnowledgeManagementService:
             if detail is None:
                 raise KnowledgeNotFoundError
             return detail
+
+    def get_personal_workbench(
+        self,
+        context: RequestContext,
+        *,
+        recent_limit: int,
+        favorite_limit: int,
+    ) -> PersonalKnowledgeWorkbench:
+        """返回同一文档授权口径下的个人知识工作台聚合。"""
+
+        account_id = _browser_account(context)
+        _require_workbench_limit(recent_limit)
+        _require_workbench_limit(favorite_limit)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work.knowledge, context.workspace_id, account_id)
+            return unit_of_work.knowledge.get_personal_workbench(
+                context.workspace_id,
+                viewer_account_id=account_id,
+                recent_limit=recent_limit,
+                favorite_limit=favorite_limit,
+                authorized_workspace=context.authorized_workspace,
+                department_ids=context.authorized_department_ids,
+                account_ids=context.authorized_account_ids,
+                resource_ids=context.authorized_resource_ids,
+                maximum_security_level=context.authorized_maximum_security_level,
+            )
+
+    def search_published_documents(
+        self,
+        context: RequestContext,
+        *,
+        query: str,
+        knowledge_base_id: UUID | None,
+        match_type: KnowledgeSearchFilter,
+        favorite_only: bool,
+        limit: int,
+        offset: int,
+    ) -> KnowledgeSearchPage:
+        """搜索获权且已发布文档，字段遮罩禁止时不读取正文 Chunk。"""
+
+        # 1. 协议边缘和应用直调共享相同输入边界，避免绕过 HTTP Query 约束。
+        account_id = _browser_account(context)
+        normalized_query = query.strip()
+        if not 1 <= len(normalized_query) <= 200:
+            raise ValueError("知识搜索词长度必须在 1 到 200 之间")
+        _require_limit(limit)
+        _require_search_offset(offset)
+        if match_type not in {"all", "title", "content"}:
+            raise ValueError("知识搜索匹配类型无效")
+        # 2. Chunk 正文最低为 INTERNAL；显式遮罩或更低密级都关闭正文匹配和摘要。
+        content_search_allowed = (
+            SECURITY_LEVEL_RANK[context.authorized_maximum_security_level]
+            >= SECURITY_LEVEL_RANK["INTERNAL"]
+            and "content" not in context.authorized_field_mask
+            and "chunk.content" not in context.authorized_field_mask
+        )
+        # 3. 活动成员复核与范围化查询位于同一事务，Repository 只执行可信策略投影。
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work.knowledge, context.workspace_id, account_id)
+            return unit_of_work.knowledge.search_published_documents(
+                context.workspace_id,
+                viewer_account_id=account_id,
+                query=normalized_query,
+                knowledge_base_id=knowledge_base_id,
+                match_type=match_type,
+                favorite_only=favorite_only,
+                include_content=content_search_allowed,
+                limit=limit,
+                offset=offset,
+                authorized_workspace=context.authorized_workspace,
+                department_ids=context.authorized_department_ids,
+                account_ids=context.authorized_account_ids,
+                resource_ids=context.authorized_resource_ids,
+                maximum_security_level=context.authorized_maximum_security_level,
+            )
+
+    def record_document_access(
+        self,
+        context: RequestContext,
+        *,
+        document_id: UUID,
+    ) -> None:
+        """在当前策略范围内幂等记录文档最近访问，不接受客户端时间。"""
+
+        account_id = _browser_account(context)
+        occurred_at = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work.knowledge, context.workspace_id, account_id)
+            recorded = unit_of_work.knowledge.record_document_access(
+                context.workspace_id,
+                document_id,
+                viewer_account_id=account_id,
+                accessed_at=occurred_at,
+                authorized_workspace=context.authorized_workspace,
+                department_ids=context.authorized_department_ids,
+                account_ids=context.authorized_account_ids,
+                resource_ids=context.authorized_resource_ids,
+                maximum_security_level=context.authorized_maximum_security_level,
+            )
+            if not recorded:
+                raise KnowledgeNotFoundError
+            _record_access(unit_of_work, context, document_id, occurred_at)
+            unit_of_work.commit()
 
     def download_document_version(
         self,
@@ -401,6 +512,16 @@ def _require_limit(limit: int) -> None:
         raise ValueError("知识管理列表上限必须在 1 到 100 之间")
 
 
+def _require_workbench_limit(limit: int) -> None:
+    if not 1 <= limit <= 20:
+        raise ValueError("个人工作台列表上限必须在 1 到 20 之间")
+
+
+def _require_search_offset(offset: int) -> None:
+    if not 0 <= offset <= 10_000:
+        raise ValueError("知识搜索偏移量必须在 0 到 10000 之间")
+
+
 def _record_retry(
     unit_of_work: KnowledgeUnitOfWork,
     context: RequestContext,
@@ -528,5 +649,33 @@ def _record_download(
                 "source_id": str(descriptor.source_id),
                 "size_bytes": descriptor.size_bytes,
             },
+        )
+    )
+
+
+def _record_access(
+    unit_of_work: KnowledgeUnitOfWork,
+    context: RequestContext,
+    document_id: UUID,
+    occurred_at: datetime,
+) -> None:
+    """记录最近访问的最小授权证据，不复制标题、正文或来源信息。"""
+
+    unit_of_work.audit.add(
+        AuditRecord(
+            audit_id=uuid4(),
+            workspace_id=context.workspace_id,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            action="knowledge.document.access",
+            resource_type="document",
+            resource_id=document_id,
+            outcome="succeeded",
+            occurred_at=occurred_at,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
+            attributes={},
         )
     )

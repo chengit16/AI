@@ -1457,6 +1457,32 @@ Index(
     document_favorites.c.created_at,
 )
 
+document_accesses = Table(
+    "document_accesses",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("account_id", UUID(as_uuid=True), primary_key=True),
+    Column("document_id", UUID(as_uuid=True), primary_key=True),
+    Column("last_accessed_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id"],
+        [f"{SCHEMA_TOKEN}.documents.workspace_id", f"{SCHEMA_TOKEN}.documents.document_id"],
+        name="fk_document_accesses_document",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_document_accesses_account",
+    ),
+)
+Index(
+    "ix_document_accesses_workspace_account_time",
+    document_accesses.c.workspace_id,
+    document_accesses.c.account_id,
+    document_accesses.c.last_accessed_at,
+)
+
 document_versions = Table(
     "document_versions",
     metadata,

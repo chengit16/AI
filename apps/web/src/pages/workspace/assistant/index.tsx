@@ -1,6 +1,7 @@
 /** @description 私有知识问答页面，完成会话、流式生成、来源查看和反馈闭环。 */
 import { Alert, App, Button, Divider, Result, Typography } from "antd";
 import { Plus } from "lucide-react";
+import { useSearchParams } from "react-router";
 
 import { errorMessage } from "@/api/client";
 import { PageHeader } from "@/components/PageHeader/PageHeader";
@@ -17,8 +18,11 @@ import { useAssistantConversation } from "./useAssistantConversation";
 /** 组合会话导航、问答线程、恢复状态、来源和反馈交互。 */
 export default function AssistantConversationsPage() {
   const { message } = App.useApp();
+  const [searchParams] = useSearchParams();
+  const initialConversationId = searchParams.get("conversation");
+  const initialPrompt = searchParams.get("prompt") ?? "";
   const { visiblePermissionCodes } = useWorkspaceMenuNavigation();
-  const model = useAssistantConversation();
+  const model = useAssistantConversation(initialConversationId);
   const canCreate = visiblePermissionCodes.has("assistant.conversation.create");
   const canAsk = visiblePermissionCodes.has("assistant.message.create");
   const canCancel = visiblePermissionCodes.has("assistant.run.cancel");
@@ -132,6 +136,7 @@ export default function AssistantConversationsPage() {
               </div>
               <Divider className="!my-0" />
               <AssistantComposer
+                initialValue={initialPrompt}
                 disabled={!canAsk || Boolean(model.activeRun) || model.createMessage.isPending}
                 sending={model.createMessage.isPending}
                 cancellable={Boolean(model.activeRun && canCancel)}

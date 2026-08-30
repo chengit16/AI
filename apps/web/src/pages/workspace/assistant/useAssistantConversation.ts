@@ -112,11 +112,13 @@ function nextStreamState(
  * 服务端消息和 Run 是恢复事实；`stream` 只保存当前浏览器尚未收到终态消息的临时展示，
  * 因此刷新或断线后仍以接口返回的不可变消息重新建立视图。
  */
-export function useAssistantConversation() {
+export function useAssistantConversation(initialConversationId: string | null = null) {
   // 1. 先建立工作空间、会话选择和服务端恢复事实查询，默认选择由查询结果派生。
   const queryClient = useQueryClient();
   const { workspaceId } = useCurrentWorkspace();
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
+    initialConversationId,
+  );
   const [pendingRun, setPendingRun] = useState<AssistantRun | null>(null);
   const [stream, setStream] = useState<AssistantStreamState>(EMPTY_STREAM);
   const [sourceMessageId, setSourceMessageId] = useState<string | null>(null);

@@ -1480,6 +1480,26 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/knowledge-search": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Search Published Knowledge Documents
+     * @description 搜索已发布文档；名称、正文、筛选和分页均在授权 SQL 内执行。
+     */
+    readonly get: operations["searchPublishedKnowledgeDocuments"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/knowledge-tags": {
     readonly parameters: {
       readonly query?: never;
@@ -2322,6 +2342,46 @@ export type paths = {
      * @description 设置职位状态；仅转换协议数据，认证授权和事务由应用服务统一执行。
      */
     readonly post: operations["setEnterprisePositionStatus"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/personal-workbench": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Personal Knowledge Workbench
+     * @description 读取个人工作台；路径空间只用于和可信上下文比对。
+     */
+    readonly get: operations["getPersonalKnowledgeWorkbench"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/personal-workbench/accesses": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Record Personal Workbench Document Access
+     * @description 记录最近访问；资源授权和服务端时间均由应用服务建立。
+     */
+    readonly post: operations["recordPersonalWorkbenchDocumentAccess"];
     readonly delete?: never;
     readonly options?: never;
     readonly head?: never;
@@ -5688,6 +5748,67 @@ export type components = {
       readonly workspace_id: string;
     };
     /**
+     * KnowledgeSearchItemResponse
+     * @description 定义全局搜索的已发布文档命中和可选正文引用摘要。
+     */
+    readonly KnowledgeSearchItemResponse: {
+      /** Chunk Id */
+      readonly chunk_id: string | null;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      readonly document_id: string;
+      /** Excerpt */
+      readonly excerpt: string | null;
+      /** Is Favorite */
+      readonly is_favorite: boolean;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      readonly knowledge_base_id: string;
+      /** Knowledge Base Name */
+      readonly knowledge_base_name: string;
+      /**
+       * Matched By
+       * @enum {string}
+       */
+      readonly matched_by: "title" | "content" | "title_and_content";
+      /**
+       * Published At
+       * Format: date-time
+       */
+      readonly published_at: string;
+      /** Sequence No */
+      readonly sequence_no: number | null;
+      /** Title */
+      readonly title: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+    };
+    /**
+     * KnowledgeSearchResponse
+     * @description 定义搜索分页与部分索引未就绪状态。
+     */
+    readonly KnowledgeSearchResponse: {
+      /** Content Search Available */
+      readonly content_search_available: boolean;
+      /** Items */
+      readonly items: readonly components["schemas"]["KnowledgeSearchItemResponse"][];
+      /** Limit */
+      readonly limit: number;
+      /** Offset */
+      readonly offset: number;
+      /** Total */
+      readonly total: number;
+      /** Unavailable Index Document Count */
+      readonly unavailable_index_document_count: number;
+    };
+    /**
      * KnowledgeTagListResponse
      * @description 定义标签列表响应。
      */
@@ -6757,6 +6878,68 @@ export type components = {
       readonly status: "pending" | "publishing" | "published" | "dead_letter";
     };
     /**
+     * PersonalKnowledgeWorkbenchResponse
+     * @description 定义个人知识工作台聚合响应；最近会话继续消费 Assistant 公开接口。
+     */
+    readonly PersonalKnowledgeWorkbenchResponse: {
+      /** Favorite Documents */
+      readonly favorite_documents: readonly components["schemas"]["PersonalWorkbenchDocumentResponse"][];
+      /** Recent Documents */
+      readonly recent_documents: readonly components["schemas"]["PersonalWorkbenchDocumentResponse"][];
+      readonly statistics: components["schemas"]["PersonalWorkbenchStatisticsResponse"];
+    };
+    /**
+     * PersonalWorkbenchDocumentResponse
+     * @description 定义个人工作台最近文档和收藏文档的低敏摘要。
+     */
+    readonly PersonalWorkbenchDocumentResponse: {
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      readonly document_id: string;
+      /** Is Favorite */
+      readonly is_favorite: boolean;
+      /** Is Indexed */
+      readonly is_indexed: boolean;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      readonly knowledge_base_id: string;
+      /** Knowledge Base Name */
+      readonly knowledge_base_name: string;
+      /** Last Accessed At */
+      readonly last_accessed_at: string | null;
+      /** Published At */
+      readonly published_at: string | null;
+      /** Title */
+      readonly title: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+    };
+    /**
+     * PersonalWorkbenchStatisticsResponse
+     * @description 定义个人工作台统一授权口径下的统计。
+     */
+    readonly PersonalWorkbenchStatisticsResponse: {
+      /** Document Count */
+      readonly document_count: number;
+      /** Favorite Document Count */
+      readonly favorite_document_count: number;
+      /** Indexed Document Count */
+      readonly indexed_document_count: number;
+      /** Knowledge Base Count */
+      readonly knowledge_base_count: number;
+      /** Pending Index Document Count */
+      readonly pending_index_document_count: number;
+      /** Published Document Count */
+      readonly published_document_count: number;
+    };
+    /**
      * PositionListResponse
      * @description 定义职位列表操作的稳定响应结构。
      */
@@ -6889,6 +7072,17 @@ export type components = {
       readonly remaining_value: number;
       /** Used Value */
       readonly used_value: number;
+    };
+    /**
+     * RecordDocumentAccessRequest
+     * @description 定义最近访问写入请求；访问时间由服务端产生。
+     */
+    readonly RecordDocumentAccessRequest: {
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      readonly document_id: string;
     };
     /**
      * RegistrationRequest
@@ -16410,6 +16604,93 @@ export interface operations {
       };
     };
   };
+  readonly searchPublishedKnowledgeDocuments: {
+    readonly parameters: {
+      readonly query: {
+        readonly favorite_only?: boolean;
+        readonly knowledge_base_id?: string | null;
+        readonly limit?: number;
+        readonly match_type?: "all" | "title" | "content";
+        readonly offset?: number;
+        readonly query: string;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["KnowledgeSearchResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   readonly listKnowledgeTags: {
     readonly parameters: {
       readonly query?: {
@@ -20852,6 +21133,180 @@ export interface operations {
       };
       /** @description 资源状态冲突 */
       readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getPersonalKnowledgeWorkbench: {
+    readonly parameters: {
+      readonly query?: {
+        readonly favorite_limit?: number;
+        readonly recent_limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["PersonalKnowledgeWorkbenchResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly recordPersonalWorkbenchDocumentAccess: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["RecordDocumentAccessRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 204: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
         headers: {
           readonly [name: string]: unknown;
         };

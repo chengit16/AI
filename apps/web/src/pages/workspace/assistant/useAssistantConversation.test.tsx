@@ -222,4 +222,32 @@ describe("P1E-06 问答页状态编排", () => {
     view.unmount();
     client.clear();
   });
+
+  it("URL 指定的现有会话优先于列表默认首项", async () => {
+    prepareQueries();
+    const requestedConversation = {
+      ...conversation,
+      conversation_id: "30000000-0000-4000-8000-000000000807",
+      title: "工作台指定会话",
+    };
+    api.getAssistantConversations.mockResolvedValue([conversation, requestedConversation]);
+    const client = queryClient();
+    const view = renderHook(() => useAssistantConversation(requestedConversation.conversation_id), {
+      wrapper: createWrapper(client),
+    });
+
+    await waitFor(() =>
+      expect(view.result.current.selectedConversationId).toBe(
+        requestedConversation.conversation_id,
+      ),
+    );
+    expect(api.getAssistantMessages).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      requestedConversation.conversation_id,
+      expect.any(AbortSignal),
+    );
+
+    view.unmount();
+    client.clear();
+  });
 });

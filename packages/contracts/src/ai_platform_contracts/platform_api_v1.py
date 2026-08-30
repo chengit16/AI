@@ -1014,6 +1014,29 @@ class KnowledgeFolderResponse(typing.TypedDict):
     workspace_id: str
 
 
+class KnowledgeSearchItemResponse(typing.TypedDict):
+    chunk_id: str | None
+    document_id: str
+    excerpt: str | None
+    is_favorite: bool
+    knowledge_base_id: str
+    knowledge_base_name: str
+    matched_by: typing.Literal["title", "content", "title_and_content"]
+    published_at: str
+    sequence_no: int | None
+    title: str
+    updated_at: str
+
+
+class KnowledgeSearchResponse(typing.TypedDict):
+    content_search_available: bool
+    items: list[KnowledgeSearchItemResponse]
+    limit: int
+    offset: int
+    total: int
+    unavailable_index_document_count: int
+
+
 class KnowledgeTagListResponse(typing.TypedDict):
     items: list[KnowledgeTagResponse]
 
@@ -1412,6 +1435,33 @@ class OutboxStatusCountResponse(typing.TypedDict):
     status: typing.Literal["pending", "publishing", "published", "dead_letter"]
 
 
+class PersonalKnowledgeWorkbenchResponse(typing.TypedDict):
+    favorite_documents: list[PersonalWorkbenchDocumentResponse]
+    recent_documents: list[PersonalWorkbenchDocumentResponse]
+    statistics: PersonalWorkbenchStatisticsResponse
+
+
+class PersonalWorkbenchDocumentResponse(typing.TypedDict):
+    document_id: str
+    is_favorite: bool
+    is_indexed: bool
+    knowledge_base_id: str
+    knowledge_base_name: str
+    last_accessed_at: str | None
+    published_at: str | None
+    title: str
+    updated_at: str
+
+
+class PersonalWorkbenchStatisticsResponse(typing.TypedDict):
+    document_count: int
+    favorite_document_count: int
+    indexed_document_count: int
+    knowledge_base_count: int
+    pending_index_document_count: int
+    published_document_count: int
+
+
 class PositionListResponse(typing.TypedDict):
     items: list[PositionResponse]
 
@@ -1467,6 +1517,10 @@ class QuotaResponse(typing.TypedDict):
     period_key: str
     remaining_value: int
     used_value: int
+
+
+class RecordDocumentAccessRequest(typing.TypedDict):
+    document_id: str
 
 
 class RegistrationRequest(typing.TypedDict):

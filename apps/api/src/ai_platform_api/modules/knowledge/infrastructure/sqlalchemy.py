@@ -28,7 +28,21 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyOutboxWriter,
 )
 from ai_platform_backend.knowledge.object_keys import parsed_artifact_object_key
-from sqlalchemy import delete, false, func, insert, or_, select, text, true, update
+from sqlalchemy import (
+    and_,
+    case,
+    delete,
+    false,
+    func,
+    insert,
+    literal,
+    null,
+    or_,
+    select,
+    text,
+    true,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.engine import CursorResult, Row
 from sqlalchemy.exc import IntegrityError
@@ -51,7 +65,13 @@ from ai_platform_api.modules.knowledge.domain.models import (
     KnowledgeDocumentDownload,
     KnowledgeDocumentSummary,
     KnowledgeDocumentVersionDetail,
+    KnowledgeSearchFilter,
+    KnowledgeSearchItem,
+    KnowledgeSearchPage,
     KnowledgeWriteConflictError,
+    PersonalKnowledgeWorkbench,
+    PersonalWorkbenchDocument,
+    PersonalWorkbenchStatistics,
 )
 from ai_platform_api.modules.knowledge.domain.organization import (
     DEFAULT_FOLDER_NAME,
@@ -64,6 +84,7 @@ from ai_platform_api.modules.knowledge.domain.organization import (
 )
 from ai_platform_api.persistence.tables import (
     department_closure,
+    document_accesses,
     document_favorites,
     document_folder_bindings,
     document_publications,
@@ -1133,6 +1154,472 @@ class SqlAlchemyKnowledgeRepository:
             object_key=cast(str, row.original_object_key),
         )
 
+    def get_personal_workbench(
+        self,
+        workspace_id: UUID,
+        *,
+        viewer_account_id: UUID,
+        recent_limit: int,
+        favorite_limit: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
+    ) -> PersonalKnowledgeWorkbench:
+        """从同一授权文档集合聚合统计、最近活动和收藏。"""
+
+        # 长函数保留原因: 统计和两类文档列表必须复用完全相同的授权表达式，集中编排可防止口径漂移。
+        # 1. 先冻结授权、密级、收藏、访问和当前索引表达式，后续聚合只从该集合派生。
+        scope = _document_scope(
+            authorized_workspace=authorized_workspace,
+            department_ids=department_ids,
+            account_ids=account_ids,
+            resource_ids=resource_ids,
+        )
+        security_scope = _document_security_scope(maximum_security_level)
+        favorite_count = (
+            select(func.count())
+            .select_from(document_favorites)
+            .where(
+                document_favorites.c.workspace_id == documents.c.workspace_id,
+                document_favorites.c.document_id == documents.c.document_id,
+                document_favorites.c.account_id == viewer_account_id,
+            )
+            .scalar_subquery()
+        )
+        last_accessed_at = (
+            select(document_accesses.c.last_accessed_at)
+            .where(
+                document_accesses.c.workspace_id == documents.c.workspace_id,
+                document_accesses.c.document_id == documents.c.document_id,
+                document_accesses.c.account_id == viewer_account_id,
+            )
+            .scalar_subquery()
+        )
+        indexed = and_(
+            document_index_publications.c.index_version_id.is_not(None),
+            index_versions.c.status == "active",
+        )
+        common_from = (
+            documents.join(
+                knowledge_bases,
+                (knowledge_bases.c.workspace_id == documents.c.workspace_id)
+                & (knowledge_bases.c.knowledge_base_id == documents.c.knowledge_base_id),
+            )
+            .outerjoin(
+                document_publications,
+                (document_publications.c.workspace_id == documents.c.workspace_id)
+                & (document_publications.c.document_id == documents.c.document_id),
+            )
+            .outerjoin(
+                document_index_publications,
+                (document_index_publications.c.workspace_id == document_publications.c.workspace_id)
+                & (document_index_publications.c.document_id == document_publications.c.document_id)
+                & (
+                    document_index_publications.c.document_version_id
+                    == document_publications.c.current_document_version_id
+                ),
+            )
+            .outerjoin(
+                index_versions,
+                (index_versions.c.workspace_id == document_index_publications.c.workspace_id)
+                & (
+                    index_versions.c.index_version_id
+                    == document_index_publications.c.index_version_id
+                ),
+            )
+        )
+        common_where = (
+            documents.c.workspace_id == workspace_id,
+            documents.c.status == "active",
+            knowledge_bases.c.status == "active",
+            scope,
+            security_scope,
+        )
+
+        # 2. 工作空间级授权可以看到空知识库；受限授权只能从实际获权文档反推知识库。
+        if authorized_workspace:
+            knowledge_base_count = int(
+                self._session.scalar(
+                    select(func.count())
+                    .select_from(knowledge_bases)
+                    .where(
+                        knowledge_bases.c.workspace_id == workspace_id,
+                        knowledge_bases.c.status == "active",
+                    )
+                )
+                or 0
+            )
+        else:
+            knowledge_base_count = int(
+                self._session.scalar(
+                    select(func.count(func.distinct(documents.c.knowledge_base_id)))
+                    .select_from(
+                        documents.join(
+                            knowledge_bases,
+                            (knowledge_bases.c.workspace_id == documents.c.workspace_id)
+                            & (
+                                knowledge_bases.c.knowledge_base_id == documents.c.knowledge_base_id
+                            ),
+                        )
+                    )
+                    .where(*common_where)
+                )
+                or 0
+            )
+
+        statistics_row = self._session.execute(
+            select(
+                func.count(func.distinct(documents.c.document_id)).label("document_count"),
+                func.count(func.distinct(document_publications.c.document_id)).label(
+                    "published_document_count"
+                ),
+                func.count(
+                    func.distinct(case((favorite_count > 0, documents.c.document_id)))
+                ).label("favorite_document_count"),
+                func.count(func.distinct(case((indexed, documents.c.document_id)))).label(
+                    "indexed_document_count"
+                ),
+            )
+            .select_from(common_from)
+            .where(*common_where)
+        ).one()
+        published_count = int(statistics_row.published_document_count or 0)
+        indexed_count = int(statistics_row.indexed_document_count or 0)
+        statistics = PersonalWorkbenchStatistics(
+            knowledge_base_count=knowledge_base_count,
+            document_count=int(statistics_row.document_count or 0),
+            published_document_count=published_count,
+            favorite_document_count=int(statistics_row.favorite_document_count or 0),
+            indexed_document_count=indexed_count,
+            pending_index_document_count=max(0, published_count - indexed_count),
+        )
+        # 3. 最近访问和收藏使用同一低敏投影，排序差异不改变资源可见集合。
+        projection = select(
+            documents.c.document_id,
+            documents.c.knowledge_base_id,
+            knowledge_bases.c.name.label("knowledge_base_name"),
+            documents.c.title,
+            documents.c.updated_at,
+            document_publications.c.published_at,
+            last_accessed_at.label("last_accessed_at"),
+            (favorite_count > 0).label("is_favorite"),
+            indexed.label("is_indexed"),
+        ).select_from(common_from)
+        recent_rows = self._session.execute(
+            projection.where(*common_where)
+            .order_by(
+                last_accessed_at.desc().nullslast(),
+                documents.c.updated_at.desc(),
+                documents.c.document_id,
+            )
+            .limit(recent_limit)
+        )
+        favorite_rows = self._session.execute(
+            projection.where(*common_where, favorite_count > 0)
+            .order_by(documents.c.updated_at.desc(), documents.c.document_id)
+            .limit(favorite_limit)
+        )
+        return PersonalKnowledgeWorkbench(
+            statistics=statistics,
+            recent_documents=tuple(_workbench_document(row) for row in recent_rows),
+            favorite_documents=tuple(_workbench_document(row) for row in favorite_rows),
+        )
+
+    def search_published_documents(
+        self,
+        workspace_id: UUID,
+        *,
+        viewer_account_id: UUID,
+        query: str,
+        knowledge_base_id: UUID | None,
+        match_type: KnowledgeSearchFilter,
+        favorite_only: bool,
+        include_content: bool,
+        limit: int,
+        offset: int,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
+    ) -> KnowledgeSearchPage:
+        """搜索当前发布版本，正文命中只读取与发布指针对齐的活动 Chunk。"""
+
+        # 长函数保留原因: 标题与正文分支共用候选授权、发布指针和分页口径，
+        # 集中编排可审计“不读正文”边界。
+        # 1. 先建立获权且已发布的候选集合，并独立统计当前版本未建立活动索引的数量。
+        normalized_query = query.casefold()
+        scope = _document_scope(
+            authorized_workspace=authorized_workspace,
+            department_ids=department_ids,
+            account_ids=account_ids,
+            resource_ids=resource_ids,
+        )
+        favorite_count = (
+            select(func.count())
+            .select_from(document_favorites)
+            .where(
+                document_favorites.c.workspace_id == documents.c.workspace_id,
+                document_favorites.c.document_id == documents.c.document_id,
+                document_favorites.c.account_id == viewer_account_id,
+            )
+            .scalar_subquery()
+        )
+        candidate_where: list[ColumnElement[bool]] = [
+            documents.c.workspace_id == workspace_id,
+            documents.c.status == "active",
+            knowledge_bases.c.status == "active",
+            scope,
+            _document_security_scope(maximum_security_level),
+        ]
+        if knowledge_base_id is not None:
+            candidate_where.append(documents.c.knowledge_base_id == knowledge_base_id)
+        if favorite_only:
+            candidate_where.append(favorite_count > 0)
+
+        publication_from = documents.join(
+            knowledge_bases,
+            (knowledge_bases.c.workspace_id == documents.c.workspace_id)
+            & (knowledge_bases.c.knowledge_base_id == documents.c.knowledge_base_id),
+        ).join(
+            document_publications,
+            (document_publications.c.workspace_id == documents.c.workspace_id)
+            & (document_publications.c.document_id == documents.c.document_id),
+        )
+        unavailable_index_count = int(
+            self._session.scalar(
+                select(func.count())
+                .select_from(
+                    publication_from.outerjoin(
+                        document_index_publications,
+                        (document_index_publications.c.workspace_id == documents.c.workspace_id)
+                        & (document_index_publications.c.document_id == documents.c.document_id)
+                        & (
+                            document_index_publications.c.document_version_id
+                            == document_publications.c.current_document_version_id
+                        ),
+                    ).outerjoin(
+                        index_versions,
+                        (
+                            index_versions.c.workspace_id
+                            == document_index_publications.c.workspace_id
+                        )
+                        & (
+                            index_versions.c.index_version_id
+                            == document_index_publications.c.index_version_id
+                        )
+                        & (index_versions.c.status == "active"),
+                    )
+                )
+                .where(*candidate_where, index_versions.c.index_version_id.is_(None))
+            )
+            or 0
+        )
+        if match_type == "content" and not include_content:
+            return KnowledgeSearchPage((), 0, unavailable_index_count, False)
+
+        title_match = func.strpos(func.lower(documents.c.title), normalized_query) > 0
+        # 2. 字段遮罩关闭正文或用户仅搜索标题时，SQL 本身不得引用 Chunk 表，避免“未返回但已读取”。
+        if match_type == "title" or not include_content:
+            title_statement = (
+                select(
+                    documents.c.document_id,
+                    documents.c.knowledge_base_id,
+                    knowledge_bases.c.name.label("knowledge_base_name"),
+                    documents.c.title,
+                    documents.c.updated_at,
+                    document_publications.c.published_at,
+                    (favorite_count > 0).label("is_favorite"),
+                    literal("title").label("matched_by"),
+                    null().label("excerpt"),
+                    null().label("chunk_id"),
+                    null().label("sequence_no"),
+                )
+                .select_from(publication_from)
+                .where(*candidate_where, title_match)
+            )
+            total = int(
+                self._session.scalar(select(func.count()).select_from(title_statement.subquery()))
+                or 0
+            )
+            rows = self._session.execute(
+                title_statement.order_by(
+                    documents.c.updated_at.desc(),
+                    documents.c.document_id,
+                )
+                .limit(limit)
+                .offset(offset)
+            )
+            return KnowledgeSearchPage(
+                items=tuple(_search_item(row) for row in rows),
+                total=total,
+                unavailable_index_document_count=unavailable_index_count,
+                content_search_available=include_content,
+            )
+
+        # 3. 正文路径只连接当前发布版本对应的活动索引，并为每篇文档截取首个稳定命中。
+        matching_chunk = (
+            select(
+                retrieval_chunks.c.chunk_id,
+                retrieval_chunks.c.sequence_no,
+                func.substr(
+                    retrieval_chunks.c.content,
+                    func.greatest(
+                        func.strpos(func.lower(retrieval_chunks.c.content), normalized_query) - 60,
+                        1,
+                    ),
+                    220,
+                ).label("excerpt"),
+            )
+            .where(
+                retrieval_chunks.c.workspace_id == documents.c.workspace_id,
+                retrieval_chunks.c.document_id == documents.c.document_id,
+                retrieval_chunks.c.document_version_id
+                == document_publications.c.current_document_version_id,
+                retrieval_chunks.c.index_version_id == index_versions.c.index_version_id,
+                retrieval_chunks.c.active.is_(True),
+                func.strpos(func.lower(retrieval_chunks.c.content), normalized_query) > 0,
+            )
+            .order_by(retrieval_chunks.c.sequence_no, retrieval_chunks.c.chunk_id)
+            .limit(1)
+            .lateral("matching_chunk")
+        )
+        searchable_from = (
+            publication_from.outerjoin(
+                document_index_publications,
+                (document_index_publications.c.workspace_id == documents.c.workspace_id)
+                & (document_index_publications.c.document_id == documents.c.document_id)
+                & (
+                    document_index_publications.c.document_version_id
+                    == document_publications.c.current_document_version_id
+                ),
+            )
+            .outerjoin(
+                index_versions,
+                (index_versions.c.workspace_id == document_index_publications.c.workspace_id)
+                & (
+                    index_versions.c.index_version_id
+                    == document_index_publications.c.index_version_id
+                )
+                & (index_versions.c.status == "active"),
+            )
+            .outerjoin(matching_chunk, true())
+        )
+        content_match = matching_chunk.c.chunk_id.is_not(None)
+        search_match = {
+            "all": or_(title_match, content_match),
+            "title": title_match,
+            "content": content_match,
+        }[match_type]
+        matched_by = case(
+            (and_(title_match, content_match), "title_and_content"),
+            (title_match, "title"),
+            else_="content",
+        ).label("matched_by")
+        search_statement = (
+            select(
+                documents.c.document_id,
+                documents.c.knowledge_base_id,
+                knowledge_bases.c.name.label("knowledge_base_name"),
+                documents.c.title,
+                documents.c.updated_at,
+                document_publications.c.published_at,
+                (favorite_count > 0).label("is_favorite"),
+                matched_by,
+                matching_chunk.c.excerpt,
+                matching_chunk.c.chunk_id,
+                matching_chunk.c.sequence_no,
+            )
+            .select_from(searchable_from)
+            .where(*candidate_where, search_match)
+        )
+        # 4. 总数与分页复用同一命中语句，标题命中优先且次序可重复。
+        total = int(
+            self._session.scalar(select(func.count()).select_from(search_statement.subquery())) or 0
+        )
+        rows = self._session.execute(
+            search_statement.order_by(
+                case((title_match, 0), else_=1),
+                documents.c.updated_at.desc(),
+                documents.c.document_id,
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+        return KnowledgeSearchPage(
+            items=tuple(_search_item(row) for row in rows),
+            total=total,
+            unavailable_index_document_count=unavailable_index_count,
+            content_search_available=include_content,
+        )
+
+    def record_document_access(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        *,
+        viewer_account_id: UUID,
+        accessed_at: datetime,
+        authorized_workspace: bool,
+        department_ids: frozenset[UUID],
+        account_ids: frozenset[UUID],
+        resource_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
+    ) -> bool:
+        """复核活动文档授权后幂等推进最近访问时间。"""
+
+        # 1. 写入前使用工作空间、活动状态、策略资源范围和密级共同复核文档可见性。
+        visible_document_id = self._session.scalar(
+            select(documents.c.document_id)
+            .select_from(
+                documents.join(
+                    knowledge_bases,
+                    (knowledge_bases.c.workspace_id == documents.c.workspace_id)
+                    & (knowledge_bases.c.knowledge_base_id == documents.c.knowledge_base_id),
+                )
+            )
+            .where(
+                documents.c.workspace_id == workspace_id,
+                documents.c.document_id == document_id,
+                documents.c.status == "active",
+                knowledge_bases.c.status == "active",
+                _document_scope(
+                    authorized_workspace=authorized_workspace,
+                    department_ids=department_ids,
+                    account_ids=account_ids,
+                    resource_ids=resource_ids,
+                ),
+                _document_security_scope(maximum_security_level),
+            )
+        )
+        if visible_document_id is None:
+            return False
+        # 2. 同一账号重复打开文档只推进服务端时间，不允许较旧请求覆盖较新访问事实。
+        statement = postgres_insert(document_accesses).values(
+            workspace_id=workspace_id,
+            account_id=viewer_account_id,
+            document_id=document_id,
+            last_accessed_at=accessed_at,
+        )
+        self._session.execute(
+            statement.on_conflict_do_update(
+                index_elements=[
+                    document_accesses.c.workspace_id,
+                    document_accesses.c.account_id,
+                    document_accesses.c.document_id,
+                ],
+                set_={
+                    "last_accessed_at": func.greatest(
+                        document_accesses.c.last_accessed_at,
+                        statement.excluded.last_accessed_at,
+                    )
+                },
+            )
+        )
+        return True
+
     def save_document(self, document: Document) -> None:
         previous_version = document.version - 1
         result = cast(
@@ -1837,6 +2324,40 @@ def _document_summary(value: Row[Any]) -> KnowledgeDocumentSummary:
     )
 
 
+def _workbench_document(value: Row[Any]) -> PersonalWorkbenchDocument:
+    """把统一聚合行转换为工作台低敏摘要。"""
+
+    return PersonalWorkbenchDocument(
+        document_id=value.document_id,
+        knowledge_base_id=value.knowledge_base_id,
+        knowledge_base_name=value.knowledge_base_name,
+        title=value.title,
+        updated_at=value.updated_at,
+        published_at=value.published_at,
+        last_accessed_at=value.last_accessed_at,
+        is_favorite=value.is_favorite,
+        is_indexed=value.is_indexed,
+    )
+
+
+def _search_item(value: Row[Any]) -> KnowledgeSearchItem:
+    """把搜索结果行转换为不包含完整正文的引用摘要。"""
+
+    return KnowledgeSearchItem(
+        document_id=value.document_id,
+        knowledge_base_id=value.knowledge_base_id,
+        knowledge_base_name=value.knowledge_base_name,
+        title=value.title,
+        updated_at=value.updated_at,
+        published_at=value.published_at,
+        is_favorite=value.is_favorite,
+        matched_by=value.matched_by,
+        excerpt=value.excerpt,
+        chunk_id=value.chunk_id,
+        sequence_no=value.sequence_no,
+    )
+
+
 def _ingestion_job(value: Row[Any]) -> IngestionJob:
     return IngestionJob(
         ingestion_job_id=value.ingestion_job_id,
@@ -1915,3 +2436,15 @@ def _document_scope(
     if resource_ids:
         conditions.append(documents.c.document_id.in_(resource_ids))
     return or_(*conditions) if conditions else false()
+
+
+def _document_security_scope(maximum_security_level: SecurityLevel) -> ColumnElement[bool]:
+    """把密级上限转换为显式允许集合，未知值不能扩大查询。"""
+
+    allowed_levels: dict[SecurityLevel, tuple[SecurityLevel, ...]] = {
+        "PUBLIC": ("PUBLIC",),
+        "INTERNAL": ("PUBLIC", "INTERNAL"),
+        "CONFIDENTIAL": ("PUBLIC", "INTERNAL", "CONFIDENTIAL"),
+        "RESTRICTED": ("PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"),
+    }
+    return documents.c.security_level.in_(allowed_levels[maximum_security_level])

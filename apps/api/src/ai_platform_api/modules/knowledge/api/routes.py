@@ -43,11 +43,17 @@ from ai_platform_api.modules.knowledge.api.schemas import (
     KnowledgeFavoriteResponse,
     KnowledgeFolderListResponse,
     KnowledgeFolderResponse,
+    KnowledgeSearchItemResponse,
+    KnowledgeSearchResponse,
     KnowledgeTagListResponse,
     KnowledgeTagResponse,
     KnowledgeTrashListResponse,
     MarkDocumentVersionReadyRequest,
     MoveKnowledgeFolderRequest,
+    PersonalKnowledgeWorkbenchResponse,
+    PersonalWorkbenchDocumentResponse,
+    PersonalWorkbenchStatisticsResponse,
+    RecordDocumentAccessRequest,
     UpdateKnowledgeFolderRequest,
     UpdateKnowledgeTagRequest,
     UploadMetadataResponse,
@@ -65,6 +71,9 @@ from ai_platform_api.modules.knowledge.application.management import (
     KnowledgeDocumentDetail,
     KnowledgeDocumentSummary,
     KnowledgeManagementService,
+    KnowledgeSearchPage,
+    PersonalKnowledgeWorkbench,
+    PersonalWorkbenchDocument,
 )
 from ai_platform_api.modules.knowledge.application.organization import (
     KnowledgeFolder,
@@ -113,6 +122,85 @@ def knowledge_organization_service(request: Request) -> KnowledgeOrganizationSer
     if not isinstance(service, KnowledgeOrganizationService):
         raise RuntimeError("知识组织服务尚未完成装配")
     return service
+
+
+@router.get(
+    "/personal-workbench",
+    response_model=PersonalKnowledgeWorkbenchResponse,
+    operation_id="getPersonalKnowledgeWorkbench",
+    responses=error_responses(400, 401, 403, 422, 500),
+)
+def get_personal_knowledge_workbench(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+    recent_limit: Annotated[int, Query(ge=1, le=20)] = 6,
+    favorite_limit: Annotated[int, Query(ge=1, le=20)] = 6,
+) -> PersonalKnowledgeWorkbenchResponse:
+    """读取个人工作台；路径空间只用于和可信上下文比对。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _personal_workbench(
+        service.get_personal_workbench(
+            context,
+            recent_limit=recent_limit,
+            favorite_limit=favorite_limit,
+        )
+    )
+
+
+@router.post(
+    "/personal-workbench/accesses",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="recordPersonalWorkbenchDocumentAccess",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def record_personal_workbench_document_access(
+    workspace_id: UUID,
+    body: RecordDocumentAccessRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+) -> Response:
+    """记录最近访问；资源授权和服务端时间均由应用服务建立。"""
+
+    _require_workspace_path(context, workspace_id)
+    service.record_document_access(context, document_id=body.document_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/knowledge-search",
+    response_model=KnowledgeSearchResponse,
+    operation_id="searchPublishedKnowledgeDocuments",
+    responses=error_responses(400, 401, 403, 422, 500),
+)
+def search_published_knowledge_documents(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[KnowledgeManagementService, Depends(knowledge_management_service)],
+    query: Annotated[str, Query(min_length=1, max_length=200)],
+    knowledge_base_id: Annotated[UUID | None, Query()] = None,
+    match_type: Annotated[Literal["all", "title", "content"], Query()] = "all",
+    favorite_only: Annotated[bool, Query()] = False,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+) -> KnowledgeSearchResponse:
+    """搜索已发布文档；名称、正文、筛选和分页均在授权 SQL 内执行。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _knowledge_search(
+        service.search_published_documents(
+            context,
+            query=query,
+            knowledge_base_id=knowledge_base_id,
+            match_type=match_type,
+            favorite_only=favorite_only,
+            limit=limit,
+            offset=offset,
+        ),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
@@ -1181,6 +1269,43 @@ def _document_detail(value: KnowledgeDocumentDetail) -> KnowledgeDocumentDetailR
             )
             for item in value.versions
         ],
+    )
+
+
+def _personal_workbench(value: PersonalKnowledgeWorkbench) -> PersonalKnowledgeWorkbenchResponse:
+    """映射工作台统计和低敏文档活动。"""
+
+    def document(item: PersonalWorkbenchDocument) -> PersonalWorkbenchDocumentResponse:
+        return PersonalWorkbenchDocumentResponse.model_validate(item, from_attributes=True)
+
+    return PersonalKnowledgeWorkbenchResponse(
+        statistics=PersonalWorkbenchStatisticsResponse.model_validate(
+            value.statistics,
+            from_attributes=True,
+        ),
+        recent_documents=[document(item) for item in value.recent_documents],
+        favorite_documents=[document(item) for item in value.favorite_documents],
+    )
+
+
+def _knowledge_search(
+    value: KnowledgeSearchPage,
+    *,
+    limit: int,
+    offset: int,
+) -> KnowledgeSearchResponse:
+    """映射搜索分页，并保持正文摘要为空时不构造替代内容。"""
+
+    return KnowledgeSearchResponse(
+        items=[
+            KnowledgeSearchItemResponse.model_validate(item, from_attributes=True)
+            for item in value.items
+        ],
+        total=value.total,
+        limit=limit,
+        offset=offset,
+        unavailable_index_document_count=value.unavailable_index_document_count,
+        content_search_available=value.content_search_available,
     )
 
 

@@ -298,6 +298,84 @@ class KnowledgeDocumentDetailResponse(BaseModel):
     versions: list[KnowledgeDocumentVersionDetailResponse]
 
 
+class PersonalWorkbenchDocumentResponse(BaseModel):
+    """定义个人工作台最近文档和收藏文档的低敏摘要。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: UUID
+    knowledge_base_id: UUID
+    knowledge_base_name: str
+    title: str
+    updated_at: datetime
+    published_at: datetime | None
+    last_accessed_at: datetime | None
+    is_favorite: bool
+    is_indexed: bool
+
+
+class PersonalWorkbenchStatisticsResponse(BaseModel):
+    """定义个人工作台统一授权口径下的统计。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    knowledge_base_count: int = Field(ge=0)
+    document_count: int = Field(ge=0)
+    published_document_count: int = Field(ge=0)
+    favorite_document_count: int = Field(ge=0)
+    indexed_document_count: int = Field(ge=0)
+    pending_index_document_count: int = Field(ge=0)
+
+
+class PersonalKnowledgeWorkbenchResponse(BaseModel):
+    """定义个人知识工作台聚合响应；最近会话继续消费 Assistant 公开接口。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    statistics: PersonalWorkbenchStatisticsResponse
+    recent_documents: list[PersonalWorkbenchDocumentResponse]
+    favorite_documents: list[PersonalWorkbenchDocumentResponse]
+
+
+class RecordDocumentAccessRequest(BaseModel):
+    """定义最近访问写入请求；访问时间由服务端产生。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: UUID
+
+
+class KnowledgeSearchItemResponse(BaseModel):
+    """定义全局搜索的已发布文档命中和可选正文引用摘要。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: UUID
+    knowledge_base_id: UUID
+    knowledge_base_name: str
+    title: str
+    updated_at: datetime
+    published_at: datetime
+    is_favorite: bool
+    matched_by: Literal["title", "content", "title_and_content"]
+    excerpt: str | None
+    chunk_id: UUID | None
+    sequence_no: int | None
+
+
+class KnowledgeSearchResponse(BaseModel):
+    """定义搜索分页与部分索引未就绪状态。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[KnowledgeSearchItemResponse]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+    offset: int = Field(ge=0, le=10_000)
+    unavailable_index_document_count: int = Field(ge=0)
+    content_search_available: bool
+
+
 class DocumentSourceResponse(BaseModel):
     """定义文档来源操作的稳定响应结构。"""
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 17,
+  "registry_version": 18,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -34,6 +34,7 @@
     { "table": "document_folder_bindings", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_tag_bindings", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_favorites", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "document_accesses", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "documents", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_versions", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_sources", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

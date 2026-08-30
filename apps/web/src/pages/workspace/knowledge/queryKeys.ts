@@ -17,4 +17,7 @@ export const knowledgeQueryKeys = {
   tags: (workspaceId: string | null) => ["knowledge-tags", workspaceId] as const,
   favorites: (workspaceId: string | null) => ["knowledge-favorites", workspaceId] as const,
   trash: (workspaceId: string | null) => ["knowledge-trash", workspaceId] as const,
+  workbench: (workspaceId: string | null) => ["personal-knowledge-workbench", workspaceId] as const,
+  search: (workspaceId: string | null, signature: string) =>
+    ["knowledge-search", workspaceId, signature] as const,
 };

@@ -28,6 +28,23 @@ export type KnowledgeDocumentDetail = components["schemas"]["KnowledgeDocumentDe
 export type CreateKnowledgeBaseRequest = components["schemas"]["CreateKnowledgeBaseRequest"];
 /** 上传完成后返回的文档、版本和异步任务标识。 */
 export type DocumentUploadResponse = components["schemas"]["DocumentUploadResponse"];
+/** 个人知识工作台的授权统计、最近文档和收藏聚合。 */
+export type PersonalKnowledgeWorkbench =
+  components["schemas"]["PersonalKnowledgeWorkbenchResponse"];
+/** 已发布文档搜索分页及索引覆盖状态。 */
+export type KnowledgeSearchResponse = components["schemas"]["KnowledgeSearchResponse"];
+/** 已发布文档的名称或正文命中摘要。 */
+export type KnowledgeSearchItem = components["schemas"]["KnowledgeSearchItemResponse"];
+
+/** 搜索筛选参数；正文是否可用仍由服务端字段策略决定。 */
+export interface KnowledgeSearchParameters {
+  query: string;
+  knowledgeBaseId?: string;
+  matchType: "all" | "title" | "content";
+  favoriteOnly: boolean;
+  limit: number;
+  offset: number;
+}
 
 /** 查询当前空间可见的知识库摘要。 */
 export async function getKnowledgeBases(workspaceId: string, signal?: AbortSignal) {
@@ -36,6 +53,42 @@ export async function getKnowledgeBases(workspaceId: string, signal?: AbortSigna
     { signal },
   );
   return response.items;
+}
+
+/** 查询个人工作台聚合；最近会话由 Assistant 公开接口独立加载。 */
+export function getPersonalKnowledgeWorkbench(workspaceId: string, signal?: AbortSignal) {
+  return apiRequest<PersonalKnowledgeWorkbench>(
+    `/api/v1/workspaces/${workspaceId}/personal-workbench`,
+    { signal },
+  );
+}
+
+/** 记录当前账号最后访问文档的服务端时间，重复调用只推进时间。 */
+export function recordPersonalWorkbenchDocumentAccess(workspaceId: string, documentId: string) {
+  return apiRequest<void>(`/api/v1/workspaces/${workspaceId}/personal-workbench/accesses`, {
+    method: "POST",
+    body: { document_id: documentId },
+  });
+}
+
+/** 搜索获权且已发布文档；分页偏移由后端再次限制在 10000 内。 */
+export function searchPublishedKnowledgeDocuments(
+  workspaceId: string,
+  parameters: KnowledgeSearchParameters,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({
+    query: parameters.query.trim(),
+    match_type: parameters.matchType,
+    favorite_only: String(parameters.favoriteOnly),
+    limit: String(parameters.limit),
+    offset: String(parameters.offset),
+  });
+  if (parameters.knowledgeBaseId) query.set("knowledge_base_id", parameters.knowledgeBaseId);
+  return apiRequest<KnowledgeSearchResponse>(
+    `/api/v1/workspaces/${workspaceId}/knowledge-search?${query.toString()}`,
+    { signal },
+  );
 }
 
 /** 查询知识库内经过服务端资源范围和字段策略投影的文档摘要。 */

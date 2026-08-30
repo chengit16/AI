@@ -1,7 +1,7 @@
 // 由 scripts/generate_resource_registry.py 自动生成, 请勿手工修改。
 export const resourceRegistry = {
   schema_version: 1,
-  registry_version: 26,
+  registry_version: 27,
   permissions: [
     {
       code: "workspace.overview.access",
@@ -3063,6 +3063,39 @@ export const resourceRegistry = {
       risk_level: "high",
       status: "active",
     },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000176",
+      api_key: "knowledge.personal_workbench.read",
+      operation_id: "getPersonalKnowledgeWorkbench",
+      method: "GET",
+      path_pattern: "/api/v1/workspaces/{workspace_id}/personal-workbench",
+      access_level: "authorized",
+      permission_code: "knowledge.document.read",
+      risk_level: "normal",
+      status: "active",
+    },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000177",
+      api_key: "knowledge.personal_workbench.access.record",
+      operation_id: "recordPersonalWorkbenchDocumentAccess",
+      method: "POST",
+      path_pattern: "/api/v1/workspaces/{workspace_id}/personal-workbench/accesses",
+      access_level: "authorized",
+      permission_code: "knowledge.document.read",
+      risk_level: "normal",
+      status: "active",
+    },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000178",
+      api_key: "knowledge.search.published",
+      operation_id: "searchPublishedKnowledgeDocuments",
+      method: "GET",
+      path_pattern: "/api/v1/workspaces/{workspace_id}/knowledge-search",
+      access_level: "authorized",
+      permission_code: "knowledge.document.read",
+      risk_level: "normal",
+      status: "active",
+    },
   ],
   menus: [
     {
@@ -5985,6 +6018,21 @@ export const resourceRegistry = {
     {
       menu_id: "82000000-0000-4000-8000-000000000255",
       api_resource_id: "81000000-0000-4000-8000-000000000175",
+      action_type: "query",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000147",
+      api_resource_id: "81000000-0000-4000-8000-000000000176",
+      action_type: "query",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000147",
+      api_resource_id: "81000000-0000-4000-8000-000000000177",
+      action_type: "mutation",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000147",
+      api_resource_id: "81000000-0000-4000-8000-000000000178",
       action_type: "query",
     },
   ],
