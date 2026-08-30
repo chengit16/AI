@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 27,
+  "registry_version": 28,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -73,6 +73,8 @@
     ,{ "code": "assistant.conversation.create", "resource_type": "conversation", "action": "create", "scope": "workspace", "status": "active" }
     ,{ "code": "assistant.conversation.read", "resource_type": "conversation", "action": "read", "scope": "workspace", "status": "active" }
     ,{ "code": "assistant.conversation.archive", "resource_type": "conversation", "action": "archive", "scope": "resource", "status": "active" }
+    ,{ "code": "assistant.conversation.scope.manage", "resource_type": "conversation", "action": "manage_scope", "scope": "resource", "status": "active" }
+    ,{ "code": "assistant.attachment.manage", "resource_type": "conversation", "action": "manage_attachment", "scope": "resource", "status": "active" }
     ,{ "code": "assistant.message.create", "resource_type": "message", "action": "create", "scope": "workspace", "status": "active" }
     ,{ "code": "assistant.page.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" }
     ,{ "code": "assistant.run.cancel", "resource_type": "assistant_run", "action": "cancel", "scope": "resource", "status": "active" }
@@ -383,6 +385,10 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000077", "api_key": "assistant.source.list", "operation_id": "listAssistantMessageSources", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/sources", "access_level": "authorized", "permission_code": "assistant.source.read", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000078", "api_key": "assistant.feedback.get", "operation_id": "getAssistantMessageFeedback", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/feedback", "access_level": "authorized", "permission_code": "assistant.feedback.manage", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000079", "api_key": "assistant.feedback.submit", "operation_id": "submitAssistantMessageFeedback", "method": "PUT", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/feedback", "access_level": "authorized", "permission_code": "assistant.feedback.manage", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000179", "api_key": "assistant.conversation.scope.update", "operation_id": "updateAssistantConversationScope", "method": "PUT", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/scope", "access_level": "authorized", "permission_code": "assistant.conversation.scope.manage", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000180", "api_key": "assistant.attachment.list", "operation_id": "listAssistantConversationAttachments", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/attachments", "access_level": "authorized", "permission_code": "assistant.attachment.manage", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000181", "api_key": "assistant.attachment.upload", "operation_id": "uploadAssistantConversationAttachment", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/attachments", "access_level": "authorized", "permission_code": "assistant.attachment.manage", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000182", "api_key": "assistant.attachment.delete", "operation_id": "deleteAssistantConversationAttachment", "method": "DELETE", "path_pattern": "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/attachments/{attachment_id}", "access_level": "authorized", "permission_code": "assistant.attachment.manage", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000080", "api_key": "workflow.definition.create", "operation_id": "createWorkflowDefinition", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows", "access_level": "authorized", "permission_code": "workflow.definition.create", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000081", "api_key": "workflow.definition.list", "operation_id": "listWorkflowDefinitions", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows", "access_level": "authorized", "permission_code": "workflow.definition.read", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000082", "api_key": "workflow.definition.get", "operation_id": "getWorkflowDefinition", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/workflows/{workflow_id}", "access_level": "authorized", "permission_code": "workflow.definition.read", "risk_level": "normal", "status": "active" },
@@ -548,6 +554,8 @@
     { "menu_id": "82000000-0000-4000-8000-000000000168", "menu_key": "navigation.workspace.assistant.run_cancel", "parent_menu_key": "navigation.workspace.assistant", "name": "取消知识问答运行", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.run.cancel", "icon_key": null, "sort_order": 250, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000169", "menu_key": "navigation.workspace.assistant.source_read", "parent_menu_key": "navigation.workspace.assistant", "name": "查看知识问答来源", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.source.read", "icon_key": null, "sort_order": 260, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000170", "menu_key": "navigation.workspace.assistant.feedback_manage", "parent_menu_key": "navigation.workspace.assistant", "name": "提交知识问答反馈", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.feedback.manage", "icon_key": null, "sort_order": 270, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000256", "menu_key": "navigation.workspace.assistant.scope_manage", "parent_menu_key": "navigation.workspace.assistant", "name": "配置会话知识范围", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.conversation.scope.manage", "icon_key": null, "sort_order": 275, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000257", "menu_key": "navigation.workspace.assistant.attachment_manage", "parent_menu_key": "navigation.workspace.assistant", "name": "管理会话临时附件", "menu_type": "action", "page_resource_id": null, "permission_code": "assistant.attachment.manage", "icon_key": null, "sort_order": 278, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000171", "menu_key": "navigation.workspace.workflow", "parent_menu_key": "navigation.workspace", "name": "工作流", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000009", "permission_code": "workflow.page.access", "icon_key": "network", "sort_order": 370, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000172", "menu_key": "navigation.workspace.workflow.definition_create", "parent_menu_key": "navigation.workspace.workflow", "name": "创建工作流", "menu_type": "action", "page_resource_id": null, "permission_code": "workflow.definition.create", "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000173", "menu_key": "navigation.workspace.workflow.definition_read", "parent_menu_key": "navigation.workspace.workflow", "name": "查看工作流", "menu_type": "action", "page_resource_id": null, "permission_code": "workflow.definition.read", "icon_key": null, "sort_order": 110, "source": "system", "status": "active" },
@@ -816,6 +824,10 @@
     { "menu_id": "82000000-0000-4000-8000-000000000255", "api_resource_id": "81000000-0000-4000-8000-000000000175", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000147", "api_resource_id": "81000000-0000-4000-8000-000000000176", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000147", "api_resource_id": "81000000-0000-4000-8000-000000000177", "action_type": "mutation" },
-    { "menu_id": "82000000-0000-4000-8000-000000000147", "api_resource_id": "81000000-0000-4000-8000-000000000178", "action_type": "query" }
+    { "menu_id": "82000000-0000-4000-8000-000000000147", "api_resource_id": "81000000-0000-4000-8000-000000000178", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000256", "api_resource_id": "81000000-0000-4000-8000-000000000179", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000257", "api_resource_id": "81000000-0000-4000-8000-000000000180", "action_type": "query" },
+    { "menu_id": "82000000-0000-4000-8000-000000000257", "api_resource_id": "81000000-0000-4000-8000-000000000181", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000257", "api_resource_id": "81000000-0000-4000-8000-000000000182", "action_type": "mutation" }
   ]
 }

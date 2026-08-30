@@ -9,7 +9,18 @@ from typing import Annotated
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from ai_platform_backend.observability import current_observability_runtime
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Header,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import StreamingResponse
 
 from ai_platform_api.common.api_errors import error_responses
@@ -21,6 +32,8 @@ from ai_platform_api.modules.assistant.api.schemas import (
     AssistantRunResponse,
     AssistantSourceListResponse,
     AssistantSourceResponse,
+    ConversationAttachmentListResponse,
+    ConversationAttachmentResponse,
     ConversationListResponse,
     ConversationResponse,
     CreateConversationRequest,
@@ -31,14 +44,19 @@ from ai_platform_api.modules.assistant.api.schemas import (
     MessagePartResponse,
     MessageResponse,
     SubmitMessageFeedbackRequest,
+    UpdateConversationScopeRequest,
     UserMessageCreatedResponse,
 )
-from ai_platform_api.modules.assistant.application.errors import AssistantDeniedError
+from ai_platform_api.modules.assistant.application.errors import (
+    AssistantDeniedError,
+    AssistantValidationError,
+)
 from ai_platform_api.modules.assistant.application.runner import AssistantRunExecutor
 from ai_platform_api.modules.assistant.application.service import (
     AssistantConversationService,
     AssistantRun,
     Conversation,
+    ConversationAttachment,
     Message,
     MessageFeedback,
 )
@@ -131,6 +149,111 @@ def list_conversations(
     )
 
 
+@router.put(
+    "/{conversation_id}/scope",
+    response_model=ConversationResponse,
+    operation_id="updateAssistantConversationScope",
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def update_conversation_scope(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    body: UpdateConversationScopeRequest,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[AssistantConversationService, Depends(assistant_conversation_service)],
+) -> ConversationResponse:
+    """更新活动私有会话范围，已排队 Run 继续使用自己的冻结范围。"""
+
+    _require_workspace_path(context, workspace_id)
+    return _conversation(
+        service.update_conversation_scope(
+            context,
+            conversation_id=conversation_id,
+            scope_mode=body.scope_mode,
+            knowledge_base_ids=tuple(body.knowledge_base_ids),
+            tag_ids=tuple(body.tag_ids),
+        )
+    )
+
+
+@router.get(
+    "/{conversation_id}/attachments",
+    response_model=ConversationAttachmentListResponse,
+    operation_id="listAssistantConversationAttachments",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def list_attachments(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[AssistantConversationService, Depends(assistant_conversation_service)],
+) -> ConversationAttachmentListResponse:
+    """列出当前账号私有会话的临时附件元数据。"""
+
+    _require_workspace_path(context, workspace_id)
+    return ConversationAttachmentListResponse(
+        items=[
+            _attachment(item)
+            for item in service.list_attachments(context, conversation_id=conversation_id)
+        ]
+    )
+
+
+@router.post(
+    "/{conversation_id}/attachments",
+    response_model=ConversationAttachmentResponse,
+    operation_id="uploadAssistantConversationAttachment",
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(400, 401, 403, 404, 409, 413, 422, 500),
+)
+async def upload_attachment(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[AssistantConversationService, Depends(assistant_conversation_service)],
+    file: Annotated[UploadFile, File(description="不进入永久知识库的 UTF-8 文本附件")],
+) -> ConversationAttachmentResponse:
+    """有界读取文本附件，超限字节不会进入服务或数据库。"""
+
+    _require_workspace_path(context, workspace_id)
+    content = await file.read(20_001)
+    if len(content) > 20_000:
+        raise AssistantValidationError
+    return _attachment(
+        service.upload_attachment(
+            context,
+            conversation_id=conversation_id,
+            file_name=file.filename or "",
+            media_type=file.content_type or "",
+            content=content,
+        )
+    )
+
+
+@router.delete(
+    "/{conversation_id}/attachments/{attachment_id}",
+    operation_id="deleteAssistantConversationAttachment",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500),
+)
+def delete_attachment(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    attachment_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[AssistantConversationService, Depends(assistant_conversation_service)],
+) -> Response:
+    """删除当前私有会话的临时附件。"""
+
+    _require_workspace_path(context, workspace_id)
+    service.delete_attachment(
+        context,
+        conversation_id=conversation_id,
+        attachment_id=attachment_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get(
     "/{conversation_id}/messages",
     response_model=MessageListResponse,
@@ -214,6 +337,7 @@ def create_user_message(
         context,
         conversation_id=conversation_id,
         texts=tuple(part.text for part in body.parts),
+        attachment_ids=tuple(body.attachment_ids),
         idempotency_key=idempotency_key,
     )
     background_tasks.add_task(executor.execute, context, submission.run.run_id)
@@ -431,6 +555,9 @@ def _conversation(value: Conversation) -> ConversationResponse:
         created_by_account_id=value.created_by_account_id,
         title=value.title,
         status=value.status,
+        scope_mode=value.scope_mode,
+        knowledge_base_ids=list(value.knowledge_base_ids),
+        tag_ids=list(value.tag_ids),
         created_at=value.created_at,
         updated_at=value.updated_at,
         version=value.version,
@@ -472,6 +599,15 @@ def _run(value: AssistantRun) -> AssistantRunResponse:
         service_route_version=value.service_route_version,
         agent_release_id=value.agent_release_id,
         runtime_config_version_id=value.runtime_config_version_id,
+        knowledge_base_ids=(
+            sorted(value.knowledge_base_ids, key=str)
+            if value.knowledge_base_ids is not None
+            else None
+        ),
+        document_ids=(
+            sorted(value.document_ids, key=str) if value.document_ids is not None else None
+        ),
+        attachment_ids=list(value.attachment_ids),
         status=value.status,
         trace_id=value.trace_id,
         created_at=value.created_at,
@@ -494,6 +630,19 @@ def _feedback(value: MessageFeedback) -> MessageFeedbackResponse:
         created_at=value.created_at,
         updated_at=value.updated_at,
         version=value.version,
+    )
+
+
+def _attachment(value: ConversationAttachment) -> ConversationAttachmentResponse:
+    return ConversationAttachmentResponse(
+        attachment_id=value.attachment_id,
+        workspace_id=value.workspace_id,
+        conversation_id=value.conversation_id,
+        file_name=value.file_name,
+        media_type=value.media_type,
+        size_bytes=value.size_bytes,
+        content_hash=value.content_hash,
+        created_at=value.created_at,
     )
 
 

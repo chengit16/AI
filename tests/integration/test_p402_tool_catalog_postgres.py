@@ -95,7 +95,7 @@ def test_nonempty_catalog_upgrade_and_roundtrip(
     # 1. 从真实非空 0052 目录升级，五个身份不变且完整治理摘要都可由应用复算。
     command.upgrade(config, "head")
     connection.commit()
-    assert _revision(connection, schema) == "20260825_0074"
+    assert _revision(connection, schema) == "20260830_0075"
     platform_engine = create_platform_engine(database_url, schema)
     sessions = sessionmaker(platform_engine, expire_on_commit=False, class_=Session)
     try:

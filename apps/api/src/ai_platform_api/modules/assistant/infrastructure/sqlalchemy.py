@@ -15,7 +15,7 @@ from ai_platform_backend.integration.sqlalchemy import (
     SqlAlchemyAuditWriter,
     SqlAlchemyOutboxWriter,
 )
-from sqlalchemy import CursorResult, case, func, insert, select, text, update
+from sqlalchemy import CursorResult, case, delete, func, insert, select, text, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +30,7 @@ from ai_platform_api.modules.assistant.domain.models import (
     AssistantUnitOfWork,
     AssistantWriteConflictError,
     Conversation,
+    ConversationAttachment,
     FeedbackIssueCode,
     FeedbackRating,
     Message,
@@ -46,7 +47,12 @@ from ai_platform_api.persistence.tables import (
     ai_runtime_config_publication,
     ai_runtime_config_versions,
     assistant_runs,
+    conversation_attachments,
     conversations,
+    document_tag_bindings,
+    documents,
+    knowledge_bases,
+    knowledge_tags,
     message_feedbacks,
     message_parts,
     messages,
@@ -222,6 +228,9 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                     conversation_kind=conversation.conversation_kind,
                     title=conversation.title,
                     status=conversation.status,
+                    scope_mode=conversation.scope_mode,
+                    knowledge_base_ids=list(conversation.knowledge_base_ids),
+                    tag_ids=list(conversation.tag_ids),
                     created_at=conversation.created_at,
                     updated_at=conversation.updated_at,
                     version=conversation.version,
@@ -281,6 +290,9 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                 .values(
                     status=conversation.status,
                     title=conversation.title,
+                    scope_mode=conversation.scope_mode,
+                    knowledge_base_ids=list(conversation.knowledge_base_ids),
+                    tag_ids=list(conversation.tag_ids),
                     updated_at=conversation.updated_at,
                     version=conversation.version,
                 )
@@ -288,6 +300,167 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         )
         if result.rowcount != 1:
             raise AssistantWriteConflictError("write")
+
+    def resolve_conversation_scope(
+        self,
+        workspace_id: UUID,
+        *,
+        knowledge_base_ids: tuple[UUID, ...],
+        tag_ids: tuple[UUID, ...],
+    ) -> tuple[frozenset[UUID] | None, frozenset[UUID] | None] | None:
+        """校验当前空间活动资源，并把标签并集冻结为活动文档集合。"""
+
+        # 1. 选择项必须全部属于当前空间且仍活动；部分命中不能静默扩大到其余空间。
+        if knowledge_base_ids:
+            visible_bases = frozenset(
+                self._session.scalars(
+                    select(knowledge_bases.c.knowledge_base_id).where(
+                        knowledge_bases.c.workspace_id == workspace_id,
+                        knowledge_bases.c.knowledge_base_id.in_(knowledge_base_ids),
+                        knowledge_bases.c.status == "active",
+                    )
+                )
+            )
+            if visible_bases != frozenset(knowledge_base_ids):
+                return None
+        else:
+            visible_bases = None
+        if tag_ids:
+            visible_tags = frozenset(
+                self._session.scalars(
+                    select(knowledge_tags.c.tag_id).where(
+                        knowledge_tags.c.workspace_id == workspace_id,
+                        knowledge_tags.c.tag_id.in_(tag_ids),
+                        knowledge_tags.c.status == "active",
+                    )
+                )
+            )
+            if visible_tags != frozenset(tag_ids):
+                return None
+        else:
+            return visible_bases, None
+
+        # 2. 多标签取文档并集；同时选择知识库时再求交集，空集保留为空而不回退全空间。
+        statement = (
+            select(document_tag_bindings.c.document_id)
+            .join(
+                documents,
+                (documents.c.workspace_id == document_tag_bindings.c.workspace_id)
+                & (documents.c.document_id == document_tag_bindings.c.document_id),
+            )
+            .where(
+                document_tag_bindings.c.workspace_id == workspace_id,
+                document_tag_bindings.c.tag_id.in_(tag_ids),
+                documents.c.status == "active",
+            )
+            .distinct()
+        )
+        if visible_bases is not None:
+            statement = statement.where(documents.c.knowledge_base_id.in_(visible_bases))
+        return visible_bases, frozenset(self._session.scalars(statement))
+
+    def add_attachment(self, attachment: ConversationAttachment) -> None:
+        self._session.execute(
+            insert(conversation_attachments).values(
+                attachment_id=attachment.attachment_id,
+                workspace_id=attachment.workspace_id,
+                conversation_id=attachment.conversation_id,
+                created_by_account_id=attachment.created_by_account_id,
+                file_name=attachment.file_name,
+                media_type=attachment.media_type,
+                content=attachment.content,
+                size_bytes=attachment.size_bytes,
+                content_hash=attachment.content_hash,
+                created_at=attachment.created_at,
+            )
+        )
+
+    def list_attachments(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        account_id: UUID,
+    ) -> tuple[ConversationAttachment, ...]:
+        rows = self._session.execute(
+            select(conversation_attachments)
+            .where(
+                conversation_attachments.c.workspace_id == workspace_id,
+                conversation_attachments.c.conversation_id == conversation_id,
+                conversation_attachments.c.created_by_account_id == account_id,
+            )
+            .order_by(
+                conversation_attachments.c.created_at,
+                conversation_attachments.c.attachment_id,
+            )
+        )
+        return tuple(_attachment(row) for row in rows)
+
+    def get_attachment(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        attachment_id: UUID,
+        account_id: UUID,
+    ) -> ConversationAttachment | None:
+        row = self._session.execute(
+            select(conversation_attachments).where(
+                conversation_attachments.c.workspace_id == workspace_id,
+                conversation_attachments.c.conversation_id == conversation_id,
+                conversation_attachments.c.attachment_id == attachment_id,
+                conversation_attachments.c.created_by_account_id == account_id,
+            )
+        ).one_or_none()
+        return _attachment(row) if row is not None else None
+
+    def delete_attachment(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        attachment_id: UUID,
+    ) -> None:
+        self._session.execute(
+            delete(conversation_attachments).where(
+                conversation_attachments.c.workspace_id == workspace_id,
+                conversation_attachments.c.conversation_id == conversation_id,
+                conversation_attachments.c.attachment_id == attachment_id,
+            )
+        )
+
+    def delete_conversation_attachments(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+    ) -> int:
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                delete(conversation_attachments).where(
+                    conversation_attachments.c.workspace_id == workspace_id,
+                    conversation_attachments.c.conversation_id == conversation_id,
+                )
+            ),
+        )
+        return result.rowcount
+
+    def get_run_attachments(self, run: AssistantRun) -> tuple[ConversationAttachment, ...]:
+        """按 Run 冻结标识和会话归属读取附件，缺项由应用层失败关闭。"""
+
+        if not run.attachment_ids:
+            return ()
+        rows = tuple(
+            self._session.execute(
+                select(conversation_attachments).where(
+                    conversation_attachments.c.workspace_id == run.workspace_id,
+                    conversation_attachments.c.conversation_id == run.conversation_id,
+                    conversation_attachments.c.attachment_id.in_(run.attachment_ids),
+                    conversation_attachments.c.created_by_account_id == run.requested_by_account_id,
+                )
+            )
+        )
+        by_id = {row.attachment_id: _attachment(row) for row in rows}
+        return tuple(
+            by_id[attachment_id] for attachment_id in run.attachment_ids if attachment_id in by_id
+        )
 
     def list_messages(
         self,
@@ -463,6 +636,11 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                     runtime_config_version_id=run.runtime_config_version_id,
                     requested_by_account_id=run.requested_by_account_id,
                     requested_by_actor_id=run.requested_by_actor_id,
+                    knowledge_base_ids=(
+                        list(run.knowledge_base_ids) if run.knowledge_base_ids is not None else None
+                    ),
+                    document_ids=list(run.document_ids) if run.document_ids is not None else None,
+                    attachment_ids=list(run.attachment_ids),
                     status=run.status,
                     idempotency_key=run.idempotency_key,
                     request_hash=run.request_hash,
@@ -796,6 +974,9 @@ def _conversation(row: Row[Any]) -> Conversation:
         row.conversation_kind,
         row.title,
         row.status,
+        row.scope_mode,
+        tuple(row.knowledge_base_ids),
+        tuple(row.tag_ids),
         row.created_at,
         row.updated_at,
         row.version,
@@ -825,6 +1006,24 @@ def _run(row: Row[Any]) -> AssistantRun:
         row.updated_at,
         row.completed_at,
         row.error_code,
+        frozenset(row.knowledge_base_ids) if row.knowledge_base_ids is not None else None,
+        frozenset(row.document_ids) if row.document_ids is not None else None,
+        tuple(row.attachment_ids),
+    )
+
+
+def _attachment(row: Row[Any]) -> ConversationAttachment:
+    return ConversationAttachment(
+        row.attachment_id,
+        row.workspace_id,
+        row.conversation_id,
+        row.created_by_account_id,
+        row.file_name,
+        row.media_type,
+        row.content,
+        row.size_bytes,
+        row.content_hash,
+        row.created_at,
     )
 
 

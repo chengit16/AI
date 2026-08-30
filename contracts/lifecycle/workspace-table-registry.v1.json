@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 18,
+  "registry_version": 19,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -87,6 +87,7 @@
     { "table": "tool_idempotency_records", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "synthetic_tool_side_effects", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "conversations", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "conversation_attachments", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "messages", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "message_parts", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "assistant_runs", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

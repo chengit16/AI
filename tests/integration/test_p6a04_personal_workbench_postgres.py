@@ -349,7 +349,7 @@ def test_p6a04_empty_migration_roundtrip() -> None:
     config = _migration_config(database_url, schema)
     try:
         command.upgrade(config, "20260825_0073")
-        command.upgrade(config, "head")
+        command.upgrade(config, "20260825_0074")
         with admin_engine.connect() as connection:
             assert connection.scalar(
                 text(f'SELECT version_num FROM "{schema}".alembic_version')
@@ -393,7 +393,7 @@ def test_p6a04_empty_migration_roundtrip() -> None:
                 == 0
             )
 
-        command.upgrade(config, "head")
+        command.upgrade(config, "20260825_0074")
         with admin_engine.connect() as connection:
             assert connection.scalar(
                 text(f'SELECT version_num FROM "{schema}".alembic_version')
@@ -412,7 +412,7 @@ def test_p6a04_existing_menu_snapshot_roundtrip(
     config, connection, schema, _ = migration_database
     workspace = _seed_pre_0073_workspace(migration_database)
 
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260825_0074")
     connection.commit()
     release_id, snapshot = _current_menu_snapshot(connection, schema, workspace.workspace_id)
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
@@ -440,7 +440,7 @@ def test_p6a04_existing_menu_snapshot_roundtrip(
         if str(item["api_resource_id"]) in _WORKBENCH_API_IDS
     }
 
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260825_0074")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
         "20260825_0074"

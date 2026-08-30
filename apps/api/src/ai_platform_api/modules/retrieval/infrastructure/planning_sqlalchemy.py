@@ -40,6 +40,7 @@ from ai_platform_api.persistence.tables import (
     agent_releases,
     ai_runtime_config_versions,
     assistant_runs,
+    conversations,
     document_index_publications,
     documents,
     index_versions,
@@ -69,6 +70,7 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             select(
                 assistant_runs,
                 messages.c.message_id.label("input_message_id"),
+                conversations.c.conversation_kind,
                 agent_releases.c.release_kind,
                 agent_releases.c.runtime_config_version_id.label(
                     "release_runtime_config_version_id"
@@ -77,6 +79,13 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
                 agent_releases.c.snapshot_hash.label("release_snapshot_hash"),
             )
             .join(messages, messages.c.message_id == assistant_runs.c.user_message_id)
+            .join(
+                conversations,
+                and_(
+                    conversations.c.workspace_id == assistant_runs.c.workspace_id,
+                    conversations.c.conversation_id == assistant_runs.c.conversation_id,
+                ),
+            )
             .join(
                 agent_releases,
                 and_(
@@ -112,7 +121,14 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             .where(assistant_runs.c.run_id == run_id)
         ).one()
         components = cast("dict[str, str]", runtime.component_versions)
-        knowledge_base_ids = self._resolve_release_knowledge_base_ids(row)
+        if row.conversation_kind == "private":
+            knowledge_base_ids = (
+                frozenset(row.knowledge_base_ids) if row.knowledge_base_ids is not None else None
+            )
+            document_ids = frozenset(row.document_ids) if row.document_ids is not None else None
+        else:
+            knowledge_base_ids = self._resolve_release_knowledge_base_ids(row)
+            document_ids = None
         return RetrievalRunInput(
             run_id=row.run_id,
             workspace_id=row.workspace_id,
@@ -126,6 +142,7 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             reranker_model_version=components.get("reranker", ""),
             source_ranking_version=components.get("source_ranking", ""),
             knowledge_base_ids=knowledge_base_ids,
+            document_ids=document_ids,
         )
 
     def _resolve_release_knowledge_base_ids(self, row: Row[Any]) -> frozenset[UUID] | None:
@@ -264,7 +281,7 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
         allowed_security_levels = tuple(
             level for level, rank in security_ranks.items() if rank <= maximum_rank
         )
-        if run.knowledge_base_ids == frozenset():
+        if run.knowledge_base_ids == frozenset() or run.document_ids == frozenset():
             return None
         statement = (
             select(
@@ -305,6 +322,8 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             statement = statement.where(
                 index_versions.c.knowledge_base_id.in_(run.knowledge_base_ids)
             )
+        if run.document_ids is not None:
+            statement = statement.where(index_versions.c.document_id.in_(run.document_ids))
         # 2. 先按工作空间、活动索引、模型版本、密级和文档状态收敛候选索引。
         rows = list(self._session.execute(statement))
         if authorization.workspace_wide:
@@ -329,7 +348,7 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             workspace_id=run.workspace_id,
             index_version_ids=index_ids,
             knowledge_base_ids=run.knowledge_base_ids,
-            document_ids=None,
+            document_ids=run.document_ids,
             department_ids=department_ids,
             visibilities=cast(frozenset[Visibility], visibilities),
             security_levels=cast(frozenset[SecurityLevel], frozenset(allowed_security_levels)),

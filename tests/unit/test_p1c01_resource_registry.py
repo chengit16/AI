@@ -33,12 +33,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 27
-    assert len(resource_registry.permissions) == 133
+    assert resource_registry.registry_version == 28
+    assert len(resource_registry.permissions) == 135
     assert len(resource_registry.page_resources) == 15
-    assert len(resource_registry.api_resources) == 178
-    assert len(resource_registry.menus) == 160
-    assert len(resource_registry.menu_api_bindings) == 171
+    assert len(resource_registry.api_resources) == 182
+    assert len(resource_registry.menus) == 162
+    assert len(resource_registry.menu_api_bindings) == 175
     assert registry_openapi_violations() == ()
 
 

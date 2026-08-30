@@ -792,6 +792,50 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/attachments": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Attachments
+     * @description 列出当前账号私有会话的临时附件元数据。
+     */
+    readonly get: operations["listAssistantConversationAttachments"];
+    readonly put?: never;
+    /**
+     * Upload Attachment
+     * @description 有界读取文本附件，超限字节不会进入服务或数据库。
+     */
+    readonly post: operations["uploadAssistantConversationAttachment"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/attachments/{attachment_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    readonly post?: never;
+    /**
+     * Delete Attachment
+     * @description 删除当前私有会话的临时附件。
+     */
+    readonly delete: operations["deleteAssistantConversationAttachment"];
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages": {
     readonly parameters: {
       readonly query?: never;
@@ -913,6 +957,26 @@ export type paths = {
      */
     readonly get: operations["streamAssistantRunEvents"];
     readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/scope": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /**
+     * Update Conversation Scope
+     * @description 更新活动私有会话范围，已排队 Run 继续使用自己的冻结范围。
+     */
+    readonly put: operations["updateAssistantConversationScope"];
     readonly post?: never;
     readonly delete?: never;
     readonly options?: never;
@@ -3973,6 +4037,8 @@ export type components = {
       readonly agent_release_id: string;
       /** Assistant Message Id */
       readonly assistant_message_id: string | null;
+      /** Attachment Ids */
+      readonly attachment_ids?: readonly string[];
       /** Completed At */
       readonly completed_at: string | null;
       /**
@@ -3985,8 +4051,12 @@ export type components = {
        * Format: date-time
        */
       readonly created_at: string;
+      /** Document Ids */
+      readonly document_ids?: readonly string[] | null;
       /** Error Code */
       readonly error_code: string | null;
+      /** Knowledge Base Ids */
+      readonly knowledge_base_ids?: readonly string[] | null;
       /**
        * Run Id
        * Format: uuid
@@ -4170,6 +4240,14 @@ export type components = {
        */
       readonly workspace_id: string;
     };
+    /** Body_uploadAssistantConversationAttachment */
+    readonly Body_uploadAssistantConversationAttachment: {
+      /**
+       * File
+       * @description 不进入永久知识库的 UTF-8 文本附件
+       */
+      readonly file: string;
+    };
     /** Body_uploadKnowledgeDocument */
     readonly Body_uploadKnowledgeDocument: {
       /** Department Ids */
@@ -4251,6 +4329,51 @@ export type components = {
       readonly version: number;
     };
     /**
+     * ConversationAttachmentListResponse
+     * @description 表示当前私有会话仍存在的临时附件。
+     */
+    readonly ConversationAttachmentListResponse: {
+      /** Items */
+      readonly items: readonly components["schemas"]["ConversationAttachmentResponse"][];
+    };
+    /**
+     * ConversationAttachmentResponse
+     * @description 返回临时附件元数据与摘要，正文只在受控模型上下文内读取。
+     */
+    readonly ConversationAttachmentResponse: {
+      /**
+       * Attachment Id
+       * Format: uuid
+       */
+      readonly attachment_id: string;
+      /** Content Hash */
+      readonly content_hash: string;
+      /**
+       * Conversation Id
+       * Format: uuid
+       */
+      readonly conversation_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /** File Name */
+      readonly file_name: string;
+      /**
+       * Media Type
+       * @enum {string}
+       */
+      readonly media_type: "text/plain" | "text/markdown" | "text/csv" | "application/json";
+      /** Size Bytes */
+      readonly size_bytes: number;
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+    };
+    /**
      * ConversationListResponse
      * @description 表示当前账号私有会话列表。
      */
@@ -4278,11 +4401,21 @@ export type components = {
        * Format: uuid
        */
       readonly created_by_account_id: string;
+      /** Knowledge Base Ids */
+      readonly knowledge_base_ids?: readonly string[];
+      /**
+       * Scope Mode
+       * @default workspace
+       * @enum {string}
+       */
+      readonly scope_mode: "workspace" | "selected";
       /**
        * Status
        * @enum {string}
        */
       readonly status: "active" | "archived";
+      /** Tag Ids */
+      readonly tag_ids?: readonly string[];
       /** Title */
       readonly title: string | null;
       /**
@@ -4637,6 +4770,8 @@ export type components = {
      * @description 表示由一个或多个文本 Part 组成的用户消息。
      */
     readonly CreateUserMessageRequest: {
+      /** Attachment Ids */
+      readonly attachment_ids?: readonly string[];
       /** Parts */
       readonly parts: readonly components["schemas"]["CreateMessagePartRequest"][];
     };
@@ -8086,6 +8221,21 @@ export type components = {
       readonly expected_revision: number;
       readonly knowledge_scope?:
         components["schemas"]["AgentKnowledgeScopeSelectionRequest"] | null;
+    };
+    /**
+     * UpdateConversationScopeRequest
+     * @description 表示会话级全空间或知识库/标签选择。
+     */
+    readonly UpdateConversationScopeRequest: {
+      /** Knowledge Base Ids */
+      readonly knowledge_base_ids?: readonly string[];
+      /**
+       * Scope Mode
+       * @enum {string}
+       */
+      readonly scope_mode: "workspace" | "selected";
+      /** Tag Ids */
+      readonly tag_ids?: readonly string[];
     };
     /**
      * UpdateKnowledgeFolderRequest
@@ -12656,6 +12806,306 @@ export interface operations {
       };
     };
   };
+  readonly listAssistantConversationAttachments: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly conversation_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ConversationAttachmentListResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly uploadAssistantConversationAttachment: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly conversation_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "multipart/form-data": components["schemas"]["Body_uploadAssistantConversationAttachment"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ConversationAttachmentResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 上传内容超过限制 */
+      readonly 413: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly deleteAssistantConversationAttachment: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly attachment_id: string;
+        readonly conversation_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 204: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   readonly listAssistantMessages: {
     readonly parameters: {
       readonly query?: {
@@ -13413,6 +13863,109 @@ export interface operations {
       };
       /** @description 请求的恢复事实已过期 */
       readonly 410: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly updateAssistantConversationScope: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly conversation_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["UpdateConversationScopeRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ConversationResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
         headers: {
           readonly [name: string]: unknown;
         };

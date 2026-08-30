@@ -64,6 +64,7 @@ class RetrievalRunInput:
     reranker_model_version: str = ""
     source_ranking_version: str = ""
     knowledge_base_ids: frozenset[UUID] | None = None
+    document_ids: frozenset[UUID] | None = None
 
 
 def release_knowledge_scope_version_ids(

@@ -7,7 +7,7 @@ import json
 import re
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, cast
 from uuid import UUID, uuid4
 
 from ai_platform_backend.integration.domain import AuditRecord
@@ -26,7 +26,10 @@ from ai_platform_api.modules.assistant.domain.models import (
     AssistantRun,
     AssistantUnitOfWork,
     AssistantWriteConflictError,
+    AttachmentMediaType,
     Conversation,
+    ConversationAttachment,
+    ConversationScopeMode,
     FeedbackIssueCode,
     FeedbackRating,
     Message,
@@ -50,11 +53,15 @@ FEEDBACK_RATINGS = frozenset({"helpful", "unhelpful"})
 FEEDBACK_ISSUE_CODES = frozenset(
     {"incorrect", "missing_source", "source_mismatch", "unsafe", "other"}
 )
+ATTACHMENT_MEDIA_TYPES = frozenset({"text/plain", "text/markdown", "text/csv", "application/json"})
+MAX_ATTACHMENT_COUNT = 3
+MAX_ATTACHMENT_BYTES = 20_000
 
 __all__ = [
     "AssistantConversationService",
     "AssistantRun",
     "Conversation",
+    "ConversationAttachment",
     "Message",
     "MessageFeedback",
 ]
@@ -113,6 +120,9 @@ class AssistantConversationService:
                 conversation_kind="private",
                 title=normalized_title,
                 status="active",
+                scope_mode="workspace",
+                knowledge_base_ids=(),
+                tag_ids=(),
                 created_at=now,
                 updated_at=now,
                 version=1,
@@ -190,6 +200,7 @@ class AssistantConversationService:
     ) -> Conversation:
         """归档当前账号创建的活动会话，已归档请求保持幂等。"""
 
+        # 1. 先锁定并校验会话归属，活动 Run 存在时拒绝改变生命周期。
         account_id = _browser_account(context)
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
@@ -205,6 +216,7 @@ class AssistantConversationService:
                 return current
             if unit_of_work.assistant.has_active_run(context.workspace_id, conversation_id):
                 raise AssistantConversationBusyError
+            # 2. 归档同时清理临时附件并写入审计与清理意图，所有事实在一个事务提交。
             archived = replace(
                 current,
                 status="archived",
@@ -212,9 +224,208 @@ class AssistantConversationService:
                 version=current.version + 1,
             )
             unit_of_work.assistant.save_conversation(archived)
+            removed_attachment_count = unit_of_work.assistant.delete_conversation_attachments(
+                context.workspace_id,
+                conversation_id,
+            )
             _record_conversation_event(unit_of_work, context, archived, "archived", now)
+            _record_attachment_cleanup(
+                unit_of_work,
+                context,
+                archived,
+                removed_attachment_count,
+                now,
+            )
             unit_of_work.commit()
             return archived
+
+    def update_conversation_scope(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        scope_mode: ConversationScopeMode,
+        knowledge_base_ids: tuple[UUID, ...],
+        tag_ids: tuple[UUID, ...],
+    ) -> Conversation:
+        """更新活动会话的知识选择；Run 会在消息提交时另行冻结解析结果。"""
+
+        # 1. 规范化选择并校验空范围，避免客户端顺序或重复值影响权限判断。
+        account_id = _browser_account(context)
+        normalized_bases, normalized_tags = _normalize_scope_selection(
+            scope_mode,
+            knowledge_base_ids,
+            tag_ids,
+        )
+        now = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            current = _owned_conversation(
+                unit_of_work,
+                context,
+                conversation_id,
+                account_id,
+                for_update=True,
+            )
+            if current.status != "active" or unit_of_work.assistant.has_active_run(
+                context.workspace_id, conversation_id
+            ):
+                raise AssistantConversationBusyError
+            if (
+                scope_mode == "selected"
+                and unit_of_work.assistant.resolve_conversation_scope(
+                    context.workspace_id,
+                    knowledge_base_ids=normalized_bases,
+                    tag_ids=normalized_tags,
+                )
+                is None
+            ):
+                raise AssistantNotFoundError
+            # 2. 仅保存已解析且可授权的范围，消息提交时再复制为不可变 Run 快照。
+            updated = replace(
+                current,
+                scope_mode=scope_mode,
+                knowledge_base_ids=normalized_bases,
+                tag_ids=normalized_tags,
+                updated_at=now,
+                version=current.version + 1,
+            )
+            unit_of_work.assistant.save_conversation(updated)
+            _record_conversation_event(unit_of_work, context, updated, "scope_updated", now)
+            unit_of_work.commit()
+            return updated
+
+    def list_attachments(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+    ) -> tuple[ConversationAttachment, ...]:
+        """列出当前账号私有会话的临时附件，不跨会话复用。"""
+
+        account_id = _browser_account(context)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            _owned_conversation(unit_of_work, context, conversation_id, account_id)
+            return unit_of_work.assistant.list_attachments(
+                context.workspace_id,
+                conversation_id,
+                account_id,
+            )
+
+    def upload_attachment(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        file_name: str,
+        media_type: str,
+        content: bytes,
+    ) -> ConversationAttachment:
+        """保存小型 UTF-8 文本附件；它不进入永久知识库、索引或在线正文模型。"""
+
+        # 1. 在事务外完成大小、编码和媒体类型校验，拒绝二进制内容进入模型上下文。
+        account_id = _browser_account(context)
+        normalized_name, normalized_type, text_content = _normalize_attachment(
+            file_name,
+            media_type,
+            content,
+        )
+        now = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            # 2. 事务内再次锁定会话并限制数量，保证活动 Run 与附件写入不会竞态。
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            conversation = _owned_conversation(
+                unit_of_work,
+                context,
+                conversation_id,
+                account_id,
+                for_update=True,
+            )
+            if conversation.status != "active" or unit_of_work.assistant.has_active_run(
+                context.workspace_id, conversation_id
+            ):
+                raise AssistantConversationBusyError
+            current = unit_of_work.assistant.list_attachments(
+                context.workspace_id,
+                conversation_id,
+                account_id,
+            )
+            if len(current) >= MAX_ATTACHMENT_COUNT:
+                raise AssistantValidationError
+            attachment = ConversationAttachment(
+                attachment_id=uuid4(),
+                workspace_id=context.workspace_id,
+                conversation_id=conversation_id,
+                created_by_account_id=account_id,
+                file_name=normalized_name,
+                media_type=normalized_type,
+                content=text_content,
+                size_bytes=len(content),
+                content_hash=hashlib.sha256(content).hexdigest(),
+                created_at=now,
+            )
+            unit_of_work.assistant.add_attachment(attachment)
+            _record_attachment_event(unit_of_work, context, attachment, "uploaded", now)
+            unit_of_work.commit()
+            return attachment
+
+    def delete_attachment(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        attachment_id: UUID,
+    ) -> None:
+        """删除临时附件；活动 Run 期间拒绝删除，避免模型上下文在执行中漂移。"""
+
+        account_id = _browser_account(context)
+        now = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            conversation = _owned_conversation(
+                unit_of_work,
+                context,
+                conversation_id,
+                account_id,
+                for_update=True,
+            )
+            if conversation.status != "active" or unit_of_work.assistant.has_active_run(
+                context.workspace_id, conversation_id
+            ):
+                raise AssistantConversationBusyError
+            attachment = unit_of_work.assistant.get_attachment(
+                context.workspace_id,
+                conversation_id,
+                attachment_id,
+                account_id,
+            )
+            if attachment is None:
+                raise AssistantNotFoundError
+            unit_of_work.assistant.delete_attachment(
+                context.workspace_id,
+                conversation_id,
+                attachment_id,
+            )
+            _record_attachment_event(unit_of_work, context, attachment, "deleted", now)
+            unit_of_work.commit()
+
+    def get_run_attachments(
+        self,
+        context: RequestContext,
+        *,
+        run_id: UUID,
+    ) -> tuple[ConversationAttachment, ...]:
+        """为执行器读取 Run 冻结附件；任一附件已缺失时失败关闭。"""
+
+        account_id, actor_id = _request_principal(context)
+        with self._unit_of_work as unit_of_work:
+            _require_active_member(unit_of_work, context.workspace_id, account_id)
+            run = _owned_run(unit_of_work, context, run_id, actor_id, for_update=False)
+            attachments = unit_of_work.assistant.get_run_attachments(run)
+            if tuple(item.attachment_id for item in attachments) != run.attachment_ids:
+                raise AssistantNotFoundError
+            return attachments
 
     def create_user_message(
         self,
@@ -223,14 +434,20 @@ class AssistantConversationService:
         conversation_id: UUID,
         texts: tuple[str, ...],
         idempotency_key: str,
+        attachment_ids: tuple[UUID, ...] = (),
     ) -> MessageSubmission:
         """原子创建用户消息和 queued Run，并冻结助手及运行配置版本。"""
 
         # 1. 先验证稳定输入并计算请求摘要，重试可以在任何会话状态检查之前返回原结果。
         account_id = _browser_account(context)
         normalized_texts = normalize_texts(texts)
+        normalized_attachment_ids = _normalize_attachment_ids(attachment_ids)
         require_idempotency_key(idempotency_key)
-        request_hash = _request_hash(conversation_id, normalized_texts)
+        request_hash = _request_hash(
+            conversation_id,
+            normalized_texts,
+            normalized_attachment_ids,
+        )
         now = datetime.now(UTC)
         try:
             with self._unit_of_work as unit_of_work:
@@ -257,6 +474,18 @@ class AssistantConversationService:
                     raise AssistantNotFoundError
                 if unit_of_work.assistant.has_active_run(context.workspace_id, conversation_id):
                     raise AssistantConversationBusyError
+                scope = _resolved_conversation_scope(unit_of_work, context, conversation)
+                attachments = tuple(
+                    unit_of_work.assistant.get_attachment(
+                        context.workspace_id,
+                        conversation_id,
+                        attachment_id,
+                        account_id,
+                    )
+                    for attachment_id in normalized_attachment_ids
+                )
+                if any(item is None for item in attachments):
+                    raise AssistantNotFoundError
                 runtime_config = _current_runtime_config(
                     unit_of_work,
                     self._runtime_bootstrap,
@@ -285,6 +514,9 @@ class AssistantConversationService:
                     texts=normalized_texts,
                     idempotency_key=idempotency_key,
                     request_hash=request_hash,
+                    knowledge_base_ids=scope[0],
+                    document_ids=scope[1],
+                    attachment_ids=normalized_attachment_ids,
                     agent_release_id=release.release_id,
                     runtime_config_version_id=release.runtime_config_version_id,
                     service_id=route_sync.deployment.service.service_id,
@@ -692,6 +924,89 @@ def _normalize_title(title: str | None) -> str | None:
     return normalized
 
 
+def _normalize_scope_selection(
+    scope_mode: ConversationScopeMode,
+    knowledge_base_ids: tuple[UUID, ...],
+    tag_ids: tuple[UUID, ...],
+) -> tuple[tuple[UUID, ...], tuple[UUID, ...]]:
+    """规范会话范围并保留稳定顺序，防止重复标识制造不同语义的版本。"""
+
+    bases = tuple(dict.fromkeys(knowledge_base_ids))
+    tags = tuple(dict.fromkeys(tag_ids))
+    if (
+        scope_mode not in {"workspace", "selected"}
+        or len(bases) != len(knowledge_base_ids)
+        or len(tags) != len(tag_ids)
+        or len(bases) > 20
+        or len(tags) > 20
+    ):
+        raise AssistantValidationError
+    if scope_mode == "workspace":
+        if bases or tags:
+            raise AssistantValidationError
+        return (), ()
+    if not bases and not tags:
+        raise AssistantValidationError
+    return bases, tags
+
+
+def _resolved_conversation_scope(
+    unit_of_work: AssistantUnitOfWork,
+    context: RequestContext,
+    conversation: Conversation,
+) -> tuple[frozenset[UUID] | None, frozenset[UUID] | None]:
+    """在排队事务内解析活动资源；失效选择不能退回工作空间全量检索。"""
+
+    if conversation.scope_mode == "workspace":
+        return None, None
+    resolved = unit_of_work.assistant.resolve_conversation_scope(
+        context.workspace_id,
+        knowledge_base_ids=conversation.knowledge_base_ids,
+        tag_ids=conversation.tag_ids,
+    )
+    if resolved is None:
+        raise AssistantNotFoundError
+    return resolved
+
+
+def _normalize_attachment(
+    file_name: str,
+    media_type: str,
+    content: bytes,
+) -> tuple[str, AttachmentMediaType, str]:
+    """限制临时附件为小型 UTF-8 文本，并拒绝路径名、空内容和二进制控制字符。"""
+
+    normalized_name = file_name.strip()
+    normalized_type = media_type.split(";", maxsplit=1)[0].strip().casefold()
+    if (
+        not normalized_name
+        or len(normalized_name) > 255
+        or "/" in normalized_name
+        or "\\" in normalized_name
+        or normalized_type not in ATTACHMENT_MEDIA_TYPES
+        or not 1 <= len(content) <= MAX_ATTACHMENT_BYTES
+    ):
+        raise AssistantValidationError
+    try:
+        text_content = content.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise AssistantValidationError from error
+    if (
+        not text_content.strip()
+        or len(text_content) > MAX_ATTACHMENT_BYTES
+        or any(ord(character) < 32 and character not in "\n\r\t" for character in text_content)
+    ):
+        raise AssistantValidationError
+    return normalized_name, cast("AttachmentMediaType", normalized_type), text_content
+
+
+def _normalize_attachment_ids(attachment_ids: tuple[UUID, ...]) -> tuple[UUID, ...]:
+    normalized = tuple(dict.fromkeys(attachment_ids))
+    if len(normalized) != len(attachment_ids) or len(normalized) > MAX_ATTACHMENT_COUNT:
+        raise AssistantValidationError
+    return normalized
+
+
 def normalize_texts(texts: tuple[str, ...]) -> tuple[str, ...]:
     """规范消息文本并统一执行 Part 数量、单项长度和总长度边界。"""
 
@@ -738,9 +1053,17 @@ def _normalize_feedback(
     return issues, normalized_comment
 
 
-def _request_hash(conversation_id: UUID, texts: tuple[str, ...]) -> str:
+def _request_hash(
+    conversation_id: UUID,
+    texts: tuple[str, ...],
+    attachment_ids: tuple[UUID, ...] = (),
+) -> str:
     canonical = json.dumps(
-        {"conversation_id": str(conversation_id), "parts": list(texts)},
+        {
+            "attachment_ids": [str(value) for value in attachment_ids],
+            "conversation_id": str(conversation_id),
+            "parts": list(texts),
+        },
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -757,6 +1080,9 @@ def new_submission(
     texts: tuple[str, ...],
     idempotency_key: str,
     request_hash: str,
+    knowledge_base_ids: frozenset[UUID] | None,
+    document_ids: frozenset[UUID] | None,
+    attachment_ids: tuple[UUID, ...],
     agent_release_id: UUID,
     runtime_config_version_id: UUID,
     service_id: UUID,
@@ -796,6 +1122,9 @@ def new_submission(
         runtime_config_version_id=runtime_config_version_id,
         requested_by_account_id=account_id,
         requested_by_actor_id=actor_id,
+        knowledge_base_ids=knowledge_base_ids,
+        document_ids=document_ids,
+        attachment_ids=attachment_ids,
         status="queued",
         idempotency_key=idempotency_key,
         request_hash=request_hash,
@@ -875,7 +1204,7 @@ def _record_conversation_event(
     unit_of_work: AssistantUnitOfWork,
     context: RequestContext,
     conversation: Conversation,
-    transition: Literal["created", "archived"],
+    transition: Literal["created", "archived", "scope_updated"],
     occurred_at: datetime,
 ) -> None:
     action = f"assistant.conversation.{transition}"
@@ -913,7 +1242,94 @@ def _record_conversation_event(
             payload={
                 "conversation_id": str(conversation.conversation_id),
                 "status": conversation.status,
+                "scope_mode": conversation.scope_mode,
+                "knowledge_base_count": len(conversation.knowledge_base_ids),
+                "tag_count": len(conversation.tag_ids),
             },
+        )
+    )
+
+
+def _record_attachment_event(
+    unit_of_work: AssistantUnitOfWork,
+    context: RequestContext,
+    attachment: ConversationAttachment,
+    transition: Literal["uploaded", "deleted"],
+    occurred_at: datetime,
+) -> None:
+    """记录附件元数据与摘要，不把临时正文写入审计或 Outbox。"""
+
+    action = f"assistant.attachment.{transition}"
+    attributes: dict[str, object] = {
+        "conversation_id": str(attachment.conversation_id),
+        "file_name": attachment.file_name,
+        "media_type": attachment.media_type,
+        "size_bytes": attachment.size_bytes,
+        "content_hash": attachment.content_hash,
+    }
+    unit_of_work.audit.add(
+        AuditRecord(
+            audit_id=uuid4(),
+            workspace_id=context.workspace_id,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            action=action,
+            resource_type="conversation_attachment",
+            resource_id=attachment.attachment_id,
+            outcome="succeeded",
+            occurred_at=occurred_at,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
+            attributes=attributes,
+        )
+    )
+    unit_of_work.outbox.add(
+        IntegrationEvent(
+            event_id=uuid4(),
+            event_type=action,
+            workspace_id=context.workspace_id,
+            aggregate_id=attachment.attachment_id,
+            aggregate_version=1,
+            occurred_at=occurred_at,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            request_id=context.request_id,
+            payload=attributes,
+        )
+    )
+
+
+def _record_attachment_cleanup(
+    unit_of_work: AssistantUnitOfWork,
+    context: RequestContext,
+    conversation: Conversation,
+    removed_count: int,
+    occurred_at: datetime,
+) -> None:
+    """归档清理只记录数量，已删除附件的名称和正文不继续传播。"""
+
+    if removed_count == 0:
+        return
+    unit_of_work.audit.add(
+        AuditRecord(
+            audit_id=uuid4(),
+            workspace_id=context.workspace_id,
+            actor_id=context.actor_id,
+            user_id=context.user_id,
+            action="assistant.attachment.cleaned",
+            resource_type="conversation",
+            resource_id=conversation.conversation_id,
+            outcome="succeeded",
+            occurred_at=occurred_at,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            traceparent=context.trace.traceparent,
+            authorization=context.audit_authorization,
+            attributes={"removed_count": removed_count},
         )
     )
 

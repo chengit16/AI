@@ -9,6 +9,7 @@ import { StateView } from "@/components/StateView/StateView";
 import { useWorkspaceMenuNavigation } from "@/hooks/useWorkspaceMenuNavigation";
 
 import { AssistantComposer } from "./components/AssistantComposer";
+import { AssistantContextBar } from "./components/AssistantContextBar";
 import { AssistantFeedbackModal } from "./components/AssistantFeedbackModal";
 import { AssistantSourcesDrawer } from "./components/AssistantSourcesDrawer";
 import { ConversationRail } from "./components/ConversationRail";
@@ -22,12 +23,19 @@ export default function AssistantConversationsPage() {
   const initialConversationId = searchParams.get("conversation");
   const initialPrompt = searchParams.get("prompt") ?? "";
   const { visiblePermissionCodes } = useWorkspaceMenuNavigation();
-  const model = useAssistantConversation(initialConversationId);
   const canCreate = visiblePermissionCodes.has("assistant.conversation.create");
+  const canArchive = visiblePermissionCodes.has("assistant.conversation.archive");
+  const canManageScope = visiblePermissionCodes.has("assistant.conversation.scope.manage");
+  const canManageAttachments = visiblePermissionCodes.has("assistant.attachment.manage");
   const canAsk = visiblePermissionCodes.has("assistant.message.create");
   const canCancel = visiblePermissionCodes.has("assistant.run.cancel");
   const canSource = visiblePermissionCodes.has("assistant.source.read");
   const canFeedback = visiblePermissionCodes.has("assistant.feedback.manage");
+  const model = useAssistantConversation(
+    initialConversationId,
+    canManageScope,
+    canManageAttachments,
+  );
 
   if (model.conversations.isError) {
     return (
@@ -49,8 +57,16 @@ export default function AssistantConversationsPage() {
   }
 
   function handleSend(text: string) {
-    if (!canAsk || !model.selectedConversationId) return;
+    if (!canAsk || model.selectedConversation?.status !== "active") return;
     model.sendMessage(text);
+  }
+
+  function handleArchive(conversationId: string) {
+    if (!canArchive || model.archiveConversation.isPending) return;
+    model.archiveConversation.mutate(conversationId, {
+      onSuccess: () => message.success("会话已归档"),
+      onError: (error) => message.error(errorMessage(error)),
+    });
   }
 
   return (
@@ -73,8 +89,13 @@ export default function AssistantConversationsPage() {
           selectedId={model.selectedConversationId}
           loading={model.conversations.isLoading}
           creating={model.createConversation.isPending}
+          filter={model.conversationStatus}
+          canArchive={canArchive}
+          archiving={model.archiveConversation.isPending}
           onSelect={model.selectConversation}
+          onFilter={model.filterConversations}
           onCreate={handleCreate}
+          onArchive={handleArchive}
         />
         <section className="ui-surface-panel flex min-h-[620px] min-w-0 flex-col overflow-hidden">
           {!model.selectedConversation ? (
@@ -111,6 +132,49 @@ export default function AssistantConversationsPage() {
                   />
                 )}
               </div>
+              {(model.knowledgeBases.isError || model.knowledgeTags.isError) &&
+                model.selectedConversation.status === "active" && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message="知识范围选项未能加载"
+                    description={errorMessage(
+                      model.knowledgeBases.error ?? model.knowledgeTags.error,
+                    )}
+                  />
+                )}
+              <AssistantContextBar
+                key={`${model.selectedConversation.conversation_id}:${model.selectedConversation.version}`}
+                conversation={model.selectedConversation}
+                knowledgeBases={model.knowledgeBases.data ?? []}
+                knowledgeTags={model.knowledgeTags.data ?? []}
+                attachments={model.attachments.data ?? []}
+                canManageScope={canManageScope && model.selectedConversation.status === "active"}
+                canManageAttachments={
+                  canManageAttachments && model.selectedConversation.status === "active"
+                }
+                busy={Boolean(model.activeRun)}
+                savingScope={model.updateScope.isPending}
+                uploading={model.uploadAttachment.isPending}
+                onSaveScope={(body) => {
+                  model.updateScope.mutate(body, {
+                    onSuccess: () => message.success("知识范围已保存"),
+                    onError: (error) => message.error(errorMessage(error)),
+                  });
+                }}
+                onUpload={(file) => {
+                  model.uploadAttachment.mutate(file, {
+                    onSuccess: () => message.success("临时附件已添加"),
+                    onError: (error) => message.error(errorMessage(error)),
+                  });
+                }}
+                onDeleteAttachment={(attachmentId) => {
+                  model.deleteAttachment.mutate(attachmentId, {
+                    onSuccess: () => message.success("临时附件已删除"),
+                    onError: (error) => message.error(errorMessage(error)),
+                  });
+                }}
+              />
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 phone-down:px-3">
                 <MessageThread
                   messages={model.messages.data ?? []}
@@ -135,20 +199,29 @@ export default function AssistantConversationsPage() {
                 />
               </div>
               <Divider className="!my-0" />
-              <AssistantComposer
-                initialValue={initialPrompt}
-                disabled={!canAsk || Boolean(model.activeRun) || model.createMessage.isPending}
-                sending={model.createMessage.isPending}
-                cancellable={Boolean(model.activeRun && canCancel)}
-                onSend={handleSend}
-                onCancel={() => {
-                  if (model.activeRun && canCancel) {
-                    model.cancelRun.mutate(model.activeRun, {
-                      onError: (error) => message.error(errorMessage(error)),
-                    });
-                  }
-                }}
-              />
+              {model.selectedConversation.status === "archived" ? (
+                <Alert
+                  className="!rounded-none"
+                  type="info"
+                  showIcon
+                  message="该会话已归档，只能查看历史消息"
+                />
+              ) : (
+                <AssistantComposer
+                  initialValue={initialPrompt}
+                  disabled={!canAsk || Boolean(model.activeRun) || model.createMessage.isPending}
+                  sending={model.createMessage.isPending}
+                  cancellable={Boolean(model.activeRun && canCancel)}
+                  onSend={handleSend}
+                  onCancel={() => {
+                    if (model.activeRun && canCancel) {
+                      model.cancelRun.mutate(model.activeRun, {
+                        onError: (error) => message.error(errorMessage(error)),
+                      });
+                    }
+                  }}
+                />
+              )}
             </>
           )}
         </section>

@@ -326,10 +326,13 @@ class AssistantRunListResponse(typing.TypedDict):
 class AssistantRunResponse(typing.TypedDict):
     agent_release_id: str
     assistant_message_id: str | None
+    attachment_ids: typing.NotRequired[list[str]]
     completed_at: str | None
     conversation_id: str
     created_at: str
+    document_ids: typing.NotRequired[list[str] | None]
     error_code: str | None
+    knowledge_base_ids: typing.NotRequired[list[str] | None]
     run_id: str
     runtime_config_version_id: str
     service_id: typing.NotRequired[str | None]
@@ -392,6 +395,10 @@ class AuthenticationContextResponse(typing.TypedDict):
     workspace_id: str
 
 
+class Body_uploadAssistantConversationAttachment(typing.TypedDict):
+    file: str
+
+
 class Body_uploadKnowledgeDocument(typing.TypedDict):
     department_ids: typing.NotRequired[list[str] | None]
     file: str
@@ -428,6 +435,21 @@ class ControlTowerSourceContractResponse(typing.TypedDict):
     version: int
 
 
+class ConversationAttachmentListResponse(typing.TypedDict):
+    items: list[ConversationAttachmentResponse]
+
+
+class ConversationAttachmentResponse(typing.TypedDict):
+    attachment_id: str
+    content_hash: str
+    conversation_id: str
+    created_at: str
+    file_name: str
+    media_type: typing.Literal["text/plain", "text/markdown", "text/csv", "application/json"]
+    size_bytes: int
+    workspace_id: str
+
+
 class ConversationListResponse(typing.TypedDict):
     items: list[ConversationResponse]
 
@@ -436,7 +458,10 @@ class ConversationResponse(typing.TypedDict):
     conversation_id: str
     created_at: str
     created_by_account_id: str
+    knowledge_base_ids: typing.NotRequired[list[str]]
+    scope_mode: typing.NotRequired[typing.Literal["workspace", "selected"]]
     status: typing.Literal["active", "archived"]
+    tag_ids: typing.NotRequired[list[str]]
     title: str | None
     updated_at: str
     version: int
@@ -577,6 +602,7 @@ class CreateToolRunRequest(typing.TypedDict):
 
 
 class CreateUserMessageRequest(typing.TypedDict):
+    attachment_ids: typing.NotRequired[list[str]]
     parts: list[CreateMessagePartRequest]
 
 
@@ -1922,6 +1948,12 @@ class UpdateAgentDraftRequest(typing.TypedDict):
     configuration: dict[str, object]
     expected_revision: int
     knowledge_scope: typing.NotRequired[AgentKnowledgeScopeSelectionRequest | None]
+
+
+class UpdateConversationScopeRequest(typing.TypedDict):
+    knowledge_base_ids: typing.NotRequired[list[str]]
+    scope_mode: typing.Literal["workspace", "selected"]
+    tag_ids: typing.NotRequired[list[str]]
 
 
 class UpdateKnowledgeFolderRequest(typing.TypedDict):

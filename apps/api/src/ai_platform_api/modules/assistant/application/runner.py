@@ -11,7 +11,7 @@ from ai_platform_backend.observability import observed_operation
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
-from ai_platform_api.modules.assistant.domain.models import AssistantRun
+from ai_platform_api.modules.assistant.domain.models import AssistantRun, ConversationAttachment
 from ai_platform_api.modules.model_gateway.application.context import (
     AuthorizedModelContextBuilder,
 )
@@ -113,6 +113,7 @@ class AssistantRunExecutor:
             retrieval_context = _retrieval_execution_context(context, run)
             plan = self._retrieval_planning.retrieve(retrieval_context, run.run_id)
             evidence = self._retrieval_evidence.prepare(retrieval_context, run.run_id)
+            attachments = self._conversations.get_run_attachments(context, run_id=run.run_id)
             self._append_status(
                 run.run_id,
                 run.trace_id,
@@ -121,10 +122,11 @@ class AssistantRunExecutor:
                 "completed",
                 candidate_count=len(plan.candidates),
                 evidence_count=len(evidence.items),
+                attachment_count=len(attachments),
             )
 
             # 2. 证据不足时使用固定降级文案；证据充分时只调用 Release 冻结的模型配置。
-            text = self._answer(run, release, plan, evidence)
+            text = self._answer(run, release, plan, evidence, attachments)
             self._append_answer_events(run.run_id, run.trace_id, run.traceparent, text, evidence)
 
             # 3. 先固化消息正文，再关闭流恢复事实；正常路径不会把模型正文写入审计或日志。
@@ -153,8 +155,9 @@ class AssistantRunExecutor:
         release: RuntimeReleaseSnapshot,
         plan: RetrievalPlanSnapshot,
         evidence: EvidenceSetSnapshot,
+        attachments: tuple[ConversationAttachment, ...],
     ) -> str:
-        if evidence.status == "uncertain":
+        if evidence.status == "uncertain" and not attachments:
             reason = evidence.degradation_reason or "no_current_evidence"
             return _DEGRADATION_MESSAGES[reason]
         runtime_config_version_id = release.runtime_config_version_id
@@ -167,11 +170,17 @@ class AssistantRunExecutor:
             trace_id=run.trace_id,
             traceparent=run.traceparent,
             task_type="assistant.answer",
-            messages=_model_messages(configuration, plan, evidence, self._model_context),
+            messages=_model_messages(
+                configuration,
+                plan,
+                evidence,
+                attachments,
+                self._model_context,
+            ),
             required_capabilities=frozenset({"generation"}),
             max_output_tokens=configuration.policy.max_output_tokens,
             external_data_allowed=True,
-            security_level=_maximum_evidence_security_level(evidence),
+            security_level=_maximum_context_security_level(evidence, attachments),
         )
         result = self._model_runtime.invoke(
             request,
@@ -318,16 +327,48 @@ def _maximum_evidence_security_level(evidence: EvidenceSetSnapshot) -> SecurityL
     return max((item.security_level for item in evidence.items), key=ranks.__getitem__)
 
 
+def _maximum_context_security_level(
+    evidence: EvidenceSetSnapshot,
+    attachments: tuple[ConversationAttachment, ...],
+) -> SecurityLevel:
+    """临时附件按 INTERNAL 处理，并与永久知识证据取更高密级。"""
+
+    if not attachments:
+        return _maximum_evidence_security_level(evidence)
+    if not evidence.items:
+        return "INTERNAL"
+    ranks: dict[SecurityLevel, int] = {
+        "PUBLIC": 0,
+        "INTERNAL": 1,
+        "CONFIDENTIAL": 2,
+        "RESTRICTED": 3,
+    }
+    evidence_level = _maximum_evidence_security_level(evidence)
+    return max((evidence_level, "INTERNAL"), key=ranks.__getitem__)
+
+
 def _model_messages(
     configuration: AiRuntimeConfigVersion,
     plan: RetrievalPlanSnapshot,
     evidence: EvidenceSetSnapshot,
+    attachments: tuple[ConversationAttachment, ...],
     builder: AuthorizedModelContextBuilder,
 ) -> tuple[ModelMessage, ...]:
     system = ModelMessage("system", configuration.system_prompt_template)
     query = builder.build_user_message(plan.variants[0].text)
     messages: list[ModelMessage] = [system]
     used_characters = system.content.__len__() + query.content.__len__()
+    # 临时附件优先进入上下文，确保用户显式选择的本轮材料不会被永久知识候选挤出预算。
+    for attachment in attachments:
+        candidate = builder.build_untrusted_evidence_message(
+            resource_type="conversation_attachment",
+            payload={"file_name": attachment.file_name, "content": attachment.content},
+            field_mask=frozenset(),
+        )
+        if used_characters + len(candidate.content) > configuration.policy.max_prompt_characters:
+            continue
+        messages.append(candidate)
+        used_characters += len(candidate.content)
     for item in evidence.items:
         candidate = builder.build_untrusted_evidence_message(
             resource_type="chunk",

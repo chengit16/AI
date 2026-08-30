@@ -9,19 +9,26 @@ import {
   type AssistantStreamEvent,
 } from "@/api/assistantSse";
 import {
+  archiveAssistantConversation,
   cancelAssistantRun,
   createAssistantConversation,
   createAssistantMessage,
+  deleteAssistantAttachment,
+  getAssistantAttachments,
   getAssistantConversations,
   getAssistantFeedback,
   getAssistantMessages,
   getAssistantRuns,
   getAssistantSources,
   submitAssistantFeedback,
+  updateAssistantConversationScope,
+  uploadAssistantAttachment,
   type AssistantConversation,
   type AssistantRun,
   type FeedbackRequest,
 } from "@/api/services/assistant";
+import { getKnowledgeBases } from "@/api/services/knowledge";
+import { getKnowledgeTags } from "@/api/services/knowledgeOrganization";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 
 /** 描述当前浏览器对一个助手 Run 的临时消费状态。 */
@@ -112,10 +119,15 @@ function nextStreamState(
  * 服务端消息和 Run 是恢复事实；`stream` 只保存当前浏览器尚未收到终态消息的临时展示，
  * 因此刷新或断线后仍以接口返回的不可变消息重新建立视图。
  */
-export function useAssistantConversation(initialConversationId: string | null = null) {
+export function useAssistantConversation(
+  initialConversationId: string | null = null,
+  scopeEnabled = false,
+  attachmentsEnabled = false,
+) {
   // 1. 先建立工作空间、会话选择和服务端恢复事实查询，默认选择由查询结果派生。
   const queryClient = useQueryClient();
   const { workspaceId } = useCurrentWorkspace();
+  const [conversationStatus, setConversationStatus] = useState<"active" | "archived">("active");
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
     initialConversationId,
   );
@@ -134,12 +146,14 @@ export function useAssistantConversation(initialConversationId: string | null = 
   });
   const effectiveConversationId = useMemo(() => {
     const selectedStillExists = conversations.data?.some(
-      (item) => item.conversation_id === selectedConversationId,
+      (item) =>
+        item.conversation_id === selectedConversationId && item.status === conversationStatus,
     );
     return selectedStillExists
       ? selectedConversationId
-      : (conversations.data?.[0]?.conversation_id ?? null);
-  }, [conversations.data, selectedConversationId]);
+      : (conversations.data?.find((item) => item.status === conversationStatus)?.conversation_id ??
+          null);
+  }, [conversationStatus, conversations.data, selectedConversationId]);
   const selectedConversation = useMemo<AssistantConversation | null>(
     () =>
       conversations.data?.find((item) => item.conversation_id === effectiveConversationId) ?? null,
@@ -159,6 +173,30 @@ export function useAssistantConversation(initialConversationId: string | null = 
     retry: false,
     refetchInterval: (query) =>
       query.state.data?.some((run) => ["queued", "running"].includes(run.status)) ? 3_000 : false,
+  });
+  const knowledgeBases = useQuery({
+    queryKey: ["assistant-scope-knowledge-bases", workspaceId],
+    queryFn: ({ signal }) => getKnowledgeBases(workspaceId!, signal),
+    enabled: Boolean(workspaceId && scopeEnabled),
+    retry: false,
+  });
+  const knowledgeTags = useQuery({
+    queryKey: ["assistant-scope-knowledge-tags", workspaceId],
+    queryFn: ({ signal }) => getKnowledgeTags(workspaceId!, false, signal),
+    enabled: Boolean(workspaceId && scopeEnabled),
+    retry: false,
+  });
+  const attachments = useQuery({
+    queryKey: ["assistant-attachments", workspaceId, effectiveConversationId],
+    queryFn: ({ signal }) =>
+      getAssistantAttachments(workspaceId!, effectiveConversationId!, signal),
+    enabled: Boolean(
+      workspaceId &&
+      effectiveConversationId &&
+      attachmentsEnabled &&
+      selectedConversation?.status === "active",
+    ),
+    retry: false,
   });
 
   const activeRun = useMemo(
@@ -183,11 +221,49 @@ export function useAssistantConversation(initialConversationId: string | null = 
   );
 
   // 2. 写操作完成后只失效相关查询，临时流状态不写入 TanStack Query 缓存。
+  // 3. 范围和附件变更沿用同一会话查询键，确保服务端并发锁定后页面立即刷新。
   const createConversation = useMutation({
     mutationFn: (title?: string) => createAssistantConversation(workspaceId!, title),
     onSuccess: async (conversation) => {
+      setConversationStatus("active");
       setSelectedConversationId(conversation.conversation_id);
       await queryClient.invalidateQueries({ queryKey: ["assistant-conversations", workspaceId] });
+    },
+  });
+  const archiveConversation = useMutation({
+    mutationFn: (conversationId: string) =>
+      archiveAssistantConversation(workspaceId!, conversationId),
+    onSuccess: async (conversation) => {
+      setSelectedConversationId(null);
+      queryClient.removeQueries({
+        queryKey: ["assistant-attachments", workspaceId, conversation.conversation_id],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["assistant-conversations", workspaceId] });
+    },
+  });
+  const updateScope = useMutation({
+    mutationFn: (body: Parameters<typeof updateAssistantConversationScope>[2]) =>
+      updateAssistantConversationScope(workspaceId!, effectiveConversationId!, body),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["assistant-conversations", workspaceId] });
+    },
+  });
+  const uploadAttachment = useMutation({
+    mutationFn: (file: File) =>
+      uploadAssistantAttachment(workspaceId!, effectiveConversationId!, file),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["assistant-attachments", workspaceId, effectiveConversationId],
+      });
+    },
+  });
+  const deleteAttachment = useMutation({
+    mutationFn: (attachmentId: string) =>
+      deleteAssistantAttachment(workspaceId!, effectiveConversationId!, attachmentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["assistant-attachments", workspaceId, effectiveConversationId],
+      });
     },
   });
   const createMessage = useMutation({
@@ -197,6 +273,7 @@ export function useAssistantConversation(initialConversationId: string | null = 
         conversationId,
         [text],
         `assistant-${crypto.randomUUID()}`,
+        attachments.data?.map((item) => item.attachment_id) ?? [],
       ),
     onSuccess: async (submission) => {
       setPendingRun(submission.run);
@@ -244,7 +321,6 @@ export function useAssistantConversation(initialConversationId: string | null = 
     },
   });
 
-  // 3. SSE 生命周期仅依赖稳定标识，轮询产生的新对象不会误触发清理并中断当前连接。
   const activeRunId = activeRun?.run_id ?? null;
   const activeRunConversationId = activeRun?.conversation_id ?? null;
   const activeRunAssistantMessageId = activeRun?.assistant_message_id ?? null;
@@ -323,6 +399,17 @@ export function useAssistantConversation(initialConversationId: string | null = 
     setSelectedConversationId(conversationId);
   }
 
+  function filterConversations(status: "active" | "archived") {
+    abortRef.current?.abort();
+    consumedRunRef.current = null;
+    setStream(EMPTY_STREAM);
+    setPendingRun(null);
+    setSourceMessageId(null);
+    setFeedbackMessageId(null);
+    setSelectedConversationId(null);
+    setConversationStatus(status);
+  }
+
   function sendMessage(text: string) {
     if (!effectiveConversationId || createMessage.isPending) return;
     createMessage.mutate({ conversationId: effectiveConversationId, text });
@@ -336,10 +423,16 @@ export function useAssistantConversation(initialConversationId: string | null = 
   return {
     workspaceId,
     conversations,
+    conversationStatus,
+    filterConversations,
     selectedConversation,
     selectedConversationId: effectiveConversationId,
     selectConversation,
     createConversation,
+    archiveConversation,
+    updateScope,
+    uploadAttachment,
+    deleteAttachment,
     messages,
     runs,
     activeRun,
@@ -347,6 +440,9 @@ export function useAssistantConversation(initialConversationId: string | null = 
     sendMessage,
     createMessage,
     cancelRun,
+    knowledgeBases,
+    knowledgeTags,
+    attachments,
     sources,
     sourceMessageId,
     selectedAssistantMessage,

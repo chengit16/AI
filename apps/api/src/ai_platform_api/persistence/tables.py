@@ -5141,6 +5141,14 @@ conversations = Table(
     Column("conversation_kind", String(32), nullable=False, server_default="private"),
     Column("title", String(200), nullable=True),
     Column("status", String(32), nullable=False),
+    Column("scope_mode", String(32), nullable=False, server_default="workspace"),
+    Column(
+        "knowledge_base_ids",
+        ARRAY(UUID(as_uuid=True)),
+        nullable=False,
+        server_default="{}",
+    ),
+    Column("tag_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("version", Integer, nullable=False),
@@ -5162,6 +5170,17 @@ conversations = Table(
     ),
     CheckConstraint("status IN ('active', 'archived')", name="ck_conversations_status"),
     CheckConstraint(
+        "scope_mode IN ('workspace', 'selected')",
+        name="ck_conversations_scope_mode",
+    ),
+    CheckConstraint(
+        "(scope_mode = 'workspace' AND cardinality(knowledge_base_ids) = 0 "
+        "AND cardinality(tag_ids) = 0) OR "
+        "(scope_mode = 'selected' AND "
+        "cardinality(knowledge_base_ids) + cardinality(tag_ids) BETWEEN 1 AND 40)",
+        name="ck_conversations_scope_shape",
+    ),
+    CheckConstraint(
         "conversation_kind IN ('private', 'service_invocation')",
         name="ck_conversations_kind",
     ),
@@ -5176,6 +5195,63 @@ Index(
     conversations.c.workspace_id,
     conversations.c.created_by_account_id,
     conversations.c.updated_at,
+)
+
+conversation_attachments = Table(
+    "conversation_attachments",
+    metadata,
+    Column("attachment_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("conversation_id", UUID(as_uuid=True), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("file_name", String(255), nullable=False),
+    Column("media_type", String(120), nullable=False),
+    Column("content", Text, nullable=False),
+    Column("size_bytes", Integer, nullable=False),
+    Column("content_hash", String(64), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "attachment_id",
+        "workspace_id",
+        "conversation_id",
+        name="uq_conversation_attachments_identity",
+    ),
+    ForeignKeyConstraint(
+        ["conversation_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.conversations.conversation_id",
+            f"{SCHEMA_TOKEN}.conversations.workspace_id",
+        ],
+        name="fk_conversation_attachments_conversation",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_conversation_attachments_creator",
+    ),
+    CheckConstraint(
+        "media_type IN ('text/plain', 'text/markdown', 'text/csv', 'application/json')",
+        name="ck_conversation_attachments_media_type",
+    ),
+    CheckConstraint(
+        "size_bytes BETWEEN 1 AND 20000 AND char_length(content) BETWEEN 1 AND 20000",
+        name="ck_conversation_attachments_size",
+    ),
+    CheckConstraint(
+        "content_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_conversation_attachments_hash",
+    ),
+    CheckConstraint(
+        "char_length(btrim(file_name)) BETWEEN 1 AND 255",
+        name="ck_conversation_attachments_name",
+    ),
+)
+Index(
+    "ix_conversation_attachments_conversation_time",
+    conversation_attachments.c.workspace_id,
+    conversation_attachments.c.conversation_id,
+    conversation_attachments.c.created_at,
 )
 
 messages = Table(
@@ -5267,6 +5343,14 @@ assistant_runs = Table(
     Column("runtime_config_version_id", UUID(as_uuid=True), nullable=False),
     Column("requested_by_account_id", UUID(as_uuid=True), nullable=False),
     Column("requested_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_ids", ARRAY(UUID(as_uuid=True)), nullable=True),
+    Column("document_ids", ARRAY(UUID(as_uuid=True)), nullable=True),
+    Column(
+        "attachment_ids",
+        ARRAY(UUID(as_uuid=True)),
+        nullable=False,
+        server_default="{}",
+    ),
     Column("status", String(32), nullable=False),
     Column("idempotency_key", String(128), nullable=False),
     Column("request_hash", String(64), nullable=False),

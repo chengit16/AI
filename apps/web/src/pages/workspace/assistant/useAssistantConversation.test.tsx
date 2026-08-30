@@ -5,19 +5,28 @@ import type { PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
+  archiveAssistantConversation: vi.fn(),
   cancelAssistantRun: vi.fn(),
   createAssistantConversation: vi.fn(),
   createAssistantMessage: vi.fn(),
+  deleteAssistantAttachment: vi.fn(),
+  getAssistantAttachments: vi.fn(),
   getAssistantConversations: vi.fn(),
   getAssistantFeedback: vi.fn(),
   getAssistantMessages: vi.fn(),
   getAssistantRuns: vi.fn(),
   getAssistantSources: vi.fn(),
   submitAssistantFeedback: vi.fn(),
+  updateAssistantConversationScope: vi.fn(),
+  uploadAssistantAttachment: vi.fn(),
 }));
 const streamApi = vi.hoisted(() => ({ streamAssistantRun: vi.fn() }));
+const knowledgeApi = vi.hoisted(() => ({ getKnowledgeBases: vi.fn() }));
+const organizationApi = vi.hoisted(() => ({ getKnowledgeTags: vi.fn() }));
 
 vi.mock("@/api/services/assistant", () => api);
+vi.mock("@/api/services/knowledge", () => knowledgeApi);
+vi.mock("@/api/services/knowledgeOrganization", () => organizationApi);
 vi.mock("@/api/assistantSse", () => ({
   AssistantSseProtocolError: class AssistantSseProtocolError extends Error {},
   streamAssistantRun: streamApi.streamAssistantRun,
@@ -31,6 +40,7 @@ import type {
   AssistantConversation,
   AssistantMessage,
   AssistantRun,
+  ConversationAttachment,
   MessageFeedback,
 } from "@/api/services/assistant";
 
@@ -41,6 +51,7 @@ const CONVERSATION_ID = "30000000-0000-4000-8000-000000000806";
 const RUN_ID = "40000000-0000-4000-8000-000000000806";
 const USER_MESSAGE_ID = "50000000-0000-4000-8000-000000000806";
 const ASSISTANT_MESSAGE_ID = "51000000-0000-4000-8000-000000000806";
+const ATTACHMENT_ID = "52000000-0000-4000-8000-000000000806";
 
 const conversation: AssistantConversation = {
   conversation_id: CONVERSATION_ID,
@@ -48,6 +59,9 @@ const conversation: AssistantConversation = {
   created_by_account_id: "10000000-0000-4000-8000-000000000806",
   title: "合成恢复会话",
   status: "active",
+  scope_mode: "workspace",
+  knowledge_base_ids: [],
+  tag_ids: [],
   created_at: "2026-08-15T12:00:00Z",
   updated_at: "2026-08-15T12:00:00Z",
   version: 1,
@@ -60,6 +74,9 @@ const activeRun: AssistantRun = {
   assistant_message_id: ASSISTANT_MESSAGE_ID,
   agent_release_id: "60000000-0000-4000-8000-000000000806",
   runtime_config_version_id: "70000000-0000-4000-8000-000000000806",
+  knowledge_base_ids: null,
+  document_ids: null,
+  attachment_ids: [],
   status: "running",
   trace_id: "a".repeat(32),
   created_at: "2026-08-15T12:00:00Z",
@@ -78,6 +95,16 @@ const streamingMessage: AssistantMessage = {
   created_at: "2026-08-15T12:00:00Z",
   updated_at: "2026-08-15T12:00:01Z",
   version: 1,
+};
+const attachment: ConversationAttachment = {
+  attachment_id: ATTACHMENT_ID,
+  workspace_id: WORKSPACE_ID,
+  conversation_id: CONVERSATION_ID,
+  file_name: "synthetic-context.md",
+  media_type: "text/markdown",
+  size_bytes: 36,
+  content_hash: "c".repeat(64),
+  created_at: "2026-08-15T12:00:00Z",
 };
 
 function createWrapper(queryClient: QueryClient) {
@@ -109,6 +136,9 @@ function prepareQueries(runs: AssistantRun[] = []) {
   api.getAssistantRuns.mockResolvedValue(runs);
   api.getAssistantSources.mockResolvedValue([]);
   api.getAssistantFeedback.mockResolvedValue(null);
+  api.getAssistantAttachments.mockResolvedValue([attachment]);
+  knowledgeApi.getKnowledgeBases.mockResolvedValue([]);
+  organizationApi.getKnowledgeTags.mockResolvedValue([]);
 }
 
 describe("P1E-06 问答页状态编排", () => {
@@ -245,6 +275,60 @@ describe("P1E-06 问答页状态编排", () => {
       WORKSPACE_ID,
       requestedConversation.conversation_id,
       expect.any(AbortSignal),
+    );
+
+    view.unmount();
+    client.clear();
+  });
+
+  it("启用上下文能力后加载范围选项，并把当前附件冻结到消息提交", async () => {
+    // 1. 准备带范围和附件能力的查询事实，验证控件只在显式启用时加载。
+    prepareQueries();
+    api.createAssistantMessage.mockResolvedValue({
+      message: {
+        ...streamingMessage,
+        message_id: USER_MESSAGE_ID,
+        role: "user",
+        status: "completed",
+        parts: [
+          {
+            part_id: "53000000-0000-4000-8000-000000000806",
+            sequence_no: 1,
+            type: "text",
+            text: "使用附件回答",
+          },
+        ],
+      },
+      run: { ...activeRun, status: "queued", attachment_ids: [ATTACHMENT_ID] },
+    });
+    streamApi.streamAssistantRun.mockImplementation(async function* () {
+      yield completedEvent();
+    });
+    const client = queryClient();
+    const view = renderHook(() => useAssistantConversation(null, true, true), {
+      wrapper: createWrapper(client),
+    });
+    await waitFor(() => expect(api.getAssistantAttachments).toHaveBeenCalledTimes(1));
+
+    act(() => view.result.current.sendMessage("使用附件回答"));
+    await waitFor(() => expect(api.createAssistantMessage).toHaveBeenCalledTimes(1));
+
+    // 2. 发送消息时冻结附件 ID，后续 SSE 完成仍沿用同一份提交快照。
+    expect(knowledgeApi.getKnowledgeBases).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      expect.any(AbortSignal),
+    );
+    expect(organizationApi.getKnowledgeTags).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      false,
+      expect.any(AbortSignal),
+    );
+    expect(api.createAssistantMessage).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      CONVERSATION_ID,
+      ["使用附件回答"],
+      expect.stringMatching(/^assistant-/),
+      [ATTACHMENT_ID],
     );
 
     view.unmount();

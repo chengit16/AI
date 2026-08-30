@@ -17,10 +17,12 @@ from ai_platform_api.modules.service_governance.domain.models import ServiceRepo
 
 ConversationStatus = Literal["active", "archived"]
 ConversationKind = Literal["private", "service_invocation"]
+ConversationScopeMode = Literal["workspace", "selected"]
 MessageRole = Literal["system", "user", "assistant", "tool"]
 MessageStatus = Literal["streaming", "completed", "failed"]
 AssistantRunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 FeedbackRating = Literal["helpful", "unhelpful"]
+AttachmentMediaType = Literal["text/plain", "text/markdown", "text/csv", "application/json"]
 FeedbackIssueCode = Literal[
     "incorrect",
     "missing_source",
@@ -67,6 +69,9 @@ class Conversation:
     conversation_kind: ConversationKind
     title: str | None
     status: ConversationStatus
+    scope_mode: ConversationScopeMode
+    knowledge_base_ids: tuple[UUID, ...]
+    tag_ids: tuple[UUID, ...]
     created_at: datetime
     updated_at: datetime
     version: int
@@ -101,6 +106,22 @@ class Message:
 
 
 @dataclass(frozen=True)
+class ConversationAttachment:
+    """表示只在单个私有会话中使用的临时文本附件。"""
+
+    attachment_id: UUID
+    workspace_id: UUID
+    conversation_id: UUID
+    created_by_account_id: UUID
+    file_name: str
+    media_type: AttachmentMediaType
+    content: str
+    size_bytes: int
+    content_hash: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class AssistantRun:
     """记录一次问答运行冻结的消息、助手发布与模型配置版本。"""
 
@@ -125,6 +146,9 @@ class AssistantRun:
     updated_at: datetime
     completed_at: datetime | None
     error_code: str | None
+    knowledge_base_ids: frozenset[UUID] | None = None
+    document_ids: frozenset[UUID] | None = None
+    attachment_ids: tuple[UUID, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -190,6 +214,46 @@ class AssistantRepository(Protocol):
     ) -> Conversation | None: ...
 
     def save_conversation(self, conversation: Conversation) -> None: ...
+
+    def resolve_conversation_scope(
+        self,
+        workspace_id: UUID,
+        *,
+        knowledge_base_ids: tuple[UUID, ...],
+        tag_ids: tuple[UUID, ...],
+    ) -> tuple[frozenset[UUID] | None, frozenset[UUID] | None] | None: ...
+
+    def add_attachment(self, attachment: ConversationAttachment) -> None: ...
+
+    def list_attachments(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        account_id: UUID,
+    ) -> tuple[ConversationAttachment, ...]: ...
+
+    def get_attachment(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        attachment_id: UUID,
+        account_id: UUID,
+    ) -> ConversationAttachment | None: ...
+
+    def delete_attachment(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+        attachment_id: UUID,
+    ) -> None: ...
+
+    def delete_conversation_attachments(
+        self,
+        workspace_id: UUID,
+        conversation_id: UUID,
+    ) -> int: ...
+
+    def get_run_attachments(self, run: AssistantRun) -> tuple[ConversationAttachment, ...]: ...
 
     def list_messages(
         self,

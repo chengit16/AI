@@ -25,6 +25,9 @@ class ConversationResponse(BaseModel):
     created_by_account_id: UUID
     title: str | None
     status: Literal["active", "archived"]
+    scope_mode: Literal["workspace", "selected"] = "workspace"
+    knowledge_base_ids: list[UUID] = Field(default_factory=list)
+    tag_ids: list[UUID] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     version: int = Field(ge=1)
@@ -53,6 +56,40 @@ class CreateUserMessageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     parts: list[CreateMessagePartRequest] = Field(min_length=1, max_length=16)
+    attachment_ids: list[UUID] = Field(default_factory=list, max_length=3)
+
+
+class UpdateConversationScopeRequest(BaseModel):
+    """表示会话级全空间或知识库/标签选择。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope_mode: Literal["workspace", "selected"]
+    knowledge_base_ids: list[UUID] = Field(default_factory=list, max_length=20)
+    tag_ids: list[UUID] = Field(default_factory=list, max_length=20)
+
+
+class ConversationAttachmentResponse(BaseModel):
+    """返回临时附件元数据与摘要，正文只在受控模型上下文内读取。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    attachment_id: UUID
+    workspace_id: UUID
+    conversation_id: UUID
+    file_name: str = Field(min_length=1, max_length=255)
+    media_type: Literal["text/plain", "text/markdown", "text/csv", "application/json"]
+    size_bytes: int = Field(ge=1, le=20_000)
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    created_at: datetime
+
+
+class ConversationAttachmentListResponse(BaseModel):
+    """表示当前私有会话仍存在的临时附件。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ConversationAttachmentResponse]
 
 
 class MessagePartResponse(BaseModel):
@@ -106,6 +143,9 @@ class AssistantRunResponse(BaseModel):
     service_route_version: int | None = Field(default=None, ge=1)
     agent_release_id: UUID
     runtime_config_version_id: UUID
+    knowledge_base_ids: list[UUID] | None = None
+    document_ids: list[UUID] | None = None
+    attachment_ids: list[UUID] = Field(default_factory=list)
     status: Literal["queued", "running", "completed", "failed", "cancelled"]
     trace_id: str = Field(min_length=16, max_length=64)
     created_at: datetime

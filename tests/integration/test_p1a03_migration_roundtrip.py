@@ -404,7 +404,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260825_0074"
+    assert current_revision(connection, schema) == "20260830_0075"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -460,6 +460,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "cost_attribution_lines",
         "cost_attribution_windows",
         "cost_ledger_entries",
+        "conversation_attachments",
         "department_closure",
         "departments",
         "document_accesses",
@@ -563,7 +564,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260825_0074"
+    assert current_revision(connection, schema) == "20260830_0075"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -912,7 +913,7 @@ def test_agent_console_upgrade_restores_roles_bindings_and_menu_publication(
     # 3. 同一非空事实再次升级仍只生成一个确定性控制台发布。
     command.upgrade(config, "head")
     connection.commit()
-    assert current_revision(connection, schema) == "20260825_0074"
+    assert current_revision(connection, schema) == "20260830_0075"
     assert (
         connection.scalar(
             text(
@@ -941,7 +942,7 @@ def test_agent_console_upgrade_restores_roles_bindings_and_menu_publication(
         .mappings()
         .one()["snapshot"]
     )
-    assert upgraded["registry_version"] == 27
+    assert upgraded["registry_version"] == 28
     assert {item["menu_id"] for item in upgraded["menus"]} >= {
         "82000000-0000-4000-8000-000000000219",
         "82000000-0000-4000-8000-000000000220",

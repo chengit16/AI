@@ -62,6 +62,17 @@ class FakeConversations:
         self.run = replace(self.run, status="running")
         return self.run
 
+    def get_run_attachments(
+        self,
+        context: RequestContext,
+        *,
+        run_id: UUID,
+    ) -> tuple[object, ...]:
+        """旧检索回归没有临时附件，显式返回空冻结范围。"""
+
+        assert context.workspace_id == self.run.workspace_id and run_id == self.run.run_id
+        return ()
+
     def complete_run(
         self,
         context: RequestContext,
