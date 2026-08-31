@@ -1483,6 +1483,274 @@ Index(
     document_accesses.c.last_accessed_at,
 )
 
+enterprise_categories = Table(
+    "enterprise_categories",
+    metadata,
+    Column("category_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("parent_category_id", UUID(as_uuid=True), nullable=True),
+    Column("name", String(120), nullable=False),
+    Column("description", String(1000), nullable=True),
+    Column("visibility", String(32), nullable=False),
+    Column("department_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id", "category_id", name="uq_enterprise_categories_workspace_category"
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_enterprise_categories_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "parent_category_id"],
+        [
+            f"{SCHEMA_TOKEN}.enterprise_categories.workspace_id",
+            f"{SCHEMA_TOKEN}.enterprise_categories.category_id",
+        ],
+        name="fk_enterprise_categories_parent",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_enterprise_categories_creator",
+    ),
+    CheckConstraint(
+        "visibility IN ('public', 'departments', 'private')",
+        name="ck_enterprise_categories_visibility",
+    ),
+    CheckConstraint(
+        "(visibility = 'departments' AND cardinality(department_ids) > 0) OR "
+        "(visibility <> 'departments' AND cardinality(department_ids) = 0)",
+        name="ck_enterprise_categories_department_scope",
+    ),
+    CheckConstraint("status IN ('active', 'archived')", name="ck_enterprise_categories_status"),
+    CheckConstraint(
+        "parent_category_id IS NULL OR parent_category_id <> category_id",
+        name="ck_enterprise_categories_not_self_parent",
+    ),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_enterprise_categories_name",
+    ),
+    CheckConstraint("version >= 1", name="ck_enterprise_categories_version"),
+)
+Index(
+    "uq_enterprise_categories_active_sibling_name",
+    enterprise_categories.c.workspace_id,
+    func.coalesce(
+        enterprise_categories.c.parent_category_id,
+        text("'00000000-0000-0000-0000-000000000000'::uuid"),
+    ),
+    func.lower(enterprise_categories.c.name),
+    unique=True,
+    postgresql_where=enterprise_categories.c.status == "active",
+)
+
+enterprise_category_documents = Table(
+    "enterprise_category_documents",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("category_id", UUID(as_uuid=True), primary_key=True),
+    Column("document_id", UUID(as_uuid=True), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "category_id"],
+        [
+            f"{SCHEMA_TOKEN}.enterprise_categories.workspace_id",
+            f"{SCHEMA_TOKEN}.enterprise_categories.category_id",
+        ],
+        name="fk_enterprise_category_documents_category",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id"],
+        [f"{SCHEMA_TOKEN}.documents.workspace_id", f"{SCHEMA_TOKEN}.documents.document_id"],
+        name="fk_enterprise_category_documents_document",
+        ondelete="CASCADE",
+    ),
+)
+Index(
+    "ix_enterprise_category_documents_document",
+    enterprise_category_documents.c.workspace_id,
+    enterprise_category_documents.c.document_id,
+)
+
+team_knowledge_domains = Table(
+    "team_knowledge_domains",
+    metadata,
+    Column("domain_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(120), nullable=False),
+    Column("description", String(1000), nullable=True),
+    Column("current_rag_policy_version", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id", "domain_id", name="uq_team_knowledge_domains_workspace_domain"
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_team_knowledge_domains_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_team_knowledge_domains_creator",
+    ),
+    CheckConstraint("status IN ('active', 'archived')", name="ck_team_knowledge_domains_status"),
+    CheckConstraint(
+        "char_length(btrim(name)) BETWEEN 1 AND 120",
+        name="ck_team_knowledge_domains_name",
+    ),
+    CheckConstraint(
+        "current_rag_policy_version >= 1", name="ck_team_knowledge_domains_policy_version"
+    ),
+    CheckConstraint("version >= 1", name="ck_team_knowledge_domains_version"),
+)
+Index(
+    "uq_team_knowledge_domains_active_name",
+    team_knowledge_domains.c.workspace_id,
+    func.lower(team_knowledge_domains.c.name),
+    unique=True,
+    postgresql_where=team_knowledge_domains.c.status == "active",
+)
+
+team_knowledge_domain_rag_policies = Table(
+    "team_knowledge_domain_rag_policies",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("domain_id", UUID(as_uuid=True), primary_key=True),
+    Column("policy_version", Integer, primary_key=True),
+    Column("mode", String(32), nullable=False),
+    Column("top_k", Integer, nullable=False),
+    Column("minimum_score", Float, nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "domain_id"],
+        [
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.workspace_id",
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.domain_id",
+        ],
+        name="fk_team_knowledge_domain_policies_domain",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_team_knowledge_domain_policies_creator",
+    ),
+    CheckConstraint(
+        "mode IN ('balanced', 'precision', 'recall')",
+        name="ck_team_knowledge_domain_policies_mode",
+    ),
+    CheckConstraint("policy_version >= 1", name="ck_team_knowledge_domain_policies_version"),
+    CheckConstraint("top_k BETWEEN 1 AND 50", name="ck_team_knowledge_domain_policies_top_k"),
+    CheckConstraint(
+        "minimum_score BETWEEN 0.0 AND 1.0",
+        name="ck_team_knowledge_domain_policies_score",
+    ),
+)
+
+team_knowledge_domain_members = Table(
+    "team_knowledge_domain_members",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("domain_id", UUID(as_uuid=True), primary_key=True),
+    Column("membership_id", UUID(as_uuid=True), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "domain_id"],
+        [
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.workspace_id",
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.domain_id",
+        ],
+        name="fk_team_knowledge_domain_members_domain",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "membership_id"],
+        [
+            f"{SCHEMA_TOKEN}.workspace_memberships.workspace_id",
+            f"{SCHEMA_TOKEN}.workspace_memberships.membership_id",
+        ],
+        name="fk_team_knowledge_domain_members_membership",
+        ondelete="CASCADE",
+    ),
+)
+Index(
+    "ix_team_knowledge_domain_members_membership",
+    team_knowledge_domain_members.c.workspace_id,
+    team_knowledge_domain_members.c.membership_id,
+)
+
+team_knowledge_domain_departments = Table(
+    "team_knowledge_domain_departments",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("domain_id", UUID(as_uuid=True), primary_key=True),
+    Column("department_id", UUID(as_uuid=True), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "domain_id"],
+        [
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.workspace_id",
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.domain_id",
+        ],
+        name="fk_team_knowledge_domain_departments_domain",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "department_id"],
+        [f"{SCHEMA_TOKEN}.departments.workspace_id", f"{SCHEMA_TOKEN}.departments.department_id"],
+        name="fk_team_knowledge_domain_departments_department",
+        ondelete="CASCADE",
+    ),
+)
+
+team_knowledge_domain_bases = Table(
+    "team_knowledge_domain_bases",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("domain_id", UUID(as_uuid=True), primary_key=True),
+    Column("knowledge_base_id", UUID(as_uuid=True), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "domain_id"],
+        [
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.workspace_id",
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.domain_id",
+        ],
+        name="fk_team_knowledge_domain_bases_domain",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "knowledge_base_id"],
+        [
+            f"{SCHEMA_TOKEN}.knowledge_bases.workspace_id",
+            f"{SCHEMA_TOKEN}.knowledge_bases.knowledge_base_id",
+        ],
+        name="fk_team_knowledge_domain_bases_base",
+        ondelete="CASCADE",
+    ),
+)
+Index(
+    "ix_team_knowledge_domain_bases_base",
+    team_knowledge_domain_bases.c.workspace_id,
+    team_knowledge_domain_bases.c.knowledge_base_id,
+)
+
 document_versions = Table(
     "document_versions",
     metadata,

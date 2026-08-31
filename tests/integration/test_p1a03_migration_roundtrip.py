@@ -404,7 +404,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     connection.commit()
     first_head = schema_snapshot(connection, schema)
 
-    assert current_revision(connection, schema) == "20260831_0077"
+    assert current_revision(connection, schema) == "20260831_0078"
     assert business_tables(connection, schema) == {
         "accounts",
         "approval_policies",
@@ -482,6 +482,8 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "document_folder_bindings",
         "document_tag_bindings",
         "document_favorites",
+        "enterprise_categories",
+        "enterprise_category_documents",
         "lifecycle_deletion_certificates",
         "lifecycle_compliance_proofs",
         "lifecycle_export_records",
@@ -523,6 +525,11 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
         "retrieval_chunks",
         "stream_events",
         "stream_runs",
+        "team_knowledge_domain_bases",
+        "team_knowledge_domain_departments",
+        "team_knowledge_domain_members",
+        "team_knowledge_domain_rag_policies",
+        "team_knowledge_domains",
         "role_menus",
         "workspace_entitlements",
         "workspace_feature_settings",
@@ -564,7 +571,7 @@ def test_empty_schema_can_upgrade_downgrade_and_reupgrade_identically(
     command.upgrade(config, "head")
     connection.commit()
 
-    assert current_revision(connection, schema) == "20260831_0077"
+    assert current_revision(connection, schema) == "20260831_0078"
     assert schema_snapshot(connection, schema) == first_head
 
 
@@ -913,7 +920,7 @@ def test_agent_console_upgrade_restores_roles_bindings_and_menu_publication(
     # 3. 同一非空事实再次升级仍只生成一个确定性控制台发布。
     command.upgrade(config, "head")
     connection.commit()
-    assert current_revision(connection, schema) == "20260831_0077"
+    assert current_revision(connection, schema) == "20260831_0078"
     assert (
         connection.scalar(
             text(
@@ -942,7 +949,7 @@ def test_agent_console_upgrade_restores_roles_bindings_and_menu_publication(
         .mappings()
         .one()["snapshot"]
     )
-    assert upgraded["registry_version"] == 30
+    assert upgraded["registry_version"] == 31
     assert {item["menu_id"] for item in upgraded["menus"]} >= {
         "82000000-0000-4000-8000-000000000219",
         "82000000-0000-4000-8000-000000000220",

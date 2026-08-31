@@ -524,6 +524,15 @@ class CreateDocumentVersionRequest(typing.TypedDict):
     source_url: typing.NotRequired[str | None]
 
 
+class CreateEnterpriseCategoryRequest(typing.TypedDict):
+    department_ids: typing.NotRequired[list[str]]
+    description: typing.NotRequired[str | None]
+    document_ids: typing.NotRequired[list[str]]
+    name: str
+    parent_category_id: typing.NotRequired[str | None]
+    visibility: typing.Literal["public", "departments", "private"]
+
+
 class CreateEnterpriseWorkspaceRequest(typing.TypedDict):
     name: str
 
@@ -591,6 +600,17 @@ class CreateServiceRequest(typing.TypedDict):
     release_id: str
     service_type: typing.Literal["custom_knowledge_agent", "scenario_application", "open_api"]
     visibility: typing.Literal["workspace", "restricted"]
+
+
+class CreateTeamKnowledgeDomainRequest(typing.TypedDict):
+    department_ids: typing.NotRequired[list[str]]
+    description: typing.NotRequired[str | None]
+    knowledge_base_ids: typing.NotRequired[list[str]]
+    member_ids: typing.NotRequired[list[str]]
+    minimum_score: typing.NotRequired[float]
+    name: str
+    rag_mode: typing.NotRequired[typing.Literal["balanced", "precision", "recall"]]
+    top_k: typing.NotRequired[int]
 
 
 class CreateToolRunRequest(typing.TypedDict):
@@ -784,6 +804,20 @@ class EffectiveRoleSourceResponse(typing.TypedDict):
     scope_type: typing.Literal["workspace", "department", "member"]
 
 
+class EnterpriseCategoryResponse(typing.TypedDict):
+    category_id: str
+    created_at: str
+    department_ids: list[str]
+    description: str | None
+    document_ids: list[str]
+    name: str
+    parent_category_id: str | None
+    status: typing.Literal["active", "archived"]
+    updated_at: str
+    version: int
+    visibility: typing.Literal["public", "departments", "private"]
+
+
 class EnterpriseConsoleRecentDocumentResponse(typing.TypedDict):
     document_id: str
     knowledge_base_id: str
@@ -828,6 +862,50 @@ class EnterpriseConsoleWorkspaceResponse(typing.TypedDict):
     status: typing.Literal["active", "suspended", "archived"]
     workspace_id: str
     workspace_type: str
+
+
+class EnterpriseDepartmentOptionResponse(typing.TypedDict):
+    department_id: str
+    name: str
+
+
+class EnterpriseDocumentOptionResponse(typing.TypedDict):
+    document_id: str
+    knowledge_base_id: str
+    security_level: str
+    title: str
+
+
+class EnterpriseKnowledgeBaseOptionResponse(typing.TypedDict):
+    default_security_level: str
+    knowledge_base_id: str
+    name: str
+
+
+class EnterpriseKnowledgePortalResponse(typing.TypedDict):
+    categories: list[EnterpriseCategoryResponse]
+    departments: list[EnterpriseDepartmentOptionResponse]
+    documents: list[EnterpriseDocumentOptionResponse]
+    domains: list[TeamKnowledgeDomainResponse]
+    generated_at: str
+    knowledge_bases: list[EnterpriseKnowledgeBaseOptionResponse]
+    members: list[EnterpriseMemberOptionResponse]
+    statistics: EnterpriseKnowledgeStatisticsResponse
+    workspace_id: str
+    workspace_name: str
+
+
+class EnterpriseKnowledgeStatisticsResponse(typing.TypedDict):
+    active_categories: int
+    active_domains: int
+    classified_documents: int
+    governed_knowledge_bases: int
+
+
+class EnterpriseMemberOptionResponse(typing.TypedDict):
+    account_id: str
+    display_name: str | None
+    membership_id: str
 
 
 class EntitlementResponse(typing.TypedDict):
@@ -1591,6 +1669,13 @@ class QuotaResponse(typing.TypedDict):
     used_value: int
 
 
+class RagPolicyResponse(typing.TypedDict):
+    minimum_score: float
+    mode: typing.Literal["balanced", "precision", "recall"]
+    policy_version: int
+    top_k: int
+
+
 class RecordDocumentAccessRequest(typing.TypedDict):
     document_id: str
 
@@ -1641,6 +1726,18 @@ class ReleaseOperationsMetricsResponse(typing.TypedDict):
     total_cost_microunits: int
 
 
+class ReplaceCategoryDocumentsRequest(typing.TypedDict):
+    document_ids: list[str]
+    expected_version: int
+
+
+class ReplaceKnowledgeDomainScopeRequest(typing.TypedDict):
+    department_ids: list[str]
+    expected_version: int
+    knowledge_base_ids: list[str]
+    member_ids: list[str]
+
+
 class ReplaceRoleMenuVisibilityRequest(typing.TypedDict):
     items: list[RoleMenuVisibilityEntry]
 
@@ -1665,6 +1762,23 @@ class ResolvedApprovalLevelResponse(typing.TypedDict):
     sequence_no: int
     timeout_action: typing.Literal["escalate", "transfer", "reject", "wait"]
     timeout_after_minutes: int
+
+
+class ResolvedKnowledgeDomainScopeResponse(typing.TypedDict):
+    actor_in_declared_scope: bool
+    authorized_knowledge_base_ids: list[str]
+    declared_knowledge_base_ids: list[str]
+    domain_id: str
+    effective_knowledge_base_ids: list[str]
+    empty_reason: typing.Literal[
+        "none",
+        "domain_inactive",
+        "member_inactive",
+        "actor_outside_declared_scope",
+        "no_declared_knowledge_bases",
+        "pdp_scope_empty",
+    ]
+    policy_version: int
 
 
 class RetentionRunResponse(typing.TypedDict):
@@ -1906,6 +2020,20 @@ class TeamInvitationResponse(typing.TypedDict):
     status: typing.Literal["pending", "accepted", "cancelled", "expired"]
 
 
+class TeamKnowledgeDomainResponse(typing.TypedDict):
+    created_at: str
+    department_ids: list[str]
+    description: str | None
+    domain_id: str
+    knowledge_base_ids: list[str]
+    member_ids: list[str]
+    name: str
+    rag_policy: RagPolicyResponse
+    status: typing.Literal["active", "archived"]
+    updated_at: str
+    version: int
+
+
 class TeamManagementResponse(typing.TypedDict):
     departments: list[TeamDepartmentResponse]
     generated_at: str
@@ -2100,6 +2228,15 @@ class UpdateConversationScopeRequest(typing.TypedDict):
     tag_ids: typing.NotRequired[list[str]]
 
 
+class UpdateEnterpriseCategoryRequest(typing.TypedDict):
+    department_ids: typing.NotRequired[list[str]]
+    description: typing.NotRequired[str | None]
+    expected_version: int
+    name: str
+    parent_category_id: typing.NotRequired[str | None]
+    visibility: typing.Literal["public", "departments", "private"]
+
+
 class UpdateKnowledgeFolderRequest(typing.TypedDict):
     name: str
 
@@ -2116,6 +2253,15 @@ class UpdateServiceRequest(typing.TypedDict):
     name: typing.NotRequired[str | None]
     target_status: typing.NotRequired[typing.Literal["active", "suspended", "archived"] | None]
     visibility: typing.NotRequired[typing.Literal["workspace", "restricted"] | None]
+
+
+class UpdateTeamKnowledgeDomainRequest(typing.TypedDict):
+    description: typing.NotRequired[str | None]
+    expected_version: int
+    minimum_score: float
+    name: str
+    rag_mode: typing.Literal["balanced", "precision", "recall"]
+    top_k: int
 
 
 class UpdateTeamMemberRequest(typing.TypedDict):
@@ -2176,6 +2322,10 @@ class UsageRecordResponse(typing.TypedDict):
 class UserMessageCreatedResponse(typing.TypedDict):
     message: MessageResponse
     run: AssistantRunResponse
+
+
+class VersionedArchiveRequest(typing.TypedDict):
+    expected_version: int
 
 
 class WorkflowDefinitionResponse(typing.TypedDict):

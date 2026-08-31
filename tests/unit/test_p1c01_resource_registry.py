@@ -33,12 +33,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 30
-    assert len(resource_registry.permissions) == 140
-    assert len(resource_registry.page_resources) == 15
-    assert len(resource_registry.api_resources) == 188
-    assert len(resource_registry.menus) == 168
-    assert len(resource_registry.menu_api_bindings) == 181
+    assert resource_registry.registry_version == 31
+    assert len(resource_registry.permissions) == 151
+    assert len(resource_registry.page_resources) == 16
+    assert len(resource_registry.api_resources) == 198
+    assert len(resource_registry.menus) == 179
+    assert len(resource_registry.menu_api_bindings) == 191
     assert registry_openapi_violations() == ()
 
 
@@ -69,6 +69,20 @@ def test_new_workspace_owner_gets_operations_permissions_but_member_does_not() -
         "workspace.member.activate",
         "workspace.member.remove",
     }.issubset(OWNER_PERMISSION_CODES)
+    assert {
+        "enterprise.knowledge.access",
+        "enterprise.knowledge.read",
+        "enterprise.category.create",
+        "enterprise.category.update",
+        "enterprise.category.archive",
+        "enterprise.category.bind",
+        "enterprise.domain.create",
+        "enterprise.domain.update",
+        "enterprise.domain.archive",
+        "enterprise.domain.scope",
+        "enterprise.domain.resolve",
+    }.issubset(OWNER_PERMISSION_CODES)
+    assert "enterprise.knowledge.access" not in MEMBER_PERMISSION_CODES
     assert "operations.control_tower.read" not in MEMBER_PERMISSION_CODES
     assert "service.definition.read" in OWNER_PERMISSION_CODES
     assert "service.definition.read" in MEMBER_PERMISSION_CODES

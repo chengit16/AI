@@ -28,7 +28,7 @@ def test_registry_classifies_credentials_and_dependent_facts() -> None:
     dependent = {item.table: item for item in registry.dependent_tables}
 
     assert registry.schema_version == 1
-    assert registry.registry_version == 19
+    assert registry.registry_version == 20
     assert policies["workspaces"].classification == "governance"
     assert policies["workspaces"].purge is False
     assert policies["workspace_resources"].classification == "business"

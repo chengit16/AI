@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 19,
+  "registry_version": 20,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -35,6 +35,13 @@
     { "table": "document_tag_bindings", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_favorites", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_accesses", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "enterprise_categories", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "enterprise_category_documents", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "team_knowledge_domains", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "team_knowledge_domain_rag_policies", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "team_knowledge_domain_members", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "team_knowledge_domain_departments", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "team_knowledge_domain_bases", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "documents", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_versions", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_sources", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

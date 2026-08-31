@@ -42,6 +42,7 @@ describe("平台路由与运行状态", () => {
       ["成员管理", "/workspace/members", "workspace.members.access"],
       ["组织架构", "/workspace/organization", "organization.structure.access"],
       ["知识生产", "/workspace/knowledge", "knowledge.production.access"],
+      ["企业知识库", "/workspace/enterprise-knowledge", "enterprise.knowledge.access"],
       ["知识问答", "/workspace/assistant", "assistant.page.access"],
       ["Agent 控制台", "/workspace/agents", "agent.page.access"],
       ["工作流", "/workspace/workflows", "workflow.page.access"],

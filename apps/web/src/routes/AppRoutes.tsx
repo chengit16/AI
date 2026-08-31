@@ -18,6 +18,7 @@ const StatusPage = lazy(() => import("@/pages/system/status"));
 const WorkspaceMembersPage = lazy(() => import("@/pages/workspace/members"));
 const WorkspaceOrganizationPage = lazy(() => import("@/pages/workspace/organization"));
 const WorkspaceOverviewPage = lazy(() => import("@/pages/workspace/overview"));
+const EnterpriseKnowledgePage = lazy(() => import("@/pages/workspace/enterpriseKnowledge"));
 const KnowledgeProductionPage = lazy(() => import("@/pages/workspace/knowledge"));
 const AssistantConversationsPage = lazy(() => import("@/pages/workspace/assistant"));
 const WorkflowDesignPage = lazy(() => import("@/pages/workspace/workflows"));
@@ -129,6 +130,14 @@ export function AppRoutes() {
               element={
                 <RequireMenuRoute>
                   <KnowledgeProductionPage />
+                </RequireMenuRoute>
+              }
+            />
+            <Route
+              path={pageRoutes.EnterpriseKnowledgePage}
+              element={
+                <RequireMenuRoute>
+                  <EnterpriseKnowledgePage />
                 </RequireMenuRoute>
               }
             />

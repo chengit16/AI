@@ -55,6 +55,12 @@ from ai_platform_api.modules.authorization.infrastructure.sqlalchemy import (
     SqlAlchemyPolicyGrantRepository,
     SqlAlchemyRolePermissionUnitOfWork,
 )
+from ai_platform_api.modules.enterprise_knowledge.application.service import (
+    EnterpriseKnowledgeService,
+)
+from ai_platform_api.modules.enterprise_knowledge.infrastructure.sqlalchemy import (
+    SqlAlchemyEnterpriseKnowledgeUnitOfWork,
+)
 from ai_platform_api.modules.identity.application.authentication import (
     ApiKeyService,
     AuthenticationService,
@@ -283,6 +289,7 @@ class ApplicationContainer:
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
     team_management: TeamManagementService | None = None
+    enterprise_knowledge: EnterpriseKnowledgeService | None = None
     policy_version_gate: ValkeyPolicyVersionGate | None = None
     menu_configuration: MenuConfigurationService | None = None
     menu_releases: MenuReleaseService | None = None
@@ -693,6 +700,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             team_management=TeamManagementService(
                 SqlAlchemyTeamManagementUnitOfWork(database.sessions)
+            ),
+            enterprise_knowledge=EnterpriseKnowledgeService(
+                SqlAlchemyEnterpriseKnowledgeUnitOfWork(database.sessions)
             ),
             entitlements=EntitlementService(
                 unit_of_work=SqlAlchemyEntitlementUnitOfWork(database.sessions),
