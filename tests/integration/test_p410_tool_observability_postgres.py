@@ -291,7 +291,7 @@ def test_database_rejects_schema_bypass_fact_mutation_and_unsafe_downgrade(
             command.downgrade(config, "20260816_0059")
         connection.rollback()
         assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-            "20260830_0075"
+            "20260831_0076"
         )
     finally:
         database.engine.dispose()

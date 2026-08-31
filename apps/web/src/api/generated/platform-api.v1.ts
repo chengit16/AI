@@ -1084,6 +1084,26 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/enterprise-console": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Enterprise Console
+     * @description 读取企业控制台聚合；认证、PDP 和空间隔离由统一依赖及应用服务执行。
+     */
+    readonly get: operations["getEnterpriseConsole"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/entitlements": {
     readonly parameters: {
       readonly query?: never;
@@ -5209,6 +5229,129 @@ export type components = {
        * @enum {string}
        */
       readonly scope_type: "workspace" | "department" | "member";
+    };
+    /**
+     * EnterpriseConsoleRecentDocumentResponse
+     * @description 定义企业控制台最近内容摘要，不暴露正文和对象存储信息。
+     */
+    readonly EnterpriseConsoleRecentDocumentResponse: {
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      readonly document_id: string;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      readonly knowledge_base_id: string;
+      /** Knowledge Base Name */
+      readonly knowledge_base_name: string;
+      /** Published At */
+      readonly published_at: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "published" | "unpublished";
+      /** Title */
+      readonly title: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+    };
+    /**
+     * EnterpriseConsoleResponse
+     * @description 定义企业控制台聚合响应及其最终一致性时间窗口。
+     */
+    readonly EnterpriseConsoleResponse: {
+      /**
+       * Consistency
+       * @constant
+       */
+      readonly consistency: "eventually_consistent";
+      /**
+       * Generated At
+       * Format: date-time
+       */
+      readonly generated_at: string;
+      /** Recent Documents */
+      readonly recent_documents: readonly components["schemas"]["EnterpriseConsoleRecentDocumentResponse"][];
+      readonly statistics: components["schemas"]["EnterpriseConsoleStatisticsResponse"];
+      /**
+       * Time Window End
+       * Format: date-time
+       */
+      readonly time_window_end: string;
+      /**
+       * Time Window Start
+       * Format: date-time
+       */
+      readonly time_window_start: string;
+      /** Trend */
+      readonly trend: readonly components["schemas"]["EnterpriseConsoleTrendPointResponse"][];
+      readonly workspace: components["schemas"]["EnterpriseConsoleWorkspaceResponse"];
+    };
+    /**
+     * EnterpriseConsoleStatisticsResponse
+     * @description 定义企业控制台统计快照的非负计数和容量字段。
+     */
+    readonly EnterpriseConsoleStatisticsResponse: {
+      /** Active Document Count */
+      readonly active_document_count: number;
+      /** Active Knowledge Base Count */
+      readonly active_knowledge_base_count: number;
+      /** Active Member Count */
+      readonly active_member_count: number;
+      /** Failed Document Count */
+      readonly failed_document_count: number;
+      /** Processing Document Count */
+      readonly processing_document_count: number;
+      /** Published Document Count */
+      readonly published_document_count: number;
+      /** Storage Limit Bytes */
+      readonly storage_limit_bytes: number;
+      /** Storage Used Bytes */
+      readonly storage_used_bytes: number;
+    };
+    /**
+     * EnterpriseConsoleTrendPointResponse
+     * @description 定义企业文档增长趋势的低敏统计点。
+     */
+    readonly EnterpriseConsoleTrendPointResponse: {
+      /** Document Count */
+      readonly document_count: number;
+      /** Period */
+      readonly period: string;
+    };
+    /**
+     * EnterpriseConsoleWorkspaceResponse
+     * @description 定义企业控制台空间资料的稳定响应结构。
+     */
+    readonly EnterpriseConsoleWorkspaceResponse: {
+      /** Description */
+      readonly description: string | null;
+      /** Logo Url */
+      readonly logo_url: string | null;
+      /** Name */
+      readonly name: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "suspended" | "archived";
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+      /**
+       * Workspace Type
+       * @constant
+       */
+      readonly workspace_type: "enterprise";
     };
     /**
      * EntitlementResponse
@@ -14475,6 +14618,98 @@ export interface operations {
       };
       /** @description 资源状态冲突 */
       readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getEnterpriseConsole: {
+    readonly parameters: {
+      readonly query?: {
+        readonly recent_limit?: number;
+        readonly trend_months?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["EnterpriseConsoleResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
         headers: {
           readonly [name: string]: unknown;
         };

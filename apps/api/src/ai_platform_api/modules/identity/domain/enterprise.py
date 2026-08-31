@@ -10,6 +10,8 @@ from uuid import UUID
 
 from ai_platform_backend.integration.domain import AuditWriter, OutboxWriter
 
+from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
+
 MembershipType = Literal["owner", "member"]
 InvitationStatus = Literal["pending", "accepted", "cancelled", "expired"]
 
@@ -115,6 +117,57 @@ class WorkspaceMemberSummary:
     status: Literal["active", "disabled", "left"]
 
 
+@dataclass(frozen=True)
+class EnterpriseConsoleTrendPoint:
+    """固定六个月窗口内企业文档增长的低敏统计点。"""
+
+    period: str
+    document_count: int
+
+
+@dataclass(frozen=True)
+class EnterpriseConsoleRecentDocument:
+    """企业控制台最近内容摘要，不包含正文、对象键和解析产物。"""
+
+    document_id: UUID
+    knowledge_base_id: UUID
+    knowledge_base_name: str
+    title: str
+    updated_at: datetime
+    published_at: datetime | None
+    status: Literal["published", "unpublished"]
+
+
+@dataclass(frozen=True)
+class EnterpriseConsoleStatistics:
+    """企业空间统计快照；所有数量必须来自同一数据库事务。"""
+
+    active_member_count: int
+    active_knowledge_base_count: int
+    active_document_count: int
+    published_document_count: int
+    processing_document_count: int
+    failed_document_count: int
+    storage_used_bytes: int
+    storage_limit_bytes: int
+
+
+@dataclass(frozen=True)
+class EnterpriseConsoleSnapshot:
+    """企业控制台只读聚合，明确统计时间窗和最终一致性语义。"""
+
+    workspace: WorkspaceRecord
+    statistics: EnterpriseConsoleStatistics
+    trend: tuple[EnterpriseConsoleTrendPoint, ...]
+    recent_documents: tuple[EnterpriseConsoleRecentDocument, ...]
+    generated_at: datetime
+    time_window_start: datetime
+    time_window_end: datetime
+    consistency: Literal["eventually_consistent"]
+    profile_description: str | None
+    profile_logo_url: str | None
+
+
 class InvalidMembershipTransitionError(Exception):
     """成员状态不允许当前转换，尤其禁止企业所有者离开或被停用。"""
 
@@ -178,6 +231,17 @@ class EnterpriseRepository(Protocol):
     def list_members(self, workspace_id: UUID) -> tuple[WorkspaceMemberSummary, ...]: ...
 
     def member_capacity_available(self, workspace_id: UUID) -> bool: ...
+
+    def get_console_snapshot(
+        self,
+        workspace_id: UUID,
+        *,
+        generated_at: datetime,
+        trend_months: int,
+        recent_limit: int,
+        maximum_security_level: SecurityLevel,
+        include_recent_documents: bool,
+    ) -> EnterpriseConsoleSnapshot | None: ...
 
 
 class EnterpriseUnitOfWork(Protocol):

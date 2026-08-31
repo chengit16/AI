@@ -1,7 +1,7 @@
 // 由 scripts/generate_resource_registry.py 自动生成, 请勿手工修改。
 export const resourceRegistry = {
   schema_version: 1,
-  registry_version: 28,
+  registry_version: 29,
   permissions: [
     {
       code: "workspace.overview.access",
@@ -3155,6 +3155,17 @@ export const resourceRegistry = {
       risk_level: "normal",
       status: "active",
     },
+    {
+      api_resource_id: "81000000-0000-4000-8000-000000000183",
+      api_key: "workspace.enterprise_console.read",
+      operation_id: "getEnterpriseConsole",
+      method: "GET",
+      path_pattern: "/api/v1/workspaces/{workspace_id}/enterprise-console",
+      access_level: "authorized",
+      permission_code: "workspace.overview.access",
+      risk_level: "normal",
+      status: "active",
+    },
   ],
   menus: [
     {
@@ -3180,6 +3191,19 @@ export const resourceRegistry = {
       permission_code: "workspace.overview.access",
       icon_key: "layout-dashboard",
       sort_order: 100,
+      source: "system",
+      status: "active",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000258",
+      menu_key: "navigation.workspace.overview.enterprise_console",
+      parent_menu_key: "navigation.workspace.overview",
+      name: "查看企业控制台",
+      menu_type: "action",
+      page_resource_id: null,
+      permission_code: "workspace.overview.access",
+      icon_key: null,
+      sort_order: 90,
       source: "system",
       status: "active",
     },
@@ -6139,6 +6163,11 @@ export const resourceRegistry = {
       menu_id: "82000000-0000-4000-8000-000000000257",
       api_resource_id: "81000000-0000-4000-8000-000000000182",
       action_type: "mutation",
+    },
+    {
+      menu_id: "82000000-0000-4000-8000-000000000258",
+      api_resource_id: "81000000-0000-4000-8000-000000000183",
+      action_type: "query",
     },
   ],
 } as const;

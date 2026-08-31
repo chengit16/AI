@@ -11,6 +11,7 @@ from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.identity.application.entitlement_errors import QuotaExceededError
 from ai_platform_api.modules.identity.domain.enterprise import (
+    EnterpriseConsoleSnapshot,
     EnterpriseRepository,
     EnterpriseUnitOfWork,
     EnterpriseWorkspace,
@@ -25,6 +26,7 @@ from ai_platform_api.modules.identity.domain.enterprise import (
 )
 
 __all__ = [
+    "EnterpriseConsoleSnapshot",
     "EnterpriseWorkspaceService",
     "WorkspaceMemberSummary",
     "WorkspaceSummary",
@@ -387,6 +389,50 @@ class EnterpriseWorkspaceService:
             return tuple(
                 member for member in members if member.account_id in context.authorized_account_ids
             )
+
+    def get_console_snapshot(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        trend_months: int = 6,
+        recent_limit: int = 10,
+    ) -> EnterpriseConsoleSnapshot:
+        """返回企业控制台低敏聚合，并在同一事务中复核空间和成员状态。"""
+
+        # 控制台只接受可信浏览器会话和当前空间；客户端不能代传主体、角色或统计范围。
+        account_id = self._browser_account(context)
+        self._require_current_workspace(context, workspace_id)
+        if not 1 <= trend_months <= 12 or not 1 <= recent_limit <= 50:
+            raise WorkspaceGovernanceValidationError
+        # 企业控制台包含成员和容量等全空间聚合。受限到部门、自身或具体资源的策略
+        # 不能安全拆分这些统计，因此必须失败关闭，避免以低敏摘要名义绕过 PDP。
+        if (
+            context.authorized_permission_code != "workspace.overview.access"
+            or not context.authorized_workspace
+        ):
+            raise WorkspaceGovernanceDeniedError
+        recent_field_masks = frozenset({"name", "title", "document.title", "knowledge_base.name"})
+        include_recent_documents = not bool(
+            context.authorized_field_mask.intersection(recent_field_masks)
+        )
+        generated_at = datetime.now(UTC)
+        with self._unit_of_work as unit_of_work:
+            self._require_enterprise(unit_of_work.enterprise, workspace_id)
+            membership = unit_of_work.enterprise.get_membership(workspace_id, account_id)
+            if membership is None or membership.status != "active":
+                raise WorkspaceGovernanceDeniedError
+            snapshot = unit_of_work.enterprise.get_console_snapshot(
+                workspace_id,
+                generated_at=generated_at,
+                trend_months=trend_months,
+                recent_limit=recent_limit,
+                maximum_security_level=context.authorized_maximum_security_level,
+                include_recent_documents=include_recent_documents,
+            )
+            if snapshot is None:
+                raise WorkspaceGovernanceDeniedError
+            return snapshot
 
     def switch(self, context: RequestContext, *, workspace_id: UUID) -> WorkspaceSummary:
         """校验目标空间可访问后返回切换结果，调用方据此刷新空间级缓存。"""

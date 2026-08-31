@@ -1724,6 +1724,182 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/enterprise-console": {
+      "get": {
+        "tags": [
+          "工作空间"
+        ],
+        "summary": "Get Enterprise Console",
+        "description": "读取企业控制台聚合；认证、PDP 和空间隔离由统一依赖及应用服务执行。",
+        "operationId": "getEnterpriseConsole",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "trend_months",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 12,
+              "minimum": 1,
+              "default": 6,
+              "title": "Trend Months"
+            }
+          },
+          {
+            "name": "recent_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Recent Limit"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnterpriseConsoleResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/entitlements": {
       "get": {
         "tags": [
@@ -34926,6 +35102,265 @@
         ],
         "title": "EffectiveRoleSourceResponse",
         "description": "定义有效角色来源操作的稳定响应结构。"
+      },
+      "EnterpriseConsoleRecentDocumentResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "knowledge_base_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Knowledge Base Id"
+          },
+          "knowledge_base_name": {
+            "type": "string",
+            "title": "Knowledge Base Name"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "unpublished"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document_id",
+          "knowledge_base_id",
+          "knowledge_base_name",
+          "title",
+          "updated_at",
+          "published_at",
+          "status"
+        ],
+        "title": "EnterpriseConsoleRecentDocumentResponse",
+        "description": "定义企业控制台最近内容摘要，不暴露正文和对象存储信息。"
+      },
+      "EnterpriseConsoleResponse": {
+        "properties": {
+          "workspace": {
+            "$ref": "#/components/schemas/EnterpriseConsoleWorkspaceResponse"
+          },
+          "statistics": {
+            "$ref": "#/components/schemas/EnterpriseConsoleStatisticsResponse"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/EnterpriseConsoleTrendPointResponse"
+            },
+            "type": "array",
+            "title": "Trend"
+          },
+          "recent_documents": {
+            "items": {
+              "$ref": "#/components/schemas/EnterpriseConsoleRecentDocumentResponse"
+            },
+            "type": "array",
+            "title": "Recent Documents"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "time_window_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time Window Start"
+          },
+          "time_window_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time Window End"
+          },
+          "consistency": {
+            "type": "string",
+            "const": "eventually_consistent",
+            "title": "Consistency"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workspace",
+          "statistics",
+          "trend",
+          "recent_documents",
+          "generated_at",
+          "time_window_start",
+          "time_window_end",
+          "consistency"
+        ],
+        "title": "EnterpriseConsoleResponse",
+        "description": "定义企业控制台聚合响应及其最终一致性时间窗口。"
+      },
+      "EnterpriseConsoleStatisticsResponse": {
+        "properties": {
+          "active_member_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Active Member Count"
+          },
+          "active_knowledge_base_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Active Knowledge Base Count"
+          },
+          "active_document_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Active Document Count"
+          },
+          "published_document_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Published Document Count"
+          },
+          "processing_document_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Processing Document Count"
+          },
+          "failed_document_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Failed Document Count"
+          },
+          "storage_used_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Storage Used Bytes"
+          },
+          "storage_limit_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Storage Limit Bytes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "active_member_count",
+          "active_knowledge_base_count",
+          "active_document_count",
+          "published_document_count",
+          "processing_document_count",
+          "failed_document_count",
+          "storage_used_bytes",
+          "storage_limit_bytes"
+        ],
+        "title": "EnterpriseConsoleStatisticsResponse",
+        "description": "定义企业控制台统计快照的非负计数和容量字段。"
+      },
+      "EnterpriseConsoleTrendPointResponse": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "title": "Period"
+          },
+          "document_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Document Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "period",
+          "document_count"
+        ],
+        "title": "EnterpriseConsoleTrendPointResponse",
+        "description": "定义企业文档增长趋势的低敏统计点。"
+      },
+      "EnterpriseConsoleWorkspaceResponse": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "workspace_type": {
+            "type": "string",
+            "const": "enterprise",
+            "title": "Workspace Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "archived"
+            ],
+            "title": "Status"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "workspace_type",
+          "name",
+          "status",
+          "description",
+          "logo_url"
+        ],
+        "title": "EnterpriseConsoleWorkspaceResponse",
+        "description": "定义企业控制台空间资料的稳定响应结构。"
       },
       "EntitlementResponse": {
         "properties": {

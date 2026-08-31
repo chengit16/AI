@@ -14,6 +14,8 @@ type WorkspaceMemberView = components["schemas"]["WorkspaceMemberListResponse"][
 export type CurrentMenuRelease = components["schemas"]["CurrentMenuReleaseResponse"];
 /** 指定成员经过直接、部门和系统角色继承后的有效角色集合。 */
 export type EffectiveRoleSet = components["schemas"]["EffectiveRoleSetResponse"];
+/** 企业控制台使用统一事务口径返回的低敏聚合快照。 */
+export type EnterpriseConsole = components["schemas"]["EnterpriseConsoleResponse"];
 
 function isWorkspaceMember(item: WorkspaceMemberView): item is WorkspaceMember {
   return (
@@ -94,6 +96,17 @@ export async function getEffectiveWorkspaceRoles(
 ): Promise<EffectiveRoleSet> {
   return apiRequest<EffectiveRoleSet>(
     `/api/v1/workspaces/${workspaceId}/roles/effective/${accountId}`,
+    { signal },
+  );
+}
+
+/** 查询企业控制台统计、趋势和最近内容；全空间聚合范围由服务端 PDP 决定。 */
+export function getEnterpriseConsole(
+  workspaceId: string,
+  signal?: AbortSignal,
+): Promise<EnterpriseConsole> {
+  return apiRequest<EnterpriseConsole>(
+    `/api/v1/workspaces/${workspaceId}/enterprise-console?trend_months=6&recent_limit=10`,
     { signal },
   );
 }

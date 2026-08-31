@@ -12,18 +12,18 @@ import {
   Switch,
   Tag,
 } from "antd";
-import { Building2, KeyRound, TicketCheck, UserRound } from "lucide-react";
+import { Building2, KeyRound, UserRound } from "lucide-react";
 import { useState } from "react";
 
 import { errorMessage } from "@/api/client";
 import { getWorkspaceEntitlement, setWorkspaceOpenApiFeature } from "@/api/services/entitlements";
 import { acceptWorkspaceInvitation } from "@/api/services/workspaces";
-import { PageHeader } from "@/components/PageHeader/PageHeader";
 import { StateView } from "@/components/StateView/StateView";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 import { useSessionStore } from "@/store/session";
 
 import { PersonalKnowledgeWorkbench } from "./PersonalKnowledgeWorkbench";
+import { EnterpriseConsole } from "./EnterpriseConsole";
 
 const quotaLabels = {
   members: "成员",
@@ -145,19 +145,13 @@ export default function WorkspaceOverviewPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="WORKSPACE"
-        title={currentWorkspace.name}
-        description="查看当前空间状态、套餐权益和资源余量。所有额度均由后端原子配额入口校验。"
-        actions={
-          <Button icon={<TicketCheck size={17} />} onClick={() => setInvitationOpen(true)}>
-            接受邀请
-          </Button>
-        }
+      <EnterpriseConsole
+        workspaceId={workspaceId!}
+        onAcceptInvitation={() => setInvitationOpen(true)}
       />
 
       <section
-        className="ui-surface-panel p-6 phone-down:p-5"
+        className="ui-surface-panel mt-6 p-6 phone-down:p-5"
         aria-labelledby="workspace-summary-title"
       >
         <div className="mb-6 flex items-center gap-4">

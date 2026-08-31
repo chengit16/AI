@@ -784,6 +784,52 @@ class EffectiveRoleSourceResponse(typing.TypedDict):
     scope_type: typing.Literal["workspace", "department", "member"]
 
 
+class EnterpriseConsoleRecentDocumentResponse(typing.TypedDict):
+    document_id: str
+    knowledge_base_id: str
+    knowledge_base_name: str
+    published_at: str | None
+    status: typing.Literal["published", "unpublished"]
+    title: str
+    updated_at: str
+
+
+class EnterpriseConsoleResponse(typing.TypedDict):
+    consistency: str
+    generated_at: str
+    recent_documents: list[EnterpriseConsoleRecentDocumentResponse]
+    statistics: EnterpriseConsoleStatisticsResponse
+    time_window_end: str
+    time_window_start: str
+    trend: list[EnterpriseConsoleTrendPointResponse]
+    workspace: EnterpriseConsoleWorkspaceResponse
+
+
+class EnterpriseConsoleStatisticsResponse(typing.TypedDict):
+    active_document_count: int
+    active_knowledge_base_count: int
+    active_member_count: int
+    failed_document_count: int
+    processing_document_count: int
+    published_document_count: int
+    storage_limit_bytes: int
+    storage_used_bytes: int
+
+
+class EnterpriseConsoleTrendPointResponse(typing.TypedDict):
+    document_count: int
+    period: str
+
+
+class EnterpriseConsoleWorkspaceResponse(typing.TypedDict):
+    description: str | None
+    logo_url: str | None
+    name: str
+    status: typing.Literal["active", "suspended", "archived"]
+    workspace_id: str
+    workspace_type: str
+
+
 class EntitlementResponse(typing.TypedDict):
     entitlement_version: int
     open_api_allowed: bool

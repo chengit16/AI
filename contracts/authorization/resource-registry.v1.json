@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 28,
+  "registry_version": 29,
   "permissions": [
     { "code": "workspace.overview.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
     { "code": "workspace.members.access", "resource_type": "page", "action": "access", "scope": "workspace", "status": "active" },
@@ -487,11 +487,13 @@
     { "api_resource_id": "81000000-0000-4000-8000-000000000175", "api_key": "knowledge.document.download", "operation_id": "downloadKnowledgeDocumentVersion", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-bases/{knowledge_base_id}/documents/{document_id}/versions/{document_version_id}/download", "access_level": "authorized", "permission_code": "knowledge.document.download", "risk_level": "high", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000176", "api_key": "knowledge.personal_workbench.read", "operation_id": "getPersonalKnowledgeWorkbench", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/personal-workbench", "access_level": "authorized", "permission_code": "knowledge.document.read", "risk_level": "normal", "status": "active" },
     { "api_resource_id": "81000000-0000-4000-8000-000000000177", "api_key": "knowledge.personal_workbench.access.record", "operation_id": "recordPersonalWorkbenchDocumentAccess", "method": "POST", "path_pattern": "/api/v1/workspaces/{workspace_id}/personal-workbench/accesses", "access_level": "authorized", "permission_code": "knowledge.document.read", "risk_level": "normal", "status": "active" },
-    { "api_resource_id": "81000000-0000-4000-8000-000000000178", "api_key": "knowledge.search.published", "operation_id": "searchPublishedKnowledgeDocuments", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-search", "access_level": "authorized", "permission_code": "knowledge.document.read", "risk_level": "normal", "status": "active" }
+    { "api_resource_id": "81000000-0000-4000-8000-000000000178", "api_key": "knowledge.search.published", "operation_id": "searchPublishedKnowledgeDocuments", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/knowledge-search", "access_level": "authorized", "permission_code": "knowledge.document.read", "risk_level": "normal", "status": "active" },
+    { "api_resource_id": "81000000-0000-4000-8000-000000000183", "api_key": "workspace.enterprise_console.read", "operation_id": "getEnterpriseConsole", "method": "GET", "path_pattern": "/api/v1/workspaces/{workspace_id}/enterprise-console", "access_level": "authorized", "permission_code": "workspace.overview.access", "risk_level": "normal", "status": "active" }
   ],
   "menus": [
     { "menu_id": "82000000-0000-4000-8000-000000000001", "menu_key": "navigation.workspace", "parent_menu_key": null, "name": "空间管理", "menu_type": "directory", "page_resource_id": null, "permission_code": null, "icon_key": null, "sort_order": 100, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000002", "menu_key": "navigation.workspace.overview", "parent_menu_key": "navigation.workspace", "name": "空间总览", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000002", "permission_code": "workspace.overview.access", "icon_key": "layout-dashboard", "sort_order": 100, "source": "system", "status": "active" },
+    { "menu_id": "82000000-0000-4000-8000-000000000258", "menu_key": "navigation.workspace.overview.enterprise_console", "parent_menu_key": "navigation.workspace.overview", "name": "查看企业控制台", "menu_type": "action", "page_resource_id": null, "permission_code": "workspace.overview.access", "icon_key": null, "sort_order": 90, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000003", "menu_key": "navigation.workspace.members", "parent_menu_key": "navigation.workspace", "name": "成员管理", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000003", "permission_code": "workspace.members.access", "icon_key": "users-round", "sort_order": 200, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000004", "menu_key": "navigation.workspace.organization", "parent_menu_key": "navigation.workspace", "name": "组织架构", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000004", "permission_code": "organization.structure.access", "icon_key": "network", "sort_order": 300, "source": "system", "status": "active" },
     { "menu_id": "82000000-0000-4000-8000-000000000005", "menu_key": "navigation.workspace.status", "parent_menu_key": "navigation.workspace", "name": "运行状态", "menu_type": "page", "page_resource_id": "80000000-0000-4000-8000-000000000005", "permission_code": "system.runtime.access", "icon_key": "activity", "sort_order": 400, "source": "system", "status": "active" },
@@ -828,6 +830,7 @@
     { "menu_id": "82000000-0000-4000-8000-000000000256", "api_resource_id": "81000000-0000-4000-8000-000000000179", "action_type": "mutation" },
     { "menu_id": "82000000-0000-4000-8000-000000000257", "api_resource_id": "81000000-0000-4000-8000-000000000180", "action_type": "query" },
     { "menu_id": "82000000-0000-4000-8000-000000000257", "api_resource_id": "81000000-0000-4000-8000-000000000181", "action_type": "mutation" },
-    { "menu_id": "82000000-0000-4000-8000-000000000257", "api_resource_id": "81000000-0000-4000-8000-000000000182", "action_type": "mutation" }
+    { "menu_id": "82000000-0000-4000-8000-000000000257", "api_resource_id": "81000000-0000-4000-8000-000000000182", "action_type": "mutation" },
+    { "menu_id": "82000000-0000-4000-8000-000000000258", "api_resource_id": "81000000-0000-4000-8000-000000000183", "action_type": "query" }
   ]
 }

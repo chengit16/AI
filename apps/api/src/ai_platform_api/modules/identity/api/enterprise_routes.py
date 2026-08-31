@@ -3,7 +3,7 @@
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from ai_platform_api.common.api_errors import error_responses
 from ai_platform_api.common.request_context import RequestContext
@@ -15,6 +15,11 @@ from ai_platform_api.modules.identity.api.dependencies import (
 )
 from ai_platform_api.modules.identity.api.enterprise_schemas import (
     CreateEnterpriseWorkspaceRequest,
+    EnterpriseConsoleRecentDocumentResponse,
+    EnterpriseConsoleResponse,
+    EnterpriseConsoleStatisticsResponse,
+    EnterpriseConsoleTrendPointResponse,
+    EnterpriseConsoleWorkspaceResponse,
     InviteWorkspaceMemberRequest,
     WorkspaceInvitationResponse,
     WorkspaceListResponse,
@@ -25,6 +30,7 @@ from ai_platform_api.modules.identity.api.enterprise_schemas import (
     WorkspaceSummaryResponse,
 )
 from ai_platform_api.modules.identity.application.enterprise import (
+    EnterpriseConsoleSnapshot,
     EnterpriseWorkspaceService,
     WorkspaceMemberSummary,
     WorkspaceSummary,
@@ -41,6 +47,53 @@ def _workspace_response(workspace: WorkspaceSummary) -> WorkspaceSummaryResponse
         status=workspace.status,
         membership_type=workspace.membership_type,
         membership_status=workspace.membership_status,
+    )
+
+
+def _console_response(snapshot: EnterpriseConsoleSnapshot) -> EnterpriseConsoleResponse:
+    """将企业控制台领域快照映射为不含敏感字段的 HTTP 响应。"""
+
+    return EnterpriseConsoleResponse(
+        workspace=EnterpriseConsoleWorkspaceResponse(
+            workspace_id=snapshot.workspace.workspace_id,
+            workspace_type="enterprise",
+            name=snapshot.workspace.name,
+            status=snapshot.workspace.status,
+            description=snapshot.profile_description,
+            logo_url=snapshot.profile_logo_url,
+        ),
+        statistics=EnterpriseConsoleStatisticsResponse(
+            active_member_count=snapshot.statistics.active_member_count,
+            active_knowledge_base_count=snapshot.statistics.active_knowledge_base_count,
+            active_document_count=snapshot.statistics.active_document_count,
+            published_document_count=snapshot.statistics.published_document_count,
+            processing_document_count=snapshot.statistics.processing_document_count,
+            failed_document_count=snapshot.statistics.failed_document_count,
+            storage_used_bytes=snapshot.statistics.storage_used_bytes,
+            storage_limit_bytes=snapshot.statistics.storage_limit_bytes,
+        ),
+        trend=[
+            EnterpriseConsoleTrendPointResponse(
+                period=point.period, document_count=point.document_count
+            )
+            for point in snapshot.trend
+        ],
+        recent_documents=[
+            EnterpriseConsoleRecentDocumentResponse(
+                document_id=document.document_id,
+                knowledge_base_id=document.knowledge_base_id,
+                knowledge_base_name=document.knowledge_base_name,
+                title=document.title,
+                updated_at=document.updated_at,
+                published_at=document.published_at,
+                status=document.status,
+            )
+            for document in snapshot.recent_documents
+        ],
+        generated_at=snapshot.generated_at,
+        time_window_start=snapshot.time_window_start,
+        time_window_end=snapshot.time_window_end,
+        consistency=snapshot.consistency,
     )
 
 
@@ -236,4 +289,29 @@ def list_workspace_members(
             _member_response(item, projection, context.authorized_field_mask)
             for item in service.list_members(context, workspace_id=workspace_id)
         ]
+    )
+
+
+@router.get(
+    "/{workspace_id}/enterprise-console",
+    response_model=EnterpriseConsoleResponse,
+    operation_id="getEnterpriseConsole",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def get_enterprise_console(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[EnterpriseWorkspaceService, Depends(enterprise_workspace_service)],
+    trend_months: Annotated[int, Query(ge=1, le=12)] = 6,
+    recent_limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> EnterpriseConsoleResponse:
+    """读取企业控制台聚合；认证、PDP 和空间隔离由统一依赖及应用服务执行。"""
+
+    return _console_response(
+        service.get_console_snapshot(
+            context,
+            workspace_id=workspace_id,
+            trend_months=trend_months,
+            recent_limit=recent_limit,
+        )
     )

@@ -29,6 +29,7 @@ from ai_platform_api.modules.identity.application.authentication import (
 )
 from ai_platform_api.modules.identity.application.enterprise import (
     EnterpriseWorkspaceService,
+    WorkspaceGovernanceDeniedError,
     WorkspaceMemberSummary,
     WorkspaceSummary,
 )
@@ -37,8 +38,13 @@ from ai_platform_api.modules.identity.application.organization import Organizati
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
 from ai_platform_api.modules.identity.domain.enterprise import (
+    EnterpriseConsoleRecentDocument,
+    EnterpriseConsoleSnapshot,
+    EnterpriseConsoleStatistics,
+    EnterpriseConsoleTrendPoint,
     WorkspaceInvitation,
     WorkspaceMembership,
+    WorkspaceRecord,
 )
 from ai_platform_api.modules.identity.infrastructure.role_cache import ValkeyRoleResolutionCache
 from ai_platform_api.modules.identity.infrastructure.security import EnvelopeSecretCipher
@@ -190,6 +196,43 @@ class StubEnterpriseWorkspaceService(EnterpriseWorkspaceService):
         assert workspace_id == ENTERPRISE_WORKSPACE_ID
         return self._summary()
 
+    def get_console_snapshot(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        trend_months: int = 6,
+        recent_limit: int = 10,
+    ) -> EnterpriseConsoleSnapshot:
+        self._browser_account(context)
+        self._require_current_workspace(context, workspace_id)
+        if workspace_id != ENTERPRISE_WORKSPACE_ID:
+            raise WorkspaceGovernanceDeniedError
+        assert trend_months == 6 and recent_limit == 10
+        generated_at = datetime(2026, 8, 31, 8, 0, tzinfo=UTC)
+        return EnterpriseConsoleSnapshot(
+            workspace=WorkspaceRecord(workspace_id, "enterprise", "合成企业空间", "active"),
+            statistics=EnterpriseConsoleStatistics(2, 1, 3, 2, 1, 0, 1024, 4096),
+            trend=(EnterpriseConsoleTrendPoint("2026-08", 3),),
+            recent_documents=(
+                EnterpriseConsoleRecentDocument(
+                    UUID("50000000-0000-4000-8000-000000000024"),
+                    UUID("60000000-0000-4000-8000-000000000024"),
+                    "合成知识库",
+                    "合成制度文档",
+                    generated_at,
+                    generated_at,
+                    "published",
+                ),
+            ),
+            generated_at=generated_at,
+            time_window_start=datetime(2026, 3, 1, tzinfo=UTC),
+            time_window_end=generated_at,
+            consistency="eventually_consistent",
+            profile_description=None,
+            profile_logo_url=None,
+        )
+
     @staticmethod
     def _summary() -> WorkspaceSummary:
         return WorkspaceSummary(
@@ -230,6 +273,23 @@ class MaskMemberIdentityPolicy:
             policy_version=1,
             cache_ttl_seconds=0,
             reason="synthetic_field_mask",
+        )
+
+
+class DenyEnterpriseConsolePolicy:
+    """模拟统一 PDP 默认拒绝，确保 Router 不会直接调用领域服务。"""
+
+    def decide(self, request: PolicyRequest) -> PolicyDecision:
+        return PolicyDecision(
+            decision_id=UUID("90000000-0000-4000-8000-000000000025"),
+            decision="deny",
+            permission_code=request.permission_code,
+            workspace_id=request.context.workspace_id,
+            resource_scope=ResourceScope(),
+            field_mask=frozenset(),
+            policy_version=1,
+            cache_ttl_seconds=0,
+            reason="synthetic_default_deny",
         )
 
 
@@ -305,6 +365,10 @@ def test_enterprise_workspace_routes_preserve_contract_and_browser_governance() 
             f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}/members",
             headers={"X-Workspace-ID": str(ENTERPRISE_WORKSPACE_ID)},
         )
+        console = client.get(
+            f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}/enterprise-console",
+            headers={"X-Workspace-ID": str(ENTERPRISE_WORKSPACE_ID)},
+        )
         disabled = client.post(
             f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}/members/{ACCOUNT_ID}/disable",
             headers=enterprise_headers,
@@ -321,6 +385,20 @@ def test_enterprise_workspace_routes_preserve_contract_and_browser_governance() 
     assert accepted.json() == created.json()
     assert switched.json() == created.json()
     assert members.json()["items"][0]["display_name"] == "合成成员"
+    assert console.status_code == 200
+    assert console.json()["statistics"] == {
+        "active_member_count": 2,
+        "active_knowledge_base_count": 1,
+        "active_document_count": 3,
+        "published_document_count": 2,
+        "processing_document_count": 1,
+        "failed_document_count": 0,
+        "storage_used_bytes": 1024,
+        "storage_limit_bytes": 4096,
+    }
+    assert console.json()["recent_documents"][0]["title"] == "合成制度文档"
+    assert "object_key" not in console.text
+    assert "content" not in console.json()["recent_documents"][0]
     assert disabled.json()["status"] == "disabled"
     assert left.json()["status"] == "left"
 
@@ -335,6 +413,58 @@ def test_enterprise_workspace_routes_preserve_contract_and_browser_governance() 
         )
     assert denied.status_code == 403
     assert denied.json()["code"] == "POLICY_DENIED"
+
+
+def test_enterprise_console_query_contract_rejects_out_of_range_values() -> None:
+    client = enterprise_client()
+    client.cookies.set("ai_platform_session", "synthetic-enterprise-session")
+    headers = {"X-Workspace-ID": str(ENTERPRISE_WORKSPACE_ID)}
+
+    with client:
+        invalid_months = client.get(
+            f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}/enterprise-console",
+            headers=headers,
+            params={"trend_months": 13},
+        )
+        invalid_limit = client.get(
+            f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}/enterprise-console",
+            headers=headers,
+            params={"recent_limit": 0},
+        )
+
+    assert invalid_months.status_code == 422
+    assert invalid_limit.status_code == 422
+
+
+def test_enterprise_console_http_rejects_policy_personal_and_workspace_mismatch() -> None:
+    """HTTP 边缘必须拒绝默认 PDP、个人空间以及路径与 Header 空间不一致。"""
+
+    denied_client = enterprise_client(cast("PolicyDecisionPoint", DenyEnterpriseConsolePolicy()))
+    denied_client.cookies.set("ai_platform_session", "synthetic-enterprise-session")
+    with denied_client:
+        policy_denied = denied_client.get(
+            f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}/enterprise-console",
+            headers={"X-Workspace-ID": str(ENTERPRISE_WORKSPACE_ID)},
+        )
+
+    client = enterprise_client()
+    client.cookies.set("ai_platform_session", "synthetic-enterprise-session")
+    with client:
+        personal_denied = client.get(
+            f"/api/v1/workspaces/{PERSONAL_WORKSPACE_ID}/enterprise-console",
+            headers={"X-Workspace-ID": str(PERSONAL_WORKSPACE_ID)},
+        )
+        header_mismatch = client.get(
+            f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}/enterprise-console",
+            headers={"X-Workspace-ID": str(PERSONAL_WORKSPACE_ID)},
+        )
+
+    assert policy_denied.status_code == 403
+    assert policy_denied.json()["code"] == "POLICY_DENIED"
+    assert personal_denied.status_code == 403
+    assert personal_denied.json()["code"] == "POLICY_DENIED"
+    assert header_mismatch.status_code == 403
+    assert header_mismatch.json()["code"] == "POLICY_DENIED"
 
 
 def test_member_response_omits_masked_fields_before_serialization() -> None:
