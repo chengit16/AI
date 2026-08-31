@@ -338,8 +338,8 @@ class SqlAlchemyEnterpriseRepository:
                 workspace_memberships.c.workspace_id == membership.workspace_id,
             )
         )
-        if membership.status != "active":
-            # 2. 离开或停用同步撤销组织和自定义角色范围，重新加入不能恢复旧权限。
+        if membership.status == "left":
+            # 2. 只有退出或移除才清理组织和自定义角色；停用保留配置以支持受控恢复。
             self._session.execute(
                 delete(membership_positions).where(
                     membership_positions.c.workspace_id == membership.workspace_id,

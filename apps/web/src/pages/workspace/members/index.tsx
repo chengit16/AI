@@ -1,61 +1,38 @@
-/** @description 企业成员治理页，处理邀请创建、成员状态展示和即时停用入口。 */
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Form, Input, Modal, Popconfirm, Skeleton, Table, Tag } from "antd";
-import type { TableColumnsType } from "antd";
-import { UserMinus, UserPlus } from "lucide-react";
+/** @description P6B-02 企业团队管理统一产品页。 */
+import { Button, Skeleton } from "antd";
+import { Network } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 
 import { errorMessage, PlatformApiError } from "@/api/client";
-import {
-  disableWorkspaceMember,
-  getWorkspaceMembers,
-  inviteWorkspaceMember,
-  type WorkspaceMember,
-} from "@/api/services/workspaces";
+import type { TeamMember } from "@/api/services/teamManagement";
 import { PageHeader } from "@/components/PageHeader/PageHeader";
 import { StateView } from "@/components/StateView/StateView";
+import { pageRoutes } from "@/config/resources";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 
-/**
- * 展示企业成员清单和治理动作。
- *
- * 个人空间不会请求企业成员接口；无权限与请求错误分开呈现，页面按钮隐藏不替代后端授权。
- */
-export default function WorkspaceMembersPage() {
-  const { message } = App.useApp();
-  const queryClient = useQueryClient();
-  const { workspaceId, workspaces, currentWorkspace } = useCurrentWorkspace();
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [form] = Form.useForm<{ loginName: string }>();
-  // 个人空间没有成员集合，提前关闭 Query 可避免无意义请求和错误状态闪烁。
-  const members = useQuery({
-    queryKey: ["workspace-members", workspaceId],
-    queryFn: ({ signal }) => getWorkspaceMembers(workspaceId!, signal),
-    enabled: Boolean(workspaceId && currentWorkspace?.workspace_type === "enterprise"),
-    retry: false,
-  });
-  const invite = useMutation({
-    mutationFn: ({ loginName }: { loginName: string }) =>
-      inviteWorkspaceMember(workspaceId!, loginName),
-    onSuccess: (invitation) => {
-      setInviteOpen(false);
-      form.resetFields();
-      void message.success(`邀请已创建：${invitation.invitation_id}`);
-    },
-    onError: (error) => void message.error(errorMessage(error)),
-  });
-  const disable = useMutation({
-    mutationFn: (accountId: string) => disableWorkspaceMember(workspaceId!, accountId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["workspace-members", workspaceId] });
-      void message.success("成员已停用");
-    },
-    onError: (error) => void message.error(errorMessage(error)),
-  });
+import { AuditTimeline } from "./components/AuditTimeline";
+import { InvitationPanel } from "./components/InvitationPanel";
+import { MemberEditor } from "./components/MemberEditor";
+import { MemberFilters } from "./components/MemberFilters";
+import { MemberTable } from "./components/MemberTable";
+import { TeamSummary } from "./components/TeamSummary";
+import { filterMembers } from "./teamUtils";
+import { useTeamFilters } from "./useTeamFilters";
+import { useTeamManagement } from "./useTeamManagement";
 
-  if (workspaces.isLoading || (!currentWorkspace && !workspaces.isError))
-    return <Skeleton active paragraph={{ rows: 8 }} />;
-  if (workspaces.isError || !currentWorkspace)
+/** 组合团队聚合、筛选和高风险治理动作，后端仍是唯一安全边界。 */
+export default function WorkspaceMembersPage() {
+  const { workspaceId, workspaces, currentWorkspace } = useCurrentWorkspace();
+  const isEnterprise = currentWorkspace?.workspace_type === "enterprise";
+  const management = useTeamManagement({ workspaceId, enabled: Boolean(isEnterprise) });
+  const { filters, setFilter, resetFilters } = useTeamFilters();
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+
+  if (workspaces.isLoading || (isEnterprise && management.team.isLoading)) {
+    return <Skeleton active paragraph={{ rows: 12 }} />;
+  }
+  if (workspaces.isError || !currentWorkspace) {
     return (
       <StateView
         kind="error"
@@ -64,147 +41,120 @@ export default function WorkspaceMembersPage() {
         description={errorMessage(workspaces.error)}
       />
     );
-  if (currentWorkspace.workspace_type === "personal") {
+  }
+  if (!isEnterprise) {
     return (
       <StateView
         kind="empty"
         headingLevel={1}
-        title="个人空间无需成员管理"
-        description="个人空间只有唯一所有者。切换到企业空间后可邀请和治理成员。"
+        title="个人空间无需团队治理"
+        description="邀请、部门、岗位和角色管理仅在企业空间中启用。"
       />
     );
   }
-  const denied =
-    members.error instanceof PlatformApiError && members.error.code === "POLICY_DENIED";
-  if (denied)
+  if (
+    management.team.error instanceof PlatformApiError &&
+    management.team.error.code === "POLICY_DENIED"
+  ) {
     return (
       <StateView
         kind="denied"
         headingLevel={1}
-        title="当前账号没有成员治理权限"
-        description="企业普通成员可以使用空间能力，但成员清单与停用操作仅向空间所有者开放。"
+        title="当前账号没有团队治理权限"
+        description="团队成员、邀请和治理审计仅向获授权的企业所有者开放。"
       />
     );
-  if (members.isError)
+  }
+  if (management.team.isError || !management.team.data) {
     return (
       <StateView
         kind="error"
         headingLevel={1}
-        title="成员清单未能加载"
-        description={errorMessage(members.error)}
-        action={<Button onClick={() => void members.refetch()}>重新加载</Button>}
+        title="团队数据未能加载"
+        description={errorMessage(management.team.error)}
+        action={<Button onClick={() => void management.team.refetch()}>重新加载</Button>}
       />
     );
+  }
 
-  const columns: TableColumnsType<WorkspaceMember> = [
-    {
-      title: "成员",
-      dataIndex: "display_name",
-      key: "display_name",
-      render: (name, record) => (
-        <div>
-          <strong className="block text-text-strong">{name}</strong>
-          <span className="mt-[3px] block font-mono text-[11px] text-text-muted">
-            {record.account_id}
-          </span>
-        </div>
-      ),
-    },
-    {
-      title: "身份",
-      dataIndex: "membership_type",
-      key: "membership_type",
-      width: 110,
-      render: (value) => (value === "owner" ? "所有者" : "成员"),
-    },
-    {
-      title: "状态",
-      dataIndex: "status",
-      key: "status",
-      width: 100,
-      render: (value) => (
-        <Tag color={value === "active" ? "success" : "default"}>
-          {value === "active" ? "启用" : value === "disabled" ? "已停用" : "已离开"}
-        </Tag>
-      ),
-    },
-    {
-      title: "操作",
-      key: "actions",
-      width: 120,
-      render: (_, record) =>
-        record.membership_type === "owner" || record.status !== "active" ? (
-          <span className="text-xs text-text-muted">不可停用</span>
-        ) : (
-          <Popconfirm
-            title="确认停用该成员？"
-            description="下次请求会立即撤销空间访问。"
-            okText="停用"
-            cancelText="取消"
-            onConfirm={() => disable.mutate(record.account_id)}
-          >
-            <Button type="text" danger icon={<UserMinus size={16} />}>
-              停用
-            </Button>
-          </Popconfirm>
-        ),
-    },
-  ];
-
+  const snapshot = management.team.data;
+  const members = filterMembers(snapshot.members, filters);
+  const lifecyclePending =
+    management.disableMember.isPending ||
+    management.activateMember.isPending ||
+    management.removeMember.isPending;
   return (
     <>
       <PageHeader
-        eyebrow="MEMBERS"
-        title="成员管理"
-        description="邀请已注册账号加入企业空间，查看成员状态，并在必要时立即撤销访问。"
+        eyebrow="TEAM MANAGEMENT"
+        title="团队管理"
+        description="在一处治理成员生命周期、组织归属、岗位、直接角色和邀请状态，并解释每个成员的有效角色来源。"
         actions={
-          <Button type="primary" icon={<UserPlus size={17} />} onClick={() => setInviteOpen(true)}>
-            邀请成员
-          </Button>
+          <Link to={pageRoutes.WorkspaceOrganizationPage}>
+            <Button icon={<Network size={16} />}>维护组织结构</Button>
+          </Link>
         }
       />
-      <section className="ui-surface-panel overflow-hidden" aria-label="企业成员清单">
-        <Table<WorkspaceMember>
-          rowKey="account_id"
-          columns={columns}
-          dataSource={members.data ?? []}
-          loading={members.isLoading}
-          pagination={false}
-          scroll={{ x: 680 }}
-          locale={{
-            emptyText: (
-              <StateView
-                kind="empty"
-                title="还没有企业成员"
-                description="邀请一个已注册账号，建立模拟企业协作空间。"
-              />
-            ),
-          }}
+      <TeamSummary snapshot={snapshot} />
+      <section
+        className="ui-surface-panel mt-5 overflow-hidden"
+        aria-labelledby="member-list-title"
+      >
+        <div className="px-6 pt-5">
+          <h2 id="member-list-title" className="m-0 text-[17px] text-text-strong">
+            成员治理
+          </h2>
+          <p className="mb-4 mt-1 text-xs text-text-muted">
+            显示 {members.length} / {snapshot.members.length} 名成员；最后活跃来自当前企业审计事实。
+          </p>
+        </div>
+        <MemberFilters
+          snapshot={snapshot}
+          filters={filters}
+          onChange={setFilter}
+          onReset={resetFilters}
+        />
+        <MemberTable
+          snapshot={snapshot}
+          members={members}
+          pending={lifecyclePending}
+          onEdit={setEditingMember}
+          onDisable={(accountId) => management.disableMember.mutate(accountId)}
+          onActivate={(accountId) => management.activateMember.mutate(accountId)}
+          onRemove={(accountId) => management.removeMember.mutate(accountId)}
         />
       </section>
-      <Modal
-        title="邀请成员"
-        open={inviteOpen}
-        okText="创建邀请"
-        cancelText="取消"
-        confirmLoading={invite.isPending}
-        onCancel={() => setInviteOpen(false)}
-        onOk={() => void form.validateFields().then((values) => invite.mutate(values))}
-      >
-        <Form form={form} layout="vertical" requiredMark={false}>
-          <Form.Item
-            label="成员登录名"
-            name="loginName"
-            rules={[
-              { required: true, message: "请输入已注册账号的登录名" },
-              { min: 3 },
-              { max: 255 },
-            ]}
-          >
-            <Input autoFocus placeholder="member@example.com" />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <div className="mt-5 grid grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)] gap-5 tablet-down:grid-cols-1">
+        <InvitationPanel
+          invitations={snapshot.invitations}
+          pending={management.invite.isPending || management.cancelInvitation.isPending}
+          onInvite={(loginName) => management.invite.mutate(loginName)}
+          onCancel={(invitationId) => management.cancelInvitation.mutate(invitationId)}
+        />
+        <AuditTimeline audits={snapshot.recent_audits} />
+      </div>
+      <MemberEditor
+        member={editingMember}
+        snapshot={snapshot}
+        pending={management.updateMember.isPending}
+        onClose={() => setEditingMember(null)}
+        onSubmit={(values) => {
+          if (!editingMember) return;
+          management.updateMember.mutate(
+            {
+              member: editingMember,
+              body: {
+                expected_version: editingMember.version,
+                department_ids: values.departmentIds ?? [],
+                primary_department_id: values.primaryDepartmentId ?? null,
+                position_ids: values.positionIds ?? [],
+                direct_role_ids: values.directRoleIds ?? [],
+              },
+            },
+            { onSuccess: () => setEditingMember(null) },
+          );
+        }}
+      />
     </>
   );
 }

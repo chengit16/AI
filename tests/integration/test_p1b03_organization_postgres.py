@@ -308,7 +308,7 @@ def test_department_tree_move_status_position_and_member_assignment(
                     membership_departments.c.membership_id == membership_id,
                 )
             )
-            == 0
+            == 2
         )
         assert (
             connection.scalar(
@@ -319,7 +319,7 @@ def test_department_tree_move_status_position_and_member_assignment(
                     membership_positions.c.membership_id == membership_id,
                 )
             )
-            == 0
+            == 1
         )
         assert (
             connection.scalar(

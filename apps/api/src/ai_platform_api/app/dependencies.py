@@ -64,6 +64,7 @@ from ai_platform_api.modules.identity.application.entitlements import Entitlemen
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
+from ai_platform_api.modules.identity.application.team_management import TeamManagementService
 from ai_platform_api.modules.identity.infrastructure.enterprise_sqlalchemy import (
     SqlAlchemyEnterpriseUnitOfWork,
 )
@@ -90,6 +91,9 @@ from ai_platform_api.modules.identity.infrastructure.sqlalchemy import (
     SqlAlchemyIdentityReader,
     SqlAlchemyIdentityUnitOfWork,
     SqlAlchemyRegistrationUnitOfWork,
+)
+from ai_platform_api.modules.identity.infrastructure.team_management_sqlalchemy import (
+    SqlAlchemyTeamManagementUnitOfWork,
 )
 from ai_platform_api.modules.integration.application.operations import (
     IntegrationOperationsService,
@@ -278,6 +282,7 @@ class ApplicationContainer:
     role_cache: ValkeyRoleResolutionCache
     secret_cipher: EnvelopeSecretCipher
     sessions: ValkeySessionStore
+    team_management: TeamManagementService | None = None
     policy_version_gate: ValkeyPolicyVersionGate | None = None
     menu_configuration: MenuConfigurationService | None = None
     menu_releases: MenuReleaseService | None = None
@@ -685,6 +690,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ),
             enterprise_workspaces=EnterpriseWorkspaceService(
                 unit_of_work=SqlAlchemyEnterpriseUnitOfWork(database.sessions),
+            ),
+            team_management=TeamManagementService(
+                SqlAlchemyTeamManagementUnitOfWork(database.sessions)
             ),
             entitlements=EntitlementService(
                 unit_of_work=SqlAlchemyEntitlementUnitOfWork(database.sessions),

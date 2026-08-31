@@ -409,8 +409,8 @@ def test_member_lifecycle_and_database_reject_cross_workspace_binding(
                 role_bindings.c.binding_id == direct_binding.binding_id
             )
         ).one()
-        assert revoked.status == "revoked"
-        assert revoked.revoked_at is not None
+        assert revoked.status == "active"
+        assert revoked.revoked_at is None
         assert (
             connection.scalar(
                 select(workspaces.c.role_version).where(workspaces.c.workspace_id == workspace_id)

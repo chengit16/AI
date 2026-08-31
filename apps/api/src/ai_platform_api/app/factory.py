@@ -28,6 +28,9 @@ from ai_platform_api.modules.identity.api.entitlement_routes import router as en
 from ai_platform_api.modules.identity.api.organization_routes import router as organization_router
 from ai_platform_api.modules.identity.api.role_routes import router as role_router
 from ai_platform_api.modules.identity.api.routes import router as identity_router
+from ai_platform_api.modules.identity.api.team_management_routes import (
+    router as team_management_router,
+)
 from ai_platform_api.modules.integration.api.routes import router as integration_operations_router
 from ai_platform_api.modules.knowledge.api.routes import router as knowledge_router
 from ai_platform_api.modules.lifecycle.api.routes import router as lifecycle_router
@@ -58,6 +61,8 @@ def create_app(
 ) -> FastAPI:
     """创建 FastAPI 应用并安装路由、中间件和统一错误映射。"""
 
+    # 长函数保留原因: 应用工厂显式列出全部服务状态和 Router，避免动态注册隐藏安全入口；
+    # 三段装配顺序本身也是启动契约。
     # 1. 配置与容器必须来自同一启动快照，避免服务读取到彼此矛盾的运行参数。
     resolved_settings = settings or get_settings()
     dependencies = container or build_application_container(resolved_settings)
@@ -99,6 +104,7 @@ def create_app(
     application.state.authentication_service = dependencies.authentication
     application.state.registration_service = dependencies.registration
     application.state.enterprise_workspace_service = dependencies.enterprise_workspaces
+    application.state.team_management_service = dependencies.team_management
     application.state.entitlement_service = dependencies.entitlements
     application.state.integration_operations_service = dependencies.integration_operations
     application.state.operations_workbench_service = dependencies.operations_workbench
@@ -150,6 +156,7 @@ def create_app(
     application.include_router(observability_router, prefix="/api/v1")
     application.include_router(identity_router, prefix="/api/v1")
     application.include_router(workspace_router, prefix="/api/v1")
+    application.include_router(team_management_router, prefix="/api/v1")
     application.include_router(entitlement_router, prefix="/api/v1")
     application.include_router(integration_operations_router, prefix="/api/v1")
     application.include_router(operations_workbench_router, prefix="/api/v1")

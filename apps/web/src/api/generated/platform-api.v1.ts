@@ -1224,6 +1224,26 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/invitations/{invitation_id}/cancel": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Cancel Invitation
+     * @description 撤销仍有效的待处理邀请，已接受、过期或跨空间目标失败关闭。
+     */
+    readonly post: operations["cancelEnterpriseWorkspaceInvitation"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/knowledge-bases": {
     readonly parameters: {
       readonly query?: never;
@@ -2802,6 +2822,86 @@ export type paths = {
      * @description 切换工作空间；仅转换协议数据，认证授权和事务由应用服务统一执行。
      */
     readonly post: operations["switchWorkspaceContext"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/team-management": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Team Management
+     * @description 读取企业团队聚合；权限、字段遮罩和空间隔离由后端统一执行。
+     */
+    readonly get: operations["getEnterpriseTeamManagement"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/team-management/members/{account_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /**
+     * Update Team Member
+     * @description 原子替换成员组织和直接角色，成员版本冲突不会覆盖新事实。
+     */
+    readonly put: operations["updateEnterpriseTeamMember"];
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/team-management/members/{account_id}/activate": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Activate Team Member
+     * @description 恢复被停用成员，保留的组织和直接角色配置重新生效。
+     */
+    readonly post: operations["activateEnterpriseTeamMember"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/team-management/members/{account_id}/remove": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Remove Team Member
+     * @description 移除普通成员并清理组织与自定义直接角色，所有者不可移除。
+     */
+    readonly post: operations["removeEnterpriseTeamMember"];
     readonly delete?: never;
     readonly options?: never;
     readonly head?: never;
@@ -8041,6 +8141,275 @@ export type components = {
       readonly rating: "helpful" | "unhelpful";
     };
     /**
+     * TeamAuditResponse
+     * @description 定义团队治理时间线的低敏审计摘要。
+     */
+    readonly TeamAuditResponse: {
+      /** Action */
+      readonly action: string;
+      /** Actor Display Name */
+      readonly actor_display_name: string | null;
+      /**
+       * Audit Id
+       * Format: uuid
+       */
+      readonly audit_id: string;
+      /**
+       * Occurred At
+       * Format: date-time
+       */
+      readonly occurred_at: string;
+      /**
+       * Outcome
+       * @enum {string}
+       */
+      readonly outcome: "succeeded" | "denied" | "failed";
+      /**
+       * Resource Id
+       * Format: uuid
+       */
+      readonly resource_id: string;
+      /** Resource Type */
+      readonly resource_type: string;
+    };
+    /**
+     * TeamDepartmentResponse
+     * @description 定义团队页可选部门及其层级和有效状态。
+     */
+    readonly TeamDepartmentResponse: {
+      /**
+       * Department Id
+       * Format: uuid
+       */
+      readonly department_id: string;
+      /** Depth */
+      readonly depth: number;
+      /** Effective Active */
+      readonly effective_active: boolean;
+      /** Name */
+      readonly name: string;
+      /** Parent Department Id */
+      readonly parent_department_id: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "disabled";
+      /** Version */
+      readonly version: number;
+    };
+    /**
+     * TeamEffectiveRoleResponse
+     * @description 定义成员有效角色及其授权来源类型。
+     */
+    readonly TeamEffectiveRoleResponse: {
+      /** Name */
+      readonly name: string;
+      /**
+       * Role Id
+       * Format: uuid
+       */
+      readonly role_id: string;
+      /** Role Key */
+      readonly role_key: string;
+      /** Source Types */
+      readonly source_types: readonly ("workspace" | "department" | "member")[];
+    };
+    /**
+     * TeamInvitationResponse
+     * @description 定义邀请目标、邀请人、有效状态与时间窗口。
+     */
+    readonly TeamInvitationResponse: {
+      /** Accepted At */
+      readonly accepted_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Expires At
+       * Format: date-time
+       */
+      readonly expires_at: string;
+      /**
+       * Invitation Id
+       * Format: uuid
+       */
+      readonly invitation_id: string;
+      /**
+       * Invited Account Id
+       * Format: uuid
+       */
+      readonly invited_account_id: string;
+      /** Invited By Display Name */
+      readonly invited_by_display_name: string | null;
+      /** Invited Display Name */
+      readonly invited_display_name: string | null;
+      /** Invited Login Name */
+      readonly invited_login_name: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "pending" | "accepted" | "cancelled" | "expired";
+    };
+    /**
+     * TeamManagementResponse
+     * @description 定义团队管理统一读模型，前端无需拼接多份漂移请求。
+     */
+    readonly TeamManagementResponse: {
+      /** Departments */
+      readonly departments: readonly components["schemas"]["TeamDepartmentResponse"][];
+      /**
+       * Generated At
+       * Format: date-time
+       */
+      readonly generated_at: string;
+      /** Invitations */
+      readonly invitations: readonly components["schemas"]["TeamInvitationResponse"][];
+      /** Members */
+      readonly members: readonly components["schemas"]["TeamMemberResponse"][];
+      /** Positions */
+      readonly positions: readonly components["schemas"]["TeamPositionResponse"][];
+      /** Recent Audits */
+      readonly recent_audits: readonly components["schemas"]["TeamAuditResponse"][];
+      /** Roles */
+      readonly roles: readonly components["schemas"]["TeamRoleResponse"][];
+      readonly statistics: components["schemas"]["TeamManagementStatisticsResponse"];
+      readonly workspace: components["schemas"]["TeamWorkspaceResponse"];
+    };
+    /**
+     * TeamManagementStatisticsResponse
+     * @description 定义团队成员、邀请与组织结构计数。
+     */
+    readonly TeamManagementStatisticsResponse: {
+      /** Active Members */
+      readonly active_members: number;
+      /** Departments */
+      readonly departments: number;
+      /** Disabled Members */
+      readonly disabled_members: number;
+      /** Pending Invitations */
+      readonly pending_invitations: number;
+      /** Positions */
+      readonly positions: number;
+    };
+    /**
+     * TeamMemberResponse
+     * @description 定义成员生命周期、组织归属、角色和最后活动快照。
+     */
+    readonly TeamMemberResponse: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      readonly account_id: string;
+      /** Department Ids */
+      readonly department_ids: readonly string[];
+      /** Direct Role Ids */
+      readonly direct_role_ids: readonly string[];
+      /** Display Name */
+      readonly display_name: string | null;
+      /** Effective Roles */
+      readonly effective_roles: readonly components["schemas"]["TeamEffectiveRoleResponse"][];
+      /**
+       * Joined At
+       * Format: date-time
+       */
+      readonly joined_at: string;
+      /** Last Active At */
+      readonly last_active_at: string | null;
+      /** Login Name */
+      readonly login_name: string | null;
+      /**
+       * Membership Type
+       * @enum {string}
+       */
+      readonly membership_type: "owner" | "member";
+      /** Position Ids */
+      readonly position_ids: readonly string[];
+      /** Primary Department Id */
+      readonly primary_department_id: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "disabled" | "left";
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+    };
+    /**
+     * TeamPositionResponse
+     * @description 定义团队页可选岗位及其所属部门。
+     */
+    readonly TeamPositionResponse: {
+      /**
+       * Department Id
+       * Format: uuid
+       */
+      readonly department_id: string;
+      /** Effective Active */
+      readonly effective_active: boolean;
+      /** Name */
+      readonly name: string;
+      /**
+       * Position Id
+       * Format: uuid
+       */
+      readonly position_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "disabled";
+      /** Version */
+      readonly version: number;
+    };
+    /**
+     * TeamRoleResponse
+     * @description 定义团队页允许直接分配的自定义角色。
+     */
+    readonly TeamRoleResponse: {
+      /** Name */
+      readonly name: string;
+      /**
+       * Role Id
+       * Format: uuid
+       */
+      readonly role_id: string;
+      /** Role Key */
+      readonly role_key: string;
+    };
+    /**
+     * TeamWorkspaceResponse
+     * @description 定义团队页企业空间摘要。
+     */
+    readonly TeamWorkspaceResponse: {
+      /** Name */
+      readonly name: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "active" | "suspended" | "archived";
+      /**
+       * Workspace Id
+       * Format: uuid
+       */
+      readonly workspace_id: string;
+      /**
+       * Workspace Type
+       * @constant
+       */
+      readonly workspace_type: "enterprise";
+    };
+    /**
      * ToolAttemptResponse
      * @description 返回一次 Attempt 的状态、用量和结果安全结论。
      */
@@ -8421,6 +8790,22 @@ export type components = {
       readonly target_status?: ("active" | "suspended" | "archived") | null;
       /** Visibility */
       readonly visibility?: ("workspace" | "restricted") | null;
+    };
+    /**
+     * UpdateTeamMemberRequest
+     * @description 定义带乐观版本的成员组织和直接角色原子替换输入。
+     */
+    readonly UpdateTeamMemberRequest: {
+      /** Department Ids */
+      readonly department_ids: readonly string[];
+      /** Direct Role Ids */
+      readonly direct_role_ids: readonly string[];
+      /** Expected Version */
+      readonly expected_version: number;
+      /** Position Ids */
+      readonly position_ids: readonly string[];
+      /** Primary Department Id */
+      readonly primary_department_id: string | null;
     };
     /**
      * UpdateWorkflowDraftRequest
@@ -15238,6 +15623,105 @@ export interface operations {
     readonly responses: {
       /** @description Successful Response */
       readonly 201: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkspaceInvitationResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly cancelEnterpriseWorkspaceInvitation: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly invitation_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
         headers: {
           readonly [name: string]: unknown;
         };
@@ -24061,6 +24545,398 @@ export interface operations {
       };
       /** @description 请求未获授权 */
       readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getEnterpriseTeamManagement: {
+    readonly parameters: {
+      readonly query?: {
+        readonly audit_limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["TeamManagementResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly updateEnterpriseTeamMember: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly account_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["UpdateTeamMemberRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkspaceMembershipResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly activateEnterpriseTeamMember: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly account_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkspaceMembershipResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly removeEnterpriseTeamMember: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly account_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["WorkspaceMembershipResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
         headers: {
           readonly [name: string]: unknown;
         };

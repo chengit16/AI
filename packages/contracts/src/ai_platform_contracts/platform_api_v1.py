@@ -1867,6 +1867,104 @@ class SubmitMessageFeedbackRequest(typing.TypedDict):
     rating: typing.Literal["helpful", "unhelpful"]
 
 
+class TeamAuditResponse(typing.TypedDict):
+    action: str
+    actor_display_name: str | None
+    audit_id: str
+    occurred_at: str
+    outcome: typing.Literal["succeeded", "denied", "failed"]
+    resource_id: str
+    resource_type: str
+
+
+class TeamDepartmentResponse(typing.TypedDict):
+    department_id: str
+    depth: int
+    effective_active: bool
+    name: str
+    parent_department_id: str | None
+    status: typing.Literal["active", "disabled"]
+    version: int
+
+
+class TeamEffectiveRoleResponse(typing.TypedDict):
+    name: str
+    role_id: str
+    role_key: str
+    source_types: list[typing.Literal["workspace", "department", "member"]]
+
+
+class TeamInvitationResponse(typing.TypedDict):
+    accepted_at: str | None
+    created_at: str
+    expires_at: str
+    invitation_id: str
+    invited_account_id: str
+    invited_by_display_name: str | None
+    invited_display_name: str | None
+    invited_login_name: str | None
+    status: typing.Literal["pending", "accepted", "cancelled", "expired"]
+
+
+class TeamManagementResponse(typing.TypedDict):
+    departments: list[TeamDepartmentResponse]
+    generated_at: str
+    invitations: list[TeamInvitationResponse]
+    members: list[TeamMemberResponse]
+    positions: list[TeamPositionResponse]
+    recent_audits: list[TeamAuditResponse]
+    roles: list[TeamRoleResponse]
+    statistics: TeamManagementStatisticsResponse
+    workspace: TeamWorkspaceResponse
+
+
+class TeamManagementStatisticsResponse(typing.TypedDict):
+    active_members: int
+    departments: int
+    disabled_members: int
+    pending_invitations: int
+    positions: int
+
+
+class TeamMemberResponse(typing.TypedDict):
+    account_id: str
+    department_ids: list[str]
+    direct_role_ids: list[str]
+    display_name: str | None
+    effective_roles: list[TeamEffectiveRoleResponse]
+    joined_at: str
+    last_active_at: str | None
+    login_name: str | None
+    membership_type: typing.Literal["owner", "member"]
+    position_ids: list[str]
+    primary_department_id: str | None
+    status: typing.Literal["active", "disabled", "left"]
+    updated_at: str
+    version: int
+
+
+class TeamPositionResponse(typing.TypedDict):
+    department_id: str
+    effective_active: bool
+    name: str
+    position_id: str
+    status: typing.Literal["active", "disabled"]
+    version: int
+
+
+class TeamRoleResponse(typing.TypedDict):
+    name: str
+    role_id: str
+    role_key: str
+
+
+class TeamWorkspaceResponse(typing.TypedDict):
+    name: str
+    status: typing.Literal["active", "suspended", "archived"]
+    workspace_id: str
+    workspace_type: str
+
+
 class ToolAttemptResponse(typing.TypedDict):
     attempt_id: str
     attempt_no: int
@@ -2018,6 +2116,14 @@ class UpdateServiceRequest(typing.TypedDict):
     name: typing.NotRequired[str | None]
     target_status: typing.NotRequired[typing.Literal["active", "suspended", "archived"] | None]
     visibility: typing.NotRequired[typing.Literal["workspace", "restricted"] | None]
+
+
+class UpdateTeamMemberRequest(typing.TypedDict):
+    department_ids: list[str]
+    direct_role_ids: list[str]
+    expected_version: int
+    position_ids: list[str]
+    primary_department_id: str | None
 
 
 class UpdateWorkflowDraftRequest(typing.TypedDict):

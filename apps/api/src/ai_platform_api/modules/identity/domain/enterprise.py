@@ -60,6 +60,30 @@ class WorkspaceMembership:
             version=self.version + 1,
         )
 
+    def reactivate(self, *, occurred_at: datetime) -> WorkspaceMembership:
+        """只恢复被停用成员；已移除成员必须重新经过邀请加入。"""
+
+        if self.membership_type == "owner" or self.status != "disabled":
+            raise InvalidMembershipTransitionError
+        return replace(
+            self,
+            status="active",
+            updated_at=occurred_at,
+            version=self.version + 1,
+        )
+
+    def remove(self, *, occurred_at: datetime) -> WorkspaceMembership:
+        """把普通成员置为离开终态；所有者和重复移除均失败关闭。"""
+
+        if self.membership_type == "owner" or self.status == "left":
+            raise InvalidMembershipTransitionError
+        return replace(
+            self,
+            status="left",
+            updated_at=occurred_at,
+            version=self.version + 1,
+        )
+
 
 @dataclass(frozen=True)
 class WorkspaceInvitation:
@@ -87,6 +111,17 @@ class WorkspaceInvitation:
         if self.status != "pending" or self.expires_at > occurred_at:
             raise InvalidInvitationTransitionError
         return replace(self, status="expired")
+
+    def cancel(self, *, occurred_at: datetime) -> WorkspaceInvitation:
+        """撤销仍在有效期内的待处理邀请，过期邀请应先转换为过期状态。"""
+
+        if (
+            self.status != "pending"
+            or self.expires_at <= occurred_at
+            or self.accepted_at is not None
+        ):
+            raise InvalidInvitationTransitionError
+        return replace(self, status="cancelled")
 
 
 @dataclass(frozen=True)

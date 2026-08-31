@@ -425,8 +425,8 @@ def test_direct_api_access_is_denied_before_service_execution() -> None:
     assert response.json()["code"] == "POLICY_DENIED"
 
 
-def test_knowledge_folder_and_tag_paths_keep_resource_identity() -> None:
-    """目录和标签资源级策略必须接收路径中的真实资源 ID。"""
+def test_resource_paths_keep_target_identity_and_attributes() -> None:
+    """成员、邀请、目录和标签策略必须接收路径中的真实资源 ID。"""
 
     context = RequestContext.trusted(
         actor_id=ACCOUNT_ID,
@@ -436,6 +436,8 @@ def test_knowledge_folder_and_tag_paths_keep_resource_identity() -> None:
         authentication_method="browser_session",
     )
     for path_name, resource_type, permission_code in (
+        ("account_id", "workspace_member", "workspace.member.update"),
+        ("invitation_id", "workspace_invitation", "workspace.invitation.cancel"),
         ("folder_id", "knowledge_folder", "knowledge.folder.update"),
         ("tag_id", "knowledge_tag", "knowledge.tag.update"),
     ):

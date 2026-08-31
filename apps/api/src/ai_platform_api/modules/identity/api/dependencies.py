@@ -30,6 +30,7 @@ from ai_platform_api.modules.identity.application.errors import (
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
+from ai_platform_api.modules.identity.application.team_management import TeamManagementService
 from ai_platform_api.modules.workspace.application.resources import AuthorizationDeniedError
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -86,6 +87,15 @@ def role_service(request: Request) -> RoleService:
     service = getattr(request.app.state, "role_service", None)
     if not isinstance(service, RoleService):
         raise RuntimeError("企业角色服务尚未完成装配")
+    return service
+
+
+def team_management_service(request: Request) -> TeamManagementService:
+    """从应用容器解析团队管理服务，避免路由重复依赖装配逻辑。"""
+
+    service = getattr(request.app.state, "team_management_service", None)
+    if not isinstance(service, TeamManagementService):
+        raise RuntimeError("团队管理服务尚未完成装配")
     return service
 
 
@@ -276,6 +286,7 @@ def _resource_reference(
             "department_id",
             "position_id",
             "role_id",
+            "invitation_id",
             "folder_id",
             "tag_id",
             "knowledge_base_id",

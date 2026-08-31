@@ -37,6 +37,15 @@ from ai_platform_api.modules.identity.application.entitlements import Entitlemen
 from ai_platform_api.modules.identity.application.organization import OrganizationService
 from ai_platform_api.modules.identity.application.registration import RegistrationService
 from ai_platform_api.modules.identity.application.roles import RoleService
+from ai_platform_api.modules.identity.application.team_management import TeamManagementService
+from ai_platform_api.modules.identity.application.team_management_views import (
+    InvitationLifecycleView,
+    MembershipLifecycleView,
+    TeamManagementView,
+    invitation_lifecycle_view,
+    membership_lifecycle_view,
+    team_management_view,
+)
 from ai_platform_api.modules.identity.domain.enterprise import (
     EnterpriseConsoleRecentDocument,
     EnterpriseConsoleSnapshot,
@@ -45,6 +54,19 @@ from ai_platform_api.modules.identity.domain.enterprise import (
     WorkspaceInvitation,
     WorkspaceMembership,
     WorkspaceRecord,
+)
+from ai_platform_api.modules.identity.domain.organization import (
+    DepartmentSummary,
+    PositionSummary,
+)
+from ai_platform_api.modules.identity.domain.team_management import (
+    TeamAuditSummary,
+    TeamEffectiveRoleSummary,
+    TeamInvitationSummary,
+    TeamManagementSnapshot,
+    TeamManagementStatistics,
+    TeamMemberSummary,
+    TeamRoleSummary,
 )
 from ai_platform_api.modules.identity.infrastructure.role_cache import ValkeyRoleResolutionCache
 from ai_platform_api.modules.identity.infrastructure.security import EnvelopeSecretCipher
@@ -61,6 +83,11 @@ PERSONAL_WORKSPACE_ID = UUID("20000000-0000-4000-8000-000000000024")
 ENTERPRISE_WORKSPACE_ID = UUID("20000000-0000-4000-8000-000000000025")
 INVITATION_ID = UUID("40000000-0000-4000-8000-000000000024")
 MEMBERSHIP_ID = UUID("30000000-0000-4000-8000-000000000024")
+TEAM_MEMBER_ID = UUID("10000000-0000-4000-8000-000000000026")
+TEAM_MEMBERSHIP_ID = UUID("30000000-0000-4000-8000-000000000025")
+TEAM_DEPARTMENT_ID = UUID("50000000-0000-4000-8000-000000000024")
+TEAM_POSITION_ID = UUID("60000000-0000-4000-8000-000000000024")
+TEAM_ROLE_ID = UUID("70000000-0000-4000-8000-000000000024")
 
 
 class ClosingDependency:
@@ -261,6 +288,174 @@ class StubEnterpriseWorkspaceService(EnterpriseWorkspaceService):
         )
 
 
+class StubTeamManagementService(TeamManagementService):
+    """隔离数据库并记录团队管理 Router 传入的资源与原子配置。"""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, object]] = []
+
+    def get_snapshot(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        audit_limit: int = 20,
+    ) -> TeamManagementView:
+        assert context.workspace_id == workspace_id == ENTERPRISE_WORKSPACE_ID
+        self.calls.append(("snapshot", audit_limit))
+        now = datetime(2026, 8, 31, 9, 30, tzinfo=UTC)
+        return team_management_view(
+            TeamManagementSnapshot(
+                workspace=WorkspaceRecord(workspace_id, "enterprise", "合成企业空间", "active"),
+                statistics=TeamManagementStatistics(2, 1, 1, 1, 1),
+                members=(
+                    TeamMemberSummary(
+                        account_id=TEAM_MEMBER_ID,
+                        display_name="合成团队成员",
+                        login_name="team-member@example.test",
+                        membership_type="member",
+                        status="active",
+                        department_ids=(TEAM_DEPARTMENT_ID,),
+                        primary_department_id=TEAM_DEPARTMENT_ID,
+                        position_ids=(TEAM_POSITION_ID,),
+                        direct_role_ids=(TEAM_ROLE_ID,),
+                        effective_roles=(
+                            TeamEffectiveRoleSummary(
+                                TEAM_ROLE_ID,
+                                "synthetic_reviewer",
+                                "合成审核员",
+                                ("member",),
+                            ),
+                        ),
+                        joined_at=now,
+                        updated_at=now,
+                        last_active_at=None,
+                        version=4,
+                    ),
+                ),
+                invitations=(
+                    TeamInvitationSummary(
+                        INVITATION_ID,
+                        TEAM_MEMBER_ID,
+                        "合成团队成员",
+                        "team-member@example.test",
+                        "合成所有者",
+                        "pending",
+                        now,
+                        now + timedelta(days=7),
+                        None,
+                    ),
+                ),
+                departments=(
+                    DepartmentSummary(TEAM_DEPARTMENT_ID, None, "合成研发部", "active", True, 0, 1),
+                ),
+                positions=(
+                    PositionSummary(
+                        TEAM_POSITION_ID, TEAM_DEPARTMENT_ID, "合成工程师", "active", True, 1
+                    ),
+                ),
+                roles=(TeamRoleSummary(TEAM_ROLE_ID, "synthetic_reviewer", "合成审核员"),),
+                recent_audits=(
+                    TeamAuditSummary(
+                        UUID("91000000-0000-4000-8000-000000000024"),
+                        "合成所有者",
+                        "workspace.member.configuration.update",
+                        "organization_assignment",
+                        TEAM_MEMBER_ID,
+                        "succeeded",
+                        now,
+                    ),
+                ),
+                generated_at=now,
+            )
+        )
+
+    def cancel_invitation(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        invitation_id: UUID,
+    ) -> InvitationLifecycleView:
+        assert context.workspace_id == workspace_id == ENTERPRISE_WORKSPACE_ID
+        assert invitation_id == INVITATION_ID
+        self.calls.append(("cancel", invitation_id))
+        now = datetime.now(UTC)
+        return invitation_lifecycle_view(
+            WorkspaceInvitation(
+                invitation_id, workspace_id, TEAM_MEMBER_ID, ACCOUNT_ID, "cancelled", now, now
+            )
+        )
+
+    def update_member(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        target_account_id: UUID,
+        expected_version: int,
+        department_ids: tuple[UUID, ...],
+        primary_department_id: UUID | None,
+        position_ids: tuple[UUID, ...],
+        direct_role_ids: tuple[UUID, ...],
+    ) -> MembershipLifecycleView:
+        assert context.workspace_id == workspace_id == ENTERPRISE_WORKSPACE_ID
+        assert target_account_id == TEAM_MEMBER_ID
+        self.calls.append(
+            (
+                "update",
+                (
+                    expected_version,
+                    department_ids,
+                    primary_department_id,
+                    position_ids,
+                    direct_role_ids,
+                ),
+            )
+        )
+        return membership_lifecycle_view(self._membership("active", version=expected_version + 1))
+
+    def activate_member(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        target_account_id: UUID,
+    ) -> MembershipLifecycleView:
+        assert context.workspace_id == workspace_id == ENTERPRISE_WORKSPACE_ID
+        assert target_account_id == TEAM_MEMBER_ID
+        self.calls.append(("activate", target_account_id))
+        return membership_lifecycle_view(self._membership("active", version=5))
+
+    def remove_member(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        target_account_id: UUID,
+    ) -> MembershipLifecycleView:
+        assert context.workspace_id == workspace_id == ENTERPRISE_WORKSPACE_ID
+        assert target_account_id == TEAM_MEMBER_ID
+        self.calls.append(("remove", target_account_id))
+        return membership_lifecycle_view(self._membership("left", version=6))
+
+    @staticmethod
+    def _membership(
+        status: Literal["active", "disabled", "left"], *, version: int
+    ) -> WorkspaceMembership:
+        now = datetime.now(UTC)
+        return WorkspaceMembership(
+            TEAM_MEMBERSHIP_ID,
+            ENTERPRISE_WORKSPACE_ID,
+            TEAM_MEMBER_ID,
+            "member",
+            status,
+            now,
+            now,
+            version,
+        )
+
+
 class MaskMemberIdentityPolicy:
     def decide(self, request: PolicyRequest) -> PolicyDecision:
         return PolicyDecision(
@@ -295,6 +490,7 @@ class DenyEnterpriseConsolePolicy:
 
 def enterprise_client(
     policy: PolicyDecisionPoint | None = None,
+    team_management: TeamManagementService | None = None,
 ) -> TestClient:
     settings = Settings(environment="test")
     closing = ClosingDependency()
@@ -317,6 +513,7 @@ def enterprise_client(
         entitlements=cast("EntitlementService", object()),
         organization=cast("OrganizationService", object()),
         roles=cast("RoleService", object()),
+        team_management=team_management or StubTeamManagementService(),
         role_cache=cast("ValkeyRoleResolutionCache", closing),
         secret_cipher=cast("EnvelopeSecretCipher", object()),
         sessions=cast("ValkeySessionStore", closing),
@@ -324,6 +521,70 @@ def enterprise_client(
         field_projection=FieldProjectionService(field_registry),
     )
     return TestClient(create_app(settings, container))
+
+
+def test_team_management_routes_preserve_resources_and_atomic_payload() -> None:
+    """五个团队接口必须保留路径资源、版本和完整组织角色请求体。"""
+
+    service = StubTeamManagementService()
+    client = enterprise_client(team_management=service)
+    client.cookies.set("ai_platform_session", "synthetic-enterprise-session")
+    read_headers = {"X-Workspace-ID": str(ENTERPRISE_WORKSPACE_ID)}
+    write_headers = {
+        **read_headers,
+        "X-CSRF-Token": "synthetic-enterprise-csrf",
+    }
+    base = f"/api/v1/workspaces/{ENTERPRISE_WORKSPACE_ID}"
+
+    with client:
+        snapshot = client.get(f"{base}/team-management", headers=read_headers)
+        cancelled = client.post(f"{base}/invitations/{INVITATION_ID}/cancel", headers=write_headers)
+        updated = client.put(
+            f"{base}/team-management/members/{TEAM_MEMBER_ID}",
+            headers=write_headers,
+            json={
+                "expected_version": 4,
+                "department_ids": [str(TEAM_DEPARTMENT_ID)],
+                "primary_department_id": str(TEAM_DEPARTMENT_ID),
+                "position_ids": [str(TEAM_POSITION_ID)],
+                "direct_role_ids": [str(TEAM_ROLE_ID)],
+            },
+        )
+        activated = client.post(
+            f"{base}/team-management/members/{TEAM_MEMBER_ID}/activate",
+            headers=write_headers,
+        )
+        removed = client.post(
+            f"{base}/team-management/members/{TEAM_MEMBER_ID}/remove",
+            headers=write_headers,
+        )
+
+    assert snapshot.status_code == 200
+    assert snapshot.json()["members"][0]["account_id"] == str(TEAM_MEMBER_ID)
+    assert snapshot.json()["members"][0]["last_active_at"] is None
+    assert snapshot.json()["recent_audits"][0]["action"] == (
+        "workspace.member.configuration.update"
+    )
+    assert cancelled.json()["status"] == "cancelled"
+    assert updated.json()["status"] == "active"
+    assert activated.json()["status"] == "active"
+    assert removed.json()["status"] == "left"
+    assert service.calls == [
+        ("snapshot", 20),
+        ("cancel", INVITATION_ID),
+        (
+            "update",
+            (
+                4,
+                (TEAM_DEPARTMENT_ID,),
+                TEAM_DEPARTMENT_ID,
+                (TEAM_POSITION_ID,),
+                (TEAM_ROLE_ID,),
+            ),
+        ),
+        ("activate", TEAM_MEMBER_ID),
+        ("remove", TEAM_MEMBER_ID),
+    ]
 
 
 def test_enterprise_workspace_routes_preserve_contract_and_browser_governance() -> None:
