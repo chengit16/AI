@@ -1,5 +1,5 @@
 /** @description 企业分类元数据与显式文档绑定表单。 */
-import { Alert, Drawer, Form, Input, Select } from "antd";
+import { Alert, Drawer, Form, Input, Select, Switch } from "antd";
 import { useEffect } from "react";
 
 import type {
@@ -39,6 +39,7 @@ export function CategoryEditor(props: CategoryEditorProps) {
       visibility: props.category?.visibility ?? "public",
       departmentIds: [...(props.category?.department_ids ?? [])],
       documentIds: [...(props.category?.document_ids ?? [])],
+      approvalRequired: props.category?.approval_required ?? false,
     });
   }, [form, props.category, props.open, props.parentCategoryId]);
   const categoryOptions = props.snapshot.categories
@@ -119,6 +120,14 @@ export function CategoryEditor(props: CategoryEditorProps) {
             />
           </Form.Item>
         )}
+        <Form.Item
+          name="approvalRequired"
+          label="发布审批"
+          valuePropName="checked"
+          extra="开启后，该分类中的就绪文档只能通过发布申请和审批链切换发布指针。"
+        >
+          <Switch checkedChildren="需要审批" unCheckedChildren="直接发布" />
+        </Form.Item>
       </Form>
     </Drawer>
   );

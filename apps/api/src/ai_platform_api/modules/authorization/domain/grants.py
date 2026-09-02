@@ -63,6 +63,8 @@ OWNER_PERMISSION_CODES = (
     "enterprise.domain.resolve",
     "enterprise.domain.scope",
     "enterprise.domain.update",
+    "enterprise.document.publish.read",
+    "enterprise.document.publish.request",
     "enterprise.knowledge.access",
     "enterprise.knowledge.read",
     "enterprise.workspace.create",

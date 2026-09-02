@@ -4492,6 +4492,516 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/enterprise-documents/{document_id}/versions/{document_version_id}/publish-requests": {
+      "post": {
+        "tags": [
+          "企业知识治理"
+        ],
+        "summary": "Request Enterprise Document Publish",
+        "description": "提交就绪版本发布申请，审批前不切换发布或索引指针。",
+        "operationId": "requestEnterpriseDocumentPublish",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "document_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Version Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentPublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentPublishRequestResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "资源状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/document-publish-requests": {
+      "get": {
+        "tags": [
+          "企业知识治理"
+        ],
+        "summary": "List Enterprise Document Publish Requests",
+        "description": "列出当前账号作为申请人或审批人可见的发布台账。",
+        "operationId": "listEnterpriseDocumentPublishRequests",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentPublishRequestResponse"
+                  },
+                  "title": "Response Listenterprisedocumentpublishrequests"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/document-publish-requests/{publish_request_id}": {
+      "get": {
+        "tags": [
+          "企业知识治理"
+        ],
+        "summary": "Get Enterprise Document Publish Request",
+        "description": "读取参与者可见的发布请求、失败原因和冻结审批链。",
+        "operationId": "getEnterpriseDocumentPublishRequest",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "publish_request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Publish Request Id"
+            }
+          },
+          {
+            "name": "X-Workspace-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentPublishRequestResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "平台内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求上下文无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "身份凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求未获授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "依赖服务暂时不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/entitlements": {
       "get": {
         "tags": [
@@ -36006,6 +36516,22 @@
         "title": "CreateDepartmentRequest",
         "description": "定义创建部门操作的请求字段与协议校验边界。"
       },
+      "CreateDocumentPublishRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key"
+        ],
+        "title": "CreateDocumentPublishRequest",
+        "description": "定义文档版本发布申请的幂等输入。"
+      },
       "CreateDocumentRequest": {
         "properties": {
           "source_kind": {
@@ -36308,6 +36834,11 @@
             "type": "array",
             "maxItems": 500,
             "title": "Document Ids"
+          },
+          "approval_required": {
+            "type": "boolean",
+            "title": "Approval Required",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -37314,6 +37845,259 @@
         "title": "DocumentIndexSummaryResponse",
         "description": "定义单个文档版本最新索引构建的可观测摘要。"
       },
+      "DocumentPublishApprovalLevelResponse": {
+        "properties": {
+          "sequence_no": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Sequence No"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "any",
+              "all"
+            ],
+            "title": "Mode"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "active",
+              "approved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Status"
+          },
+          "approver_account_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Approver Account Ids"
+          },
+          "fallback_activated": {
+            "type": "boolean",
+            "title": "Fallback Activated"
+          },
+          "reminder_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder At"
+          },
+          "timeout_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sequence_no",
+          "mode",
+          "status",
+          "approver_account_ids",
+          "fallback_activated",
+          "reminder_at",
+          "timeout_at",
+          "completed_at"
+        ],
+        "title": "DocumentPublishApprovalLevelResponse",
+        "description": "定义发布审批层级、审批人和时间游标。"
+      },
+      "DocumentPublishApprovalResponse": {
+        "properties": {
+          "approval_instance_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Instance Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Status"
+          },
+          "current_sequence_no": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Current Sequence No"
+          },
+          "personal_owner_confirmation": {
+            "type": "boolean",
+            "title": "Personal Owner Confirmation"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentPublishApprovalLevelResponse"
+            },
+            "type": "array",
+            "title": "Levels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "approval_instance_id",
+          "status",
+          "current_sequence_no",
+          "personal_owner_confirmation",
+          "levels"
+        ],
+        "title": "DocumentPublishApprovalResponse",
+        "description": "定义发布请求绑定的通用审批运行快照。"
+      },
+      "DocumentPublishRequestResponse": {
+        "properties": {
+          "publish_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Publish Request Id"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "document_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Version Id"
+          },
+          "knowledge_base_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Knowledge Base Id"
+          },
+          "requester_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requester Account Id"
+          },
+          "category_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Category Ids"
+          },
+          "version_number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version Number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "published",
+              "rejected",
+              "withdrawn",
+              "expired",
+              "publish_failed"
+            ],
+            "title": "Status"
+          },
+          "failure_reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason Code"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "approval": {
+            "$ref": "#/components/schemas/DocumentPublishApprovalResponse"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "publish_request_id",
+          "document_id",
+          "document_version_id",
+          "knowledge_base_id",
+          "requester_account_id",
+          "category_ids",
+          "version_number",
+          "status",
+          "failure_reason_code",
+          "created_at",
+          "updated_at",
+          "completed_at",
+          "version",
+          "approval"
+        ],
+        "title": "DocumentPublishRequestResponse",
+        "description": "定义发布版本、分类快照、业务终态和审批链台账。"
+      },
       "DocumentResponse": {
         "properties": {
           "document_id": {
@@ -37902,6 +38686,11 @@
             },
             "type": "array",
             "title": "Document Ids"
+          },
+          "approval_required": {
+            "type": "boolean",
+            "title": "Approval Required",
+            "default": false
           },
           "status": {
             "type": "string",
@@ -46212,6 +47001,11 @@
             "type": "array",
             "maxItems": 100,
             "title": "Department Ids"
+          },
+          "approval_required": {
+            "type": "boolean",
+            "title": "Approval Required",
+            "default": false
           }
         },
         "additionalProperties": false,

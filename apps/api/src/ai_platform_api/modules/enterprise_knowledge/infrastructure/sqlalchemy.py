@@ -21,6 +21,11 @@ from sqlalchemy.orm import Session
 from ai_platform_api.modules.authorization.domain.fields import SECURITY_LEVEL_RANK, SecurityLevel
 from ai_platform_api.modules.enterprise_knowledge.domain.models import (
     CategoryVisibility,
+    DocumentPublishCandidate,
+    DocumentPublishCategorySnapshot,
+    DocumentPublishFailureReason,
+    DocumentPublishRequest,
+    DocumentPublishRequestStatus,
     EnterpriseCategory,
     EnterpriseCategoryView,
     EnterpriseDepartmentOption,
@@ -39,9 +44,13 @@ from ai_platform_api.modules.enterprise_knowledge.domain.models import (
 from ai_platform_api.persistence.tables import (
     accounts,
     departments,
+    document_publish_request_categories,
+    document_publish_requests,
+    document_versions,
     documents,
     enterprise_categories,
     enterprise_category_documents,
+    index_versions,
     knowledge_bases,
     membership_departments,
     team_knowledge_domain_bases,
@@ -65,6 +74,7 @@ class SqlAlchemyEnterpriseKnowledgeRepository:
     def require_active_enterprise_member(
         self, workspace_id: UUID, account_id: UUID, *, for_update: bool = False
     ) -> bool:
+        # 1. 先读取活动文档和不可变就绪版本，确保候选只属于当前工作空间。
         statement = (
             select(workspace_memberships.c.membership_id)
             .select_from(
@@ -570,6 +580,209 @@ class SqlAlchemyEnterpriseKnowledgeRepository:
             is not None
         )
 
+    def get_document_publish_candidate(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> DocumentPublishCandidate | None:
+        """读取不可变就绪版本及当前活动分类，索引只判断是否存在可发布候选。"""
+
+        # 1. 先读取活动文档和不可变就绪版本，确保候选只属于当前工作空间。
+        statement = (
+            select(
+                documents.c.document_id,
+                documents.c.knowledge_base_id,
+                documents.c.title,
+                documents.c.security_level,
+                documents.c.department_ids,
+                document_versions.c.document_version_id,
+                document_versions.c.version_number,
+                document_versions.c.content_hash,
+            )
+            .join(
+                document_versions,
+                (document_versions.c.workspace_id == documents.c.workspace_id)
+                & (document_versions.c.document_id == documents.c.document_id),
+            )
+            .where(
+                documents.c.workspace_id == workspace_id,
+                documents.c.document_id == document_id,
+                documents.c.status == "active",
+                document_versions.c.document_version_id == document_version_id,
+                document_versions.c.status == "ready",
+            )
+        )
+        if for_update:
+            # 文档行与版本行必须共用同一锁定快照，避免审批绑定期间版本关系漂移。
+            statement = statement.with_for_update()
+        row = self._session.execute(statement).one_or_none()
+        if row is None or row.content_hash is None:
+            return None
+        # 2. 冻结当前活动分类及审批开关，批准时通过摘要检测治理漂移。
+        category_statement = (
+            select(
+                enterprise_categories.c.category_id,
+                enterprise_categories.c.name,
+                enterprise_categories.c.version,
+                enterprise_categories.c.approval_required,
+            )
+            .join(
+                enterprise_category_documents,
+                (
+                    enterprise_category_documents.c.workspace_id
+                    == enterprise_categories.c.workspace_id
+                )
+                & (
+                    enterprise_category_documents.c.category_id
+                    == enterprise_categories.c.category_id
+                ),
+            )
+            .where(
+                enterprise_category_documents.c.workspace_id == workspace_id,
+                enterprise_category_documents.c.document_id == document_id,
+                enterprise_categories.c.status == "active",
+            )
+            .order_by(enterprise_categories.c.category_id)
+        )
+        if for_update:
+            category_statement = category_statement.with_for_update(of=enterprise_categories)
+        categories = tuple(
+            DocumentPublishCategorySnapshot(
+                item.category_id,
+                item.name,
+                item.version,
+                item.approval_required,
+            )
+            for item in self._session.execute(category_statement)
+        )
+        # 3. 最后读取目标版本可用索引，未就绪只作为失败原因而不改变旧指针。
+        index_statement = (
+            select(index_versions.c.index_version_id)
+            .where(
+                index_versions.c.workspace_id == workspace_id,
+                index_versions.c.document_id == document_id,
+                index_versions.c.document_version_id == document_version_id,
+                index_versions.c.status.in_(("ready", "active")),
+            )
+            .order_by(index_versions.c.build_no.desc())
+            .limit(1)
+        )
+        if for_update:
+            index_statement = index_statement.with_for_update()
+        index_ready = self._session.scalar(index_statement)
+        return DocumentPublishCandidate(
+            workspace_id=workspace_id,
+            document_id=row.document_id,
+            document_version_id=row.document_version_id,
+            knowledge_base_id=row.knowledge_base_id,
+            title=row.title,
+            version_number=row.version_number,
+            content_hash=row.content_hash,
+            security_level=cast("SecurityLevel", row.security_level),
+            department_ids=tuple(row.department_ids),
+            index_ready=bool(index_ready),
+            categories=categories,
+        )
+
+    def get_publish_request_by_approval(
+        self,
+        workspace_id: UUID,
+        approval_instance_id: UUID,
+    ) -> DocumentPublishRequest | None:
+        row = self._session.execute(
+            select(document_publish_requests).where(
+                document_publish_requests.c.workspace_id == workspace_id,
+                document_publish_requests.c.approval_instance_id == approval_instance_id,
+            )
+        ).one_or_none()
+        return None if row is None else self._publish_request(row)
+
+    def get_publish_request_by_idempotency(
+        self,
+        workspace_id: UUID,
+        requester_account_id: UUID,
+        idempotency_key: str,
+    ) -> DocumentPublishRequest | None:
+        """按申请人幂等键读取既有请求，使终态重放不依赖当前版本状态。"""
+
+        row = self._session.execute(
+            select(document_publish_requests).where(
+                document_publish_requests.c.workspace_id == workspace_id,
+                document_publish_requests.c.requester_account_id == requester_account_id,
+                document_publish_requests.c.idempotency_key == idempotency_key,
+            )
+        ).one_or_none()
+        return None if row is None else self._publish_request(row)
+
+    def get_publish_request(
+        self,
+        workspace_id: UUID,
+        publish_request_id: UUID,
+    ) -> DocumentPublishRequest | None:
+        row = self._session.execute(
+            select(document_publish_requests).where(
+                document_publish_requests.c.workspace_id == workspace_id,
+                document_publish_requests.c.publish_request_id == publish_request_id,
+            )
+        ).one_or_none()
+        return None if row is None else self._publish_request(row)
+
+    def list_publish_requests(
+        self,
+        workspace_id: UUID,
+        *,
+        approval_instance_ids: tuple[UUID, ...],
+        limit: int,
+    ) -> tuple[DocumentPublishRequest, ...]:
+        if not approval_instance_ids:
+            return ()
+        statement = select(document_publish_requests).where(
+            document_publish_requests.c.workspace_id == workspace_id,
+            document_publish_requests.c.approval_instance_id.in_(approval_instance_ids),
+        )
+        rows = self._session.execute(
+            statement.order_by(document_publish_requests.c.created_at.desc()).limit(limit)
+        )
+        return tuple(self._publish_request(row) for row in rows)
+
+    def _publish_request(self, row: Any) -> DocumentPublishRequest:
+        category_ids = tuple(
+            self._session.scalars(
+                select(document_publish_request_categories.c.category_id)
+                .where(
+                    document_publish_request_categories.c.workspace_id == row.workspace_id,
+                    document_publish_request_categories.c.publish_request_id
+                    == row.publish_request_id,
+                )
+                .order_by(document_publish_request_categories.c.category_id)
+            )
+        )
+        return DocumentPublishRequest(
+            publish_request_id=row.publish_request_id,
+            workspace_id=row.workspace_id,
+            document_id=row.document_id,
+            document_version_id=row.document_version_id,
+            knowledge_base_id=row.knowledge_base_id,
+            requester_account_id=row.requester_account_id,
+            approval_instance_id=row.approval_instance_id,
+            category_ids=category_ids,
+            version_number=row.version_number,
+            content_hash=row.content_hash,
+            governance_digest=row.governance_digest,
+            idempotency_key=row.idempotency_key,
+            status=cast("DocumentPublishRequestStatus", row.status),
+            failure_reason_code=cast(
+                "DocumentPublishFailureReason | None", row.failure_reason_code
+            ),
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            completed_at=row.completed_at,
+            version=row.version,
+        )
+
     def resolve_domain_scope(
         self,
         *,
@@ -852,6 +1065,7 @@ def _category(row: Any) -> EnterpriseCategory:
         created_at=row.created_at,
         updated_at=row.updated_at,
         version=row.version,
+        approval_required=row.approval_required,
     )
 
 
@@ -864,6 +1078,7 @@ def _category_values(
         "description": value.description,
         "visibility": value.visibility,
         "department_ids": list(value.department_ids),
+        "approval_required": value.approval_required,
         "status": value.status,
         "created_by_account_id": value.created_by_account_id,
         "created_at": value.created_at,

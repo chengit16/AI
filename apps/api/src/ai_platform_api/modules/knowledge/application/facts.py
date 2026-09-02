@@ -19,6 +19,9 @@ from ai_platform_api.modules.identity.application.entitlement_errors import (
 )
 from ai_platform_api.modules.identity.application.usage import UsageMutation, consume_usage
 from ai_platform_api.modules.integration.domain.events import IntegrationEvent
+from ai_platform_api.modules.knowledge.application.publishing import (
+    publish_document_version_in_transaction,
+)
 from ai_platform_api.modules.knowledge.domain.models import (
     Document,
     DocumentSource,
@@ -71,6 +74,12 @@ class KnowledgeQuotaExceededError(PlatformError):
     """表示知识额度超限错误，由协议层映射为稳定错误码。"""
 
     error_code = "QUOTA_EXCEEDED"
+
+
+class DocumentPublishApprovalRequiredError(PlatformError):
+    """企业分类要求审批时，禁止从知识事实接口直接切换发布指针。"""
+
+    error_code = "DOCUMENT_PUBLISH_APPROVAL_REQUIRED"
 
 
 class KnowledgeFactService:
@@ -538,48 +547,19 @@ class KnowledgeFactService:
         try:
             with self._unit_of_work as unit_of_work:
                 _require_owner(unit_of_work.knowledge, context.workspace_id, account_id)
-                document = unit_of_work.knowledge.get_document(
-                    context.workspace_id,
-                    document_id,
-                    for_update=True,
-                )
-                version = unit_of_work.knowledge.get_document_version(
-                    context.workspace_id,
-                    document_id,
-                    document_version_id,
-                    for_update=True,
-                )
-                if (
-                    document is None
-                    or document.knowledge_base_id != knowledge_base_id
-                    or document.status != "active"
-                    or version is None
+                if unit_of_work.knowledge.document_requires_publish_approval(
+                    context.workspace_id, document_id
                 ):
-                    raise KnowledgeNotFoundError
-                # 2. 先生成目标发布态并把旧发布版本标记为已替代。
-                published = version.publish(occurred_at=now)
-                current = unit_of_work.knowledge.get_current_document_version(
-                    context.workspace_id,
-                    document_id,
-                    for_update=True,
+                    raise DocumentPublishApprovalRequiredError
+                published = publish_document_version_in_transaction(
+                    unit_of_work.knowledge,
+                    workspace_id=context.workspace_id,
+                    knowledge_base_id=knowledge_base_id,
+                    document_id=document_id,
+                    document_version_id=document_version_id,
+                    occurred_at=now,
                 )
-                if current is not None:
-                    unit_of_work.knowledge.save_document_version(current.supersede())
-                unit_of_work.knowledge.save_document_version(published)
-                # 3. 当前版本指针和在线索引指针必须原子切换，避免回答引用错误内容。
-                unit_of_work.knowledge.set_current_document_version(
-                    context.workspace_id,
-                    document_id,
-                    document_version_id,
-                    published_at=now,
-                )
-                unit_of_work.knowledge.switch_document_index(
-                    context.workspace_id,
-                    document_id,
-                    document_version_id,
-                    activated_at=now,
-                )
-                # 4. 发布事实与指针切换同事务提交，消费者不会提前观察到未生效版本。
+                # 2. 发布事实与指针切换同事务提交，消费者不会提前观察到未生效版本。
                 _record(
                     unit_of_work,
                     context,

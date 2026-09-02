@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 20,
+  "registry_version": 21,
   "tables": [
     { "table": "workspaces", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
     { "table": "workspace_memberships", "classification": "governance", "export": true, "purge": false, "excluded_columns": [] },
@@ -42,6 +42,8 @@
     { "table": "team_knowledge_domain_members", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "team_knowledge_domain_departments", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "team_knowledge_domain_bases", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "document_publish_requests", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
+    { "table": "document_publish_request_categories", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "documents", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_versions", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },
     { "table": "document_sources", "classification": "business", "export": true, "purge": true, "excluded_columns": [] },

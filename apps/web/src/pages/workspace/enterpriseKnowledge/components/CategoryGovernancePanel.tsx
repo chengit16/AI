@@ -109,6 +109,7 @@ export function CategoryGovernancePanel(props: CategoryGovernancePanelProps) {
                         {category.status === "active" ? "活动" : "已归档"}
                       </Tag>
                       <Tag>{visibilityLabel[category.visibility]}</Tag>
+                      {category.approval_required && <Tag color="warning">发布需审批</Tag>}
                     </div>
                     <p className="mb-0 mt-2 line-clamp-2 text-xs leading-5 text-text-muted">
                       {category.description ?? "暂无分类说明"}

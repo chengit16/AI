@@ -1,4 +1,4 @@
-/** @description P6B-03 企业知识 Hook 的启用、统一刷新与乐观冲突反馈测试。 */
+/** @description P6B-04 企业知识 Hook 的治理、发布审批刷新与错误反馈测试。 */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, screen, waitFor } from "@testing-library/react";
 import { App as AntdApp } from "antd";
@@ -13,6 +13,9 @@ const api = vi.hoisted(() => ({
   createEnterpriseCategory: vi.fn(),
   createTeamKnowledgeDomain: vi.fn(),
   getEnterpriseKnowledgePortal: vi.fn(),
+  getEnterpriseDocumentDetail: vi.fn(),
+  listEnterpriseDocumentPublishRequests: vi.fn(),
+  requestEnterpriseDocumentPublish: vi.fn(),
   replaceEnterpriseCategoryDocuments: vi.fn(),
   replaceTeamKnowledgeDomainScope: vi.fn(),
   resolveTeamKnowledgeDomainScope: vi.fn(),
@@ -20,6 +23,11 @@ const api = vi.hoisted(() => ({
   updateTeamKnowledgeDomain: vi.fn(),
 }));
 vi.mock("@/api/services/enterpriseKnowledge", () => api);
+const workflowApi = vi.hoisted(() => ({
+  actOnApproval: vi.fn(),
+  transferApproval: vi.fn(),
+}));
+vi.mock("@/api/services/workflows", () => workflowApi);
 
 import { shouldRetryEnterpriseKnowledge, useEnterpriseKnowledge } from "./useEnterpriseKnowledge";
 
@@ -37,13 +45,18 @@ function createWrapper() {
   return { queryClient, Wrapper };
 }
 
-describe("P6B-03 企业知识 Hook", () => {
+describe("P6B-04 企业知识 Hook", () => {
   afterEach(() => vi.clearAllMocks());
 
   it("没有读取条件时不请求门户，只重试明确可恢复的策略传播错误", () => {
     const { queryClient, Wrapper } = createWrapper();
     const view = renderHook(
-      () => useEnterpriseKnowledge({ workspaceId: WORKSPACE_ID, enabled: false }),
+      () =>
+        useEnterpriseKnowledge({
+          workspaceId: WORKSPACE_ID,
+          enabled: false,
+          publishRequestsEnabled: false,
+        }),
       { wrapper: Wrapper },
     );
     expect(api.getEnterpriseKnowledgePortal).not.toHaveBeenCalled();
@@ -61,7 +74,12 @@ describe("P6B-03 企业知识 Hook", () => {
     const { queryClient, Wrapper } = createWrapper();
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     const view = renderHook(
-      () => useEnterpriseKnowledge({ workspaceId: WORKSPACE_ID, enabled: true }),
+      () =>
+        useEnterpriseKnowledge({
+          workspaceId: WORKSPACE_ID,
+          enabled: true,
+          publishRequestsEnabled: false,
+        }),
       { wrapper: Wrapper },
     );
     await waitFor(() => expect(api.getEnterpriseKnowledgePortal).toHaveBeenCalledOnce());
@@ -73,6 +91,7 @@ describe("P6B-03 企业知识 Hook", () => {
         visibility: "public",
         department_ids: [],
         document_ids: [],
+        approval_required: false,
       }),
     );
     expect(invalidate).toHaveBeenCalledWith({
@@ -89,7 +108,12 @@ describe("P6B-03 企业知识 Hook", () => {
     );
     const { queryClient, Wrapper } = createWrapper();
     const view = renderHook(
-      () => useEnterpriseKnowledge({ workspaceId: WORKSPACE_ID, enabled: true }),
+      () =>
+        useEnterpriseKnowledge({
+          workspaceId: WORKSPACE_ID,
+          enabled: true,
+          publishRequestsEnabled: false,
+        }),
       { wrapper: Wrapper },
     );
     await waitFor(() => expect(api.getEnterpriseKnowledgePortal).toHaveBeenCalledOnce());
@@ -102,6 +126,7 @@ describe("P6B-03 企业知识 Hook", () => {
           visibility: "public",
           department_ids: [],
           document_ids: [],
+          approval_required: false,
         }),
       ).rejects.toBeInstanceOf(PlatformApiError);
     });
@@ -122,7 +147,12 @@ describe("P6B-03 企业知识 Hook", () => {
     );
     const { queryClient, Wrapper } = createWrapper();
     const view = renderHook(
-      () => useEnterpriseKnowledge({ workspaceId: WORKSPACE_ID, enabled: true }),
+      () =>
+        useEnterpriseKnowledge({
+          workspaceId: WORKSPACE_ID,
+          enabled: true,
+          publishRequestsEnabled: false,
+        }),
       { wrapper: Wrapper },
     );
     await waitFor(() => expect(api.getEnterpriseKnowledgePortal).toHaveBeenCalledOnce());
@@ -136,6 +166,7 @@ describe("P6B-03 企业知识 Hook", () => {
           visibility: "public",
           department_ids: [],
           document_ids: [],
+          approval_required: false,
           status: "active",
           created_at: "2026-08-31T00:00:00Z",
           updated_at: "2026-08-31T00:00:00Z",
@@ -144,6 +175,78 @@ describe("P6B-03 企业知识 Hook", () => {
       ).rejects.toBeInstanceOf(PlatformApiError);
     });
     expect(await screen.findByText("分类仍存在活动子分类，请先归档子分类")).toBeInTheDocument();
+    view.unmount();
+    queryClient.clear();
+  });
+
+  it("提交发布申请后刷新参与者台账和企业知识快照", async () => {
+    api.getEnterpriseKnowledgePortal.mockResolvedValue({ categories: [], domains: [] });
+    api.listEnterpriseDocumentPublishRequests.mockResolvedValue([]);
+    api.requestEnterpriseDocumentPublish.mockResolvedValue({ status: "pending" });
+    const { queryClient, Wrapper } = createWrapper();
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const view = renderHook(
+      () =>
+        useEnterpriseKnowledge({
+          workspaceId: WORKSPACE_ID,
+          enabled: true,
+          publishRequestsEnabled: true,
+        }),
+      { wrapper: Wrapper },
+    );
+    await waitFor(() => expect(api.listEnterpriseDocumentPublishRequests).toHaveBeenCalledOnce());
+
+    await act(() =>
+      view.result.current.requestPublish.mutateAsync({
+        documentId: "document-1",
+        documentVersionId: "version-1",
+        idempotencyKey: "synthetic-p6b04-request",
+      }),
+    );
+
+    expect(api.requestEnterpriseDocumentPublish).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      "document-1",
+      "version-1",
+      "synthetic-p6b04-request",
+    );
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["enterprise-document-publish-requests", WORKSPACE_ID],
+    });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["enterprise-knowledge", WORKSPACE_ID],
+    });
+    view.unmount();
+    queryClient.clear();
+  });
+
+  it("发布候选不就绪时显示稳定提示且不刷新成功事实", async () => {
+    api.getEnterpriseKnowledgePortal.mockResolvedValue({ categories: [], domains: [] });
+    api.requestEnterpriseDocumentPublish.mockRejectedValue(
+      new PlatformApiError(409, "DOCUMENT_PUBLISH_NOT_READY", "原始服务端文本", false),
+    );
+    const { queryClient, Wrapper } = createWrapper();
+    const view = renderHook(
+      () =>
+        useEnterpriseKnowledge({
+          workspaceId: WORKSPACE_ID,
+          enabled: true,
+          publishRequestsEnabled: false,
+        }),
+      { wrapper: Wrapper },
+    );
+    await act(async () => {
+      await expect(
+        view.result.current.requestPublish.mutateAsync({
+          documentId: "document-1",
+          documentVersionId: "version-1",
+          idempotencyKey: "synthetic-p6b04-not-ready",
+        }),
+      ).rejects.toBeInstanceOf(PlatformApiError);
+    });
+    expect(
+      await screen.findByText("当前版本尚未满足发布申请条件，请刷新后重试"),
+    ).toBeInTheDocument();
     view.unmount();
     queryClient.clear();
   });

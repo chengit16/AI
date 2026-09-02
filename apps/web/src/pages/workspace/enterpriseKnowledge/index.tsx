@@ -1,5 +1,5 @@
 /**
- * @description P6B-03 企业分类与团队知识域统一治理页
+ * @description P6B-04 企业分类、知识域与文档发布审批统一治理页
  *
  * 页面组合服务端统一快照、动态菜单体验权限和治理抽屉；不在浏览器计算授权、
  * 复制文档事实或扩展知识域范围，所有高风险操作仍由后端逐请求校验。
@@ -13,12 +13,14 @@ import { PageHeader } from "@/components/PageHeader/PageHeader";
 import { StateView } from "@/components/StateView/StateView";
 import { useCurrentWorkspace } from "@/hooks/useCurrentWorkspace";
 import { useWorkspaceMenuNavigation } from "@/hooks/useWorkspaceMenuNavigation";
+import { useSessionStore } from "@/store/session";
 
 import { CategoryDocumentBinder, CategoryEditor } from "./components/CategoryDialogs";
 import { CategoryGovernancePanel } from "./components/CategoryGovernancePanel";
 import { DomainEditor, DomainScopeEditor } from "./components/DomainDialogs";
 import { DomainGovernancePanel } from "./components/DomainGovernancePanel";
 import { EnterpriseKnowledgeSummary } from "./components/EnterpriseKnowledgeSummary";
+import { DocumentPublishApprovalPanel } from "./components/DocumentPublishApprovalPanel";
 import { ScopeExplanationDrawer } from "./components/ScopeExplanationDrawer";
 import {
   categoryCreateBody,
@@ -38,11 +40,16 @@ export default function EnterpriseKnowledgePage() {
   // 1. 同时读取可信空间事实和菜单发布权限，个人空间与无读取权限均不发起门户请求。
   const { workspaceId, workspaces, currentWorkspace } = useCurrentWorkspace();
   const menu = useWorkspaceMenuNavigation();
+  const accountId = useSessionStore((state) => state.accountId);
   const isEnterprise = currentWorkspace?.workspace_type === "enterprise";
   const canRead = menu.visiblePermissionCodes.has("enterprise.knowledge.read");
+  const canReadPublishRequests = menu.visiblePermissionCodes.has(
+    "enterprise.document.publish.read",
+  );
   const management = useEnterpriseKnowledge({
     workspaceId,
     enabled: Boolean(isEnterprise && canRead),
+    publishRequestsEnabled: canReadPublishRequests,
   });
 
   // 2. 抽屉只持有当前交互目标，提交成功后依靠统一 Query 刷新服务端事实。
@@ -121,6 +128,12 @@ export default function EnterpriseKnowledgePage() {
     archiveDomain: permissionCodes.has("enterprise.domain.archive"),
     scopeDomain: permissionCodes.has("enterprise.domain.scope"),
     resolveDomain: permissionCodes.has("enterprise.domain.resolve"),
+    readPublishRequests: canReadPublishRequests,
+    requestPublishRequest: permissionCodes.has("enterprise.document.publish.request"),
+    approvePublishRequest: permissionCodes.has("approval.instance.approve"),
+    rejectPublishRequest: permissionCodes.has("approval.instance.reject"),
+    transferPublishRequest: permissionCodes.has("approval.instance.transfer"),
+    withdrawPublishRequest: permissionCodes.has("approval.instance.withdraw"),
   };
   const snapshot = management.portal.data;
   const categoryPending =
@@ -180,6 +193,45 @@ export default function EnterpriseKnowledgePage() {
           onArchive={(domain) => management.archiveDomain.mutate(domain)}
         />
       </div>
+      {permissions.readPublishRequests && (
+        <DocumentPublishApprovalPanel
+          snapshot={snapshot}
+          items={management.publishRequests.data ?? []}
+          accountId={accountId}
+          permissions={permissions}
+          loading={management.publishRequests.isLoading}
+          errorDescription={
+            management.publishRequests.isError
+              ? errorMessage(management.publishRequests.error)
+              : null
+          }
+          pending={
+            management.actOnPublishRequest.isPending ||
+            management.transferPublishRequest.isPending ||
+            management.requestPublish.isPending
+          }
+          onRetry={() => void management.publishRequests.refetch()}
+          onAct={(instanceId, action, reasonCode) =>
+            management.actOnPublishRequest.mutate({ instanceId, action, reasonCode })
+          }
+          onTransfer={(instanceId, targetAccountId) =>
+            management.transferPublishRequest.mutate({ instanceId, targetAccountId })
+          }
+          onLoadVersions={(knowledgeBaseId, documentId) =>
+            management.loadDocumentVersions.mutate({ knowledgeBaseId, documentId })
+          }
+          versionsLoading={management.loadDocumentVersions.isPending}
+          versionsDocumentId={management.loadDocumentVersions.variables?.documentId ?? null}
+          versionsDetail={management.loadDocumentVersions.data}
+          requestPending={management.requestPublish.isPending}
+          onRequestPublish={(documentId, documentVersionId, idempotencyKey, onSuccess) =>
+            management.requestPublish.mutate(
+              { documentId, documentVersionId, idempotencyKey },
+              { onSuccess },
+            )
+          }
+        />
+      )}
       <CategoryEditor
         snapshot={snapshot}
         category={editingCategory}

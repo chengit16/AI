@@ -30,6 +30,8 @@ class EnterpriseCategoryResponse(BaseModel):
     visibility: Literal["public", "departments", "private"]
     department_ids: list[UUID]
     document_ids: list[UUID]
+    # 兼容既有企业分类响应：历史服务端未返回该字段时，客户端按关闭审批处理。
+    approval_required: bool = False
     status: Literal["active", "archived"]
     created_at: datetime
     updated_at: datetime
@@ -133,6 +135,7 @@ class CreateEnterpriseCategoryRequest(BaseModel):
     visibility: Literal["public", "departments", "private"]
     department_ids: list[UUID] = Field(default_factory=list, max_length=100)
     document_ids: list[UUID] = Field(default_factory=list, max_length=500)
+    approval_required: bool = False
 
 
 class UpdateEnterpriseCategoryRequest(BaseModel):
@@ -146,6 +149,7 @@ class UpdateEnterpriseCategoryRequest(BaseModel):
     parent_category_id: UUID | None = None
     visibility: Literal["public", "departments", "private"]
     department_ids: list[UUID] = Field(default_factory=list, max_length=100)
+    approval_required: bool = False
 
 
 class ReplaceCategoryDocumentsRequest(BaseModel):
@@ -223,3 +227,66 @@ class ResolvedKnowledgeDomainScopeResponse(BaseModel):
         "no_declared_knowledge_bases",
         "pdp_scope_empty",
     ]
+
+
+class CreateDocumentPublishRequest(BaseModel):
+    """定义文档版本发布申请的幂等输入。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+
+
+class DocumentPublishApprovalLevelResponse(BaseModel):
+    """定义发布审批层级、审批人和时间游标。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sequence_no: int = Field(ge=1, le=5)
+    mode: Literal["any", "all"]
+    status: Literal["waiting", "active", "approved", "rejected", "withdrawn"]
+    approver_account_ids: list[UUID]
+    fallback_activated: bool
+    reminder_at: datetime | None
+    timeout_at: datetime | None
+    completed_at: datetime | None
+
+
+class DocumentPublishApprovalResponse(BaseModel):
+    """定义发布请求绑定的通用审批运行快照。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    approval_instance_id: UUID
+    status: Literal["pending", "approved", "rejected", "withdrawn"]
+    current_sequence_no: int = Field(ge=1, le=5)
+    personal_owner_confirmation: bool
+    levels: list[DocumentPublishApprovalLevelResponse]
+
+
+class DocumentPublishRequestResponse(BaseModel):
+    """定义发布版本、分类快照、业务终态和审批链台账。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    publish_request_id: UUID
+    document_id: UUID
+    document_version_id: UUID
+    knowledge_base_id: UUID
+    requester_account_id: UUID
+    category_ids: list[UUID]
+    version_number: int = Field(ge=1)
+    status: Literal[
+        "pending",
+        "published",
+        "rejected",
+        "withdrawn",
+        "expired",
+        "publish_failed",
+    ]
+    failure_reason_code: str | None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
+    version: int = Field(ge=1)
+    approval: DocumentPublishApprovalResponse

@@ -92,6 +92,8 @@ from ai_platform_api.persistence.tables import (
     document_tag_bindings,
     document_versions,
     documents,
+    enterprise_categories,
+    enterprise_category_documents,
     ingestion_job_attempts,
     ingestion_job_stages,
     ingestion_jobs,
@@ -943,6 +945,36 @@ class SqlAlchemyKnowledgeRepository:
             statement = statement.with_for_update()
         row = self._session.execute(statement).one_or_none()
         return _document(row) if row is not None else None
+
+    def document_requires_publish_approval(self, workspace_id: UUID, document_id: UUID) -> bool:
+        """只要命中一个活动审批分类，直接发布入口就必须失败关闭。"""
+
+        return (
+            self._session.execute(
+                select(enterprise_categories.c.category_id)
+                .select_from(
+                    enterprise_categories.join(
+                        enterprise_category_documents,
+                        (
+                            enterprise_category_documents.c.workspace_id
+                            == enterprise_categories.c.workspace_id
+                        )
+                        & (
+                            enterprise_category_documents.c.category_id
+                            == enterprise_categories.c.category_id
+                        ),
+                    )
+                )
+                .where(
+                    enterprise_category_documents.c.workspace_id == workspace_id,
+                    enterprise_category_documents.c.document_id == document_id,
+                    enterprise_categories.c.status == "active",
+                    enterprise_categories.c.approval_required.is_(True),
+                )
+                .limit(1)
+            ).scalar_one_or_none()
+            is not None
+        )
 
     def get_document_detail(
         self,

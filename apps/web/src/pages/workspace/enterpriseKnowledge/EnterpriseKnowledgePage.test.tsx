@@ -1,4 +1,4 @@
-/** @description P6B-03 企业知识页的状态、权限裁剪、治理动作与响应式骨架测试。 */
+/** @description P6B-04 企业知识页的治理、发布申请、权限裁剪与响应式骨架测试。 */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App as AntdApp } from "antd";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,6 +27,8 @@ const DOMAIN_ID = "40000000-0000-4000-8000-000000000905";
 const KNOWLEDGE_BASE_ID = "50000000-0000-4000-8000-000000000905";
 const MEMBERSHIP_ID = "80000000-0000-4000-8000-000000000905";
 const ACCOUNT_ID = "70000000-0000-4000-8000-000000000905";
+const DOCUMENT_ID = "60000000-0000-4000-8000-000000000905";
+const DOCUMENT_VERSION_ID = "61000000-0000-4000-8000-000000000905";
 const ALL_PERMISSIONS = new Set([
   "enterprise.knowledge.read",
   "enterprise.category.create",
@@ -38,6 +40,8 @@ const ALL_PERMISSIONS = new Set([
   "enterprise.domain.archive",
   "enterprise.domain.scope",
   "enterprise.domain.resolve",
+  "enterprise.document.publish.read",
+  "enterprise.document.publish.request",
 ]);
 
 const snapshot: EnterpriseKnowledgePortal = {
@@ -57,7 +61,8 @@ const snapshot: EnterpriseKnowledgePortal = {
       description: "仅用于页面测试",
       visibility: "public",
       department_ids: [],
-      document_ids: ["60000000-0000-4000-8000-000000000905"],
+      document_ids: [DOCUMENT_ID],
+      approval_required: true,
       status: "active",
       created_at: "2026-08-31T08:00:00Z",
       updated_at: "2026-08-31T08:00:00Z",
@@ -81,7 +86,7 @@ const snapshot: EnterpriseKnowledgePortal = {
   ],
   documents: [
     {
-      document_id: "60000000-0000-4000-8000-000000000905",
+      document_id: DOCUMENT_ID,
       knowledge_base_id: KNOWLEDGE_BASE_ID,
       title: "合成制度文档",
       security_level: "INTERNAL",
@@ -117,7 +122,7 @@ function renderPage() {
   );
 }
 
-describe("P6B-03 企业知识治理页面", () => {
+describe("P6B-04 企业知识治理与发布审批页面", () => {
   beforeEach(() => {
     workspaceHarness.value = {
       workspaceId: WORKSPACE_ID,
@@ -148,6 +153,48 @@ describe("P6B-03 企业知识治理页面", () => {
         effective_knowledge_base_ids: [KNOWLEDGE_BASE_ID],
         empty_reason: "none",
       }),
+      publishRequests: {
+        isLoading: false,
+        isError: false,
+        error: null,
+        data: [],
+        refetch: vi.fn(),
+      },
+      actOnPublishRequest: mutation(),
+      transferPublishRequest: mutation(),
+      loadDocumentVersions: {
+        ...mutation({
+          document: {},
+          current_document_version_id: null,
+          folder_id: "62000000-0000-4000-8000-000000000905",
+          tag_ids: [],
+          is_favorite: false,
+          versions: [
+            {
+              version: {
+                document_version_id: DOCUMENT_VERSION_ID,
+                version_number: 2,
+                status: "ready",
+              },
+              index: { status: "ready" },
+              ingestion: null,
+              source: {},
+            },
+            {
+              version: {
+                document_version_id: "63000000-0000-4000-8000-000000000905",
+                version_number: 3,
+                status: "draft",
+              },
+              index: { status: "ready" },
+              ingestion: null,
+              source: {},
+            },
+          ],
+        }),
+        variables: { documentId: DOCUMENT_ID },
+      },
+      requestPublish: mutation(),
     };
   });
 
@@ -279,5 +326,48 @@ describe("P6B-03 企业知识治理页面", () => {
       ),
     );
     expect(MEMBERSHIP_ID).not.toBe(ACCOUNT_ID);
+  });
+
+  it("只展示审批分类文档和就绪索引版本并提交幂等发布申请", async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "提交发布申请" }));
+
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "发布申请文档" }));
+    const documentOptions = await screen.findAllByText("合成制度文档");
+    fireEvent.click(documentOptions.at(-1)!);
+    expect(
+      (managementHarness.value.loadDocumentVersions as ReturnType<typeof mutation>).mutate,
+    ).toHaveBeenCalledWith({ knowledgeBaseId: KNOWLEDGE_BASE_ID, documentId: DOCUMENT_ID });
+
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "发布申请版本" }));
+    fireEvent.click(await screen.findByText("V2 · 索引已就绪"));
+    expect(screen.queryByText("V3 · 索引已就绪")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "提交申请" }));
+
+    await waitFor(() =>
+      expect(
+        (managementHarness.value.requestPublish as ReturnType<typeof mutation>).mutate,
+      ).toHaveBeenCalledWith(
+        {
+          documentId: DOCUMENT_ID,
+          documentVersionId: DOCUMENT_VERSION_ID,
+          idempotencyKey: expect.any(String),
+        },
+        { onSuccess: expect.any(Function) },
+      ),
+    );
+  });
+
+  it("没有发布申请权限时隐藏申请入口但保留参与者台账", () => {
+    menuHarness.value = {
+      ...menuHarness.value,
+      visiblePermissionCodes: new Set([
+        "enterprise.knowledge.read",
+        "enterprise.document.publish.read",
+      ]),
+    };
+    renderPage();
+    expect(screen.getByText("文档发布审批")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "提交发布申请" })).not.toBeInTheDocument();
   });
 });

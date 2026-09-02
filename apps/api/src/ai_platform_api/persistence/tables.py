@@ -1493,6 +1493,7 @@ enterprise_categories = Table(
     Column("description", String(1000), nullable=True),
     Column("visibility", String(32), nullable=False),
     Column("department_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
+    Column("approval_required", Boolean, nullable=False, server_default=false()),
     Column("status", String(32), nullable=False),
     Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
@@ -1908,6 +1909,156 @@ document_publications = Table(
         ],
         name="fk_document_publications_version",
     ),
+)
+
+document_publish_requests = Table(
+    "document_publish_requests",
+    metadata,
+    Column("publish_request_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("document_id", UUID(as_uuid=True), nullable=False),
+    Column("document_version_id", UUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", UUID(as_uuid=True), nullable=False),
+    Column("requester_account_id", UUID(as_uuid=True), nullable=False),
+    Column("approval_instance_id", UUID(as_uuid=True), nullable=False),
+    Column("version_number", Integer, nullable=False),
+    Column("content_hash", String(64), nullable=False),
+    Column("governance_digest", String(64), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("failure_reason_code", String(64), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("version", Integer, nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "publish_request_id",
+        name="uq_document_publish_requests_workspace_request",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "approval_instance_id",
+        name="uq_document_publish_requests_approval",
+    ),
+    UniqueConstraint(
+        "workspace_id",
+        "requester_account_id",
+        "idempotency_key",
+        name="uq_document_publish_requests_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id"],
+        [f"{SCHEMA_TOKEN}.documents.workspace_id", f"{SCHEMA_TOKEN}.documents.document_id"],
+        name="fk_document_publish_requests_document",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "knowledge_base_id"],
+        [
+            f"{SCHEMA_TOKEN}.knowledge_bases.workspace_id",
+            f"{SCHEMA_TOKEN}.knowledge_bases.knowledge_base_id",
+        ],
+        name="fk_document_publish_requests_knowledge_base",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "document_id", "document_version_id"],
+        [
+            f"{SCHEMA_TOKEN}.document_versions.workspace_id",
+            f"{SCHEMA_TOKEN}.document_versions.document_id",
+            f"{SCHEMA_TOKEN}.document_versions.document_version_id",
+        ],
+        name="fk_document_publish_requests_version",
+    ),
+    ForeignKeyConstraint(
+        ["approval_instance_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.approval_instances.approval_instance_id",
+            f"{SCHEMA_TOKEN}.approval_instances.workspace_id",
+        ],
+        name="fk_document_publish_requests_approval",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["requester_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_document_publish_requests_requester",
+    ),
+    CheckConstraint(
+        "status IN ('pending', 'published', 'rejected', 'withdrawn', 'expired', 'publish_failed')",
+        name="ck_document_publish_requests_status",
+    ),
+    CheckConstraint(
+        "failure_reason_code IS NULL OR failure_reason_code IN "
+        "('requester_inactive', 'permission_revoked', 'policy_unavailable', "
+        "'document_inactive', "
+        "'version_changed', 'governance_changed', 'index_not_ready')",
+        name="ck_document_publish_requests_failure_reason",
+    ),
+    CheckConstraint(
+        "(status = 'pending' AND completed_at IS NULL AND failure_reason_code IS NULL) OR "
+        "(status = 'publish_failed' AND completed_at IS NOT NULL "
+        "AND failure_reason_code IS NOT NULL) OR "
+        "(status IN ('published', 'rejected', 'withdrawn', 'expired') "
+        "AND completed_at IS NOT NULL AND failure_reason_code IS NULL)",
+        name="ck_document_publish_requests_completion",
+    ),
+    CheckConstraint(
+        "content_hash ~ '^[0-9a-f]{64}$' AND governance_digest ~ '^[0-9a-f]{64}$'",
+        name="ck_document_publish_requests_digests",
+    ),
+    CheckConstraint(
+        "idempotency_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'",
+        name="ck_document_publish_requests_idempotency",
+    ),
+    CheckConstraint("version_number >= 1", name="ck_document_publish_requests_version_number"),
+    CheckConstraint("version >= 1", name="ck_document_publish_requests_version"),
+)
+Index(
+    "uq_document_publish_requests_active_version",
+    document_publish_requests.c.workspace_id,
+    document_publish_requests.c.document_version_id,
+    unique=True,
+    postgresql_where=document_publish_requests.c.status == "pending",
+)
+Index(
+    "ix_document_publish_requests_workspace_status_time",
+    document_publish_requests.c.workspace_id,
+    document_publish_requests.c.status,
+    document_publish_requests.c.created_at,
+)
+
+document_publish_request_categories = Table(
+    "document_publish_request_categories",
+    metadata,
+    Column("workspace_id", UUID(as_uuid=True), primary_key=True),
+    Column("publish_request_id", UUID(as_uuid=True), primary_key=True),
+    Column("category_id", UUID(as_uuid=True), primary_key=True),
+    Column("category_version", Integer, nullable=False),
+    Column("approval_required", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    ForeignKeyConstraint(
+        ["workspace_id", "publish_request_id"],
+        [
+            f"{SCHEMA_TOKEN}.document_publish_requests.workspace_id",
+            f"{SCHEMA_TOKEN}.document_publish_requests.publish_request_id",
+        ],
+        name="fk_document_publish_request_categories_request",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id", "category_id"],
+        [
+            f"{SCHEMA_TOKEN}.enterprise_categories.workspace_id",
+            f"{SCHEMA_TOKEN}.enterprise_categories.category_id",
+        ],
+        name="fk_document_publish_request_categories_category",
+    ),
+    CheckConstraint("category_version >= 1", name="ck_document_publish_request_categories_version"),
+)
+Index(
+    "ix_document_publish_request_categories_category",
+    document_publish_request_categories.c.workspace_id,
+    document_publish_request_categories.c.category_id,
 )
 Index(
     "ix_role_permission_grants_lookup",

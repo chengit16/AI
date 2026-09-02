@@ -15,6 +15,9 @@ from ai_platform_api.modules.enterprise_knowledge.application.service import (
     EnterpriseKnowledgeService,
 )
 from ai_platform_api.modules.enterprise_knowledge.application.views import (
+    DocumentPublishApprovalLevelView,
+    DocumentPublishApprovalView,
+    DocumentPublishRequestView,
     EnterpriseCategoryResultView,
     EnterpriseKnowledgePortalView,
     ResolvedKnowledgeDomainScopeView,
@@ -48,6 +51,9 @@ WORKSPACE_ID = UUID("20000000-0000-4000-8000-000000000903")
 CATEGORY_ID = UUID("30000000-0000-4000-8000-000000000903")
 DOMAIN_ID = UUID("40000000-0000-4000-8000-000000000903")
 DOCUMENT_ID = UUID("50000000-0000-4000-8000-000000000903")
+DOCUMENT_VERSION_ID = UUID("51000000-0000-4000-8000-000000000903")
+PUBLISH_REQUEST_ID = UUID("52000000-0000-4000-8000-000000000903")
+APPROVAL_INSTANCE_ID = UUID("53000000-0000-4000-8000-000000000903")
 KNOWLEDGE_BASE_ID = UUID("60000000-0000-4000-8000-000000000903")
 DEPARTMENT_ID = UUID("70000000-0000-4000-8000-000000000903")
 MEMBERSHIP_ID = UUID("80000000-0000-4000-8000-000000000903")
@@ -104,16 +110,32 @@ class StubEnterpriseKnowledgeService:
         visibility: CategoryVisibility,
         department_ids: tuple[UUID, ...],
         document_ids: tuple[UUID, ...],
+        approval_required: bool = False,
     ) -> EnterpriseCategoryResultView:
         assert context is CONTEXT and workspace_id == WORKSPACE_ID
         self.calls.append(
             (
                 "create_category",
-                (name, description, parent_category_id, visibility, department_ids, document_ids),
+                (
+                    name,
+                    description,
+                    parent_category_id,
+                    visibility,
+                    department_ids,
+                    document_ids,
+                    approval_required,
+                ),
             )
         )
         return enterprise_category_result_view(
-            EnterpriseCategoryView(self._category(name=name, visibility=visibility), document_ids)
+            EnterpriseCategoryView(
+                self._category(
+                    name=name,
+                    visibility=visibility,
+                    approval_required=approval_required,
+                ),
+                document_ids,
+            )
         )
 
     def update_category(
@@ -128,6 +150,7 @@ class StubEnterpriseKnowledgeService:
         parent_category_id: UUID | None,
         visibility: CategoryVisibility,
         department_ids: tuple[UUID, ...],
+        approval_required: bool | None = None,
     ) -> EnterpriseCategoryResultView:
         assert context is CONTEXT and workspace_id == WORKSPACE_ID and category_id == CATEGORY_ID
         self.calls.append(
@@ -140,12 +163,18 @@ class StubEnterpriseKnowledgeService:
                     parent_category_id,
                     visibility,
                     department_ids,
+                    approval_required,
                 ),
             )
         )
         return enterprise_category_result_view(
             EnterpriseCategoryView(
-                self._category(name=name, visibility=visibility, version=expected_version + 1),
+                self._category(
+                    name=name,
+                    visibility=visibility,
+                    version=expected_version + 1,
+                    approval_required=bool(approval_required),
+                ),
                 (DOCUMENT_ID,),
             )
         )
@@ -313,6 +342,85 @@ class StubEnterpriseKnowledgeService:
             )
         )
 
+    def request_document_publish(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        idempotency_key: str,
+    ) -> DocumentPublishRequestView:
+        """记录发布申请的资源标识和幂等键。"""
+
+        assert context is CONTEXT and workspace_id == WORKSPACE_ID
+        self.calls.append(
+            (
+                "request_document_publish",
+                (document_id, document_version_id, idempotency_key),
+            )
+        )
+        return self._publish_request()
+
+    def list_document_publish_requests(
+        self, context: RequestContext, *, workspace_id: UUID, limit: int
+    ) -> tuple[DocumentPublishRequestView, ...]:
+        """记录发布台账的参与者可见列表查询。"""
+
+        assert context is CONTEXT and workspace_id == WORKSPACE_ID
+        self.calls.append(("list_document_publish_requests", limit))
+        return (self._publish_request(),)
+
+    def get_document_publish_request(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        publish_request_id: UUID,
+    ) -> DocumentPublishRequestView:
+        """记录发布台账详情的精确资源查询。"""
+
+        assert context is CONTEXT and workspace_id == WORKSPACE_ID
+        self.calls.append(("get_document_publish_request", publish_request_id))
+        return self._publish_request()
+
+    @staticmethod
+    def _publish_request() -> DocumentPublishRequestView:
+        """构造仅含协议所需低敏字段的合成发布申请。"""
+
+        level = DocumentPublishApprovalLevelView(
+            sequence_no=1,
+            mode="any",
+            status="active",
+            approver_account_ids=(ACCOUNT_ID,),
+            fallback_activated=False,
+            reminder_at=None,
+            timeout_at=None,
+            completed_at=None,
+        )
+        return DocumentPublishRequestView(
+            publish_request_id=PUBLISH_REQUEST_ID,
+            document_id=DOCUMENT_ID,
+            document_version_id=DOCUMENT_VERSION_ID,
+            knowledge_base_id=KNOWLEDGE_BASE_ID,
+            requester_account_id=ACCOUNT_ID,
+            category_ids=(CATEGORY_ID,),
+            version_number=1,
+            status="pending",
+            failure_reason_code=None,
+            created_at=NOW,
+            updated_at=NOW,
+            completed_at=None,
+            version=1,
+            approval=DocumentPublishApprovalView(
+                approval_instance_id=APPROVAL_INSTANCE_ID,
+                status="pending",
+                current_sequence_no=1,
+                personal_owner_confirmation=False,
+                levels=(level,),
+            ),
+        )
+
     @staticmethod
     def _category(
         *,
@@ -320,6 +428,7 @@ class StubEnterpriseKnowledgeService:
         visibility: CategoryVisibility = "public",
         status: GovernanceStatus = "active",
         version: int = 1,
+        approval_required: bool = False,
     ) -> EnterpriseCategory:
         return EnterpriseCategory(
             category_id=CATEGORY_ID,
@@ -334,6 +443,7 @@ class StubEnterpriseKnowledgeService:
             created_at=NOW,
             updated_at=NOW,
             version=version,
+            approval_required=approval_required,
         )
 
     @staticmethod
@@ -394,6 +504,7 @@ def test_enterprise_knowledge_routes_preserve_complete_governance_commands() -> 
         "visibility": "public",
         "department_ids": [],
         "document_ids": [str(DOCUMENT_ID)],
+        "approval_required": True,
     }
     domain_body = {
         "name": "合成研发知识域",
@@ -419,6 +530,7 @@ def test_enterprise_knowledge_routes_preserve_complete_governance_commands() -> 
                 "parent_category_id": category_body["parent_category_id"],
                 "visibility": category_body["visibility"],
                 "department_ids": category_body["department_ids"],
+                "approval_required": category_body["approval_required"],
             },
         )
         category_archived = client.post(
@@ -522,4 +634,72 @@ def test_enterprise_knowledge_contract_rejects_partial_scope_and_extra_fields() 
 
     assert partial_scope.status_code == 422
     assert extra_category.status_code == 422
+    assert service.calls == []
+
+
+def test_document_publish_routes_preserve_idempotency_and_low_sensitive_views() -> None:
+    """发布申请、台账和详情必须保留命令语义且只返回低敏审批事实。"""
+
+    service = StubEnterpriseKnowledgeService()
+    client = enterprise_knowledge_client(service)
+    base = f"/api/v1/workspaces/{WORKSPACE_ID}"
+    request_path = (
+        f"{base}/enterprise-documents/{DOCUMENT_ID}/versions/{DOCUMENT_VERSION_ID}/publish-requests"
+    )
+
+    with client:
+        created = client.post(
+            request_path,
+            json={"idempotency_key": "synthetic-p6b04-http-1"},
+        )
+        listed = client.get(f"{base}/document-publish-requests", params={"limit": 25})
+        detailed = client.get(f"{base}/document-publish-requests/{PUBLISH_REQUEST_ID}")
+
+    assert [created.status_code, listed.status_code, detailed.status_code] == [200, 200, 200]
+    assert service.calls == [
+        (
+            "request_document_publish",
+            (DOCUMENT_ID, DOCUMENT_VERSION_ID, "synthetic-p6b04-http-1"),
+        ),
+        ("list_document_publish_requests", 25),
+        ("get_document_publish_request", PUBLISH_REQUEST_ID),
+    ]
+    assert listed.json() == [created.json()]
+    assert detailed.json() == created.json()
+    assert created.json()["approval"]["levels"][0]["approver_account_ids"] == [str(ACCOUNT_ID)]
+    serialized = created.text + listed.text + detailed.text
+    for forbidden in (
+        "content_hash",
+        "governance_digest",
+        "idempotency_key",
+        "object_key",
+        "policy_conditions",
+    ):
+        assert forbidden not in serialized
+
+
+def test_document_publish_contract_rejects_invalid_idempotency_keys() -> None:
+    """空白、非法字符和超长幂等键必须在协议层拒绝，不进入应用服务。"""
+
+    service = StubEnterpriseKnowledgeService()
+    client = enterprise_knowledge_client(service)
+    path = (
+        f"/api/v1/workspaces/{WORKSPACE_ID}/enterprise-documents/{DOCUMENT_ID}/"
+        f"versions/{DOCUMENT_VERSION_ID}/publish-requests"
+    )
+
+    with client:
+        responses = [
+            client.post(path, json={"idempotency_key": value})
+            for value in ("", "has space", "x" * 129)
+        ]
+        extra = client.post(
+            path,
+            json={
+                "idempotency_key": "synthetic-p6b04-valid",
+                "document_content": "不得进入审批主题",
+            },
+        )
+
+    assert [response.status_code for response in (*responses, extra)] == [422] * 4
     assert service.calls == []

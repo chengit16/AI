@@ -23,6 +23,8 @@ export interface CategoryFormValues {
   departmentIds?: string[];
   /** 创建时的初始文档绑定。 */
   documentIds?: string[];
+  /** 命中文档发布时是否强制进入审批链。 */
+  approvalRequired: boolean;
 }
 
 /** 团队知识域创建或编辑表单值。 */
@@ -75,6 +77,18 @@ export interface EnterpriseKnowledgePermissions {
   scopeDomain: boolean;
   /** 是否允许解释运行时有效范围。 */
   resolveDomain: boolean;
+  /** 是否允许读取参与者可见的文档发布审批。 */
+  readPublishRequests: boolean;
+  /** 是否允许发起文档发布审批申请。 */
+  requestPublishRequest: boolean;
+  /** 是否允许通过当前指派。 */
+  approvePublishRequest: boolean;
+  /** 是否允许驳回当前指派。 */
+  rejectPublishRequest: boolean;
+  /** 是否允许转交当前指派。 */
+  transferPublishRequest: boolean;
+  /** 是否允许申请人撤回待审批请求。 */
+  withdrawPublishRequest: boolean;
 }
 
 /** 把表单值转换为创建分类契约，空字符串不会进入服务端事实。 */
@@ -86,6 +100,7 @@ export function categoryCreateBody(values: CategoryFormValues): CreateEnterprise
     visibility: values.visibility,
     department_ids: values.visibility === "departments" ? (values.departmentIds ?? []) : [],
     document_ids: values.documentIds ?? [],
+    approval_required: values.approvalRequired,
   };
 }
 
@@ -101,6 +116,7 @@ export function categoryUpdateBody(
     parent_category_id: values.parentCategoryId ?? null,
     visibility: values.visibility,
     department_ids: values.visibility === "departments" ? (values.departmentIds ?? []) : [],
+    approval_required: values.approvalRequired,
   };
 }
 

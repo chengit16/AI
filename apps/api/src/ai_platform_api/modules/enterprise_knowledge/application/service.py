@@ -12,10 +12,12 @@ from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.enterprise_knowledge.application.views import (
+    DocumentPublishRequestView,
     EnterpriseCategoryResultView,
     EnterpriseKnowledgePortalView,
     ResolvedKnowledgeDomainScopeView,
     TeamKnowledgeDomainView,
+    document_publish_request_view,
     enterprise_category_result_view,
     enterprise_knowledge_portal_view,
     resolved_knowledge_domain_scope_view,
@@ -33,6 +35,8 @@ from ai_platform_api.modules.enterprise_knowledge.domain.models import (
     RagPolicyMode,
     TeamKnowledgeDomain,
 )
+from ai_platform_api.modules.workflow.application.approval_runtime import ApprovalInstanceService
+from ai_platform_api.modules.workflow.domain.approvals import ApprovalSubject
 
 
 class EnterpriseKnowledgeDeniedError(PlatformError):
@@ -65,11 +69,22 @@ class EnterpriseKnowledgeValidationError(PlatformError):
     error_code = "VALIDATION_ERROR"
 
 
+class EnterpriseDocumentPublishNotReadyError(PlatformError):
+    """文档版本、解析索引或审批分类尚不满足发起条件。"""
+
+    error_code = "DOCUMENT_PUBLISH_NOT_READY"
+
+
 class EnterpriseKnowledgeService:
     """以小接口隐藏多表关系、授权复核、审计和 Outbox 细节。"""
 
-    def __init__(self, unit_of_work: EnterpriseKnowledgeUnitOfWork) -> None:
+    def __init__(
+        self,
+        unit_of_work: EnterpriseKnowledgeUnitOfWork,
+        approval_instances: ApprovalInstanceService | None = None,
+    ) -> None:
         self._unit_of_work = unit_of_work
+        self._approval_instances = approval_instances
 
     def get_portal(
         self, context: RequestContext, *, workspace_id: UUID
@@ -103,6 +118,7 @@ class EnterpriseKnowledgeService:
         visibility: CategoryVisibility,
         department_ids: tuple[UUID, ...],
         document_ids: tuple[UUID, ...],
+        approval_required: bool = False,
     ) -> EnterpriseCategoryResultView:
         """创建企业分类并原子建立初始文档绑定。"""
 
@@ -124,6 +140,7 @@ class EnterpriseKnowledgeService:
             created_at=now,
             updated_at=now,
             version=1,
+            approval_required=approval_required,
         )
         normalized_documents = self._unique(document_ids)
         # 2. 在同一事务内复核成员与引用，随后提交分类、绑定、审计和 Outbox。
@@ -184,6 +201,7 @@ class EnterpriseKnowledgeService:
         parent_category_id: UUID | None,
         visibility: CategoryVisibility,
         department_ids: tuple[UUID, ...],
+        approval_required: bool | None = None,
     ) -> EnterpriseCategoryResultView:
         """按乐观版本更新分类元数据和独立可见策略。"""
 
@@ -212,6 +230,11 @@ class EnterpriseKnowledgeService:
                     description=_description(description),
                     visibility=visibility,
                     department_ids=self._unique(department_ids),
+                    approval_required=(
+                        current.approval_required
+                        if approval_required is None
+                        else approval_required
+                    ),
                     updated_at=now,
                     version=current.version + 1,
                 )
@@ -228,6 +251,7 @@ class EnterpriseKnowledgeService:
                     parent_category_id=parent_category_id,
                 ):
                     raise EnterpriseKnowledgeConflictError
+                # 3. 持久化后只读取当前密级可见绑定，审计与 Outbox 随事务提交。
                 repository.update_category(candidate, expected_version=expected_version)
                 document_ids = repository.get_category_document_ids(
                     workspace_id,
@@ -673,6 +697,127 @@ class EnterpriseKnowledgeService:
             if result is None:
                 raise EnterpriseKnowledgeNotFoundError
             return resolved_knowledge_domain_scope_view(result)
+
+    def request_document_publish(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        idempotency_key: str,
+    ) -> DocumentPublishRequestView:
+        """冻结就绪版本与治理摘要，并复用通用审批运行时创建发布请求。"""
+
+        # 1. 验证当前企业成员、资源授权和审批服务装配状态。
+        account_id = self._authorized_account(
+            context,
+            workspace_id,
+            "enterprise.document.publish.request",
+            resource_id=document_id,
+        )
+        approvals = self._require_approval_instances()
+        # 2. 在事务快照中优先回放幂等键，再冻结候选版本与治理分类。
+        with self._unit_of_work as unit_of_work:
+            repository = unit_of_work.enterprise_knowledge
+            self._require_member(repository, workspace_id, account_id)
+            existing = repository.get_publish_request_by_idempotency(
+                workspace_id, account_id, idempotency_key
+            )
+            if existing is not None:
+                if (
+                    existing.document_id != document_id
+                    or existing.document_version_id != document_version_id
+                ):
+                    raise EnterpriseKnowledgeConflictError
+                approval = approvals.get_participant_visible(
+                    context, approval_instance_id=existing.approval_instance_id
+                )
+                return document_publish_request_view(existing, approval)
+            candidate = repository.get_document_publish_candidate(
+                workspace_id, document_id, document_version_id
+            )
+        if candidate is None or not candidate.index_ready or not candidate.approval_required:
+            raise EnterpriseDocumentPublishNotReadyError
+        subject = ApprovalSubject(
+            workspace_id=workspace_id,
+            requester_account_id=account_id,
+            resource_type="document.publish",
+            operation="publish",
+            resource_id=document_id,
+            department_ids=candidate.department_ids,
+            security_level=candidate.security_level,
+            risk_level="high",
+            fields={
+                "category_ids": [str(item.category_id) for item in candidate.categories],
+                "content_hash": candidate.content_hash,
+                "document_version_id": str(candidate.document_version_id),
+                "governance_digest": candidate.governance_digest,
+                "knowledge_base_id": str(candidate.knowledge_base_id),
+                "version_number": candidate.version_number,
+            },
+        )
+        result = approvals.start(context, subject=subject, idempotency_key=idempotency_key)
+        with self._unit_of_work as unit_of_work:
+            request = unit_of_work.enterprise_knowledge.get_publish_request_by_approval(
+                workspace_id, result.state.instance.approval_instance_id
+            )
+        if request is None:
+            raise EnterpriseKnowledgeConflictError
+        return document_publish_request_view(request, result.state)
+
+    def list_document_publish_requests(
+        self, context: RequestContext, *, workspace_id: UUID, limit: int
+    ) -> tuple[DocumentPublishRequestView, ...]:
+        """列出申请人或审批人可见的发布台账，普通菜单权限不能扩大审批可见性。"""
+
+        self._authorized_account(context, workspace_id, "enterprise.document.publish.read")
+        if not 1 <= limit <= 200:
+            raise EnterpriseKnowledgeValidationError
+        approvals = self._require_approval_instances()
+        visible_states = tuple(
+            state
+            for state in approvals.list(context, limit=200)
+            if state.instance.resource_type == "document.publish"
+        )
+        states_by_id = {state.instance.approval_instance_id: state for state in visible_states}
+        with self._unit_of_work as unit_of_work:
+            requests = unit_of_work.enterprise_knowledge.list_publish_requests(
+                workspace_id,
+                approval_instance_ids=tuple(states_by_id),
+                limit=limit,
+            )
+        return tuple(
+            document_publish_request_view(request, states_by_id[request.approval_instance_id])
+            for request in requests
+            if request.approval_instance_id in states_by_id
+        )
+
+    def get_document_publish_request(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        publish_request_id: UUID,
+    ) -> DocumentPublishRequestView:
+        """读取参与者可见的发布请求详情与冻结审批链。"""
+
+        self._authorized_account(context, workspace_id, "enterprise.document.publish.read")
+        with self._unit_of_work as unit_of_work:
+            request = unit_of_work.enterprise_knowledge.get_publish_request(
+                workspace_id, publish_request_id
+            )
+        if request is None:
+            raise EnterpriseKnowledgeNotFoundError
+        approval = self._require_approval_instances().get_participant_visible(
+            context, approval_instance_id=request.approval_instance_id
+        )
+        return document_publish_request_view(request, approval)
+
+    def _require_approval_instances(self) -> ApprovalInstanceService:
+        if self._approval_instances is None:
+            raise RuntimeError("企业文档发布审批服务尚未完成装配")
+        return self._approval_instances
 
     @staticmethod
     def _authorized_account(

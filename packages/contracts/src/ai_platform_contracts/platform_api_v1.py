@@ -497,6 +497,10 @@ class CreateDepartmentRequest(typing.TypedDict):
     parent_department_id: typing.NotRequired[str | None]
 
 
+class CreateDocumentPublishRequest(typing.TypedDict):
+    idempotency_key: str
+
+
 class CreateDocumentRequest(typing.TypedDict):
     captured_at: typing.NotRequired[str | None]
     department_ids: typing.NotRequired[list[str] | None]
@@ -525,6 +529,7 @@ class CreateDocumentVersionRequest(typing.TypedDict):
 
 
 class CreateEnterpriseCategoryRequest(typing.TypedDict):
+    approval_required: typing.NotRequired[bool]
     department_ids: typing.NotRequired[list[str]]
     description: typing.NotRequired[str | None]
     document_ids: typing.NotRequired[list[str]]
@@ -713,6 +718,44 @@ class DocumentIndexSummaryResponse(typing.TypedDict):
     updated_at: str
 
 
+class DocumentPublishApprovalLevelResponse(typing.TypedDict):
+    approver_account_ids: list[str]
+    completed_at: str | None
+    fallback_activated: bool
+    mode: typing.Literal["any", "all"]
+    reminder_at: str | None
+    sequence_no: int
+    status: typing.Literal["waiting", "active", "approved", "rejected", "withdrawn"]
+    timeout_at: str | None
+
+
+class DocumentPublishApprovalResponse(typing.TypedDict):
+    approval_instance_id: str
+    current_sequence_no: int
+    levels: list[DocumentPublishApprovalLevelResponse]
+    personal_owner_confirmation: bool
+    status: typing.Literal["pending", "approved", "rejected", "withdrawn"]
+
+
+class DocumentPublishRequestResponse(typing.TypedDict):
+    approval: DocumentPublishApprovalResponse
+    category_ids: list[str]
+    completed_at: str | None
+    created_at: str
+    document_id: str
+    document_version_id: str
+    failure_reason_code: str | None
+    knowledge_base_id: str
+    publish_request_id: str
+    requester_account_id: str
+    status: typing.Literal[
+        "pending", "published", "rejected", "withdrawn", "expired", "publish_failed"
+    ]
+    updated_at: str
+    version: int
+    version_number: int
+
+
 class DocumentResponse(typing.TypedDict):
     created_at: str
     created_by_account_id: str
@@ -805,6 +848,7 @@ class EffectiveRoleSourceResponse(typing.TypedDict):
 
 
 class EnterpriseCategoryResponse(typing.TypedDict):
+    approval_required: typing.NotRequired[bool]
     category_id: str
     created_at: str
     department_ids: list[str]
@@ -2229,6 +2273,7 @@ class UpdateConversationScopeRequest(typing.TypedDict):
 
 
 class UpdateEnterpriseCategoryRequest(typing.TypedDict):
+    approval_required: typing.NotRequired[bool]
     department_ids: typing.NotRequired[list[str]]
     description: typing.NotRequired[str | None]
     expected_version: int

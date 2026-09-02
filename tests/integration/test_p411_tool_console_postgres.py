@@ -231,7 +231,7 @@ def test_revision_0061_grants_existing_owner_and_restores_menu_snapshot_on_round
     command.upgrade(config, "head")
     connection.commit()
     assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == (
-        "20260831_0078"
+        "20260831_0079"
     )
     assert _owner_tool_permission_count(connection, schema, registration.personal_workspace_id) == 6
 

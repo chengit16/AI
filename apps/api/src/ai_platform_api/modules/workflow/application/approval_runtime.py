@@ -219,6 +219,23 @@ class ApprovalInstanceService:
             raise ApprovalInstanceDenied
         return state
 
+    def get_participant_visible(
+        self,
+        context: RequestContext,
+        *,
+        approval_instance_id: UUID,
+    ) -> ApprovalRuntimeState:
+        """供已完成业务权限校验的模块读取参与者可见审批，不复用接口资源范围。"""
+
+        account_id = _browser_account(context)
+        with self._unit_of_work as unit_of_work:
+            state = unit_of_work.runtimes.get_state(context.workspace_id, approval_instance_id)
+        if state is None:
+            raise ApprovalInstanceNotFound
+        if not _visible_to(state, account_id):
+            raise ApprovalInstanceDenied
+        return state
+
     @observed_operation(component="approval", operation="act")
     def act(
         self,

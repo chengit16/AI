@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+import json
+import re
+from dataclasses import dataclass, replace
 from datetime import datetime
 from types import TracebackType
 from typing import Literal, Protocol
@@ -15,6 +18,25 @@ from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 CategoryVisibility = Literal["public", "departments", "private"]
 GovernanceStatus = Literal["active", "archived"]
 RagPolicyMode = Literal["balanced", "precision", "recall"]
+DocumentPublishRequestStatus = Literal[
+    "pending",
+    "published",
+    "rejected",
+    "withdrawn",
+    "expired",
+    "publish_failed",
+]
+DocumentPublishFailureReason = Literal[
+    "requester_inactive",
+    "permission_revoked",
+    "policy_unavailable",
+    "document_inactive",
+    "version_changed",
+    "governance_changed",
+    "index_not_ready",
+]
+
+_IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 
 class InvalidEnterpriseKnowledgeError(Exception):
@@ -41,6 +63,7 @@ class EnterpriseCategory:
     created_at: datetime
     updated_at: datetime
     version: int
+    approval_required: bool = False
 
     def assert_valid(self) -> None:
         normalized_name = self.name.strip()
@@ -56,6 +79,122 @@ class EnterpriseCategory:
             raise InvalidEnterpriseKnowledgeError
         if len(set(self.department_ids)) != len(self.department_ids):
             raise InvalidEnterpriseKnowledgeError
+
+
+@dataclass(frozen=True)
+class DocumentPublishRequest:
+    """冻结一个不可变文档版本的企业发布申请和最终发布结果。"""
+
+    publish_request_id: UUID
+    workspace_id: UUID
+    document_id: UUID
+    document_version_id: UUID
+    knowledge_base_id: UUID
+    requester_account_id: UUID
+    approval_instance_id: UUID
+    category_ids: tuple[UUID, ...]
+    version_number: int
+    content_hash: str
+    governance_digest: str
+    idempotency_key: str
+    status: DocumentPublishRequestStatus
+    failure_reason_code: DocumentPublishFailureReason | None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
+    version: int
+
+    def assert_valid(self) -> None:
+        """验证摘要、状态和终态时间，拒绝无法追溯的半完成事实。"""
+
+        valid_hashes = (self.content_hash, self.governance_digest)
+        if (
+            self.version_number < 1
+            or self.version < 1
+            or not self.category_ids
+            or len(set(self.category_ids)) != len(self.category_ids)
+            or not _IDEMPOTENCY_PATTERN.fullmatch(self.idempotency_key)
+            or any(
+                len(value) != 64 or any(character not in "0123456789abcdef" for character in value)
+                for value in valid_hashes
+            )
+        ):
+            raise InvalidEnterpriseKnowledgeError
+        terminal = self.status != "pending"
+        if terminal != (self.completed_at is not None):
+            raise InvalidEnterpriseKnowledgeError
+        if (self.status == "publish_failed") != (self.failure_reason_code is not None):
+            raise InvalidEnterpriseKnowledgeError
+
+    def finish(
+        self,
+        *,
+        status: Literal["published", "rejected", "withdrawn", "expired", "publish_failed"],
+        occurred_at: datetime,
+        failure_reason_code: DocumentPublishFailureReason | None = None,
+    ) -> DocumentPublishRequest:
+        """只允许待审批申请进入一个可解释终态，审批事实不会被复活。"""
+
+        if self.status != "pending":
+            raise InvalidEnterpriseKnowledgeError
+        candidate = replace(
+            self,
+            status=status,
+            failure_reason_code=failure_reason_code,
+            updated_at=occurred_at,
+            completed_at=occurred_at,
+            version=self.version + 1,
+        )
+        candidate.assert_valid()
+        return candidate
+
+
+@dataclass(frozen=True)
+class DocumentPublishCategorySnapshot:
+    """冻结发布申请命中的活动分类版本，供批准时检测治理漂移。"""
+
+    category_id: UUID
+    name: str
+    category_version: int
+    approval_required: bool
+
+
+@dataclass(frozen=True)
+class DocumentPublishCandidate:
+    """提供发起审批所需的低敏版本、索引和分类治理事实。"""
+
+    workspace_id: UUID
+    document_id: UUID
+    document_version_id: UUID
+    knowledge_base_id: UUID
+    title: str
+    version_number: int
+    content_hash: str
+    security_level: SecurityLevel
+    department_ids: tuple[UUID, ...]
+    index_ready: bool
+    categories: tuple[DocumentPublishCategorySnapshot, ...]
+
+    @property
+    def approval_required(self) -> bool:
+        """任一活动分类要求审批时，企业发布不能走直接发布入口。"""
+
+        return any(item.approval_required for item in self.categories)
+
+    @property
+    def governance_digest(self) -> str:
+        """对排序后的分类版本和审批开关生成稳定摘要，不包含文档正文。"""
+
+        document = [
+            {
+                "approval_required": item.approval_required,
+                "category_id": str(item.category_id),
+                "category_version": item.category_version,
+            }
+            for item in sorted(self.categories, key=lambda value: value.category_id.int)
+        ]
+        encoded = json.dumps(document, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -283,6 +422,42 @@ class EnterpriseKnowledgeRepository(Protocol):
     ) -> bool: ...
 
     def category_has_active_children(self, workspace_id: UUID, category_id: UUID) -> bool: ...
+
+    def get_document_publish_candidate(
+        self,
+        workspace_id: UUID,
+        document_id: UUID,
+        document_version_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> DocumentPublishCandidate | None: ...
+
+    def get_publish_request_by_approval(
+        self,
+        workspace_id: UUID,
+        approval_instance_id: UUID,
+    ) -> DocumentPublishRequest | None: ...
+
+    def get_publish_request_by_idempotency(
+        self,
+        workspace_id: UUID,
+        requester_account_id: UUID,
+        idempotency_key: str,
+    ) -> DocumentPublishRequest | None: ...
+
+    def get_publish_request(
+        self,
+        workspace_id: UUID,
+        publish_request_id: UUID,
+    ) -> DocumentPublishRequest | None: ...
+
+    def list_publish_requests(
+        self,
+        workspace_id: UUID,
+        *,
+        approval_instance_ids: tuple[UUID, ...],
+        limit: int,
+    ) -> tuple[DocumentPublishRequest, ...]: ...
 
     def resolve_domain_scope(
         self,

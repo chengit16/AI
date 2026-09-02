@@ -44,6 +44,10 @@ class InvalidDocumentVersionTransitionError(Exception):
     """文档版本状态不允许当前转换。"""
 
 
+class DocumentIndexNotReadyError(InvalidDocumentVersionTransitionError):
+    """目标文档版本没有可原子启用的就绪索引。"""
+
+
 class KnowledgeWriteConflictError(Exception):
     """并发更新或数据库唯一约束拒绝本次知识事实写入。"""
 
@@ -404,6 +408,8 @@ class KnowledgeRepository(Protocol):
     def get_document(
         self, workspace_id: UUID, document_id: UUID, *, for_update: bool = False
     ) -> Document | None: ...
+
+    def document_requires_publish_approval(self, workspace_id: UUID, document_id: UUID) -> bool: ...
 
     def save_document(self, document: Document) -> None: ...
 

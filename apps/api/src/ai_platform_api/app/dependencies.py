@@ -54,9 +54,13 @@ from ai_platform_api.modules.authorization.infrastructure.policy_version import 
 from ai_platform_api.modules.authorization.infrastructure.sqlalchemy import (
     SqlAlchemyPolicyGrantRepository,
     SqlAlchemyRolePermissionUnitOfWork,
+    SqlAlchemyTransactionalPolicyGrantRepository,
 )
 from ai_platform_api.modules.enterprise_knowledge.application.service import (
     EnterpriseKnowledgeService,
+)
+from ai_platform_api.modules.enterprise_knowledge.infrastructure.document_publish_approval import (
+    SqlAlchemyDocumentPublishSubjectLifecycle,
 )
 from ai_platform_api.modules.enterprise_knowledge.infrastructure.sqlalchemy import (
     SqlAlchemyEnterpriseKnowledgeUnitOfWork,
@@ -110,9 +114,13 @@ from ai_platform_api.modules.integration.infrastructure.operations_sqlalchemy im
 from ai_platform_api.modules.knowledge.application.facts import KnowledgeFactService
 from ai_platform_api.modules.knowledge.application.management import KnowledgeManagementService
 from ai_platform_api.modules.knowledge.application.organization import KnowledgeOrganizationService
+from ai_platform_api.modules.knowledge.application.publishing import (
+    publish_document_version_in_transaction,
+)
 from ai_platform_api.modules.knowledge.application.uploads import KnowledgeUploadService
 from ai_platform_api.modules.knowledge.infrastructure.object_storage import MinioObjectStorage
 from ai_platform_api.modules.knowledge.infrastructure.sqlalchemy import (
+    SqlAlchemyKnowledgeRepository,
     SqlAlchemyKnowledgeUnitOfWork,
 )
 from ai_platform_api.modules.knowledge.infrastructure.upload_security import (
@@ -502,6 +510,16 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             lambda session: RoutedApprovalSubjectLifecycle(
                 {
                     "agent.release": SqlAlchemyAgentApprovalSubjectLifecycle(session),
+                    "document.publish": SqlAlchemyDocumentPublishSubjectLifecycle(
+                        session,
+                        SqlAlchemyKnowledgeRepository(session),
+                        RbacPolicyDecisionPoint(
+                            resource_registry,
+                            SqlAlchemyTransactionalPolicyGrantRepository(session),
+                            field_registry,
+                        ),
+                        publish_document_version_in_transaction,
+                    ),
                     "tool.call": SqlAlchemyToolConfirmationSubjectLifecycle(session),
                 }
             ),
@@ -702,7 +720,8 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
                 SqlAlchemyTeamManagementUnitOfWork(database.sessions)
             ),
             enterprise_knowledge=EnterpriseKnowledgeService(
-                SqlAlchemyEnterpriseKnowledgeUnitOfWork(database.sessions)
+                SqlAlchemyEnterpriseKnowledgeUnitOfWork(database.sessions),
+                approval_instances,
             ),
             entitlements=EntitlementService(
                 unit_of_work=SqlAlchemyEntitlementUnitOfWork(database.sessions),

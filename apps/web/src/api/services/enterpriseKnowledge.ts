@@ -1,6 +1,7 @@
 /** @description 企业分类、团队知识域与可解释范围的类型化 API Service。 */
 import type { components } from "@/api/generated/platform-api.v1";
 import { apiRequest } from "@/api/client";
+import type { KnowledgeDocumentDetail } from "@/api/services/knowledge";
 
 /** 企业知识门户统一快照。 */
 export type EnterpriseKnowledgePortal = components["schemas"]["EnterpriseKnowledgePortalResponse"];
@@ -22,6 +23,10 @@ export type UpdateTeamKnowledgeDomain = components["schemas"]["UpdateTeamKnowled
 /** 原子替换团队知识域范围输入。 */
 export type ReplaceKnowledgeDomainScope =
   components["schemas"]["ReplaceKnowledgeDomainScopeRequest"];
+/** 企业文档不可变版本的一次发布审批请求。 */
+export type DocumentPublishRequest = components["schemas"]["DocumentPublishRequestResponse"];
+/** 文档详情及其不可变版本处理链，用于服务端筛选可申请版本。 */
+export type EnterpriseDocumentDetail = KnowledgeDocumentDetail;
 
 /** 读取服务端已执行密级与字段裁剪的企业知识统一快照。 */
 export function getEnterpriseKnowledgePortal(
@@ -131,6 +136,52 @@ export function resolveTeamKnowledgeDomainScope(
 ) {
   return apiRequest<ResolvedKnowledgeDomainScope>(
     "/api/v1/workspaces/" + workspaceId + "/team-knowledge-domains/" + domainId + "/resolved-scope",
+    { signal },
+  );
+}
+
+/** 为命中审批分类的就绪文档版本发起幂等发布申请。 */
+export function requestEnterpriseDocumentPublish(
+  workspaceId: string,
+  documentId: string,
+  documentVersionId: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<DocumentPublishRequest>(
+    `/api/v1/workspaces/${workspaceId}/enterprise-documents/${documentId}/versions/${documentVersionId}/publish-requests`,
+    { method: "POST", body: { idempotency_key: idempotencyKey } },
+  );
+}
+
+/** 查询当前账号可见的文档版本与索引状态，不向页面暴露对象存储定位信息。 */
+export function getEnterpriseDocumentDetail(
+  workspaceId: string,
+  knowledgeBaseId: string,
+  documentId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<EnterpriseDocumentDetail>(
+    `/api/v1/workspaces/${workspaceId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`,
+    { signal },
+  );
+}
+
+/** 读取当前账号作为申请人或审批参与者可见的发布台账。 */
+export function listEnterpriseDocumentPublishRequests(workspaceId: string, signal?: AbortSignal) {
+  return apiRequest<readonly DocumentPublishRequest[]>(
+    `/api/v1/workspaces/${workspaceId}/document-publish-requests?limit=100`,
+    { signal },
+  );
+}
+
+/** 读取单条参与者可见发布请求和冻结审批链。 */
+export function getEnterpriseDocumentPublishRequest(
+  workspaceId: string,
+  publishRequestId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<DocumentPublishRequest>(
+    `/api/v1/workspaces/${workspaceId}/document-publish-requests/${publishRequestId}`,
     { signal },
   );
 }

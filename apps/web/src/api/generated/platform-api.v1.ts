@@ -984,6 +984,46 @@ export type paths = {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/v1/workspaces/{workspace_id}/document-publish-requests": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * List Enterprise Document Publish Requests
+     * @description 列出当前账号作为申请人或审批人可见的发布台账。
+     */
+    readonly get: operations["listEnterpriseDocumentPublishRequests"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/document-publish-requests/{publish_request_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /**
+     * Get Enterprise Document Publish Request
+     * @description 读取参与者可见的发布请求、失败原因和冻结审批链。
+     */
+    readonly get: operations["getEnterpriseDocumentPublishRequest"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/v1/workspaces/{workspace_id}/documents/{document_id}/favorite": {
     readonly parameters: {
       readonly query?: never;
@@ -1178,6 +1218,26 @@ export type paths = {
     readonly get: operations["getEnterpriseConsole"];
     readonly put?: never;
     readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/v1/workspaces/{workspace_id}/enterprise-documents/{document_id}/versions/{document_version_id}/publish-requests": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Request Enterprise Document Publish
+     * @description 提交就绪版本发布申请，审批前不切换发布或索引指针。
+     */
+    readonly post: operations["requestEnterpriseDocumentPublish"];
     readonly delete?: never;
     readonly options?: never;
     readonly head?: never;
@@ -4812,6 +4872,14 @@ export type components = {
       readonly parent_department_id?: string | null;
     };
     /**
+     * CreateDocumentPublishRequest
+     * @description 定义文档版本发布申请的幂等输入。
+     */
+    readonly CreateDocumentPublishRequest: {
+      /** Idempotency Key */
+      readonly idempotency_key: string;
+    };
+    /**
      * CreateDocumentRequest
      * @description 定义创建文档操作的请求字段与协议校验边界。
      */
@@ -4880,6 +4948,11 @@ export type components = {
      * @description 定义分类创建及初始文档绑定输入。
      */
     readonly CreateEnterpriseCategoryRequest: {
+      /**
+       * Approval Required
+       * @default false
+       */
+      readonly approval_required: boolean;
       /** Department Ids */
       readonly department_ids?: readonly string[];
       /** Description */
@@ -5336,6 +5409,114 @@ export type components = {
       readonly updated_at: string;
     };
     /**
+     * DocumentPublishApprovalLevelResponse
+     * @description 定义发布审批层级、审批人和时间游标。
+     */
+    readonly DocumentPublishApprovalLevelResponse: {
+      /** Approver Account Ids */
+      readonly approver_account_ids: readonly string[];
+      /** Completed At */
+      readonly completed_at: string | null;
+      /** Fallback Activated */
+      readonly fallback_activated: boolean;
+      /**
+       * Mode
+       * @enum {string}
+       */
+      readonly mode: "any" | "all";
+      /** Reminder At */
+      readonly reminder_at: string | null;
+      /** Sequence No */
+      readonly sequence_no: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "waiting" | "active" | "approved" | "rejected" | "withdrawn";
+      /** Timeout At */
+      readonly timeout_at: string | null;
+    };
+    /**
+     * DocumentPublishApprovalResponse
+     * @description 定义发布请求绑定的通用审批运行快照。
+     */
+    readonly DocumentPublishApprovalResponse: {
+      /**
+       * Approval Instance Id
+       * Format: uuid
+       */
+      readonly approval_instance_id: string;
+      /** Current Sequence No */
+      readonly current_sequence_no: number;
+      /** Levels */
+      readonly levels: readonly components["schemas"]["DocumentPublishApprovalLevelResponse"][];
+      /** Personal Owner Confirmation */
+      readonly personal_owner_confirmation: boolean;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status: "pending" | "approved" | "rejected" | "withdrawn";
+    };
+    /**
+     * DocumentPublishRequestResponse
+     * @description 定义发布版本、分类快照、业务终态和审批链台账。
+     */
+    readonly DocumentPublishRequestResponse: {
+      readonly approval: components["schemas"]["DocumentPublishApprovalResponse"];
+      /** Category Ids */
+      readonly category_ids: readonly string[];
+      /** Completed At */
+      readonly completed_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      readonly created_at: string;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      readonly document_id: string;
+      /**
+       * Document Version Id
+       * Format: uuid
+       */
+      readonly document_version_id: string;
+      /** Failure Reason Code */
+      readonly failure_reason_code: string | null;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      readonly knowledge_base_id: string;
+      /**
+       * Publish Request Id
+       * Format: uuid
+       */
+      readonly publish_request_id: string;
+      /**
+       * Requester Account Id
+       * Format: uuid
+       */
+      readonly requester_account_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      readonly status:
+        "pending" | "published" | "rejected" | "withdrawn" | "expired" | "publish_failed";
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      readonly updated_at: string;
+      /** Version */
+      readonly version: number;
+      /** Version Number */
+      readonly version_number: number;
+    };
+    /**
      * DocumentResponse
      * @description 定义文档操作的稳定响应结构。
      */
@@ -5588,6 +5769,11 @@ export type components = {
      * @description 定义企业分类、独立可见策略和显式文档关系。
      */
     readonly EnterpriseCategoryResponse: {
+      /**
+       * Approval Required
+       * @default false
+       */
+      readonly approval_required: boolean;
       /**
        * Category Id
        * Format: uuid
@@ -9273,6 +9459,11 @@ export type components = {
      * @description 定义带乐观版本的分类元数据更新输入。
      */
     readonly UpdateEnterpriseCategoryRequest: {
+      /**
+       * Approval Required
+       * @default false
+       */
+      readonly approval_required: boolean;
       /** Department Ids */
       readonly department_ids?: readonly string[];
       /** Description */
@@ -15099,6 +15290,178 @@ export interface operations {
       };
     };
   };
+  readonly listEnterpriseDocumentPublishRequests: {
+    readonly parameters: {
+      readonly query?: {
+        readonly limit?: number;
+      };
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": readonly components["schemas"]["DocumentPublishRequestResponse"][];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly getEnterpriseDocumentPublishRequest: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly publish_request_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["DocumentPublishRequestResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   readonly setKnowledgeDocumentFavorite: {
     readonly parameters: {
       readonly query?: never;
@@ -16066,6 +16429,110 @@ export interface operations {
       };
       /** @description 资源不存在或不可见 */
       readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求参数无效 */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 平台内部错误 */
+      readonly 500: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 依赖服务暂时不可用 */
+      readonly 503: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  readonly requestEnterpriseDocumentPublish: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+        readonly "X-CSRF-Token"?: string | null;
+        readonly "X-Workspace-ID"?: string | null;
+      };
+      readonly path: {
+        readonly document_id: string;
+        readonly document_version_id: string;
+        readonly workspace_id: string;
+      };
+      readonly cookie?: never;
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["CreateDocumentPublishRequest"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["DocumentPublishRequestResponse"];
+        };
+      };
+      /** @description 请求上下文无效 */
+      readonly 400: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 身份凭证无效 */
+      readonly 401: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 请求未获授权 */
+      readonly 403: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源不存在或不可见 */
+      readonly 404: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description 资源状态冲突 */
+      readonly 409: {
         headers: {
           readonly [name: string]: unknown;
         };

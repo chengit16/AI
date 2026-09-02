@@ -12,6 +12,8 @@
     { "code": "QUOTA_EXCEEDED", "http_status": 409, "message": "当前用量已达到套餐上限", "retryable": false },
     { "code": "ENTITLEMENT_CONFLICT", "http_status": 409, "message": "套餐、功能开关或用量状态已发生变化", "retryable": true },
     { "code": "KNOWLEDGE_CONFLICT", "http_status": 409, "message": "知识库、文档或文档版本状态不允许当前操作", "retryable": false },
+    { "code": "DOCUMENT_PUBLISH_APPROVAL_REQUIRED", "http_status": 409, "message": "当前企业文档版本必须通过发布审批后才能生效", "retryable": false },
+    { "code": "DOCUMENT_PUBLISH_NOT_READY", "http_status": 409, "message": "文档版本、索引或审批分类尚未满足发布申请条件", "retryable": false },
     { "code": "CATEGORY_HAS_ACTIVE_CHILDREN", "http_status": 409, "message": "分类仍存在活动子分类，请先归档子分类", "retryable": false },
     { "code": "UPLOAD_EMPTY_FILE", "http_status": 422, "message": "上传文件内容为空", "retryable": false },
     { "code": "UPLOAD_FILE_TOO_LARGE", "http_status": 413, "message": "上传文件超过当前配置的大小限制", "retryable": false },

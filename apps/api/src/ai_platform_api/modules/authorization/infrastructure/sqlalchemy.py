@@ -155,6 +155,112 @@ class SqlAlchemyPolicyGrantRepository:
             )
 
 
+class SqlAlchemyTransactionalPolicyGrantRepository:
+    """在调用方事务快照内解析授权事实，供批准等原子业务复核使用。"""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def resolve_subject(self, context: RequestContext) -> PolicySubject | None:
+        """使用当前 Session 恢复活动成员和有效角色，不开启旁路事务。"""
+
+        # 1. 先锁定工作空间与成员当前状态，失效主体不得进入 PDP。
+        if context.user_id is None:
+            return None
+        workspace_row = self._session.execute(
+            select(workspaces.c.status, workspaces.c.role_version).where(
+                workspaces.c.workspace_id == context.workspace_id
+            )
+        ).one_or_none()
+        membership_row = self._session.execute(
+            select(workspace_memberships).where(
+                workspace_memberships.c.workspace_id == context.workspace_id,
+                workspace_memberships.c.account_id == context.user_id,
+            )
+        ).one_or_none()
+        if (
+            workspace_row is None
+            or workspace_row.status != "active"
+            or membership_row is None
+            or membership_row.status != "active"
+        ):
+            return None
+        membership = WorkspaceMembership(
+            membership_row.membership_id,
+            membership_row.workspace_id,
+            membership_row.account_id,
+            cast("MembershipType", membership_row.membership_type),
+            membership_row.status,
+            membership_row.created_at,
+            membership_row.updated_at,
+            membership_row.version,
+        )
+        # 2. 在同一事务快照展开组织与角色，生成最小可追溯主体事实。
+        effective = resolve_effective_roles(
+            membership=membership,
+            role_version=workspace_row.role_version,
+            roles=_roles(self._session, context.workspace_id),
+            bindings=_bindings(self._session, context.workspace_id),
+            departments=_departments(self._session, context.workspace_id),
+            assigned_department_ids=tuple(
+                self._session.scalars(
+                    select(membership_departments.c.department_id).where(
+                        membership_departments.c.workspace_id == context.workspace_id,
+                        membership_departments.c.membership_id == membership.membership_id,
+                    )
+                )
+            ),
+        )
+        return PolicySubject(
+            account_id=context.user_id,
+            membership_id=membership.membership_id,
+            role_version=effective.role_version,
+            role_ids=frozenset(role.role_id for role in effective.roles),
+        )
+
+    def list_role_grants(
+        self,
+        workspace_id: UUID,
+        role_ids: frozenset[UUID],
+    ) -> tuple[RolePermissionGrant, ...]:
+        if not role_ids:
+            return ()
+        return tuple(
+            _grant(row)
+            for row in self._session.execute(
+                select(role_permission_grants).where(
+                    role_permission_grants.c.workspace_id == workspace_id,
+                    role_permission_grants.c.role_id.in_(role_ids),
+                )
+            )
+        )
+
+    def expand_department_tree(
+        self,
+        workspace_id: UUID,
+        department_ids: frozenset[UUID],
+    ) -> frozenset[UUID]:
+        if not department_ids:
+            return frozenset()
+        return frozenset(
+            self._session.scalars(
+                select(department_closure.c.descendant_department_id)
+                .join(
+                    departments,
+                    (departments.c.workspace_id == department_closure.c.workspace_id)
+                    & (
+                        departments.c.department_id == department_closure.c.descendant_department_id
+                    ),
+                )
+                .where(
+                    department_closure.c.workspace_id == workspace_id,
+                    department_closure.c.ancestor_department_id.in_(department_ids),
+                    departments.c.status == "active",
+                )
+            )
+        )
+
+
 class SqlAlchemyRolePermissionRepository:
     """在工作空间隔离下整体维护角色授权项和角色版本。"""
 

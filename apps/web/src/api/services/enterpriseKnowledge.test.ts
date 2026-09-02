@@ -1,4 +1,4 @@
-/** @description P6B-03 企业知识 Service 的 HTTP 方法、路径与命令映射测试。 */
+/** @description P6B-04 企业知识 Service 的治理与发布审批 HTTP 映射测试。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { configureApiClient } from "@/api/client";
@@ -9,6 +9,10 @@ import {
   createEnterpriseCategory,
   createTeamKnowledgeDomain,
   getEnterpriseKnowledgePortal,
+  getEnterpriseDocumentDetail,
+  getEnterpriseDocumentPublishRequest,
+  listEnterpriseDocumentPublishRequests,
+  requestEnterpriseDocumentPublish,
   replaceEnterpriseCategoryDocuments,
   replaceTeamKnowledgeDomainScope,
   resolveTeamKnowledgeDomainScope,
@@ -20,7 +24,7 @@ const WORKSPACE_ID = "20000000-0000-4000-8000-000000000903";
 const CATEGORY_ID = "30000000-0000-4000-8000-000000000903";
 const DOMAIN_ID = "40000000-0000-4000-8000-000000000903";
 
-describe("P6B-03 企业知识 Service", () => {
+describe("P6B-04 企业知识 Service", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     configureApiClient(
@@ -52,6 +56,7 @@ describe("P6B-03 企业知识 Service", () => {
       visibility: "public",
       department_ids: [],
       document_ids: [],
+      approval_required: false,
     });
     await updateEnterpriseCategory(WORKSPACE_ID, CATEGORY_ID, {
       expected_version: 2,
@@ -60,6 +65,7 @@ describe("P6B-03 企业知识 Service", () => {
       parent_category_id: null,
       visibility: "private",
       department_ids: [],
+      approval_required: true,
     });
     await archiveEnterpriseCategory(WORKSPACE_ID, CATEGORY_ID, 3);
     await replaceEnterpriseCategoryDocuments(WORKSPACE_ID, CATEGORY_ID, 4, ["document-1"]);
@@ -119,6 +125,51 @@ describe("P6B-03 企业知识 Service", () => {
       member_ids: ["member-1"],
       department_ids: ["department-1"],
       knowledge_base_ids: ["knowledge-base-1"],
+    });
+  });
+
+  it("映射版本详情、发布申请和参与者台账路径", async () => {
+    configureApiClient(
+      () => ({ workspaceId: WORKSPACE_ID, csrfToken: "synthetic-csrf" }),
+      () => undefined,
+    );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    await getEnterpriseDocumentDetail(WORKSPACE_ID, "knowledge-base-1", "document-1");
+    await requestEnterpriseDocumentPublish(
+      WORKSPACE_ID,
+      "document-1",
+      "version-1",
+      "synthetic-p6b04-service",
+    );
+    await listEnterpriseDocumentPublishRequests(WORKSPACE_ID);
+    await getEnterpriseDocumentPublishRequest(WORKSPACE_ID, "publish-request-1");
+
+    const calls = fetchMock.mock.calls.map(([path, request]) => ({
+      path,
+      method: request?.method,
+      body: request?.body,
+    }));
+    expect(calls.map((call) => [call.method, call.path])).toEqual([
+      [
+        "GET",
+        `/api/v1/workspaces/${WORKSPACE_ID}/knowledge-bases/knowledge-base-1/documents/document-1`,
+      ],
+      [
+        "POST",
+        `/api/v1/workspaces/${WORKSPACE_ID}/enterprise-documents/document-1/versions/version-1/publish-requests`,
+      ],
+      ["GET", `/api/v1/workspaces/${WORKSPACE_ID}/document-publish-requests?limit=100`],
+      ["GET", `/api/v1/workspaces/${WORKSPACE_ID}/document-publish-requests/publish-request-1`],
+    ]);
+    expect(JSON.parse(String(calls[1]?.body))).toEqual({
+      idempotency_key: "synthetic-p6b04-service",
     });
   });
 });

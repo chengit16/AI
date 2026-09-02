@@ -9,6 +9,9 @@ import {
   createEnterpriseCategory,
   createTeamKnowledgeDomain,
   getEnterpriseKnowledgePortal,
+  getEnterpriseDocumentDetail,
+  listEnterpriseDocumentPublishRequests,
+  requestEnterpriseDocumentPublish,
   replaceEnterpriseCategoryDocuments,
   replaceTeamKnowledgeDomainScope,
   resolveTeamKnowledgeDomainScope,
@@ -22,12 +25,15 @@ import {
   type UpdateEnterpriseCategory,
   type UpdateTeamKnowledgeDomain,
 } from "@/api/services/enterpriseKnowledge";
+import { actOnApproval, transferApproval } from "@/api/services/workflows";
 
 interface UseEnterpriseKnowledgeOptions {
   /** 来自可信空间切换状态的工作空间标识。 */
   workspaceId: string | null | undefined;
   /** 仅企业空间且菜单允许读取时启用查询。 */
   enabled: boolean;
+  /** 只有菜单允许读取发布台账时启用参与者查询。 */
+  publishRequestsEnabled: boolean;
 }
 
 /** 策略传播暂时不可用时有限重试，其他错误立即交给页面处理。 */
@@ -41,7 +47,11 @@ export function shouldRetryEnterpriseKnowledge(failureCount: number, error: unkn
 }
 
 /** 集中维护企业知识快照刷新、稳定反馈和乐观冲突提示。 */
-export function useEnterpriseKnowledge({ workspaceId, enabled }: UseEnterpriseKnowledgeOptions) {
+export function useEnterpriseKnowledge({
+  workspaceId,
+  enabled,
+  publishRequestsEnabled,
+}: UseEnterpriseKnowledgeOptions) {
   // 1. 建立当前企业空间唯一查询键，读取与所有写操作共享同一份事务快照。
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -52,6 +62,15 @@ export function useEnterpriseKnowledge({ workspaceId, enabled }: UseEnterpriseKn
     enabled: Boolean(workspaceId && enabled),
     retry: shouldRetryEnterpriseKnowledge,
     retryDelay: (failureCount) => Math.min(500 * 2 ** failureCount, 4_000),
+  });
+  const publishRequestQueryKey = ["enterprise-document-publish-requests", workspaceId] as const;
+  const publishRequests = useQuery({
+    queryKey: publishRequestQueryKey,
+    queryFn: ({ signal }) => listEnterpriseDocumentPublishRequests(workspaceId!, signal),
+    enabled: Boolean(workspaceId && enabled && publishRequestsEnabled),
+    retry: shouldRetryEnterpriseKnowledge,
+    refetchInterval: (query) =>
+      query.state.data?.some((request) => request.status === "pending") ? 3_000 : false,
   });
 
   const refresh = async () => queryClient.invalidateQueries({ queryKey });
@@ -138,9 +157,94 @@ export function useEnterpriseKnowledge({ workspaceId, enabled }: UseEnterpriseKn
     mutationFn: (domainId: string) => resolveTeamKnowledgeDomainScope(workspaceId!, domainId),
     onError: (error) => void message.error(errorMessage(error)),
   });
+  const loadDocumentVersions = useMutation({
+    mutationFn: ({
+      knowledgeBaseId,
+      documentId,
+    }: {
+      knowledgeBaseId: string;
+      documentId: string;
+    }) => getEnterpriseDocumentDetail(workspaceId!, knowledgeBaseId, documentId),
+    onError: (error) => void message.error(errorMessage(error)),
+  });
+
+  // 3. 发布审批动作复用通用审批运行时，并同时刷新审批台账与企业知识快照。
+  const refreshPublishRequests = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: publishRequestQueryKey }),
+      queryClient.invalidateQueries({ queryKey }),
+    ]);
+  };
+  const actOnPublishRequest = useMutation({
+    mutationFn: ({
+      instanceId,
+      action,
+      reasonCode,
+    }: {
+      instanceId: string;
+      action: "approve" | "reject" | "withdraw";
+      reasonCode?: string;
+    }) =>
+      actOnApproval(
+        workspaceId!,
+        instanceId,
+        action,
+        ["document-publish", action, crypto.randomUUID()].join("-"),
+        reasonCode,
+      ),
+    onSuccess: async () => {
+      await refreshPublishRequests();
+      void message.success("发布审批状态已更新");
+    },
+    onError: (error) => void message.error(errorMessage(error)),
+  });
+  const transferPublishRequest = useMutation({
+    mutationFn: ({
+      instanceId,
+      targetAccountId,
+    }: {
+      instanceId: string;
+      targetAccountId: string;
+    }) =>
+      transferApproval(
+        workspaceId!,
+        instanceId,
+        targetAccountId,
+        ["document-publish-transfer", crypto.randomUUID()].join("-"),
+      ),
+    onSuccess: async () => {
+      await refreshPublishRequests();
+      void message.success("发布审批责任已转交");
+    },
+    onError: (error) => void message.error(errorMessage(error)),
+  });
+  const requestPublish = useMutation({
+    mutationFn: ({
+      documentId,
+      documentVersionId,
+      idempotencyKey,
+    }: {
+      documentId: string;
+      documentVersionId: string;
+      idempotencyKey: string;
+    }) =>
+      requestEnterpriseDocumentPublish(workspaceId!, documentId, documentVersionId, idempotencyKey),
+    onSuccess: async () => {
+      await refreshPublishRequests();
+      void message.success("发布申请已提交");
+    },
+    onError: (error) => {
+      const content =
+        error instanceof PlatformApiError && error.code === "DOCUMENT_PUBLISH_NOT_READY"
+          ? "当前版本尚未满足发布申请条件，请刷新后重试"
+          : errorMessage(error);
+      void message.error(content);
+    },
+  });
 
   return {
     portal,
+    publishRequests,
     createCategory,
     updateCategory,
     archiveCategory,
@@ -150,5 +254,9 @@ export function useEnterpriseKnowledge({ workspaceId, enabled }: UseEnterpriseKn
     archiveDomain,
     replaceDomainScope,
     resolveDomainScope,
+    actOnPublishRequest,
+    transferPublishRequest,
+    loadDocumentVersions,
+    requestPublish,
   };
 }
