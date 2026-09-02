@@ -16,9 +16,16 @@ from ai_platform_api.modules.authorization.api.schemas import (
     MenuReleaseSnapshotMenuEntry,
     MenuReleaseSnapshotResponse,
     MenuReleaseSnapshotRoleMenuEntry,
+    PermissionCatalogGroupResponse,
+    PermissionCatalogItemResponse,
+    PermissionFieldCatalogResponse,
     ReplaceRoleMenuVisibilityRequest,
     ReplaceRolePermissionsRequest,
     ReplaceWorkspaceMenuConfigurationRequest,
+    RoleAffectedMemberResponse,
+    RoleBindingSummaryResponse,
+    RoleGovernanceResponse,
+    RoleGovernanceRoleResponse,
     RoleMenuVisibilityEntry,
     RoleMenuVisibilityResponse,
     RolePermissionEntry,
@@ -50,6 +57,84 @@ menu_router = APIRouter(prefix="/workspaces/{workspace_id}", tags=["菜单权限
 
 
 @router.get(
+    "/governance",
+    response_model=RoleGovernanceResponse,
+    operation_id="getEnterpriseRoleGovernance",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def get_role_governance(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[RolePermissionService, Depends(role_permission_service)],
+) -> RoleGovernanceResponse:
+    """返回权限页角色、矩阵目录、绑定和影响成员聚合。"""
+
+    snapshot = service.get_governance(context, workspace_id=workspace_id)
+    return RoleGovernanceResponse(
+        role_version=snapshot.role_version,
+        roles=[
+            RoleGovernanceRoleResponse(
+                role_id=role.role_id,
+                role_key=role.role_key,
+                name=role.name,
+                status=role.status,
+                system_managed=role.system_managed,
+                editable=role.editable,
+                grants=[_entry(grant) for grant in role.grants],
+                bindings=[
+                    RoleBindingSummaryResponse(
+                        scope_type=binding.scope_type,
+                        scope_id=binding.scope_id,
+                        scope_name=binding.scope_name,
+                    )
+                    for binding in role.bindings
+                ],
+                affected_member_count=len(role.affected_members),
+                affected_members=[
+                    RoleAffectedMemberResponse(
+                        account_id=member.account_id,
+                        display_name=member.display_name,
+                        membership_type=member.membership_type,
+                        sources=[
+                            RoleBindingSummaryResponse(
+                                scope_type=source.scope_type,
+                                scope_id=source.scope_id,
+                                scope_name=source.scope_name,
+                            )
+                            for source in member.sources
+                        ],
+                    )
+                    for member in role.affected_members
+                ],
+            )
+            for role in snapshot.roles
+        ],
+        permission_groups=[
+            PermissionCatalogGroupResponse(
+                domain=group.domain,
+                items=[
+                    PermissionCatalogItemResponse(
+                        permission_code=item.permission_code,
+                        resource_type=item.resource_type,
+                        action=item.action,
+                        allowed_scope_types=list(item.allowed_scope_types),
+                        fields=[
+                            PermissionFieldCatalogResponse(
+                                field_name=field.field_name,
+                                security_level=field.security_level,
+                            )
+                            for field in item.fields
+                        ],
+                    )
+                    for item in group.items
+                ],
+            )
+            for group in snapshot.permission_groups
+        ],
+    )
+
+
+@router.get(
     "/{role_id}/permissions",
     response_model=RolePermissionListResponse,
     operation_id="listEnterpriseRolePermissions",
@@ -63,15 +148,13 @@ def list_role_permissions(
 ) -> RolePermissionListResponse:
     """列出角色权限集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
 
+    snapshot = service.list(
+        context,
+        workspace_id=workspace_id,
+        role_id=role_id,
+    )
     return RolePermissionListResponse(
-        items=[
-            _entry(grant)
-            for grant in service.list(
-                context,
-                workspace_id=workspace_id,
-                role_id=role_id,
-            )
-        ]
+        role_version=snapshot.role_version, items=[_entry(grant) for grant in snapshot.grants]
     )
 
 
@@ -90,10 +173,17 @@ def replace_role_permissions(
 ) -> RolePermissionListResponse:
     """整体替换角色权限集合；仅转换协议数据，认证授权和事务由应用服务统一执行。"""
 
-    grants = service.replace(
+    # V1 兼容窗口允许旧客户端省略版本；新治理页始终显式提交读取到的可信版本。
+    expected_role_version = body.expected_role_version
+    if expected_role_version is None:
+        expected_role_version = service.list(
+            context, workspace_id=workspace_id, role_id=role_id
+        ).role_version
+    snapshot = service.replace(
         context,
         workspace_id=workspace_id,
         role_id=role_id,
+        expected_role_version=expected_role_version,
         entries=tuple(
             (
                 item.permission_code,
@@ -106,7 +196,10 @@ def replace_role_permissions(
             for item in body.items
         ),
     )
-    return RolePermissionListResponse(items=[_entry(grant) for grant in grants])
+    return RolePermissionListResponse(
+        role_version=snapshot.role_version,
+        items=[_entry(grant) for grant in snapshot.grants],
+    )
 
 
 def _entry(grant: RolePermissionGrant) -> RolePermissionEntry:

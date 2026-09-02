@@ -238,6 +238,11 @@ def test_dropped_invalidation_rejects_all_surfaces_within_five_seconds(
         owner_context,
         workspace_id=workspace.workspace_id,
         role_id=role.role_id,
+        expected_role_version=propagation_database.permissions.list(
+            owner_context,
+            workspace_id=workspace.workspace_id,
+            role_id=role.role_id,
+        ).role_version,
         entries=(
             (
                 "knowledge.document.read",

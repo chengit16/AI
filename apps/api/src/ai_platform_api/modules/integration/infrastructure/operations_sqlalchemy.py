@@ -10,18 +10,23 @@ from typing import Any, Literal, cast
 from uuid import UUID
 
 from ai_platform_backend.integration.persistence import (
+    audit_export_requests,
     audit_records,
     consumer_receipts,
     outbox_events,
     outbox_replay_requests,
 )
-from ai_platform_backend.integration.sqlalchemy import SqlAlchemyAuditWriter
+from ai_platform_backend.integration.sqlalchemy import (
+    SqlAlchemyAuditWriter,
+    SqlAlchemyOutboxWriter,
+)
 from sqlalchemy import CursorResult, func, insert, not_, or_, select, tuple_, update
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ai_platform_api.modules.integration.domain.operations import (
+    AuditExportRequest,
     AuditOperationsPage,
     AuditOperationsRecord,
     AuditOutcome,
@@ -97,6 +102,96 @@ class SqlAlchemyIntegrationOperationsRepository:
         return AuditOperationsPage(
             items=items[:limit],
             next_cursor=items[limit - 1].audit_id if len(items) > limit else None,
+        )
+
+    def get_audit_record(self, workspace_id: UUID, audit_id: UUID) -> AuditOperationsRecord | None:
+        """按空间和审计标识读取单条事实，跨空间标识不可探测。"""
+
+        row = (
+            self._session.execute(
+                select(audit_records).where(
+                    audit_records.c.workspace_id == workspace_id,
+                    audit_records.c.audit_id == audit_id,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else _audit_record(row)
+
+    def list_audit_export_requests(
+        self, workspace_id: UUID, *, limit: int
+    ) -> tuple[AuditExportRequest, ...]:
+        rows = self._session.execute(
+            select(audit_export_requests)
+            .where(audit_export_requests.c.workspace_id == workspace_id)
+            .order_by(
+                audit_export_requests.c.created_at.desc(),
+                audit_export_requests.c.audit_export_request_id.desc(),
+            )
+            .limit(limit)
+        ).mappings()
+        return tuple(_audit_export_request(row) for row in rows)
+
+    def get_audit_export_request(
+        self, workspace_id: UUID, audit_export_request_id: UUID
+    ) -> AuditExportRequest | None:
+        row = (
+            self._session.execute(
+                select(audit_export_requests).where(
+                    audit_export_requests.c.workspace_id == workspace_id,
+                    audit_export_requests.c.audit_export_request_id == audit_export_request_id,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else _audit_export_request(row)
+
+    def get_audit_export_request_by_key(
+        self, workspace_id: UUID, idempotency_key: str
+    ) -> AuditExportRequest | None:
+        row = (
+            self._session.execute(
+                select(audit_export_requests).where(
+                    audit_export_requests.c.workspace_id == workspace_id,
+                    audit_export_requests.c.idempotency_key == idempotency_key,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else _audit_export_request(row)
+
+    def add_audit_export_request(self, request: AuditExportRequest) -> None:
+        self._session.execute(
+            insert(audit_export_requests).values(
+                audit_export_request_id=request.audit_export_request_id,
+                workspace_id=request.workspace_id,
+                idempotency_key=request.idempotency_key,
+                request_hash=request.request_hash,
+                actor_id=request.actor_id,
+                action=request.action,
+                resource_type=request.resource_type,
+                outcome=request.outcome,
+                occurred_from=request.occurred_from,
+                occurred_to=request.occurred_to,
+                field_mask=sorted(request.field_mask),
+                requested_by_actor_id=request.requested_by_actor_id,
+                requested_by_user_id=request.requested_by_user_id,
+                request_id=request.request_id,
+                trace_id=request.trace_id,
+                traceparent=request.traceparent,
+                status=request.status,
+                attempt_count=request.attempt_count,
+                last_error_code=request.last_error_code,
+                row_count=request.row_count,
+                result_sha256=request.result_sha256,
+                result_summary=request.result_summary,
+                created_at=request.created_at,
+                updated_at=request.updated_at,
+                completed_at=request.completed_at,
+            )
         )
 
     def list_outbox_events(
@@ -351,7 +446,13 @@ class SqlAlchemyIntegrationOperationsUnitOfWork:
     def __init__(self, session_factory: SessionFactory) -> None:
         self._session_factory = session_factory
         self._state: ContextVar[
-            tuple[Session, SqlAlchemyIntegrationOperationsRepository, SqlAlchemyAuditWriter] | None
+            tuple[
+                Session,
+                SqlAlchemyIntegrationOperationsRepository,
+                SqlAlchemyAuditWriter,
+                SqlAlchemyOutboxWriter,
+            ]
+            | None
         ] = ContextVar("integration_operations_unit_of_work", default=None)
 
     def __enter__(self) -> SqlAlchemyIntegrationOperationsUnitOfWork:
@@ -363,6 +464,7 @@ class SqlAlchemyIntegrationOperationsUnitOfWork:
                 session,
                 SqlAlchemyIntegrationOperationsRepository(session),
                 SqlAlchemyAuditWriter(session),
+                SqlAlchemyOutboxWriter(session),
             )
         )
         return self
@@ -388,6 +490,10 @@ class SqlAlchemyIntegrationOperationsUnitOfWork:
     def audit(self) -> SqlAlchemyAuditWriter:
         return self._current()[2]
 
+    @property
+    def outbox(self) -> SqlAlchemyOutboxWriter:
+        return self._current()[3]
+
     def commit(self) -> None:
         try:
             self._current()[0].commit()
@@ -397,7 +503,12 @@ class SqlAlchemyIntegrationOperationsUnitOfWork:
 
     def _current(
         self,
-    ) -> tuple[Session, SqlAlchemyIntegrationOperationsRepository, SqlAlchemyAuditWriter]:
+    ) -> tuple[
+        Session,
+        SqlAlchemyIntegrationOperationsRepository,
+        SqlAlchemyAuditWriter,
+        SqlAlchemyOutboxWriter,
+    ]:
         state = self._state.get()
         if state is None:
             raise RuntimeError("Integration Operations Unit of Work 尚未进入事务范围")
@@ -443,6 +554,36 @@ def _audit_record(row: RowMapping) -> AuditOperationsRecord:
         policy_decision_id=row["policy_decision_id"],
         policy_version=row["policy_version"],
         attributes=cast(dict[str, object], row["attributes"]),
+    )
+
+
+def _audit_export_request(row: RowMapping) -> AuditExportRequest:
+    return AuditExportRequest(
+        audit_export_request_id=row["audit_export_request_id"],
+        workspace_id=row["workspace_id"],
+        idempotency_key=row["idempotency_key"],
+        request_hash=row["request_hash"],
+        actor_id=row["actor_id"],
+        action=row["action"],
+        resource_type=row["resource_type"],
+        outcome=cast(AuditOutcome | None, row["outcome"]),
+        occurred_from=row["occurred_from"],
+        occurred_to=row["occurred_to"],
+        field_mask=frozenset(row["field_mask"]),
+        requested_by_actor_id=row["requested_by_actor_id"],
+        requested_by_user_id=row["requested_by_user_id"],
+        request_id=row["request_id"],
+        trace_id=row["trace_id"],
+        traceparent=row["traceparent"],
+        status=cast(Any, row["status"]),
+        attempt_count=row["attempt_count"],
+        last_error_code=row["last_error_code"],
+        row_count=row["row_count"],
+        result_sha256=row["result_sha256"],
+        result_summary=row["result_summary"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        completed_at=row["completed_at"],
     )
 
 

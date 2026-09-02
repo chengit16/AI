@@ -265,10 +265,16 @@ def test_system_grants_and_custom_role_scope_are_persistent(
         department_id=root.department_id,
         target_account_id=None,
     )
+    initial_role_version = authorization_database.permissions.list(
+        owner_context,
+        workspace_id=workspace_id,
+        role_id=reader_role.role_id,
+    ).role_version
     grants = authorization_database.permissions.replace(
         owner_context,
         workspace_id=workspace_id,
         role_id=reader_role.role_id,
+        expected_role_version=initial_role_version,
         entries=(
             (
                 "organization.department.read",
@@ -296,6 +302,22 @@ def test_system_grants_and_custom_role_scope_are_persistent(
         )
         == grants
     )
+    governance = authorization_database.permissions.get_governance(
+        owner_context, workspace_id=workspace_id
+    )
+    governed_role = next(item for item in governance.roles if item.role_id == reader_role.role_id)
+    assert governance.role_version == grants.role_version
+    assert governed_role.editable is True
+    assert governed_role.bindings[0].scope_type == "department"
+    assert {item.account_id for item in governed_role.affected_members} == {member.account_id}
+    with pytest.raises(RolePermissionConflictError):
+        authorization_database.permissions.replace(
+            owner_context,
+            workspace_id=workspace_id,
+            role_id=reader_role.role_id,
+            expected_role_version=initial_role_version,
+            entries=(),
+        )
 
     child_decision = decide(
         authorization_database,
@@ -385,6 +407,11 @@ def test_system_roles_cannot_be_rewritten(authorization_database: AuthorizationH
             owner_context,
             workspace_id=workspace.workspace_id,
             role_id=owner_role.role_id,
+            expected_role_version=authorization_database.permissions.list(
+                owner_context,
+                workspace_id=workspace.workspace_id,
+                role_id=owner_role.role_id,
+            ).role_version,
             entries=(),
         )
 

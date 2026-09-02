@@ -363,6 +363,60 @@ class AssistantSourceResponse(typing.TypedDict):
     source_position: dict[str, object]
 
 
+class AuditExportBody(typing.TypedDict):
+    action: typing.NotRequired[str | None]
+    actor_id: typing.NotRequired[str | None]
+    idempotency_key: str
+    occurred_from: typing.NotRequired[str | None]
+    occurred_to: typing.NotRequired[str | None]
+    outcome: typing.NotRequired[typing.Literal["succeeded", "denied", "failed"] | None]
+    resource_type: typing.NotRequired[str | None]
+
+
+class AuditExportListResponse(typing.TypedDict):
+    items: list[AuditExportResponse]
+
+
+class AuditExportResponse(typing.TypedDict):
+    action: str | None
+    actor_id: str | None
+    attempt_count: int
+    audit_export_request_id: str
+    completed_at: str | None
+    created_at: str
+    idempotency_key: str
+    last_error_code: str | None
+    occurred_from: str | None
+    occurred_to: str
+    outcome: typing.Literal["succeeded", "denied", "failed"] | None
+    resource_type: str | None
+    result_sha256: str | None
+    result_summary: str | None
+    row_count: int | None
+    status: typing.Literal["pending", "running", "retry_wait", "completed", "dead_letter"]
+    updated_at: str
+    workspace_id: str
+
+
+class AuditRecordDetailResponse(typing.TypedDict):
+    action: str
+    actor_id: str
+    actor_id_masked: typing.NotRequired[bool]
+    attributes: dict[str, object]
+    audit_id: str
+    occurred_at: str
+    outcome: typing.Literal["succeeded", "denied", "failed"]
+    permission_code: str | None
+    policy_decision_id: str | None
+    policy_version: int | None
+    request_id: str
+    resource_id: str
+    resource_type: str
+    trace_id: str
+    user_id: str | None
+    workspace_id: str
+
+
 class AuditRecordPageResponse(typing.TypedDict):
     items: list[AuditRecordResponse]
     next_cursor: str | None
@@ -371,6 +425,7 @@ class AuditRecordPageResponse(typing.TypedDict):
 class AuditRecordResponse(typing.TypedDict):
     action: str
     actor_id: str
+    actor_id_masked: typing.NotRequired[bool]
     audit_id: str
     occurred_at: str
     outcome: typing.Literal["succeeded", "denied", "failed"]
@@ -1629,6 +1684,24 @@ class OutboxStatusCountResponse(typing.TypedDict):
     status: typing.Literal["pending", "publishing", "published", "dead_letter"]
 
 
+class PermissionCatalogGroupResponse(typing.TypedDict):
+    domain: str
+    items: list[PermissionCatalogItemResponse]
+
+
+class PermissionCatalogItemResponse(typing.TypedDict):
+    action: str
+    allowed_scope_types: list[typing.Literal["workspace", "department_tree", "self", "resource"]]
+    fields: list[PermissionFieldCatalogResponse]
+    permission_code: str
+    resource_type: str
+
+
+class PermissionFieldCatalogResponse(typing.TypedDict):
+    field_name: str
+    security_level: typing.Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+
+
 class PersonalKnowledgeWorkbenchResponse(typing.TypedDict):
     favorite_documents: list[PersonalWorkbenchDocumentResponse]
     recent_documents: list[PersonalWorkbenchDocumentResponse]
@@ -1787,6 +1860,7 @@ class ReplaceRoleMenuVisibilityRequest(typing.TypedDict):
 
 
 class ReplaceRolePermissionsRequest(typing.TypedDict):
+    expected_role_version: typing.NotRequired[int | None]
     items: list[RolePermissionEntry]
 
 
@@ -1851,6 +1925,13 @@ class ReviseApprovalPolicyRequest(typing.TypedDict):
     expected_version: int
 
 
+class RoleAffectedMemberResponse(typing.TypedDict):
+    account_id: str
+    display_name: str
+    membership_type: typing.Literal["owner", "member"]
+    sources: list[RoleBindingSummaryResponse]
+
+
 class RoleBindingResponse(typing.TypedDict):
     binding_id: str
     department_id: str | None
@@ -1859,6 +1940,31 @@ class RoleBindingResponse(typing.TypedDict):
     scope_type: typing.Literal["workspace", "department", "member"]
     status: typing.Literal["active", "revoked"]
     version: int
+
+
+class RoleBindingSummaryResponse(typing.TypedDict):
+    scope_id: str
+    scope_name: str
+    scope_type: typing.Literal["workspace", "department", "member"]
+
+
+class RoleGovernanceResponse(typing.TypedDict):
+    permission_groups: list[PermissionCatalogGroupResponse]
+    role_version: int
+    roles: list[RoleGovernanceRoleResponse]
+
+
+class RoleGovernanceRoleResponse(typing.TypedDict):
+    affected_member_count: int
+    affected_members: list[RoleAffectedMemberResponse]
+    bindings: list[RoleBindingSummaryResponse]
+    editable: bool
+    grants: list[RolePermissionEntry]
+    name: str
+    role_id: str
+    role_key: str
+    status: typing.Literal["active", "disabled"]
+    system_managed: bool
 
 
 class RoleListResponse(typing.TypedDict):
@@ -1888,6 +1994,7 @@ class RolePermissionEntry(typing.TypedDict):
 
 class RolePermissionListResponse(typing.TypedDict):
     items: list[RolePermissionEntry]
+    role_version: typing.NotRequired[int | None]
 
 
 class RoleResponse(typing.TypedDict):

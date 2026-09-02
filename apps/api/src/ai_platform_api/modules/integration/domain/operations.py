@@ -8,10 +8,11 @@ from types import TracebackType
 from typing import Literal, Protocol
 from uuid import UUID
 
-from ai_platform_backend.integration.domain import AuditWriter
+from ai_platform_backend.integration.domain import AuditWriter, OutboxWriter
 
 AuditOutcome = Literal["succeeded", "denied", "failed"]
 OutboxStatus = Literal["pending", "publishing", "published", "dead_letter"]
+AuditExportStatus = Literal["pending", "running", "retry_wait", "completed", "dead_letter"]
 
 
 @dataclass(frozen=True)
@@ -20,7 +21,7 @@ class AuditOperationsRecord:
 
     audit_id: UUID
     workspace_id: UUID
-    actor_id: UUID
+    actor_id: UUID | None
     user_id: UUID | None
     action: str
     resource_type: str
@@ -41,6 +42,37 @@ class AuditOperationsPage:
 
     items: tuple[AuditOperationsRecord, ...]
     next_cursor: UUID | None
+
+
+@dataclass(frozen=True)
+class AuditExportRequest:
+    """冻结审计筛选、字段遮罩和异步处理结果，不暴露内部导出载荷。"""
+
+    audit_export_request_id: UUID
+    workspace_id: UUID
+    idempotency_key: str
+    request_hash: str
+    actor_id: UUID | None
+    action: str | None
+    resource_type: str | None
+    outcome: AuditOutcome | None
+    occurred_from: datetime | None
+    occurred_to: datetime
+    field_mask: frozenset[str]
+    requested_by_actor_id: UUID
+    requested_by_user_id: UUID | None
+    request_id: UUID
+    trace_id: str
+    traceparent: str
+    status: AuditExportStatus
+    attempt_count: int
+    last_error_code: str | None
+    row_count: int | None
+    result_sha256: str | None
+    result_summary: str | None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -136,6 +168,24 @@ class IntegrationOperationsRepository(Protocol):
         occurred_to: datetime | None,
     ) -> AuditOperationsPage: ...
 
+    def get_audit_record(
+        self, workspace_id: UUID, audit_id: UUID
+    ) -> AuditOperationsRecord | None: ...
+
+    def list_audit_export_requests(
+        self, workspace_id: UUID, *, limit: int
+    ) -> tuple[AuditExportRequest, ...]: ...
+
+    def get_audit_export_request(
+        self, workspace_id: UUID, audit_export_request_id: UUID
+    ) -> AuditExportRequest | None: ...
+
+    def get_audit_export_request_by_key(
+        self, workspace_id: UUID, idempotency_key: str
+    ) -> AuditExportRequest | None: ...
+
+    def add_audit_export_request(self, request: AuditExportRequest) -> None: ...
+
     def list_outbox_events(
         self,
         workspace_id: UUID,
@@ -182,6 +232,9 @@ class IntegrationOperationsUnitOfWork(Protocol):
 
     @property
     def audit(self) -> AuditWriter: ...
+
+    @property
+    def outbox(self) -> OutboxWriter: ...
 
     def __enter__(self) -> IntegrationOperationsUnitOfWork: ...
 

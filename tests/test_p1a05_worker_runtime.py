@@ -86,6 +86,7 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
     assert "platform.indexing.embed.v1" in celery_app.tasks
     assert "platform.indexing.commit.v1" in celery_app.tasks
     assert "platform.indexing.inspect.v1" in celery_app.tasks
+    assert "platform.operations.audit_exports.v1" in celery_app.tasks
     assert celery_app.conf.task_serializer == "json"
     assert celery_app.conf.accept_content == ["json"]
     assert celery_app.conf.result_backend is None
@@ -109,6 +110,9 @@ def test_celery_registers_versioned_tasks_and_reliable_delivery_options() -> Non
     )
     assert celery_app.conf.beat_schedule["inspect-index-consistency"]["task"] == (
         "platform.indexing.inspect.v1"
+    )
+    assert celery_app.conf.beat_schedule["process-audit-exports"]["task"] == (
+        "platform.operations.audit_exports.v1"
     )
     assert celery_app.conf.task_routes["platform.ingestion.ocr.v1"]["queue"] == "platform.ocr"
     assert celery_app.conf.task_routes["platform.indexing.commit.v1"]["queue"] == (

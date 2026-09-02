@@ -40,6 +40,10 @@ class WorkerSettings(BaseSettings):
     outbox_max_attempts: int = 5
     outbox_retry_base_seconds: int = 5
     outbox_dispatch_interval_seconds: float = 2.0
+    audit_export_batch_size: int = 4
+    audit_export_lease_seconds: int = 120
+    audit_export_max_attempts: int = 3
+    audit_export_dispatch_interval_seconds: float = 2.0
     minio_endpoint: str = "http://127.0.0.1:9000"
     minio_access_key: str = "ai-platform-local"
     minio_secret_key: SecretStr = SecretStr("local-development-only")
@@ -98,6 +102,17 @@ class WorkerSettings(BaseSettings):
             raise ValueError("Outbox 整数参数必须为正数")
         if not 0.5 <= self.outbox_dispatch_interval_seconds <= 60:
             raise ValueError("Outbox 调度间隔必须位于 0.5 到 60 秒之间")
+        audit_export_values = (
+            self.audit_export_batch_size,
+            self.audit_export_lease_seconds,
+            self.audit_export_max_attempts,
+        )
+        if any(value < 1 for value in audit_export_values):
+            raise ValueError("审计导出整数参数必须为正数")
+        if self.audit_export_max_attempts > 3:
+            raise ValueError("审计导出最多允许三次尝试")
+        if not 0.5 <= self.audit_export_dispatch_interval_seconds <= 60:
+            raise ValueError("审计导出调度间隔必须位于 0.5 到 60 秒之间")
         ingestion_values = (
             self.ingestion_batch_size,
             self.ingestion_lease_seconds,

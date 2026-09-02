@@ -19,6 +19,10 @@ from ai_platform_api.modules.identity.application.entitlements import (
     UsageMetric,
 )
 from ai_platform_api.modules.integration.api.schemas import (
+    AuditExportBody,
+    AuditExportListResponse,
+    AuditExportResponse,
+    AuditRecordDetailResponse,
     AuditRecordPageResponse,
     AuditRecordResponse,
     IntegrationInspectionResponse,
@@ -87,6 +91,95 @@ def list_audit_records(
     return AuditRecordPageResponse(
         items=[AuditRecordResponse.from_domain(item) for item in page.items],
         next_cursor=page.next_cursor,
+    )
+
+
+@router.get(
+    "/audit-records/{audit_id}",
+    response_model=AuditRecordDetailResponse,
+    operation_id="getOperationsAuditRecord",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def get_audit_record(
+    workspace_id: UUID,
+    audit_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[IntegrationOperationsService, Depends(operations_service)],
+) -> AuditRecordDetailResponse:
+    """读取单条审计详情，敏感自由属性由应用服务先行脱敏。"""
+
+    return AuditRecordDetailResponse.from_domain(
+        service.get_audit_record(
+            context,
+            workspace_id=workspace_id,
+            audit_id=audit_id,
+        )
+    )
+
+
+@router.post(
+    "/audit-exports",
+    response_model=AuditExportResponse,
+    operation_id="createOperationsAuditExport",
+    responses=error_responses(400, 401, 403, 409, 422, 500),
+)
+def create_audit_export(
+    workspace_id: UUID,
+    body: AuditExportBody,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[IntegrationOperationsService, Depends(operations_service)],
+) -> AuditExportResponse:
+    """冻结当前授权和筛选，登记一个可追踪的异步导出请求。"""
+
+    return AuditExportResponse.from_domain(
+        service.create_audit_export_request(context, workspace_id=workspace_id, **body.model_dump())
+    )
+
+
+@router.get(
+    "/audit-exports",
+    response_model=AuditExportListResponse,
+    operation_id="listOperationsAuditExports",
+    responses=error_responses(400, 401, 403, 422, 500),
+)
+def list_audit_exports(
+    workspace_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[IntegrationOperationsService, Depends(operations_service)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> AuditExportListResponse:
+    """返回最近导出状态，前端据此轮询而不读取 Worker 内部信息。"""
+
+    return AuditExportListResponse(
+        items=[
+            AuditExportResponse.from_domain(item)
+            for item in service.list_audit_export_requests(
+                context, workspace_id=workspace_id, limit=limit
+            )
+        ]
+    )
+
+
+@router.get(
+    "/audit-exports/{audit_export_request_id}",
+    response_model=AuditExportResponse,
+    operation_id="getOperationsAuditExport",
+    responses=error_responses(400, 401, 403, 404, 422, 500),
+)
+def get_audit_export(
+    workspace_id: UUID,
+    audit_export_request_id: UUID,
+    context: Annotated[RequestContext, Depends(trusted_request_context)],
+    service: Annotated[IntegrationOperationsService, Depends(operations_service)],
+) -> AuditExportResponse:
+    """按空间读取一条导出状态，跨空间标识不会被探测。"""
+
+    return AuditExportResponse.from_domain(
+        service.get_audit_export_request(
+            context,
+            workspace_id=workspace_id,
+            audit_export_request_id=audit_export_request_id,
+        )
     )
 
 

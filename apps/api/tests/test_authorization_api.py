@@ -11,7 +11,17 @@ from ai_platform_api.app.factory import create_app
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.common.trace import TraceContext
 from ai_platform_api.config import Settings
-from ai_platform_api.modules.authorization.application.grants import RolePermissionService
+from ai_platform_api.modules.authorization.application.grants import (
+    PermissionCatalogGroup,
+    PermissionCatalogItem,
+    PermissionFieldCatalogItem,
+    RoleAffectedMember,
+    RoleBindingSummary,
+    RoleGovernanceItem,
+    RoleGovernanceSnapshot,
+    RolePermissionService,
+    RolePermissionSnapshot,
+)
 from ai_platform_api.modules.authorization.application.menu_releases import MenuReleaseService
 from ai_platform_api.modules.authorization.application.menus import MenuConfigurationService
 from ai_platform_api.modules.authorization.application.resources import load_resource_registry
@@ -104,9 +114,60 @@ class StubRolePermissionService(RolePermissionService):
         *,
         workspace_id: UUID,
         role_id: UUID,
-    ) -> tuple[RolePermissionGrant, ...]:
+    ) -> RolePermissionSnapshot:
         assert context.workspace_id == workspace_id and role_id == ROLE_ID
-        return self._grants()
+        return RolePermissionSnapshot(7, self._grants())
+
+    def get_governance(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+    ) -> RoleGovernanceSnapshot:
+        assert context.workspace_id == workspace_id
+        source = RoleBindingSummary("workspace", WORKSPACE_ID, "当前工作空间")
+        return RoleGovernanceSnapshot(
+            role_version=7,
+            roles=(
+                RoleGovernanceItem(
+                    role_id=ROLE_ID,
+                    role_key="synthetic_reviewer",
+                    name="合成审核员",
+                    status="active",
+                    system_managed=False,
+                    editable=True,
+                    grants=self._grants(),
+                    bindings=(source,),
+                    affected_members=(
+                        RoleAffectedMember(
+                            account_id=ACCOUNT_ID,
+                            display_name="合成所有者",
+                            membership_type="owner",
+                            sources=(source,),
+                        ),
+                    ),
+                ),
+            ),
+            permission_groups=(
+                PermissionCatalogGroup(
+                    domain="operations",
+                    items=(
+                        PermissionCatalogItem(
+                            permission_code="operations.records.read",
+                            resource_type="operations_record",
+                            action="read",
+                            allowed_scope_types=(
+                                "workspace",
+                                "department_tree",
+                                "self",
+                                "resource",
+                            ),
+                            fields=(PermissionFieldCatalogItem("actor_id", "CONFIDENTIAL"),),
+                        ),
+                    ),
+                ),
+            ),
+        )
 
     def replace(
         self,
@@ -114,6 +175,7 @@ class StubRolePermissionService(RolePermissionService):
         *,
         workspace_id: UUID,
         role_id: UUID,
+        expected_role_version: int,
         entries: tuple[
             tuple[
                 str,
@@ -125,8 +187,9 @@ class StubRolePermissionService(RolePermissionService):
             ],
             ...,
         ],
-    ) -> tuple[RolePermissionGrant, ...]:
+    ) -> RolePermissionSnapshot:
         assert context.workspace_id == workspace_id and role_id == ROLE_ID
+        assert expected_role_version == 7
         assert entries[0][1:] == (
             "department_tree",
             frozenset({DEPARTMENT_ID}),
@@ -134,7 +197,7 @@ class StubRolePermissionService(RolePermissionService):
             "RESTRICTED",
             frozenset(),
         )
-        return self._grants()
+        return RolePermissionSnapshot(8, self._grants())
 
     @staticmethod
     def _grants() -> tuple[RolePermissionGrant, ...]:
@@ -487,6 +550,7 @@ def test_role_permission_routes_share_registered_permission_codes() -> None:
             path,
             headers=headers,
             json={
+                "expected_role_version": 7,
                 "items": [
                     {
                         "permission_code": "organization.department.read",
@@ -494,13 +558,35 @@ def test_role_permission_routes_share_registered_permission_codes() -> None:
                         "department_ids": [str(DEPARTMENT_ID)],
                         "resource_ids": [],
                     }
-                ]
+                ],
             },
         )
 
     assert listed.status_code == 200
     assert replaced.status_code == 200
-    assert listed.json() == replaced.json()
+    assert listed.json()["role_version"] == 7
+    assert replaced.json()["role_version"] == 8
+    assert listed.json()["items"] == replaced.json()["items"]
+
+
+def test_role_governance_route_returns_catalog_bindings_and_affected_members() -> None:
+    client = authorization_client(AllowRegisteredPolicy())
+    with client:
+        response = client.get(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/roles/governance",
+            headers={"X-Workspace-ID": str(WORKSPACE_ID)},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["role_version"] == 7
+    assert body["roles"][0]["editable"] is True
+    assert body["roles"][0]["affected_member_count"] == 1
+    assert body["roles"][0]["bindings"][0]["scope_type"] == "workspace"
+    assert body["permission_groups"][0]["domain"] == "operations"
+    assert body["permission_groups"][0]["items"][0]["fields"] == [
+        {"field_name": "actor_id", "security_level": "CONFIDENTIAL"}
+    ]
 
 
 def test_menu_routes_share_registered_permission_codes() -> None:

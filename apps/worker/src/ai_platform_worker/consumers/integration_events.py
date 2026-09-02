@@ -195,6 +195,27 @@ def process_index_maintenance_commands() -> dict[str, int]:
             runtime.close()
 
 
+@shared_task(name="platform.operations.audit_exports.v1", ignore_result=True)
+def process_audit_exports() -> dict[str, int]:
+    """处理审计导出请求，结果只保留脱敏投影行数和校验摘要。"""
+
+    settings = get_worker_settings()
+    observability = get_worker_observability()
+    task_name = "platform.operations.audit_exports.v1"
+    with observability.task(task_name=task_name, queue=_queue_name()):
+        runtime = build_worker_runtime(settings)
+        try:
+            result = runtime.audit_exports.run_batch(limit=settings.audit_export_batch_size)
+            return {
+                "claimed": result.claimed,
+                "completed": result.completed,
+                "retried": result.retried,
+                "dead_lettered": result.dead_lettered,
+            }
+        finally:
+            runtime.close()
+
+
 @shared_task(name="platform.knowledge.trash_retention.v1", ignore_result=True)
 def purge_knowledge_trash(*, workspace_id: str | None = None) -> dict[str, int]:
     """清理超过保留期的回收站文档，并为对象/索引清理登记待处理事件。"""

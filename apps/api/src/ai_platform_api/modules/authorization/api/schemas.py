@@ -43,6 +43,7 @@ class ReplaceRolePermissionsRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    expected_role_version: int | None = Field(default=None, ge=1)
     items: list[RolePermissionEntry] = Field(max_length=200)
 
 
@@ -51,7 +52,86 @@ class RolePermissionListResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    role_version: int | None = Field(default=None, ge=1)
     items: list[RolePermissionEntry]
+
+
+class PermissionFieldCatalogResponse(BaseModel):
+    """定义权限矩阵可配置字段及其敏感级别。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    field_name: str
+    security_level: Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+
+
+class PermissionCatalogItemResponse(BaseModel):
+    """定义权限目录中的权限码、资源动作和可选治理维度。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    permission_code: str
+    resource_type: str
+    action: str
+    allowed_scope_types: list[Literal["workspace", "department_tree", "self", "resource"]]
+    fields: list[PermissionFieldCatalogResponse]
+
+
+class PermissionCatalogGroupResponse(BaseModel):
+    """按产品域分组返回活动权限目录。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    domain: str
+    items: list[PermissionCatalogItemResponse]
+
+
+class RoleBindingSummaryResponse(BaseModel):
+    """定义角色绑定的服务端可信来源摘要。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope_type: Literal["workspace", "department", "member"]
+    scope_id: UUID
+    scope_name: str
+
+
+class RoleAffectedMemberResponse(BaseModel):
+    """定义角色实际影响的低敏成员及有效来源。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    account_id: UUID
+    display_name: str
+    membership_type: Literal["owner", "member"]
+    sources: list[RoleBindingSummaryResponse]
+
+
+class RoleGovernanceRoleResponse(BaseModel):
+    """定义权限治理页中的角色、授权和影响成员聚合。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role_id: UUID
+    role_key: str
+    name: str
+    status: Literal["active", "disabled"]
+    system_managed: bool
+    editable: bool
+    grants: list[RolePermissionEntry]
+    bindings: list[RoleBindingSummaryResponse]
+    affected_member_count: int = Field(ge=0)
+    affected_members: list[RoleAffectedMemberResponse]
+
+
+class RoleGovernanceResponse(BaseModel):
+    """定义权限治理页一次读取使用的稳定聚合响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role_version: int = Field(ge=1)
+    roles: list[RoleGovernanceRoleResponse]
+    permission_groups: list[PermissionCatalogGroupResponse]
 
 
 class WorkspaceMenuOverrideEntry(BaseModel):

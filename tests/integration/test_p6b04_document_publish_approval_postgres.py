@@ -424,6 +424,11 @@ def _grant_requester_publish_role(
         owner_context,
         workspace_id=workspace_id,
         role_id=role.role_id,
+        expected_role_version=permission_service.list(
+            owner_context,
+            workspace_id=workspace_id,
+            role_id=role.role_id,
+        ).role_version,
         entries=tuple(
             (
                 permission_code,

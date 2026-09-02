@@ -17,6 +17,7 @@ const LoginPage = lazy(() => import("@/pages/auth/login"));
 const StatusPage = lazy(() => import("@/pages/system/status"));
 const WorkspaceMembersPage = lazy(() => import("@/pages/workspace/members"));
 const WorkspaceOrganizationPage = lazy(() => import("@/pages/workspace/organization"));
+const PermissionsAuditPage = lazy(() => import("@/pages/workspace/permissionsAudit"));
 const WorkspaceOverviewPage = lazy(() => import("@/pages/workspace/overview"));
 const EnterpriseKnowledgePage = lazy(() => import("@/pages/workspace/enterpriseKnowledge"));
 const KnowledgeProductionPage = lazy(() => import("@/pages/workspace/knowledge"));
@@ -122,6 +123,14 @@ export function AppRoutes() {
               element={
                 <RequireMenuRoute>
                   <WorkspaceOrganizationPage />
+                </RequireMenuRoute>
+              }
+            />
+            <Route
+              path={pageRoutes.PermissionsAuditPage}
+              element={
+                <RequireMenuRoute>
+                  <PermissionsAuditPage />
                 </RequireMenuRoute>
               }
             />

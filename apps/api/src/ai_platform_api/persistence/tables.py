@@ -30,6 +30,7 @@ from ai_platform_api.persistence.database import SCHEMA_TOKEN
 
 metadata = MetaData(schema=SCHEMA_TOKEN)
 audit_records = integration_tables.audit_records
+audit_export_requests = integration_tables.audit_export_requests
 consumer_receipts = integration_tables.consumer_receipts
 outbox_events = integration_tables.outbox_events
 resource_projections = integration_tables.resource_projections

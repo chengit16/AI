@@ -24,6 +24,7 @@ from ai_platform_api.modules.identity.infrastructure.entitlements_sqlalchemy imp
 from ai_platform_api.modules.integration.api.schemas import OutboxEventResponse
 from ai_platform_api.modules.integration.application.operations import (
     IntegrationOperationsService,
+    OperationsNotFoundError,
     OperationsValidationError,
 )
 from ai_platform_api.modules.integration.infrastructure.operations_sqlalchemy import (
@@ -32,6 +33,7 @@ from ai_platform_api.modules.integration.infrastructure.operations_sqlalchemy im
 from ai_platform_api.persistence.database import create_platform_engine, create_session_factory
 from ai_platform_api.persistence.tables import (
     accounts,
+    audit_export_requests,
     audit_records,
     consumer_receipts,
     menu_releases,
@@ -49,9 +51,13 @@ from ai_platform_backend.integration.consumer import IdempotentProjectionConsume
 from ai_platform_backend.integration.domain import IntegrationEvent
 from ai_platform_backend.integration.persistence import outbox_replay_requests
 from ai_platform_backend.integration.sqlalchemy import SqlAlchemyConsumerUnitOfWork
+from ai_platform_worker.modules.integration.application.audit_exports import AuditExportProcessor
+from ai_platform_worker.modules.integration.infrastructure.audit_exports_sqlalchemy import (
+    SqlAlchemyAuditExportRequestStore,
+)
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Engine, create_engine, insert, select, text, update
+from sqlalchemy import Engine, create_engine, func, insert, select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -421,7 +427,11 @@ def _audit(
         "permission_code": "knowledge.base.create",
         "policy_decision_id": uuid4(),
         "policy_version": 7,
-        "attributes": {"source": "synthetic-p207"},
+        "attributes": {
+            "source": "synthetic-p207",
+            "access_token": "synthetic-must-not-escape",
+            "nested": {"value": "synthetic-must-not-escape"},
+        },
     }
 
 
@@ -511,8 +521,8 @@ def test_migration_backfills_historical_receipts_and_existing_owner_permissions(
                 )
             ).scalars()
         )
-        binding_count = session.scalar(
-            select(text("count(*)"))
+        bound_api_count = session.scalar(
+            select(func.count(func.distinct(registered_menu_api_bindings.c.api_resource_id)))
             .select_from(registered_menu_api_bindings)
             .where(
                 registered_menu_api_bindings.c.api_resource_id.in_(
@@ -533,7 +543,7 @@ def test_migration_backfills_historical_receipts_and_existing_owner_permissions(
     assert tuple(receipt) == (1, NOW)
     assert tuple(historical_audit) == (None, None, None)
     assert permissions == {"operations.records.read", "operations.outbox.replay"}
-    assert binding_count == 6
+    assert bound_api_count == 6
     assert len(releases) >= 3
     assert releases[0].snapshot["registry_version"] == 15
     assert len(releases[0].snapshot["menus"]) == 1
@@ -629,6 +639,88 @@ def test_audit_and_outbox_queries_are_isolated_and_payload_free(
             limit=10,
             cursor=operations_database.other_event_id,
         )
+
+
+def test_audit_detail_and_export_are_masked_isolated_and_worker_completed(
+    operations_database: OperationsHarness,
+) -> None:
+    service = IntegrationOperationsService(
+        SqlAlchemyIntegrationOperationsUnitOfWork(operations_database.sessions)
+    )
+    context = replace(
+        _context(operations_database, "operations.records.read"),
+        authorized_field_mask=frozenset({"actor_id"}),
+    )
+    audit_id = (
+        service.list_audit_records(context, workspace_id=operations_database.workspace_id, limit=10)
+        .items[0]
+        .audit_id
+    )
+    detail = service.get_audit_record(
+        context, workspace_id=operations_database.workspace_id, audit_id=audit_id
+    )
+    assert detail.actor_id is None
+    assert detail.attributes == {
+        "access_token": "[已脱敏]",
+        "nested": "[已脱敏]",
+        "source": "synthetic-p207",
+    }
+    with pytest.raises(OperationsNotFoundError):
+        service.get_audit_record(
+            context,
+            workspace_id=operations_database.workspace_id,
+            audit_id=operations_database.other_audit_id,
+        )
+
+    export = service.create_audit_export_request(
+        context,
+        workspace_id=operations_database.workspace_id,
+        idempotency_key="synthetic-p6b05-export-0001",
+        requested_at=NOW + timedelta(minutes=10),
+    )
+    completed = AuditExportProcessor(
+        SqlAlchemyAuditExportRequestStore(operations_database.sessions),
+        worker_id="synthetic-p6b05-worker",
+        lease_seconds=30,
+    ).run_batch(limit=10, now=NOW + timedelta(minutes=11))
+    assert completed.claimed == completed.completed == 1
+    stored = service.get_audit_export_request(
+        context,
+        workspace_id=operations_database.workspace_id,
+        audit_export_request_id=export.audit_export_request_id,
+    )
+    assert stored.status == "completed"
+    assert stored.row_count == 1
+    assert stored.result_sha256 is not None and len(stored.result_sha256) == 64
+    with operations_database.sessions() as session:
+        export_audit_count = session.scalar(
+            select(text("count(*)"))
+            .select_from(audit_records)
+            .where(
+                audit_records.c.workspace_id == operations_database.workspace_id,
+                audit_records.c.action == "operations.audit.export.create",
+                audit_records.c.resource_id == export.audit_export_request_id,
+            )
+        )
+        export_event_count = session.scalar(
+            select(text("count(*)"))
+            .select_from(outbox_events)
+            .where(
+                outbox_events.c.workspace_id == operations_database.workspace_id,
+                outbox_events.c.event_type == "operations.audit.export_requested",
+                outbox_events.c.aggregate_id == export.audit_export_request_id,
+            )
+        )
+        other_workspace_export_count = session.scalar(
+            select(text("count(*)"))
+            .select_from(audit_export_requests)
+            .where(
+                audit_export_requests.c.workspace_id == operations_database.other_workspace_id,
+                audit_export_requests.c.audit_export_request_id == export.audit_export_request_id,
+            )
+        )
+    assert export_audit_count == export_event_count == 1
+    assert other_workspace_export_count == 0
 
 
 def test_replay_keeps_event_id_and_request_and_audit_are_immutable(

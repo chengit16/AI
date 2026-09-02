@@ -21,6 +21,8 @@ from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.grants import (
     PolicySubject,
+    RoleGovernanceFacts,
+    RoleGovernanceMemberFact,
     RolePermissionGrant,
     RolePermissionWriteConflictError,
 )
@@ -36,6 +38,7 @@ from ai_platform_api.modules.identity.domain.roles import (
     resolve_effective_roles,
 )
 from ai_platform_api.persistence.tables import (
+    accounts,
     department_closure,
     departments,
     membership_departments,
@@ -292,6 +295,79 @@ class SqlAlchemyRolePermissionRepository:
         ).one_or_none()
         return tuple(row) if row is not None else None
 
+    def get_role_version(self, workspace_id: UUID) -> int | None:
+        return self._session.scalar(
+            select(workspaces.c.role_version).where(workspaces.c.workspace_id == workspace_id)
+        )
+
+    def get_governance_facts(self, workspace_id: UUID) -> RoleGovernanceFacts | None:
+        """在一个事务快照中读取角色、绑定、组织和成员事实。"""
+
+        # 1. 先确认活动空间并读取角色、授权、绑定和部门，所有事实共享当前事务快照。
+        workspace_row = self._session.execute(
+            select(workspaces.c.role_version, workspaces.c.status).where(
+                workspaces.c.workspace_id == workspace_id
+            )
+        ).one_or_none()
+        if workspace_row is None or workspace_row.status != "active":
+            return None
+        role_values = _roles(self._session, workspace_id)
+        grant_values = self.list_role_grants(
+            workspace_id, frozenset(role.role_id for role in role_values)
+        )
+        binding_values = _bindings(self._session, workspace_id)
+        department_values = _departments(self._session, workspace_id)
+
+        # 2. 再聚合成员组织归属和低敏展示名，避免页面自行推断角色影响范围。
+        department_ids_by_membership: dict[UUID, list[UUID]] = {}
+        for row in self._session.execute(
+            select(
+                membership_departments.c.membership_id,
+                membership_departments.c.department_id,
+            )
+            .where(membership_departments.c.workspace_id == workspace_id)
+            .order_by(
+                membership_departments.c.membership_id,
+                membership_departments.c.department_id,
+            )
+        ):
+            department_ids_by_membership.setdefault(row.membership_id, []).append(row.department_id)
+
+        members = tuple(
+            RoleGovernanceMemberFact(
+                membership=WorkspaceMembership(
+                    row.membership_id,
+                    row.workspace_id,
+                    row.account_id,
+                    cast("MembershipType", row.membership_type),
+                    row.status,
+                    row.created_at,
+                    row.updated_at,
+                    row.version,
+                ),
+                display_name=row.display_name,
+                department_ids=tuple(department_ids_by_membership.get(row.membership_id, ())),
+            )
+            for row in self._session.execute(
+                select(workspace_memberships, accounts.c.display_name)
+                .join(accounts, accounts.c.account_id == workspace_memberships.c.account_id)
+                .where(workspace_memberships.c.workspace_id == workspace_id)
+                .order_by(
+                    workspace_memberships.c.membership_type,
+                    accounts.c.display_name,
+                    workspace_memberships.c.membership_id,
+                )
+            )
+        )
+        return RoleGovernanceFacts(
+            role_version=workspace_row.role_version,
+            roles=role_values,
+            grants=grant_values,
+            bindings=binding_values,
+            departments=department_values,
+            members=members,
+        )
+
     def list_role_grants(
         self,
         workspace_id: UUID,
@@ -353,11 +429,14 @@ class SqlAlchemyRolePermissionRepository:
                 ],
             )
 
-    def bump_role_version(self, workspace_id: UUID) -> int:
+    def bump_role_version(self, workspace_id: UUID, expected_version: int) -> int:
         version = self._session.scalar(
             update(workspaces)
-            .where(workspaces.c.workspace_id == workspace_id)
-            .values(role_version=workspaces.c.role_version + 1)
+            .where(
+                workspaces.c.workspace_id == workspace_id,
+                workspaces.c.role_version == expected_version,
+            )
+            .values(role_version=expected_version + 1)
             .returning(workspaces.c.role_version)
         )
         if version is None:

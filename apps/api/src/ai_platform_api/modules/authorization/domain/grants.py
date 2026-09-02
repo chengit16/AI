@@ -12,6 +12,9 @@ from ai_platform_backend.integration.domain import AuditWriter, OutboxWriter
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.policy import DataScopeType
+from ai_platform_api.modules.identity.domain.enterprise import WorkspaceMembership
+from ai_platform_api.modules.identity.domain.organization import Department
+from ai_platform_api.modules.identity.domain.roles import Role, RoleBinding
 
 OWNER_PERMISSION_CODES = (
     "agent.definition.archive",
@@ -238,6 +241,27 @@ class RolePermissionWriteConflictError(Exception):
 
 
 @dataclass(frozen=True)
+class RoleGovernanceMemberFact:
+    """提供计算角色影响范围所需的低敏成员与部门事实。"""
+
+    membership: WorkspaceMembership
+    display_name: str
+    department_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True)
+class RoleGovernanceFacts:
+    """冻结一次权限治理读取使用的角色、组织、成员和授权事实。"""
+
+    role_version: int
+    roles: tuple[Role, ...]
+    grants: tuple[RolePermissionGrant, ...]
+    bindings: tuple[RoleBinding, ...]
+    departments: tuple[Department, ...]
+    members: tuple[RoleGovernanceMemberFact, ...]
+
+
+@dataclass(frozen=True)
 class PolicySubject:
     """汇总账号、成员、角色版本和有效角色，作为策略计算的可信主体。"""
 
@@ -276,6 +300,10 @@ class RolePermissionRepository(PolicyGrantReader, Protocol):
 
     def get_role(self, workspace_id: UUID, role_id: UUID) -> tuple[str, bool, str] | None: ...
 
+    def get_role_version(self, workspace_id: UUID) -> int | None: ...
+
+    def get_governance_facts(self, workspace_id: UUID) -> RoleGovernanceFacts | None: ...
+
     def replace_role_grants(
         self,
         workspace_id: UUID,
@@ -283,7 +311,7 @@ class RolePermissionRepository(PolicyGrantReader, Protocol):
         grants: tuple[RolePermissionGrant, ...],
     ) -> None: ...
 
-    def bump_role_version(self, workspace_id: UUID) -> int: ...
+    def bump_role_version(self, workspace_id: UUID, expected_version: int) -> int: ...
 
 
 class RolePermissionUnitOfWork(Protocol):

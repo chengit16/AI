@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "registry_version": 2,
+  "registry_version": 3,
   "rules": [
     { "resource_type": "workspace_member", "field_name": "account_id", "security_level": "CONFIDENTIAL" },
     { "resource_type": "workspace_member", "field_name": "display_name", "security_level": "INTERNAL" },
@@ -29,6 +29,9 @@
     { "resource_type": "workflow_instance", "field_name": "input", "security_level": "INTERNAL", "inherit_resource_level": true },
     { "resource_type": "workflow_instance", "field_name": "output", "security_level": "INTERNAL", "inherit_resource_level": true },
     { "resource_type": "approval", "field_name": "comment", "security_level": "INTERNAL", "inherit_resource_level": true },
-    { "resource_type": "approval", "field_name": "conditions", "security_level": "CONFIDENTIAL", "inherit_resource_level": true }
+    { "resource_type": "approval", "field_name": "conditions", "security_level": "CONFIDENTIAL", "inherit_resource_level": true },
+    { "resource_type": "operations_record", "field_name": "actor_id", "security_level": "CONFIDENTIAL" },
+    { "resource_type": "operations_record", "field_name": "user_id", "security_level": "CONFIDENTIAL" },
+    { "resource_type": "operations_record", "field_name": "attributes", "security_level": "RESTRICTED" }
   ]
 }

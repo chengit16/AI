@@ -13,11 +13,67 @@ from ai_platform_api.modules.identity.application.entitlements import (
     UsageRecord,
 )
 from ai_platform_api.modules.integration.application.operations import (
+    AuditExportRequest,
     AuditOperationsRecord,
     IntegrationInspection,
     OutboxOperationsRecord,
     OutboxReplayRequest,
 )
+
+MASKED_ACTOR_ID = UUID(int=0)
+
+
+class AuditExportBody(BaseModel):
+    """接收审计筛选快照和客户端幂等键。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$",
+    )
+    actor_id: UUID | None = None
+    action: str | None = Field(default=None, min_length=1, max_length=255)
+    resource_type: str | None = Field(default=None, min_length=1, max_length=128)
+    outcome: Literal["succeeded", "denied", "failed"] | None = None
+    occurred_from: datetime | None = None
+    occurred_to: datetime | None = None
+
+
+class AuditExportResponse(BaseModel):
+    """返回导出状态和安全结果摘要，不暴露请求哈希或内部对象定位。"""
+
+    audit_export_request_id: UUID
+    workspace_id: UUID
+    idempotency_key: str
+    actor_id: UUID | None
+    action: str | None
+    resource_type: str | None
+    outcome: Literal["succeeded", "denied", "failed"] | None
+    occurred_from: datetime | None
+    occurred_to: datetime
+    status: Literal["pending", "running", "retry_wait", "completed", "dead_letter"]
+    attempt_count: int
+    last_error_code: str | None
+    row_count: int | None
+    result_sha256: str | None
+    result_summary: str | None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
+
+    @classmethod
+    def from_domain(cls, request: AuditExportRequest) -> AuditExportResponse:
+        return cls(
+            **{key: value for key, value in request.__dict__.items() if key in cls.model_fields}
+        )
+
+
+class AuditExportListResponse(BaseModel):
+    """返回最近审计导出状态。"""
+
+    items: list[AuditExportResponse]
 
 
 class AuditRecordResponse(BaseModel):
@@ -26,6 +82,7 @@ class AuditRecordResponse(BaseModel):
     audit_id: UUID
     workspace_id: UUID
     actor_id: UUID
+    actor_id_masked: bool = False
     user_id: UUID | None
     action: str
     resource_type: str
@@ -45,7 +102,8 @@ class AuditRecordResponse(BaseModel):
         return cls(
             audit_id=record.audit_id,
             workspace_id=record.workspace_id,
-            actor_id=record.actor_id,
+            actor_id=record.actor_id or MASKED_ACTOR_ID,
+            actor_id_masked=record.actor_id is None,
             user_id=record.user_id,
             action=record.action,
             resource_type=record.resource_type,
@@ -65,6 +123,19 @@ class AuditRecordPageResponse(BaseModel):
 
     items: list[AuditRecordResponse]
     next_cursor: UUID | None
+
+
+class AuditRecordDetailResponse(AuditRecordResponse):
+    """返回单条审计的白名单化扩展属性。"""
+
+    attributes: dict[str, object]
+
+    @classmethod
+    def from_domain(cls, record: AuditOperationsRecord) -> AuditRecordDetailResponse:
+        return cls(
+            **AuditRecordResponse.from_domain(record).model_dump(),
+            attributes=record.attributes,
+        )
 
 
 class UsageRecordResponse(BaseModel):

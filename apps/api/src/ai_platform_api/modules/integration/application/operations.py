@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import UTC, datetime
 from typing import Literal, cast
 from uuid import UUID, uuid4
 
-from ai_platform_backend.integration.domain import AuditRecord
+from ai_platform_backend.integration.domain import AuditRecord, IntegrationEvent
 
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.integration.domain.operations import (
+    AuditExportRequest,
     AuditOperationsPage,
     AuditOperationsRecord,
     AuditOutcome,
@@ -26,6 +29,7 @@ from ai_platform_api.modules.integration.domain.operations import (
 )
 
 __all__ = [
+    "AuditExportRequest",
     "AuditOperationsPage",
     "AuditOperationsRecord",
     "AuditOutcome",
@@ -42,6 +46,10 @@ REPLAY_PERMISSION = "operations.outbox.replay"
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 REASON_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 EVENT_TYPE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$")
+SENSITIVE_AUDIT_KEY_PATTERN = re.compile(
+    r"(?:password|token|secret|cookie|object_key|content|payload|credential|authorization)",
+    re.IGNORECASE,
+)
 
 
 class OperationsDeniedError(PlatformError):
@@ -100,7 +108,7 @@ class IntegrationOperationsService:
         _validate_window(limit, occurred_from, occurred_to)
         try:
             with self._unit_of_work as unit_of_work:
-                return unit_of_work.operations.list_audit_records(
+                page = unit_of_work.operations.list_audit_records(
                     workspace_id,
                     limit=limit,
                     cursor=cursor,
@@ -111,8 +119,197 @@ class IntegrationOperationsService:
                     occurred_from=occurred_from,
                     occurred_to=occurred_to,
                 )
+                return AuditOperationsPage(
+                    items=tuple(
+                        _project_audit_record(
+                            item, context.authorized_field_mask, include_attributes=False
+                        )
+                        for item in page.items
+                    ),
+                    next_cursor=page.next_cursor,
+                )
         except IntegrationOperationsCursorError as error:
             raise OperationsValidationError from error
+
+    def get_audit_record(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        audit_id: UUID,
+    ) -> AuditOperationsRecord:
+        """返回白名单化详情；自由属性不会未经裁剪越过审计边界。"""
+
+        self._require(context, workspace_id, READ_PERMISSION)
+        with self._unit_of_work as unit_of_work:
+            record = unit_of_work.operations.get_audit_record(workspace_id, audit_id)
+        if record is None:
+            raise OperationsNotFoundError
+        return _project_audit_record(
+            record,
+            context.authorized_field_mask,
+            include_attributes=True,
+        )
+
+    def list_audit_export_requests(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        limit: int,
+    ) -> tuple[AuditExportRequest, ...]:
+        """返回当前工作空间的导出状态，不返回内部哈希和传播字段。"""
+
+        self._require(context, workspace_id, READ_PERMISSION)
+        if limit < 1 or limit > 100:
+            raise OperationsValidationError
+        with self._unit_of_work as unit_of_work:
+            return unit_of_work.operations.list_audit_export_requests(workspace_id, limit=limit)
+
+    def get_audit_export_request(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        audit_export_request_id: UUID,
+    ) -> AuditExportRequest:
+        """按空间读取单条导出状态，跨空间标识统一表现为不存在。"""
+
+        self._require(context, workspace_id, READ_PERMISSION)
+        with self._unit_of_work as unit_of_work:
+            request = unit_of_work.operations.get_audit_export_request(
+                workspace_id, audit_export_request_id
+            )
+        if request is None:
+            raise OperationsNotFoundError
+        return request
+
+    def create_audit_export_request(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        idempotency_key: str,
+        actor_id: UUID | None = None,
+        action: str | None = None,
+        resource_type: str | None = None,
+        outcome: AuditOutcome | None = None,
+        occurred_from: datetime | None = None,
+        occurred_to: datetime | None = None,
+        requested_at: datetime | None = None,
+    ) -> AuditExportRequest:
+        """冻结已授权筛选与字段遮罩，并原子登记导出、审计和 Outbox。"""
+
+        # 1. 校验可信浏览器上下文和请求参数，并在创建时冻结查询上界与字段遮罩。
+        self._require(context, workspace_id, READ_PERMISSION)
+        if context.authentication_method != "browser_session" or context.user_id is None:
+            raise OperationsDeniedError
+        if IDEMPOTENCY_PATTERN.fullmatch(idempotency_key) is None:
+            raise OperationsValidationError
+        now = requested_at or datetime.now(UTC)
+        frozen_occurred_to = occurred_to or now
+        _validate_window(1, occurred_from, frozen_occurred_to)
+        normalized_action = _optional_filter(action)
+        normalized_resource_type = _optional_filter(resource_type)
+        request_hash = _audit_export_hash(
+            actor_id=actor_id,
+            action=normalized_action,
+            resource_type=normalized_resource_type,
+            outcome=outcome,
+            occurred_from=occurred_from,
+            occurred_to=frozen_occurred_to,
+            field_mask=context.authorized_field_mask,
+        )
+        # 2. 在同一事务中处理幂等读取，并原子写入导出请求、审计事实和 Outbox 事件。
+        try:
+            with self._unit_of_work as unit_of_work:
+                previous = unit_of_work.operations.get_audit_export_request_by_key(
+                    workspace_id, idempotency_key
+                )
+                if previous is not None:
+                    if previous.request_hash != request_hash:
+                        raise OperationsIdempotencyConflictError
+                    return previous
+                export_request = AuditExportRequest(
+                    audit_export_request_id=uuid4(),
+                    workspace_id=workspace_id,
+                    idempotency_key=idempotency_key,
+                    request_hash=request_hash,
+                    actor_id=actor_id,
+                    action=normalized_action,
+                    resource_type=normalized_resource_type,
+                    outcome=outcome,
+                    occurred_from=occurred_from,
+                    occurred_to=frozen_occurred_to,
+                    field_mask=context.authorized_field_mask,
+                    requested_by_actor_id=context.actor_id,
+                    requested_by_user_id=context.user_id,
+                    request_id=context.request_id,
+                    trace_id=context.trace.trace_id,
+                    traceparent=context.trace.traceparent,
+                    status="pending",
+                    attempt_count=0,
+                    last_error_code=None,
+                    row_count=None,
+                    result_sha256=None,
+                    result_summary=None,
+                    created_at=now,
+                    updated_at=now,
+                    completed_at=None,
+                )
+                unit_of_work.operations.add_audit_export_request(export_request)
+                unit_of_work.audit.add(
+                    AuditRecord(
+                        audit_id=uuid4(),
+                        workspace_id=workspace_id,
+                        actor_id=context.actor_id,
+                        user_id=context.user_id,
+                        action="operations.audit.export.create",
+                        resource_type="audit_export_request",
+                        resource_id=export_request.audit_export_request_id,
+                        outcome="succeeded",
+                        occurred_at=now,
+                        request_id=context.request_id,
+                        trace_id=context.trace.trace_id,
+                        traceparent=context.trace.traceparent,
+                        authorization=context.audit_authorization,
+                        attributes={
+                            "has_actor_filter": actor_id is not None,
+                            "has_time_window": occurred_from is not None or occurred_to is not None,
+                        },
+                    )
+                )
+                unit_of_work.outbox.add(
+                    IntegrationEvent(
+                        event_id=uuid4(),
+                        event_type="operations.audit.export_requested",
+                        workspace_id=workspace_id,
+                        aggregate_id=export_request.audit_export_request_id,
+                        aggregate_version=1,
+                        occurred_at=now,
+                        trace_id=context.trace.trace_id,
+                        traceparent=context.trace.traceparent,
+                        actor_id=context.actor_id,
+                        user_id=context.user_id,
+                        request_id=context.request_id,
+                        payload={
+                            "audit_export_request_id": str(export_request.audit_export_request_id)
+                        },
+                    )
+                )
+                unit_of_work.commit()
+                return export_request
+        # 3. 并发唯一键冲突后重读首次提交事实，只允许相同摘要复用同一幂等键。
+        except IntegrationOperationsWriteConflictError as error:
+            with self._unit_of_work as unit_of_work:
+                previous = unit_of_work.operations.get_audit_export_request_by_key(
+                    workspace_id, idempotency_key
+                )
+                if previous is None:
+                    raise OperationsConflictError from error
+                if previous.request_hash != request_hash:
+                    raise OperationsIdempotencyConflictError from error
+                return previous
 
     def list_outbox_events(
         self,
@@ -283,6 +480,37 @@ class IntegrationOperationsService:
             raise OperationsDeniedError
 
 
+def _project_audit_record(
+    record: AuditOperationsRecord,
+    field_mask: frozenset[str],
+    *,
+    include_attributes: bool,
+) -> AuditOperationsRecord:
+    """在应用边界执行字段遮罩，列表不携带自由属性。"""
+
+    return AuditOperationsRecord(
+        audit_id=record.audit_id,
+        workspace_id=record.workspace_id,
+        actor_id=None if "actor_id" in field_mask else record.actor_id,
+        user_id=None if "user_id" in field_mask else record.user_id,
+        action=record.action,
+        resource_type=record.resource_type,
+        resource_id=record.resource_id,
+        outcome=record.outcome,
+        occurred_at=record.occurred_at,
+        request_id=record.request_id,
+        trace_id=record.trace_id,
+        permission_code=record.permission_code,
+        policy_decision_id=record.policy_decision_id,
+        policy_version=record.policy_version,
+        attributes=(
+            _safe_audit_attributes(record.attributes)
+            if include_attributes and "attributes" not in field_mask
+            else {}
+        ),
+    )
+
+
 def _validate_window(
     limit: int,
     occurred_from: datetime | None,
@@ -305,3 +533,43 @@ def _optional_filter(value: str | None) -> str | None:
     if not normalized or len(normalized) > 255:
         raise OperationsValidationError
     return normalized
+
+
+def _safe_audit_attributes(attributes: dict[str, object]) -> dict[str, object]:
+    """只保留有界标量；敏感键与嵌套载荷统一显示脱敏占位。"""
+
+    result: dict[str, object] = {}
+    for key in sorted(attributes)[:50]:
+        value = attributes[key]
+        if SENSITIVE_AUDIT_KEY_PATTERN.search(key) or isinstance(value, (dict, list, tuple)):
+            result[key] = "[已脱敏]"
+        elif value is None or isinstance(value, (str, int, float, bool)):
+            result[key] = value[:500] if isinstance(value, str) else value
+        else:
+            result[key] = str(value)[:500]
+    return result
+
+
+def _audit_export_hash(
+    *,
+    actor_id: UUID | None,
+    action: str | None,
+    resource_type: str | None,
+    outcome: AuditOutcome | None,
+    occurred_from: datetime | None,
+    occurred_to: datetime | None,
+    field_mask: frozenset[str],
+) -> str:
+    """用规范化筛选和可信字段遮罩生成稳定幂等摘要。"""
+
+    payload = {
+        "actor_id": str(actor_id) if actor_id is not None else None,
+        "action": action,
+        "resource_type": resource_type,
+        "outcome": outcome,
+        "occurred_from": occurred_from.isoformat() if occurred_from else None,
+        "occurred_to": occurred_to.isoformat() if occurred_to else None,
+        "field_mask": sorted(field_mask),
+    }
+    serialized = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

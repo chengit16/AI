@@ -14,6 +14,7 @@ from ai_platform_api.modules.integration.application.operations import (
     IntegrationOperationsService,
 )
 from ai_platform_api.modules.integration.domain.operations import (
+    AuditOperationsRecord,
     OutboxOperationsPage,
     OutboxOperationsRecord,
     OutboxReplayRequest,
@@ -24,6 +25,7 @@ from fastapi.testclient import TestClient
 WORKSPACE_ID = UUID("20000000-0000-4000-8000-000000000207")
 ACCOUNT_ID = UUID("10000000-0000-4000-8000-000000000207")
 EVENT_ID = UUID("60000000-0000-4000-8000-000000000207")
+AUDIT_ID = UUID("61000000-0000-4000-8000-000000000207")
 NOW = datetime(2026, 8, 15, 7, 30, tzinfo=UTC)
 TRACE = TraceContext.continue_from("00-8123456789abcdef0123456789abcdef-8123456789abcdef-01")
 
@@ -66,6 +68,32 @@ class StubOperationsService:
                 ),
             ),
             next_cursor=None,
+        )
+
+    def get_audit_record(
+        self,
+        context: RequestContext,
+        *,
+        workspace_id: UUID,
+        audit_id: UUID,
+    ) -> AuditOperationsRecord:
+        assert context.workspace_id == workspace_id and audit_id == AUDIT_ID
+        return AuditOperationsRecord(
+            audit_id=AUDIT_ID,
+            workspace_id=workspace_id,
+            actor_id=ACCOUNT_ID,
+            user_id=ACCOUNT_ID,
+            action="synthetic.audit.view",
+            resource_type="synthetic_resource",
+            resource_id=EVENT_ID,
+            outcome="succeeded",
+            occurred_at=NOW,
+            request_id=context.request_id,
+            trace_id=context.trace.trace_id,
+            permission_code="operations.records.read",
+            policy_decision_id=None,
+            policy_version=1,
+            attributes={"reason_code": "SYNTHETIC", "token": "[已脱敏]"},
         )
 
     def replay_outbox_event(
@@ -166,3 +194,20 @@ def test_replay_http_contract_is_strict_and_forwards_idempotency() -> None:
         "MANUAL_RECOVERY",
     )
     assert rejected.status_code == 422
+
+
+def test_audit_detail_returns_only_sanitized_attributes() -> None:
+    client, _ = operations_client()
+
+    with client:
+        response = client.get(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/operations/audit-records/{AUDIT_ID}"
+        )
+
+    assert response.status_code == 200
+    assert response.json()["actor_id"] == str(ACCOUNT_ID)
+    assert response.json()["actor_id_masked"] is False
+    assert response.json()["attributes"] == {
+        "reason_code": "SYNTHETIC",
+        "token": "[已脱敏]",
+    }

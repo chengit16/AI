@@ -57,6 +57,12 @@ from ai_platform_worker.modules.ingestion.infrastructure.tika import (
     TikaChineseOcrAdapter,
     TikaDocumentParser,
 )
+from ai_platform_worker.modules.integration.application.audit_exports import (
+    AuditExportProcessor,
+)
+from ai_platform_worker.modules.integration.infrastructure.audit_exports_sqlalchemy import (
+    SqlAlchemyAuditExportRequestStore,
+)
 from ai_platform_worker.modules.knowledge.application.object_cleanup import (
     ObjectCleanupService,
 )
@@ -83,6 +89,7 @@ class WorkerRuntime:
     indexing: IndexCommitProcessor
     index_maintenance: IndexMaintenanceProcessor
     index_maintenance_commands: IndexMaintenanceCommandProcessor
+    audit_exports: AuditExportProcessor
     trash_retention: TrashRetentionService
     object_cleanup: ObjectCleanupService
 
@@ -182,6 +189,12 @@ def build_worker_runtime(settings: WorkerSettings | None = None) -> WorkerRuntim
             index_maintenance,
             worker_id=worker_id,
             lease_seconds=resolved.indexing_lease_seconds,
+        ),
+        audit_exports=AuditExportProcessor(
+            SqlAlchemyAuditExportRequestStore(database.sessions),
+            worker_id=worker_id,
+            lease_seconds=resolved.audit_export_lease_seconds,
+            max_attempts=resolved.audit_export_max_attempts,
         ),
         trash_retention=TrashRetentionService(
             SqlAlchemyTrashRetentionStore(

@@ -14,7 +14,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 
 from ai_platform_backend.database import SCHEMA_TOKEN
 
@@ -176,6 +176,96 @@ Index(
     outbox_replay_requests.c.workspace_id,
     outbox_replay_requests.c.event_id,
     outbox_replay_requests.c.requested_at,
+)
+
+audit_export_requests = Table(
+    "audit_export_requests",
+    metadata,
+    Column("audit_export_request_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("actor_id", UUID(as_uuid=True), nullable=True),
+    Column("action", String(255), nullable=True),
+    Column("resource_type", String(128), nullable=True),
+    Column("outcome", String(32), nullable=True),
+    Column("occurred_from", DateTime(timezone=True), nullable=True),
+    Column("occurred_to", DateTime(timezone=True), nullable=True),
+    Column("field_mask", ARRAY(String(128)), nullable=False),
+    Column("requested_by_actor_id", UUID(as_uuid=True), nullable=False),
+    Column("requested_by_user_id", UUID(as_uuid=True), nullable=True),
+    Column("request_id", UUID(as_uuid=True), nullable=False),
+    Column("trace_id", String(32), nullable=False),
+    Column("traceparent", String(55), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("attempt_count", Integer, nullable=False),
+    Column("claimed_by", String(255), nullable=True),
+    Column("claim_until", DateTime(timezone=True), nullable=True),
+    Column("last_error_code", String(128), nullable=True),
+    Column("row_count", Integer, nullable=True),
+    Column("result_sha256", String(64), nullable=True),
+    Column("result_summary", String(500), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    UniqueConstraint(
+        "workspace_id",
+        "idempotency_key",
+        name="uq_audit_export_requests_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_audit_export_requests_workspace",
+        ondelete="CASCADE",
+    ),
+    CheckConstraint(
+        "outcome IS NULL OR outcome IN ('succeeded', 'denied', 'failed')",
+        name="ck_audit_export_requests_outcome",
+    ),
+    CheckConstraint(
+        "status IN ('pending', 'running', 'retry_wait', 'completed', 'dead_letter')",
+        name="ck_audit_export_requests_status",
+    ),
+    CheckConstraint(
+        "attempt_count BETWEEN 0 AND 3",
+        name="ck_audit_export_requests_attempts",
+    ),
+    CheckConstraint(
+        "request_hash ~ '^[0-9a-f]{64}$'",
+        name="ck_audit_export_requests_hash",
+    ),
+    CheckConstraint(
+        "occurred_from IS NULL OR occurred_to IS NULL OR occurred_from < occurred_to",
+        name="ck_audit_export_requests_window",
+    ),
+    CheckConstraint(
+        "(status = 'running' AND claimed_by IS NOT NULL AND claim_until IS NOT NULL) OR "
+        "(status <> 'running' AND claimed_by IS NULL AND claim_until IS NULL)",
+        name="ck_audit_export_requests_claim",
+    ),
+    CheckConstraint(
+        "(status = 'completed' AND completed_at IS NOT NULL AND row_count IS NOT NULL "
+        "AND row_count >= 0 AND result_sha256 IS NOT NULL AND result_summary IS NOT NULL "
+        "AND last_error_code IS NULL) OR "
+        "(status = 'dead_letter' AND completed_at IS NOT NULL AND row_count IS NULL "
+        "AND result_sha256 IS NULL AND result_summary IS NULL "
+        "AND last_error_code IS NOT NULL) OR "
+        "(status NOT IN ('completed', 'dead_letter') AND completed_at IS NULL "
+        "AND row_count IS NULL AND result_sha256 IS NULL AND result_summary IS NULL)",
+        name="ck_audit_export_requests_completion",
+    ),
+)
+Index(
+    "ix_audit_export_requests_claim",
+    audit_export_requests.c.status,
+    audit_export_requests.c.updated_at,
+)
+Index(
+    "ix_audit_export_requests_workspace_created",
+    audit_export_requests.c.workspace_id,
+    audit_export_requests.c.created_at,
+    audit_export_requests.c.audit_export_request_id,
 )
 
 resource_projections = Table(
