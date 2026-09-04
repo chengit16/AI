@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "acceptance_id": "p6b07-v1",
+  "status": "frozen",
+  "synthetic": true,
+  "description": "以全合成企业空间数据执行阶段 B 的控制台、团队治理、知识域、发布审批、权限审计、企业大脑、撤权、Migration 和跨空间联合验收。",
+  "execution_policy": {
+    "preflight_command": "./platform doctor",
+    "recovery_command": "./platform doctor",
+    "stop_scenarios_on_preflight_failure": true,
+    "always_run_recovery_check": true,
+    "failure_mode": "fail_closed",
+    "evidence_path": ".ai-platform/evidence/p6b07-latest.json"
+  },
+  "required_capabilities": ["enterprise_console", "team_governance", "knowledge_domain", "publication_approval", "permission_audit", "enterprise_brain", "revocation_fail_closed", "migration_roundtrip", "cross_workspace_isolation"],
+  "scenarios": [
+    { "scenario_id": "p6b07-console-001", "title": "企业控制台真实统计、字段裁剪和空间隔离", "capability": "enterprise_console", "pytest_node": "tests/integration/test_p6b01_enterprise_console_postgres.py::test_enterprise_console_aggregates_real_postgres_and_isolates_workspaces", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-team-002", "title": "成员组织角色事务、停用恢复和移除终态", "capability": "team_governance", "pytest_node": "tests/integration/test_p6b02_team_management_postgres.py::test_team_management_real_transaction_preserves_then_removes_assignments", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-domain-003", "title": "知识域声明范围与 PDP 交集及状态失败关闭", "capability": "knowledge_domain", "pytest_node": "tests/integration/test_p6b03_enterprise_knowledge_postgres.py::test_domain_scope_intersects_pdp_and_fails_closed_after_status_changes", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-isolation-004", "title": "企业知识对象跨空间和个人空间引用拒绝", "capability": "cross_workspace_isolation", "pytest_node": "tests/integration/test_p6b03_enterprise_knowledge_postgres.py::test_cross_workspace_and_personal_references_are_denied", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-approval-005", "title": "两级审批原子切换文档与索引发布指针", "capability": "publication_approval", "pytest_node": "tests/integration/test_p6b04_document_publish_approval_postgres.py::test_two_level_approval_switches_document_and_index_pointers_atomically", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-revocation-006", "title": "发布权限撤销后最终批准失败关闭", "capability": "revocation_fail_closed", "pytest_node": "tests/integration/test_p6b04_document_publish_approval_postgres.py::test_revoked_publish_role_fails_closed_before_publication", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-approval-isolation-007", "title": "审批幂等冲突、参与者可见性和跨空间拒绝", "capability": "publication_approval", "pytest_node": "tests/integration/test_p6b04_document_publish_approval_postgres.py::test_idempotency_conflict_participant_visibility_and_cross_workspace_denial", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-audit-008", "title": "审计详情遮罩、空间隔离和异步导出完成", "capability": "permission_audit", "pytest_node": "tests/integration/test_p207_operations_postgres.py::test_audit_detail_and_export_are_masked_isolated_and_worker_completed", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-brain-009", "title": "企业大脑空授权、密钥缺失和跨空间失败无写入", "capability": "enterprise_brain", "pytest_node": "tests/integration/test_p6b06_enterprise_brain_postgres.py::test_empty_pdp_api_key_and_cross_workspace_fail_without_writes", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-brain-revocation-010", "title": "知识域撤权阻止新运行并保留历史报告", "capability": "revocation_fail_closed", "pytest_node": "tests/integration/test_p6b06_enterprise_brain_postgres.py::test_domain_revocation_blocks_new_run_but_keeps_historical_report", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-brain-flow-011", "title": "企业大脑 SSE、反馈、报告下载和归档闭环", "capability": "enterprise_brain", "pytest_node": "tests/integration/test_p6b06_enterprise_brain_postgres.py::test_http_completed_flow_sse_feedback_report_download_and_archive", "expected_case_count": 1 },
+    { "scenario_id": "p6b07-migration-012", "title": "企业大脑存量回填、空间隔离和降级保护", "capability": "migration_roundtrip", "pytest_node": "tests/integration/test_p6b06_enterprise_brain_postgres.py::test_revision_0081_enterprise_backfill_isolation_and_downgrade_guards", "expected_case_count": 1 }
+  ],
+  "manual_acceptance": {
+    "synthetic_data": true,
+    "browser_viewports": ["1440x900", "390x844"],
+    "evidence_document": "docs/stages/stage-6-report.md"
+  }
+}
