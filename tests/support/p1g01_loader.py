@@ -424,10 +424,15 @@ def _load_roles(session: Session, dataset: JsonObject, context: _LoadContext) ->
     system_role_rows: list[JsonObject] = []
     system_binding_rows: list[JsonObject] = []
     system_grant_rows: list[JsonObject] = []
-    for workspace_id, owner_membership_id in (
-        (context.enterprise_workspace_id, context.enterprise_membership_ids["user-001"]),
-        (context.personal_workspace_id, context.personal_membership_id),
-    ):
+    workspace_seeds: tuple[tuple[UUID, Literal["personal", "enterprise"], UUID], ...] = (
+        (
+            context.enterprise_workspace_id,
+            "enterprise",
+            context.enterprise_membership_ids["user-001"],
+        ),
+        (context.personal_workspace_id, "personal", context.personal_membership_id),
+    )
+    for workspace_id, workspace_type, owner_membership_id in workspace_seeds:
         seeded_roles, seeded_bindings = system_role_seed(
             workspace_id=workspace_id,
             owner_membership_id=owner_membership_id,
@@ -439,6 +444,7 @@ def _load_roles(session: Session, dataset: JsonObject, context: _LoadContext) ->
             _grant_row(grant)
             for grant in system_role_permission_seed(
                 workspace_id=workspace_id,
+                workspace_type=workspace_type,
                 owner_role_id=seeded_roles[0].role_id,
                 member_role_id=seeded_roles[1].role_id,
             )

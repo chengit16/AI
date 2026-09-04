@@ -5569,6 +5569,8 @@ conversations = Table(
         server_default="{}",
     ),
     Column("tag_ids", ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"),
+    Column("knowledge_domain_id", UUID(as_uuid=True), nullable=True),
+    Column("knowledge_domain_policy_version", Integer, nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("version", Integer, nullable=False),
@@ -5588,6 +5590,14 @@ conversations = Table(
         [f"{SCHEMA_TOKEN}.accounts.account_id"],
         name="fk_conversations_creator",
     ),
+    ForeignKeyConstraint(
+        ["workspace_id", "knowledge_domain_id"],
+        [
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.workspace_id",
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.domain_id",
+        ],
+        name="fk_conversations_knowledge_domain",
+    ),
     CheckConstraint("status IN ('active', 'archived')", name="ck_conversations_status"),
     CheckConstraint(
         "scope_mode IN ('workspace', 'selected')",
@@ -5601,8 +5611,15 @@ conversations = Table(
         name="ck_conversations_scope_shape",
     ),
     CheckConstraint(
-        "conversation_kind IN ('private', 'service_invocation')",
+        "conversation_kind IN ('private', 'service_invocation', 'enterprise_brain')",
         name="ck_conversations_kind",
+    ),
+    CheckConstraint(
+        "(conversation_kind = 'enterprise_brain' AND knowledge_domain_id IS NOT NULL "
+        "AND knowledge_domain_policy_version >= 1) OR "
+        "(conversation_kind <> 'enterprise_brain' AND knowledge_domain_id IS NULL "
+        "AND knowledge_domain_policy_version IS NULL)",
+        name="ck_conversations_knowledge_domain",
     ),
     CheckConstraint("version >= 1", name="ck_conversations_version"),
     CheckConstraint(
@@ -5780,6 +5797,8 @@ assistant_runs = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("completed_at", DateTime(timezone=True), nullable=True),
     Column("error_code", String(128), nullable=True),
+    Column("knowledge_domain_id", UUID(as_uuid=True), nullable=True),
+    Column("knowledge_domain_policy_version", Integer, nullable=True),
     UniqueConstraint(
         "workspace_id",
         "requested_by_actor_id",
@@ -5838,6 +5857,14 @@ assistant_runs = Table(
         [f"{SCHEMA_TOKEN}.accounts.account_id"],
         name="fk_assistant_runs_requester",
     ),
+    ForeignKeyConstraint(
+        ["workspace_id", "knowledge_domain_id"],
+        [
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.workspace_id",
+            f"{SCHEMA_TOKEN}.team_knowledge_domains.domain_id",
+        ],
+        name="fk_assistant_runs_knowledge_domain",
+    ),
     CheckConstraint(
         "(service_id IS NULL AND service_route_id IS NULL AND service_route_version IS NULL) OR "
         "(service_id IS NOT NULL AND service_route_id IS NOT NULL "
@@ -5858,6 +5885,11 @@ assistant_runs = Table(
         name="ck_assistant_runs_request_hash",
     ),
     CheckConstraint("trace_id ~ '^[0-9a-f]{32}$'", name="ck_assistant_runs_trace_id"),
+    CheckConstraint(
+        "(knowledge_domain_id IS NULL AND knowledge_domain_policy_version IS NULL) OR "
+        "(knowledge_domain_id IS NOT NULL AND knowledge_domain_policy_version >= 1)",
+        name="ck_assistant_runs_knowledge_domain",
+    ),
 )
 Index(
     "ix_assistant_runs_workspace_time",
@@ -5946,6 +5978,83 @@ Index(
     "ix_message_feedbacks_workspace_time",
     message_feedbacks.c.workspace_id,
     message_feedbacks.c.updated_at,
+)
+
+enterprise_brain_reports = Table(
+    "enterprise_brain_reports",
+    metadata,
+    Column("report_id", UUID(as_uuid=True), primary_key=True),
+    Column("workspace_id", UUID(as_uuid=True), nullable=False),
+    Column("created_by_account_id", UUID(as_uuid=True), nullable=False),
+    Column("conversation_id", UUID(as_uuid=True), nullable=False),
+    Column("message_id", UUID(as_uuid=True), nullable=False),
+    Column("run_id", UUID(as_uuid=True), nullable=False),
+    Column("template", String(32), nullable=False),
+    Column("title", String(200), nullable=False),
+    Column("content", Text, nullable=False),
+    Column("content_sha256", String(64), nullable=False),
+    Column("citation_count", Integer, nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "workspace_id",
+        "created_by_account_id",
+        "idempotency_key",
+        name="uq_enterprise_brain_reports_idempotency",
+    ),
+    ForeignKeyConstraint(
+        ["workspace_id"],
+        [f"{SCHEMA_TOKEN}.workspaces.workspace_id"],
+        name="fk_enterprise_brain_reports_workspace",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["conversation_id", "workspace_id"],
+        [
+            f"{SCHEMA_TOKEN}.conversations.conversation_id",
+            f"{SCHEMA_TOKEN}.conversations.workspace_id",
+        ],
+        name="fk_enterprise_brain_reports_conversation",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["run_id"],
+        [f"{SCHEMA_TOKEN}.assistant_runs.run_id"],
+        name="fk_enterprise_brain_reports_run",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["message_id", "workspace_id"],
+        [f"{SCHEMA_TOKEN}.messages.message_id", f"{SCHEMA_TOKEN}.messages.workspace_id"],
+        name="fk_enterprise_brain_reports_message",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["created_by_account_id"],
+        [f"{SCHEMA_TOKEN}.accounts.account_id"],
+        name="fk_enterprise_brain_reports_creator",
+    ),
+    CheckConstraint(
+        "template IN ('briefing', 'risk_review', 'comparison')",
+        name="ck_enterprise_brain_reports_template",
+    ),
+    CheckConstraint(
+        "char_length(btrim(title)) BETWEEN 1 AND 200",
+        name="ck_enterprise_brain_reports_title",
+    ),
+    CheckConstraint(
+        "char_length(content) BETWEEN 1 AND 200000",
+        name="ck_enterprise_brain_reports_content",
+    ),
+    CheckConstraint(
+        "content_sha256 ~ '^[0-9a-f]{64}$' AND citation_count >= 0",
+        name="ck_enterprise_brain_reports_integrity",
+    ),
+)
+Index(
+    "ix_enterprise_brain_reports_workspace_time",
+    enterprise_brain_reports.c.workspace_id,
+    enterprise_brain_reports.c.created_at,
 )
 
 quality_sample_versions = Table(

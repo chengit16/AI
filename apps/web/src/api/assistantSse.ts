@@ -40,7 +40,12 @@ export async function* streamAssistantRun(
   workspaceId: string,
   conversationId: string,
   runId: string,
-  options: { signal?: AbortSignal; lastEventId?: string | null; maxReconnects?: number } = {},
+  options: {
+    signal?: AbortSignal;
+    lastEventId?: string | null;
+    maxReconnects?: number;
+    eventsPath?: string;
+  } = {},
 ): AsyncGenerator<AssistantStreamEvent, void, undefined> {
   let cursor = options.lastEventId ?? null;
   let lastSequence = 0;
@@ -52,7 +57,8 @@ export async function* streamAssistantRun(
     try {
       // 连接建立和响应体读取都可能因短暂网络故障失败，二者共享同一重连预算与游标。
       const response = await apiStreamRequest(
-        `/api/v1/workspaces/${workspaceId}/conversations/${conversationId}/runs/${runId}/events`,
+        options.eventsPath ??
+          `/api/v1/workspaces/${workspaceId}/conversations/${conversationId}/runs/${runId}/events`,
         { signal: options.signal, lastEventId: cursor },
       );
       if (!response.body) throw new AssistantSseProtocolError("浏览器未提供 SSE 响应流");

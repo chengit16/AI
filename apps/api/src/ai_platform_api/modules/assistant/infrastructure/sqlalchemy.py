@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from contextvars import ContextVar
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import TracebackType
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
@@ -31,6 +31,10 @@ from ai_platform_api.modules.assistant.domain.models import (
     AssistantWriteConflictError,
     Conversation,
     ConversationAttachment,
+    ConversationKind,
+    EnterpriseBrainOverview,
+    EnterpriseBrainReport,
+    EnterpriseKnowledgeScopeResolver,
     FeedbackIssueCode,
     FeedbackRating,
     Message,
@@ -51,11 +55,13 @@ from ai_platform_api.persistence.tables import (
     conversations,
     document_tag_bindings,
     documents,
+    enterprise_brain_reports,
     knowledge_bases,
     knowledge_tags,
     message_feedbacks,
     message_parts,
     messages,
+    model_invocations,
     workspace_memberships,
     workspaces,
 )
@@ -63,6 +69,7 @@ from ai_platform_api.persistence.tables import (
 SessionFactory = Callable[[], Session]
 UsageRepositoryFactory = Callable[[Session], UsageRepository]
 ServiceRepositoryFactory = Callable[[Session], ServiceRepository]
+EnterpriseKnowledgeScopeResolverFactory = Callable[[Session], EnterpriseKnowledgeScopeResolver]
 SYSTEM_AGENT_KEY = "system_knowledge"
 SYSTEM_AGENT_NAME = "系统知识助手"
 
@@ -231,6 +238,8 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                     scope_mode=conversation.scope_mode,
                     knowledge_base_ids=list(conversation.knowledge_base_ids),
                     tag_ids=list(conversation.tag_ids),
+                    knowledge_domain_id=conversation.knowledge_domain_id,
+                    knowledge_domain_policy_version=conversation.knowledge_domain_policy_version,
                     created_at=conversation.created_at,
                     updated_at=conversation.updated_at,
                     version=conversation.version,
@@ -245,13 +254,14 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         account_id: UUID,
         *,
         limit: int,
+        conversation_kind: ConversationKind = "private",
     ) -> tuple[Conversation, ...]:
         rows = self._session.execute(
             select(conversations)
             .where(
                 conversations.c.workspace_id == workspace_id,
                 conversations.c.created_by_account_id == account_id,
-                conversations.c.conversation_kind == "private",
+                conversations.c.conversation_kind == conversation_kind,
             )
             .order_by(conversations.c.updated_at.desc(), conversations.c.conversation_id)
             .limit(limit)
@@ -265,12 +275,13 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         account_id: UUID,
         *,
         for_update: bool = False,
+        conversation_kind: ConversationKind = "private",
     ) -> Conversation | None:
         statement = select(conversations).where(
             conversations.c.workspace_id == workspace_id,
             conversations.c.conversation_id == conversation_id,
             conversations.c.created_by_account_id == account_id,
-            conversations.c.conversation_kind == "private",
+            conversations.c.conversation_kind == conversation_kind,
         )
         if for_update:
             statement = statement.with_for_update()
@@ -650,6 +661,8 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
                     updated_at=run.updated_at,
                     completed_at=run.completed_at,
                     error_code=run.error_code,
+                    knowledge_domain_id=run.knowledge_domain_id,
+                    knowledge_domain_policy_version=run.knowledge_domain_policy_version,
                 )
             )
         except IntegrityError as error:
@@ -784,6 +797,193 @@ class SqlAlchemyAssistantRepository(AssistantRepository):
         if result.rowcount != 1:
             raise AssistantWriteConflictError("write")
 
+    def add_enterprise_brain_report(self, report: EnterpriseBrainReport) -> None:
+        """写入不可变报告；幂等键冲突交由应用层转换为稳定错误。"""
+
+        try:
+            self._session.execute(
+                insert(enterprise_brain_reports).values(
+                    report_id=report.report_id,
+                    workspace_id=report.workspace_id,
+                    created_by_account_id=report.created_by_account_id,
+                    conversation_id=report.conversation_id,
+                    message_id=report.message_id,
+                    run_id=report.run_id,
+                    template=report.template,
+                    title=report.title,
+                    content=report.content,
+                    content_sha256=report.content_sha256,
+                    citation_count=report.citation_count,
+                    idempotency_key=report.idempotency_key,
+                    created_at=report.created_at,
+                )
+            )
+        except IntegrityError as error:
+            raise AssistantWriteConflictError("idempotency") from error
+
+    def get_enterprise_brain_report(
+        self,
+        workspace_id: UUID,
+        report_id: UUID,
+        account_id: UUID,
+    ) -> EnterpriseBrainReport | None:
+        """按工作空间、报告创建者和企业大脑会话三重边界读取报告。"""
+
+        row = self._session.execute(
+            select(enterprise_brain_reports)
+            .join(
+                conversations,
+                (conversations.c.workspace_id == enterprise_brain_reports.c.workspace_id)
+                & (conversations.c.conversation_id == enterprise_brain_reports.c.conversation_id),
+            )
+            .where(
+                enterprise_brain_reports.c.workspace_id == workspace_id,
+                enterprise_brain_reports.c.report_id == report_id,
+                enterprise_brain_reports.c.created_by_account_id == account_id,
+                conversations.c.conversation_kind == "enterprise_brain",
+            )
+        ).one_or_none()
+        return _enterprise_brain_report(row) if row is not None else None
+
+    def get_enterprise_brain_report_by_key(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        idempotency_key: str,
+    ) -> EnterpriseBrainReport | None:
+        """读取当前账号在当前空间的幂等报告，防止跨空间重放。"""
+
+        row = self._session.execute(
+            select(enterprise_brain_reports).where(
+                enterprise_brain_reports.c.workspace_id == workspace_id,
+                enterprise_brain_reports.c.created_by_account_id == account_id,
+                enterprise_brain_reports.c.idempotency_key == idempotency_key,
+            )
+        ).one_or_none()
+        return _enterprise_brain_report(row) if row is not None else None
+
+    def list_enterprise_brain_reports(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[EnterpriseBrainReport, ...]:
+        """仅列出当前账号创建的企业大脑报告，按创建时间倒序稳定分页。"""
+
+        rows = self._session.execute(
+            select(enterprise_brain_reports)
+            .where(
+                enterprise_brain_reports.c.workspace_id == workspace_id,
+                enterprise_brain_reports.c.created_by_account_id == account_id,
+            )
+            .order_by(
+                enterprise_brain_reports.c.created_at.desc(),
+                enterprise_brain_reports.c.report_id,
+            )
+            .limit(limit)
+        )
+        return tuple(_enterprise_brain_report(row) for row in rows)
+
+    def get_enterprise_brain_overview(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        *,
+        generated_at: datetime,
+    ) -> EnterpriseBrainOverview | None:
+        """聚合当前账号企业大脑会话与近 30 天 Run，用同一空间边界过滤。"""
+
+        # 1. 先确认目标为活动企业空间；失败时不继续聚合，也不泄露空间统计。
+        workspace_name = self._session.scalar(
+            select(workspaces.c.name).where(
+                workspaces.c.workspace_id == workspace_id,
+                workspaces.c.workspace_type == "enterprise",
+                workspaces.c.status == "active",
+            )
+        )
+        if not isinstance(workspace_name, str):
+            return None
+
+        # 2. 会话和 Run 分别按空间、账号及企业大脑类型聚合，普通助手运行不得混入。
+        base = (
+            select(conversations.c.status, func.count().label("count"))
+            .where(
+                conversations.c.workspace_id == workspace_id,
+                conversations.c.created_by_account_id == account_id,
+                conversations.c.conversation_kind == "enterprise_brain",
+            )
+            .group_by(conversations.c.status)
+        )
+        conversation_counts = {
+            row.status: int(row._mapping["count"]) for row in self._session.execute(base)
+        }
+        since = generated_at - timedelta(days=30)
+        run_counts = {
+            row.status: int(row._mapping["count"])
+            for row in self._session.execute(
+                select(assistant_runs.c.status, func.count().label("count"))
+                .where(
+                    assistant_runs.c.workspace_id == workspace_id,
+                    assistant_runs.c.requested_by_actor_id == account_id,
+                    assistant_runs.c.knowledge_domain_id.is_not(None),
+                    assistant_runs.c.created_at >= since,
+                    assistant_runs.c.created_at < generated_at,
+                )
+                .group_by(assistant_runs.c.status)
+            )
+        }
+        # 3. 在相同时间窗内汇总模型成本，并返回账号实际使用过的知识域集合。
+        invocation_row = self._session.execute(
+            select(
+                func.coalesce(
+                    func.sum(model_invocations.c.input_tokens + model_invocations.c.output_tokens),
+                    0,
+                ).label("tokens"),
+                func.coalesce(func.sum(model_invocations.c.estimated_cost_microunits), 0).label(
+                    "cost"
+                ),
+            )
+            .join(assistant_runs, assistant_runs.c.trace_id == model_invocations.c.trace_id)
+            .where(
+                model_invocations.c.workspace_id == workspace_id,
+                assistant_runs.c.workspace_id == workspace_id,
+                assistant_runs.c.requested_by_actor_id == account_id,
+                assistant_runs.c.knowledge_domain_id.is_not(None),
+                model_invocations.c.started_at >= since,
+                model_invocations.c.started_at < generated_at,
+            )
+        ).one()
+        domain_ids = tuple(
+            self._session.scalars(
+                select(conversations.c.knowledge_domain_id)
+                .where(
+                    conversations.c.workspace_id == workspace_id,
+                    conversations.c.created_by_account_id == account_id,
+                    conversations.c.conversation_kind == "enterprise_brain",
+                    conversations.c.knowledge_domain_id.is_not(None),
+                )
+                .distinct()
+                .order_by(conversations.c.knowledge_domain_id)
+            )
+        )
+        return EnterpriseBrainOverview(
+            workspace_id=workspace_id,
+            workspace_name=workspace_name,
+            generated_at=generated_at,
+            window_started_at=since,
+            window_ended_at=generated_at,
+            active_conversation_count=conversation_counts.get("active", 0),
+            archived_conversation_count=conversation_counts.get("archived", 0),
+            run_count_30d=sum(run_counts.values()),
+            completed_run_count_30d=run_counts.get("completed", 0),
+            failed_run_count_30d=run_counts.get("failed", 0),
+            cancelled_run_count_30d=run_counts.get("cancelled", 0),
+            token_count_30d=int(invocation_row.tokens),
+            estimated_cost_microunits_30d=int(invocation_row.cost),
+            knowledge_domain_ids=domain_ids,
+        )
+
     def _insert_message(self, message: Message) -> None:
         self._session.execute(
             insert(messages).values(
@@ -859,10 +1059,12 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
         session_factory: SessionFactory,
         service_repository_factory: ServiceRepositoryFactory,
         usage_repository_factory: UsageRepositoryFactory | None = None,
+        enterprise_knowledge_scope_factory: (EnterpriseKnowledgeScopeResolverFactory | None) = None,
     ) -> None:
         self._session_factory = session_factory
         self._service_repository_factory = service_repository_factory
         self._usage_repository_factory = usage_repository_factory
+        self._enterprise_knowledge_scope_factory = enterprise_knowledge_scope_factory
         self._state: ContextVar[
             tuple[
                 Session,
@@ -871,6 +1073,7 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
                 UsageRepository | None,
                 SqlAlchemyAuditWriter,
                 SqlAlchemyOutboxWriter,
+                EnterpriseKnowledgeScopeResolver | None,
             ]
             | None
         ] = ContextVar("assistant_unit_of_work", default=None)
@@ -891,6 +1094,11 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
                 ),
                 SqlAlchemyAuditWriter(session),
                 SqlAlchemyOutboxWriter(session),
+                (
+                    self._enterprise_knowledge_scope_factory(session)
+                    if self._enterprise_knowledge_scope_factory is not None
+                    else None
+                ),
             )
         )
         return self
@@ -935,6 +1143,15 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
     def outbox(self) -> SqlAlchemyOutboxWriter:
         return self._require_state()[5]
 
+    @property
+    def enterprise_knowledge(self) -> EnterpriseKnowledgeScopeResolver:
+        """返回组合根注入的窄查询端口，未装配时明确失败。"""
+
+        resolver = self._require_state()[6]
+        if resolver is None:
+            raise RuntimeError("Assistant Unit of Work 未装配企业知识域查询端口")
+        return resolver
+
     def commit(self) -> None:
         self._require_state()[0].commit()
 
@@ -947,6 +1164,7 @@ class SqlAlchemyAssistantUnitOfWork(AssistantUnitOfWork):
         UsageRepository | None,
         SqlAlchemyAuditWriter,
         SqlAlchemyOutboxWriter,
+        EnterpriseKnowledgeScopeResolver | None,
     ]:
         state = self._state.get()
         if state is None:
@@ -980,6 +1198,8 @@ def _conversation(row: Row[Any]) -> Conversation:
         row.created_at,
         row.updated_at,
         row.version,
+        row.knowledge_domain_id,
+        row.knowledge_domain_policy_version,
     )
 
 
@@ -1009,6 +1229,8 @@ def _run(row: Row[Any]) -> AssistantRun:
         frozenset(row.knowledge_base_ids) if row.knowledge_base_ids is not None else None,
         frozenset(row.document_ids) if row.document_ids is not None else None,
         tuple(row.attachment_ids),
+        row.knowledge_domain_id,
+        row.knowledge_domain_policy_version,
     )
 
 
@@ -1041,6 +1263,26 @@ def _feedback(row: Row[Any]) -> MessageFeedback:
         row.created_at,
         row.updated_at,
         row.version,
+    )
+
+
+def _enterprise_brain_report(row: Row[Any]) -> EnterpriseBrainReport:
+    """将报告行投影为不可变领域对象，不向上层暴露 ORM 行。"""
+
+    return EnterpriseBrainReport(
+        report_id=row.report_id,
+        workspace_id=row.workspace_id,
+        created_by_account_id=row.created_by_account_id,
+        conversation_id=row.conversation_id,
+        message_id=row.message_id,
+        run_id=row.run_id,
+        template=cast("Literal['briefing', 'risk_review', 'comparison']", row.template),
+        title=row.title,
+        content=row.content,
+        content_sha256=row.content_sha256,
+        citation_count=row.citation_count,
+        idempotency_key=row.idempotency_key,
+        created_at=row.created_at,
     )
 
 

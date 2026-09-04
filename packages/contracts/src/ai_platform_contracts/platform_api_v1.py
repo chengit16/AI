@@ -333,6 +333,8 @@ class AssistantRunResponse(typing.TypedDict):
     document_ids: typing.NotRequired[list[str] | None]
     error_code: str | None
     knowledge_base_ids: typing.NotRequired[list[str] | None]
+    knowledge_domain_id: typing.NotRequired[str | None]
+    knowledge_domain_policy_version: typing.NotRequired[int | None]
     run_id: str
     runtime_config_version_id: str
     service_id: typing.NotRequired[str | None]
@@ -581,6 +583,17 @@ class CreateDocumentVersionRequest(typing.TypedDict):
     source_name: str
     source_path: typing.NotRequired[str | None]
     source_url: typing.NotRequired[str | None]
+
+
+class CreateEnterpriseBrainConversationRequest(typing.TypedDict):
+    knowledge_domain_id: str
+    title: typing.NotRequired[str | None]
+
+
+class CreateEnterpriseBrainReportRequest(typing.TypedDict):
+    message_id: str
+    template: typing.Literal["briefing", "risk_review", "comparison"]
+    title: str
 
 
 class CreateEnterpriseCategoryRequest(typing.TypedDict):
@@ -900,6 +913,60 @@ class EffectiveRoleSetResponse(typing.TypedDict):
 class EffectiveRoleSourceResponse(typing.TypedDict):
     scope_id: str
     scope_type: typing.Literal["workspace", "department", "member"]
+
+
+class EnterpriseBrainConversationListResponse(typing.TypedDict):
+    items: list[EnterpriseBrainConversationResponse]
+
+
+class EnterpriseBrainConversationResponse(typing.TypedDict):
+    conversation_id: str
+    created_at: str
+    created_by_account_id: str
+    knowledge_domain_id: str
+    knowledge_domain_policy_version: int
+    status: typing.Literal["active", "archived"]
+    title: str | None
+    updated_at: str
+    version: int
+    workspace_id: str
+
+
+class EnterpriseBrainOverviewResponse(typing.TypedDict):
+    active_conversation_count: int
+    archived_conversation_count: int
+    cancelled_run_count_30d: int
+    completed_run_count_30d: int
+    estimated_cost_microunits_30d: int
+    failed_run_count_30d: int
+    generated_at: str
+    knowledge_domain_ids: typing.NotRequired[list[str]]
+    run_count_30d: int
+    token_count_30d: int
+    window_ended_at: str
+    window_started_at: str
+    workspace_id: str
+    workspace_name: str
+
+
+class EnterpriseBrainReportListResponse(typing.TypedDict):
+    items: list[EnterpriseBrainReportResponse]
+
+
+class EnterpriseBrainReportResponse(typing.TypedDict):
+    citation_count: int
+    content: str
+    content_sha256: str
+    conversation_id: str
+    created_at: str
+    created_by_account_id: str
+    idempotency_key: str
+    message_id: str
+    report_id: str
+    run_id: str
+    template: typing.Literal["briefing", "risk_review", "comparison"]
+    title: str
+    workspace_id: str
 
 
 class EnterpriseCategoryResponse(typing.TypedDict):
@@ -1727,6 +1794,10 @@ class PersonalWorkbenchStatisticsResponse(typing.TypedDict):
     knowledge_base_count: int
     pending_index_document_count: int
     published_document_count: int
+
+
+class PlatformAdministrationResponse(typing.TypedDict):
+    is_platform_administrator: bool
 
 
 class PositionListResponse(typing.TypedDict):

@@ -692,7 +692,10 @@ class EnterpriseKnowledgeService:
                 domain_id=domain_id,
                 account_id=account_id,
                 authorized_workspace=context.authorized_workspace,
-                authorized_knowledge_base_ids=context.authorized_resource_ids,
+                authorized_department_ids=context.authorized_department_ids,
+                authorized_account_ids=context.authorized_account_ids,
+                authorized_document_ids=context.authorized_resource_ids,
+                maximum_security_level=context.authorized_maximum_security_level,
             )
             if result is None:
                 raise EnterpriseKnowledgeNotFoundError

@@ -431,7 +431,7 @@ def cancel_run(
         run_id=run_id,
     )
     if run.status == "cancelled":
-        _close_cancelled_stream(streams, run)
+        close_cancelled_stream(streams, run)
     return _run(run)
 
 
@@ -608,6 +608,8 @@ def _run(value: AssistantRun) -> AssistantRunResponse:
             sorted(value.document_ids, key=str) if value.document_ids is not None else None
         ),
         attachment_ids=list(value.attachment_ids),
+        knowledge_domain_id=value.knowledge_domain_id,
+        knowledge_domain_policy_version=value.knowledge_domain_policy_version,
         status=value.status,
         trace_id=value.trace_id,
         created_at=value.created_at,
@@ -672,7 +674,7 @@ def initial_stream_replay(
         return None
 
 
-def _close_cancelled_stream(
+def close_cancelled_stream(
     streams: TransactionalStreamService,
     run: AssistantRun,
 ) -> None:

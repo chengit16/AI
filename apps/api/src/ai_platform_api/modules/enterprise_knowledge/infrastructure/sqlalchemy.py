@@ -790,8 +790,15 @@ class SqlAlchemyEnterpriseKnowledgeRepository:
         domain_id: UUID,
         account_id: UUID,
         authorized_workspace: bool,
-        authorized_knowledge_base_ids: frozenset[UUID],
+        authorized_department_ids: frozenset[UUID],
+        authorized_account_ids: frozenset[UUID],
+        authorized_document_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
     ) -> ResolvedKnowledgeDomainScope | None:
+        """解析账号在知识域声明、PDP 授权与文档治理约束下的有效知识库交集。"""
+
+        # 长函数保留原因: 成员、知识域、PDP 文档范围和密级必须在同一事务快照中收敛，
+        # 拆成可独立调用的查询会允许调用方跳过失败关闭步骤，并产生跨时点授权漂移。
         # 1. 先读取唯一归属空间内的知识域，归档态立即返回显式空集。
         domain = self.get_domain(workspace_id, domain_id)
         if domain is None:
@@ -844,7 +851,7 @@ class SqlAlchemyEnterpriseKnowledgeRepository:
         if not declared:
             return _empty_scope(domain, declared, "no_declared_knowledge_bases", actor=True)
 
-        # 3. 最终范围固定为活动声明知识库与当前 PDP 授权的交集，空交集绝不扩大。
+        # 3. 只保留活动声明知识库；归档知识库不能因历史知识域关系继续参与检索。
         active_declared = {
             row.knowledge_base_id
             for row in self._session.execute(
@@ -855,11 +862,76 @@ class SqlAlchemyEnterpriseKnowledgeRepository:
                 )
             )
         }
-        authorized = (
-            active_declared
-            if authorized_workspace
-            else active_declared.intersection(authorized_knowledge_base_ids)
+        if not active_declared:
+            return ResolvedKnowledgeDomainScope(
+                domain_id=domain.domain_id,
+                policy_version=domain.rag_policy.policy_version,
+                actor_in_declared_scope=True,
+                declared_knowledge_base_ids=declared,
+                authorized_knowledge_base_ids=(),
+                effective_knowledge_base_ids=(),
+                empty_reason="pdp_scope_empty",
+            )
+
+        # 4. PDP 的 resource_ids 是文档 ID，必须先裁剪活动文档再映射知识库。
+        # 工作空间范围也不能绕过文档自身的 private/department 可见性；受限范围按
+        # 部门、创建者和显式文档授权取并集，并统一应用当前密级上限。
+        allowed_levels = tuple(
+            level
+            for level, rank in SECURITY_LEVEL_RANK.items()
+            if rank <= SECURITY_LEVEL_RANK[maximum_security_level]
         )
+        if authorized_workspace:
+            document_scope = (
+                (documents.c.visibility == "workspace")
+                | (
+                    (documents.c.visibility == "private")
+                    & (documents.c.created_by_account_id == account_id)
+                )
+                | (
+                    (documents.c.visibility == "departments")
+                    & documents.c.department_ids.overlap(list(membership_department_ids))
+                )
+            )
+        else:
+            restricted_conditions = []
+            if authorized_department_ids:
+                restricted_conditions.append(
+                    (documents.c.visibility == "departments")
+                    & documents.c.department_ids.overlap(list(authorized_department_ids))
+                )
+            if authorized_account_ids:
+                restricted_conditions.append(
+                    documents.c.created_by_account_id.in_(authorized_account_ids)
+                )
+            if authorized_document_ids:
+                restricted_conditions.append(documents.c.document_id.in_(authorized_document_ids))
+            if not restricted_conditions:
+                return ResolvedKnowledgeDomainScope(
+                    domain_id=domain.domain_id,
+                    policy_version=domain.rag_policy.policy_version,
+                    actor_in_declared_scope=True,
+                    declared_knowledge_base_ids=declared,
+                    authorized_knowledge_base_ids=(),
+                    effective_knowledge_base_ids=(),
+                    empty_reason="pdp_scope_empty",
+                )
+            document_scope = restricted_conditions[0]
+            for condition in restricted_conditions[1:]:
+                document_scope = document_scope | condition
+
+        authorized = {
+            row.knowledge_base_id
+            for row in self._session.execute(
+                select(documents.c.knowledge_base_id).where(
+                    documents.c.workspace_id == workspace_id,
+                    documents.c.knowledge_base_id.in_(active_declared),
+                    documents.c.status == "active",
+                    documents.c.security_level.in_(allowed_levels),
+                    document_scope,
+                )
+            )
+        }
         authorized_values = tuple(sorted(authorized, key=lambda item: item.int))
         if not authorized_values:
             return ResolvedKnowledgeDomainScope(

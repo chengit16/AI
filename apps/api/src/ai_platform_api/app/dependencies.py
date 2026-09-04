@@ -27,9 +27,15 @@ from ai_platform_api.modules.agent_operations.application.service import AgentOp
 from ai_platform_api.modules.agent_operations.infrastructure.sqlalchemy import (
     SqlAlchemyAgentOperationsUnitOfWork,
 )
+from ai_platform_api.modules.assistant.application.enterprise_brain import (
+    EnterpriseBrainConversationService,
+)
 from ai_platform_api.modules.assistant.application.runner import AssistantRunExecutor
 from ai_platform_api.modules.assistant.application.service import AssistantConversationService
-from ai_platform_api.modules.assistant.application.sources import AssistantSourceService
+from ai_platform_api.modules.assistant.application.sources import (
+    AssistantSourceService,
+    RetrievalCurrentEvidenceCitationCounter,
+)
 from ai_platform_api.modules.assistant.infrastructure.sqlalchemy import (
     SqlAlchemyAssistantUnitOfWork,
 )
@@ -63,6 +69,7 @@ from ai_platform_api.modules.enterprise_knowledge.infrastructure.document_publis
     SqlAlchemyDocumentPublishSubjectLifecycle,
 )
 from ai_platform_api.modules.enterprise_knowledge.infrastructure.sqlalchemy import (
+    SqlAlchemyEnterpriseKnowledgeRepository,
     SqlAlchemyEnterpriseKnowledgeUnitOfWork,
 )
 from ai_platform_api.modules.identity.application.authentication import (
@@ -315,7 +322,9 @@ class ApplicationContainer:
     ai_runtime_configurations: AiRuntimeConfigurationService | None = None
     model_runtime: RuntimeModelGatewayService | None = None
     assistant_conversations: AssistantConversationService | None = None
+    enterprise_brain_conversations: EnterpriseBrainConversationService | None = None
     assistant_run_executor: AssistantRunExecutor | None = None
+    enterprise_brain_run_executor: AssistantRunExecutor | None = None
     agent_controls: AgentControlService | None = None
     agent_operations: AgentOperationsService | None = None
     service_governance: ServiceGovernanceService | None = None
@@ -323,6 +332,7 @@ class ApplicationContainer:
     invocation_rate_limiter: InvocationRateLimiter | None = None
     runtime_releases: RuntimeReleaseLoader | None = None
     assistant_sources: AssistantSourceService | None = None
+    enterprise_brain_sources: AssistantSourceService | None = None
     streaming: TransactionalStreamService | None = None
     retrieval_planning: BoundedRetrievalPlanningService | None = None
     retrieval_evidence: RetrievalEvidenceService | None = None
@@ -486,6 +496,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         database.sessions,
         SqlAlchemyServiceRepository,
         SqlAlchemyEntitlementRepository,
+        SqlAlchemyEnterpriseKnowledgeRepository,
     )
     assistant_conversations = AssistantConversationService(
         assistant_unit_of_work,
@@ -585,6 +596,13 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         field_registry,
         DeterministicLexicalReranker(),
     )
+    enterprise_brain_conversations = EnterpriseBrainConversationService(
+        assistant_unit_of_work,
+        policy,
+        RetrievalCurrentEvidenceCitationCounter(retrieval_evidence),
+        runtime_bootstrap=runtime_bootstrap,
+        current_route_invalidator=runtime_releases,
+    )
     runtime_reader = SqlAlchemyRuntimeConfigurationReader(database.sessions)
     http_runtime_provider_factory = OpenAiCompatibleRuntimeProviderFactory(provider_url_policy)
     runtime_provider_factory = (
@@ -627,6 +645,17 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         streaming,
         delta_batch_characters=settings.stream_delta_batch_characters,
     )
+    enterprise_brain_run_executor = AssistantRunExecutor(
+        enterprise_brain_conversations,
+        retrieval_planning,
+        retrieval_evidence,
+        runtime_releases,
+        runtime_reader,
+        model_runtime,
+        model_context,
+        streaming,
+        delta_batch_characters=settings.stream_delta_batch_characters,
+    )
     # 3. 容器接管全部资源；构造中途失败时按依赖逆序关闭，避免泄漏连接和缓存客户端。
     try:
         return ApplicationContainer(
@@ -657,7 +686,9 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             ai_runtime_configurations=ai_runtime_configurations,
             model_runtime=model_runtime,
             assistant_conversations=assistant_conversations,
+            enterprise_brain_conversations=enterprise_brain_conversations,
             assistant_run_executor=assistant_run_executor,
+            enterprise_brain_run_executor=enterprise_brain_run_executor,
             agent_controls=agent_controls,
             agent_operations=agent_operations,
             service_governance=service_governance,
@@ -666,6 +697,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             runtime_releases=runtime_releases,
             assistant_sources=AssistantSourceService(
                 assistant_conversations,
+                retrieval_evidence,
+            ),
+            enterprise_brain_sources=AssistantSourceService(
+                enterprise_brain_conversations,
                 retrieval_evidence,
             ),
             streaming=streaming,

@@ -11,17 +11,22 @@ from uuid import UUID
 from ai_platform_backend.integration.domain import AuditWriter
 
 from ai_platform_api.common.runtime import RuntimeConfigSnapshot
+from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
+from ai_platform_api.modules.enterprise_knowledge.domain.models import (
+    ResolvedKnowledgeDomainScope,
+)
 from ai_platform_api.modules.identity.domain.entitlements import UsageRepository
 from ai_platform_api.modules.integration.domain.events import OutboxWriter
 from ai_platform_api.modules.service_governance.domain.models import ServiceRepository
 
 ConversationStatus = Literal["active", "archived"]
-ConversationKind = Literal["private", "service_invocation"]
+ConversationKind = Literal["private", "service_invocation", "enterprise_brain"]
 ConversationScopeMode = Literal["workspace", "selected"]
 MessageRole = Literal["system", "user", "assistant", "tool"]
 MessageStatus = Literal["streaming", "completed", "failed"]
 AssistantRunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 FeedbackRating = Literal["helpful", "unhelpful"]
+ReportTemplate = Literal["briefing", "risk_review", "comparison"]
 AttachmentMediaType = Literal["text/plain", "text/markdown", "text/csv", "application/json"]
 FeedbackIssueCode = Literal[
     "incorrect",
@@ -44,6 +49,25 @@ class RuntimeConfigurationBootstrap(Protocol):
     """在本地零配置模式下创建当前 AI 运行配置，不改变真实配置发布流程。"""
 
     def ensure(self, account_id: UUID) -> RuntimeConfigSnapshot: ...
+
+
+class EnterpriseKnowledgeScopeResolver(Protocol):
+    """在助手事务内解析团队知识域，不暴露企业知识模块的写入接口。"""
+
+    def require_active_enterprise_member(self, workspace_id: UUID, account_id: UUID) -> bool: ...
+
+    def resolve_domain_scope(
+        self,
+        *,
+        workspace_id: UUID,
+        domain_id: UUID,
+        account_id: UUID,
+        authorized_workspace: bool,
+        authorized_department_ids: frozenset[UUID],
+        authorized_account_ids: frozenset[UUID],
+        authorized_document_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
+    ) -> ResolvedKnowledgeDomainScope | None: ...
 
 
 @dataclass(frozen=True)
@@ -75,6 +99,8 @@ class Conversation:
     created_at: datetime
     updated_at: datetime
     version: int
+    knowledge_domain_id: UUID | None = None
+    knowledge_domain_policy_version: int | None = None
 
 
 @dataclass(frozen=True)
@@ -149,6 +175,8 @@ class AssistantRun:
     knowledge_base_ids: frozenset[UUID] | None = None
     document_ids: frozenset[UUID] | None = None
     attachment_ids: tuple[UUID, ...] = ()
+    knowledge_domain_id: UUID | None = None
+    knowledge_domain_policy_version: int | None = None
 
 
 @dataclass(frozen=True)
@@ -178,6 +206,45 @@ class MessageFeedback:
     version: int
 
 
+@dataclass(frozen=True)
+class EnterpriseBrainReport:
+    """表示从企业大脑已完成回答生成的不可变 Markdown 报告。"""
+
+    report_id: UUID
+    workspace_id: UUID
+    created_by_account_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    run_id: UUID
+    template: ReportTemplate
+    title: str
+    content: str
+    content_sha256: str
+    citation_count: int
+    idempotency_key: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class EnterpriseBrainOverview:
+    """提供企业大脑页面所需的低敏聚合统计，不包含问答正文。"""
+
+    workspace_id: UUID
+    workspace_name: str
+    generated_at: datetime
+    window_started_at: datetime
+    window_ended_at: datetime
+    active_conversation_count: int
+    archived_conversation_count: int
+    run_count_30d: int
+    completed_run_count_30d: int
+    failed_run_count_30d: int
+    cancelled_run_count_30d: int
+    token_count_30d: int
+    estimated_cost_microunits_30d: int
+    knowledge_domain_ids: tuple[UUID, ...]
+
+
 class AssistantRepository(Protocol):
     """按工作空间和会话创建者边界读写助手事实。"""
 
@@ -202,6 +269,7 @@ class AssistantRepository(Protocol):
         account_id: UUID,
         *,
         limit: int,
+        conversation_kind: ConversationKind = "private",
     ) -> tuple[Conversation, ...]: ...
 
     def get_conversation(
@@ -211,6 +279,7 @@ class AssistantRepository(Protocol):
         account_id: UUID,
         *,
         for_update: bool = False,
+        conversation_kind: ConversationKind = "private",
     ) -> Conversation | None: ...
 
     def save_conversation(self, conversation: Conversation) -> None: ...
@@ -330,6 +399,38 @@ class AssistantRepository(Protocol):
 
     def save_feedback(self, feedback: MessageFeedback) -> None: ...
 
+    def add_enterprise_brain_report(self, report: EnterpriseBrainReport) -> None: ...
+
+    def get_enterprise_brain_report(
+        self,
+        workspace_id: UUID,
+        report_id: UUID,
+        account_id: UUID,
+    ) -> EnterpriseBrainReport | None: ...
+
+    def get_enterprise_brain_report_by_key(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        idempotency_key: str,
+    ) -> EnterpriseBrainReport | None: ...
+
+    def list_enterprise_brain_reports(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        *,
+        limit: int,
+    ) -> tuple[EnterpriseBrainReport, ...]: ...
+
+    def get_enterprise_brain_overview(
+        self,
+        workspace_id: UUID,
+        account_id: UUID,
+        *,
+        generated_at: datetime,
+    ) -> EnterpriseBrainOverview | None: ...
+
 
 class AssistantUnitOfWork(Protocol):
     """保证会话、消息、运行、审计和 Outbox 在同一事务内提交。"""
@@ -348,6 +449,11 @@ class AssistantUnitOfWork(Protocol):
 
     @property
     def outbox(self) -> OutboxWriter: ...
+
+    @property
+    def enterprise_knowledge(self) -> EnterpriseKnowledgeScopeResolver:
+        """返回与助手事实共享事务的知识域只读端口。"""
+        ...
 
     def __enter__(self) -> AssistantUnitOfWork: ...
 

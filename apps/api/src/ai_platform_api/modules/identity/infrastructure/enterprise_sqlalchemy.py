@@ -186,6 +186,7 @@ class SqlAlchemyEnterpriseRepository:
                     }
                     for grant in system_role_permission_seed(
                         workspace_id=workspace.workspace_id,
+                        workspace_type="enterprise",
                         owner_role_id=owner_role.role_id,
                         member_role_id=member_role.role_id,
                     )

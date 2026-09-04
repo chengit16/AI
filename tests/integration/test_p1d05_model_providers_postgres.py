@@ -166,6 +166,8 @@ def test_platform_admin_provider_lifecycle_is_encrypted_audited_and_policy_gated
 
     with pytest.raises(PlatformAdministratorRequiredError):
         provider_database.providers.list_configurations(platform_context(member_id))
+    assert provider_database.providers.is_platform_administrator(platform_context(admin_id))
+    assert not provider_database.providers.is_platform_administrator(platform_context(member_id))
 
     plaintext_v1 = "synthetic-provider-secret-v1"
     created = provider_database.providers.create(

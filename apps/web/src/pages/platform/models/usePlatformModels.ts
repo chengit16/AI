@@ -15,13 +15,14 @@ import {
   getCurrentPlatformAiRuntimeConfig,
   getPlatformAiRuntimeConfigs,
   probePlatformModelProvider,
+  getPlatformModelProviders,
   reviewPlatformModelProviderDataPolicy,
   rotatePlatformModelProviderCredential,
   type CreateAiRuntimeConfigRequest,
   type CreateModelProviderRequest,
   type ReviewModelProviderDataPolicyRequest,
 } from "@/api/services/platformModels";
-import { usePlatformAdministration } from "@/hooks/usePlatformAdministration";
+import { useSessionStore } from "@/store/session";
 
 /**
  * 返回模型供应商和运行配置的查询、写操作及统一加载状态。
@@ -32,8 +33,14 @@ import { usePlatformAdministration } from "@/hooks/usePlatformAdministration";
 export function usePlatformModels() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
-  // 1. 供应商事实来自平台管理 Hook，运行配置分别缓存版本清单和当前发布指针。
-  const { providers } = usePlatformAdministration();
+  const accountId = useSessionStore((state) => state.accountId);
+  // 1. 进入管理员页面后才读取治理业务数据；全局壳层只消费独立的低敏资格接口。
+  const providers = useQuery({
+    queryKey: ["platform-model-providers", accountId],
+    queryFn: ({ signal }) => getPlatformModelProviders(signal),
+    enabled: Boolean(accountId),
+    retry: false,
+  });
   const runtimeConfigs = useQuery({
     queryKey: ["platform-ai-runtime-configs"],
     queryFn: ({ signal }) => getPlatformAiRuntimeConfigs(signal),

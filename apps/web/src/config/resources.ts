@@ -5,6 +5,7 @@
 import {
   Activity,
   Bot,
+  BrainCircuit,
   Cpu,
   History,
   LibraryBig,
@@ -28,6 +29,7 @@ export const pageById = new Map(
 export const iconByKey = {
   activity: Activity,
   bot: Bot,
+  "brain-circuit": BrainCircuit,
   cpu: Cpu,
   history: History,
   "library-big": LibraryBig,

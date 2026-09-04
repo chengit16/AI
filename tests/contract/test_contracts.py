@@ -312,6 +312,9 @@ def test_model_provider_openapi_keeps_credentials_write_only() -> None:
     assert paths["/api/v1/platform/model-providers"]["get"]["operationId"] == (
         "listPlatformModelProviders"
     )
+    assert paths["/api/v1/platform/administration"]["get"]["operationId"] == (
+        "getPlatformAdministration"
+    )
     assert paths["/api/v1/platform/model-providers"]["post"]["operationId"] == (
         "createPlatformModelProvider"
     )

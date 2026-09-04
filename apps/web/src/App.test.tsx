@@ -19,6 +19,119 @@ function renderApp(path: string) {
   );
 }
 
+const publishedMenuRelease = {
+  item: { status: "published" },
+  snapshot: {
+    schema_version: 1,
+    registry_version: 3,
+    workspace_id: "workspace-id",
+    menu_version: 2,
+    menus: [
+      {
+        menu_id: "directory",
+        menu_key: "navigation.workspace",
+        parent_menu_id: null,
+        name: "空间管理",
+        menu_type: "directory",
+        page_resource_id: null,
+        permission_code: null,
+        icon_key: null,
+        sort_order: 1,
+        source: "system",
+        status: "active",
+        visible: true,
+      },
+      {
+        menu_id: "overview",
+        menu_key: "navigation.workspace.overview",
+        parent_menu_id: "directory",
+        name: "已发布总览",
+        menu_type: "page",
+        page_resource_id: "80000000-0000-4000-8000-000000000002",
+        permission_code: "workspace.overview.access",
+        icon_key: "layout-dashboard",
+        sort_order: 10,
+        source: "system",
+        status: "active",
+        visible: true,
+      },
+      {
+        menu_id: "status",
+        menu_key: "navigation.workspace.status",
+        parent_menu_id: "directory",
+        name: "运行状态",
+        menu_type: "page",
+        page_resource_id: "80000000-0000-4000-8000-000000000005",
+        permission_code: "system.runtime.access",
+        icon_key: "activity",
+        sort_order: 20,
+        source: "system",
+        status: "active",
+        visible: true,
+      },
+    ],
+    role_menus: [],
+    menu_api_bindings: [],
+  },
+};
+
+const syntheticWorkspaces = {
+  items: [
+    {
+      workspace_id: "workspace-id",
+      workspace_type: "personal",
+      name: "合成个人空间",
+      status: "active",
+      membership_type: "owner",
+      membership_status: "active",
+    },
+  ],
+};
+
+/** 构造应用壳层测试使用的 JSON 响应。 */
+function jsonResponse(body: unknown, status = 200) {
+  return Promise.resolve(
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+}
+
+/** 按请求路径返回发布菜单测试所需的最小合成依赖。 */
+function publishedNavigationResponse(input: RequestInfo | URL) {
+  const url = String(input);
+  if (url.endsWith("/menu-releases/current")) return jsonResponse(publishedMenuRelease);
+  if (url.endsWith("/api/v1/workspaces")) return jsonResponse(syntheticWorkspaces);
+  if (url.endsWith("/api/v1/platform/administration"))
+    return jsonResponse({ is_platform_administrator: false });
+  if (url.includes("/entitlements"))
+    return jsonResponse({
+      workspace_id: "workspace-id",
+      plan_code: "personal_local",
+      entitlement_version: 1,
+      open_api_allowed: false,
+      open_api_enabled: false,
+      quotas: [],
+    });
+  if (url.includes("/roles/effective/"))
+    return jsonResponse({
+      account_id: "account-id",
+      membership_id: "membership-id",
+      role_version: 1,
+      roles: [],
+    });
+  if (url.endsWith("/api/v1/health/ready"))
+    return jsonResponse({
+      service: "ai-platform-api",
+      status: "ok",
+      version: "0.0.0",
+      environment: "local",
+      checks: { api: "ok", configuration: "ok" },
+    });
+  return jsonResponse({ items: [] });
+}
+
 describe("平台路由与运行状态", () => {
   beforeEach(() => {
     useSessionStore.getState().clear();
@@ -46,6 +159,7 @@ describe("平台路由与运行状态", () => {
       ["企业知识库", "/workspace/enterprise-knowledge", "enterprise.knowledge.access"],
       ["知识问答", "/workspace/assistant", "assistant.page.access"],
       ["Agent 控制台", "/workspace/agents", "agent.page.access"],
+      ["AI 企业大脑", "/workspace/enterprise-brain", "enterprise.brain.access"],
       ["工作流", "/workspace/workflows", "workflow.page.access"],
       ["服务发布", "/workspace/services", "service.page.access"],
       ["Release 运营", "/workspace/agent-operations", "agent.operations.read"],
@@ -62,150 +176,17 @@ describe("平台路由与运行状态", () => {
       .getState()
       .setAuthenticated("account-id", "workspace-id", "synthetic-csrf-token");
     // 2. 同时模拟菜单快照及页面依赖，验证导航只消费后端当前发布事实。
-    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      // 1. 优先识别菜单发布请求，返回能够驱动目录与页面路由的完整快照。
-      const url = String(input);
-      if (url.endsWith("/menu-releases/current")) {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              item: { status: "published" },
-              snapshot: {
-                schema_version: 1,
-                registry_version: 3,
-                workspace_id: "workspace-id",
-                menu_version: 2,
-                menus: [
-                  {
-                    menu_id: "directory",
-                    menu_key: "navigation.workspace",
-                    parent_menu_id: null,
-                    name: "空间管理",
-                    menu_type: "directory",
-                    page_resource_id: null,
-                    permission_code: null,
-                    icon_key: null,
-                    sort_order: 1,
-                    source: "system",
-                    status: "active",
-                    visible: true,
-                  },
-                  {
-                    menu_id: "overview",
-                    menu_key: "navigation.workspace.overview",
-                    parent_menu_id: "directory",
-                    name: "已发布总览",
-                    menu_type: "page",
-                    page_resource_id: "80000000-0000-4000-8000-000000000002",
-                    permission_code: "workspace.overview.access",
-                    icon_key: "layout-dashboard",
-                    sort_order: 10,
-                    source: "system",
-                    status: "active",
-                    visible: true,
-                  },
-                  {
-                    menu_id: "status",
-                    menu_key: "navigation.workspace.status",
-                    parent_menu_id: "directory",
-                    name: "运行状态",
-                    menu_type: "page",
-                    page_resource_id: "80000000-0000-4000-8000-000000000005",
-                    permission_code: "system.runtime.access",
-                    icon_key: "activity",
-                    sort_order: 20,
-                    source: "system",
-                    status: "active",
-                    visible: true,
-                  },
-                ],
-                role_menus: [],
-                menu_api_bindings: [],
-              },
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-        );
-      }
-      // 2. 补齐应用壳层初始化所需的空间事实，避免菜单断言依赖无关请求失败。
-      if (url.endsWith("/api/v1/workspaces")) {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              items: [
-                {
-                  workspace_id: "workspace-id",
-                  workspace_type: "personal",
-                  name: "合成个人空间",
-                  status: "active",
-                  membership_type: "owner",
-                  membership_status: "active",
-                },
-              ],
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-        );
-      }
-      // 3. 模拟配额与角色上下文，其余非关键端点使用空集合保持测试边界稳定。
-      if (url.includes("/entitlements")) {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              workspace_id: "workspace-id",
-              plan_code: "personal_local",
-              entitlement_version: 1,
-              open_api_allowed: false,
-              open_api_enabled: false,
-              quotas: [],
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-        );
-      }
-      if (url.includes("/roles/effective/")) {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              account_id: "account-id",
-              membership_id: "membership-id",
-              role_version: 1,
-              roles: [],
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-        );
-      }
-      if (url.endsWith("/api/v1/health/ready")) {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              service: "ai-platform-api",
-              status: "ok",
-              version: "0.0.0",
-              environment: "local",
-              checks: { api: "ok", configuration: "ok" },
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-        );
-      }
-      return Promise.resolve(
-        new Response(JSON.stringify({ items: [] }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(publishedNavigationResponse);
 
     // 3. 渲染真实应用壳层，并从最终页面文案确认发布菜单已经驱动路由。
     renderApp(pageRoutes.WorkspaceOverviewPage);
 
     expect((await screen.findAllByText("已发布总览")).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole("link", { name: "跳到主要内容" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "跳到主要内容" })).toHaveAttribute(
       "href",
       "#main-content",
     );
+    expect(screen.queryByRole("navigation", { name: "平台治理" })).not.toBeInTheDocument();
     const desktopNavigationScrollRegion = screen.getByRole("navigation", {
       name: "空间管理",
     }).parentElement;

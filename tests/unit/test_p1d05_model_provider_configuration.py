@@ -192,6 +192,19 @@ def test_non_platform_administrator_cannot_trigger_url_or_secret_processing(tmp_
     assert url_policy.call_count == 0
 
 
+def test_administration_qualification_returns_boolean_without_listing_business_data(
+    tmp_path: Path,
+) -> None:
+    """资格查询对管理员和普通账号均成功，管理员业务列表仍失败关闭。"""
+
+    configuration_service, _, _ = service(tmp_path)
+
+    assert configuration_service.is_platform_administrator(context(ADMIN_ID)) is True
+    assert configuration_service.is_platform_administrator(context(MEMBER_ID)) is False
+    with pytest.raises(PlatformAdministratorRequiredError):
+        configuration_service.list_configurations(context(MEMBER_ID))
+
+
 def test_provider_requires_policy_and_probe_then_rotates_without_plaintext(tmp_path: Path) -> None:
     configuration_service, unit_of_work, _ = service(tmp_path)
     created = configuration_service.create(

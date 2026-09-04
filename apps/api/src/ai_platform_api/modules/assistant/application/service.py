@@ -90,11 +90,11 @@ class AssistantConversationService:
 
         # 1. 先验证成员并同步系统 Release 与 Service Route，避免创建不可运行的空会话。
         account_id = _browser_account(context)
-        normalized_title = _normalize_title(title)
+        normalized_title = normalize_title(title)
         now = datetime.now(UTC)
         with self._unit_of_work as unit_of_work:
             _require_active_member(unit_of_work, context.workspace_id, account_id)
-            runtime_config = _current_runtime_config(
+            runtime_config = current_runtime_config(
                 unit_of_work,
                 self._runtime_bootstrap,
                 account_id,
@@ -443,7 +443,7 @@ class AssistantConversationService:
         normalized_texts = normalize_texts(texts)
         normalized_attachment_ids = _normalize_attachment_ids(attachment_ids)
         require_idempotency_key(idempotency_key)
-        request_hash = _request_hash(
+        request_hash = message_request_hash(
             conversation_id,
             normalized_texts,
             normalized_attachment_ids,
@@ -486,7 +486,7 @@ class AssistantConversationService:
                 )
                 if any(item is None for item in attachments):
                     raise AssistantNotFoundError
-                runtime_config = _current_runtime_config(
+                runtime_config = current_runtime_config(
                     unit_of_work,
                     self._runtime_bootstrap,
                     account_id,
@@ -842,11 +842,13 @@ def _require_active_member(
         raise AssistantDeniedError
 
 
-def _current_runtime_config(
+def current_runtime_config(
     unit_of_work: AssistantUnitOfWork,
     bootstrap: RuntimeConfigurationBootstrap | None,
     account_id: UUID,
 ) -> RuntimeConfigSnapshot:
+    """取得当前可运行的模型配置；显式本地模式会先幂等修复内置配置。"""
+
     if bootstrap is not None:
         # 显式本地模式每次都做幂等复核，使误停用的内置 Provider 在下一次交互前恢复。
         return bootstrap.ensure(account_id)
@@ -915,7 +917,9 @@ def _owned_run_by_message(
     return run
 
 
-def _normalize_title(title: str | None) -> str | None:
+def normalize_title(title: str | None) -> str | None:
+    """规范可选会话标题，并拒绝空白或超出持久化边界的内容。"""
+
     if title is None:
         return None
     normalized = title.strip()
@@ -1053,11 +1057,13 @@ def _normalize_feedback(
     return issues, normalized_comment
 
 
-def _request_hash(
+def message_request_hash(
     conversation_id: UUID,
     texts: tuple[str, ...],
     attachment_ids: tuple[UUID, ...] = (),
 ) -> str:
+    """按稳定序列化规则生成请求摘要，供消息幂等冲突检测使用。"""
+
     canonical = json.dumps(
         {
             "attachment_ids": [str(value) for value in attachment_ids],
@@ -1089,6 +1095,8 @@ def new_submission(
     service_route_id: UUID,
     service_route_version: int,
     now: datetime,
+    knowledge_domain_id: UUID | None = None,
+    knowledge_domain_policy_version: int | None = None,
 ) -> MessageSubmission:
     """构造冻结服务路由与发布版本的排队 Run；持久化和提交由调用方负责。"""
 
@@ -1134,6 +1142,8 @@ def new_submission(
         updated_at=now,
         completed_at=None,
         error_code=None,
+        knowledge_domain_id=knowledge_domain_id,
+        knowledge_domain_policy_version=knowledge_domain_policy_version,
     )
     assistant_message = Message(
         message_id=assistant_message_id,

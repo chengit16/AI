@@ -388,6 +388,7 @@ class SqlAlchemyRegistrationWriter:
                 }
                 for grant in system_role_permission_seed(
                     workspace_id=registration.personal_workspace_id,
+                    workspace_type="personal",
                     owner_role_id=owner_role.role_id,
                     member_role_id=member_role.role_id,
                 )

@@ -2,11 +2,12 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Protocol
 from uuid import UUID
 
 from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.assistant.application.errors import AssistantConversationBusyError
-from ai_platform_api.modules.assistant.application.service import AssistantConversationService
+from ai_platform_api.modules.assistant.domain.models import AssistantRun
 from ai_platform_api.modules.retrieval.application.evidence import RetrievalEvidenceService
 from ai_platform_api.modules.retrieval.domain.evidence import SourceKind
 
@@ -28,12 +29,44 @@ class AssistantSource:
     conflict_detected: bool
 
 
+class AssistantMessageRunReader(Protocol):
+    """抽象普通助手与企业大脑共用的消息归属校验入口。"""
+
+    def get_run_for_message(
+        self,
+        context: RequestContext,
+        *,
+        conversation_id: UUID,
+        message_id: UUID,
+    ) -> AssistantRun: ...
+
+
+class CurrentEvidenceCitationCounter(Protocol):
+    """为报告生成提供当前仍获授权的不可变引用数量。"""
+
+    def count_current_citations(self, context: RequestContext, *, run_id: UUID) -> int:
+        """重新鉴权既有证据后返回当前可读取的引用数量。"""
+        ...
+
+
+class RetrievalCurrentEvidenceCitationCounter:
+    """通过 Retrieval 公开应用服务读取报告所需的当前引用事实。"""
+
+    def __init__(self, evidence: RetrievalEvidenceService) -> None:
+        self._evidence = evidence
+
+    def count_current_citations(self, context: RequestContext, *, run_id: UUID) -> int:
+        """复核策略、范围和活动索引，禁止从模型正文猜测引用数量。"""
+
+        return len(self._evidence.prepare(context, run_id).items)
+
+
 class AssistantSourceService:
     """把私有消息归属验证和 Retrieval 当前性复核封装为单一来源查询。"""
 
     def __init__(
         self,
-        conversations: AssistantConversationService,
+        conversations: AssistantMessageRunReader,
         evidence: RetrievalEvidenceService,
     ) -> None:
         self._conversations = conversations

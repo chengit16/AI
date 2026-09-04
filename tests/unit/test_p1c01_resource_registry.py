@@ -11,6 +11,7 @@ from ai_platform_api.modules.authorization.application.resources import load_res
 from ai_platform_api.modules.authorization.domain.grants import (
     MEMBER_PERMISSION_CODES,
     OWNER_PERMISSION_CODES,
+    system_role_permission_seed,
 )
 from ai_platform_api.modules.authorization.domain.resources import (
     Menu,
@@ -33,12 +34,12 @@ def test_frozen_registry_is_valid_and_covers_openapi() -> None:
     resource_registry = registry()
 
     assert resource_registry.schema_version == 1
-    assert resource_registry.registry_version == 35
-    assert len(resource_registry.permissions) == 153
-    assert len(resource_registry.page_resources) == 17
-    assert len(resource_registry.api_resources) == 206
-    assert len(resource_registry.menus) == 186
-    assert len(resource_registry.menu_api_bindings) == 203
+    assert resource_registry.registry_version == 38
+    assert len(resource_registry.permissions) == 163
+    assert len(resource_registry.page_resources) == 18
+    assert len(resource_registry.api_resources) == 223
+    assert len(resource_registry.menus) == 198
+    assert len(resource_registry.menu_api_bindings) == 219
     assert registry_openapi_violations() == ()
 
 
@@ -85,6 +86,20 @@ def test_new_workspace_owner_gets_operations_permissions_but_member_does_not() -
         "enterprise.document.publish.request",
     }.issubset(OWNER_PERMISSION_CODES)
     assert "enterprise.knowledge.access" not in MEMBER_PERMISSION_CODES
+    enterprise_brain_permissions = {
+        "enterprise.brain.access",
+        "enterprise.brain.conversation.archive",
+        "enterprise.brain.conversation.create",
+        "enterprise.brain.feedback.manage",
+        "enterprise.brain.message.create",
+        "enterprise.brain.read",
+        "enterprise.brain.run.cancel",
+        "enterprise.brain.source.read",
+        "enterprise.brain.report.create",
+        "enterprise.brain.report.read",
+    }
+    assert enterprise_brain_permissions.issubset(OWNER_PERMISSION_CODES)
+    assert enterprise_brain_permissions.issubset(MEMBER_PERMISSION_CODES)
     assert "operations.control_tower.read" not in MEMBER_PERMISSION_CODES
     assert "service.definition.read" in OWNER_PERMISSION_CODES
     assert "service.definition.read" in MEMBER_PERMISSION_CODES
@@ -119,6 +134,39 @@ def test_new_workspace_owner_gets_operations_permissions_but_member_does_not() -
         "tool.run.cancel",
         "tool.confirmation.respond",
     }.issubset(OWNER_PERMISSION_CODES)
+
+
+def test_system_role_permission_seed_excludes_enterprise_brain_from_personal_workspace() -> None:
+    """新建个人空间不授予企业大脑权限，企业系统角色仍获得完整能力。"""
+
+    workspace_id = UUID("20000000-0000-4000-8000-000000000106")
+    owner_role_id = UUID("30000000-0000-4000-8000-000000000106")
+    member_role_id = UUID("30000000-0000-4000-8000-000000000107")
+    personal_codes = {
+        grant.permission_code
+        for grant in system_role_permission_seed(
+            workspace_id=workspace_id,
+            workspace_type="personal",
+            owner_role_id=owner_role_id,
+            member_role_id=member_role_id,
+        )
+    }
+    enterprise_codes = {
+        grant.permission_code
+        for grant in system_role_permission_seed(
+            workspace_id=workspace_id,
+            workspace_type="enterprise",
+            owner_role_id=owner_role_id,
+            member_role_id=member_role_id,
+        )
+    }
+
+    assert not any(code.startswith("enterprise.brain.") for code in personal_codes)
+    assert {
+        "enterprise.brain.access",
+        "enterprise.brain.read",
+        "enterprise.brain.report.create",
+    }.issubset(enterprise_codes)
 
 
 def test_registry_rejects_duplicate_dangling_and_unbound_resources() -> None:

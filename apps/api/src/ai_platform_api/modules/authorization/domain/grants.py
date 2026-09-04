@@ -13,6 +13,7 @@ from ai_platform_api.common.request_context import RequestContext
 from ai_platform_api.modules.authorization.domain.fields import SecurityLevel
 from ai_platform_api.modules.authorization.domain.policy import DataScopeType
 from ai_platform_api.modules.identity.domain.enterprise import WorkspaceMembership
+from ai_platform_api.modules.identity.domain.models import WorkspaceType
 from ai_platform_api.modules.identity.domain.organization import Department
 from ai_platform_api.modules.identity.domain.roles import Role, RoleBinding
 
@@ -68,6 +69,16 @@ OWNER_PERMISSION_CODES = (
     "enterprise.domain.update",
     "enterprise.document.publish.read",
     "enterprise.document.publish.request",
+    "enterprise.brain.access",
+    "enterprise.brain.conversation.archive",
+    "enterprise.brain.conversation.create",
+    "enterprise.brain.feedback.manage",
+    "enterprise.brain.message.create",
+    "enterprise.brain.read",
+    "enterprise.brain.run.cancel",
+    "enterprise.brain.source.read",
+    "enterprise.brain.report.create",
+    "enterprise.brain.report.read",
     "enterprise.knowledge.access",
     "enterprise.knowledge.read",
     "enterprise.workspace.create",
@@ -185,6 +196,16 @@ MEMBER_PERMISSION_CODES = (
     "approval.instance.withdraw",
     "authorization.effective_role.read",
     "authorization.menu_release.read",
+    "enterprise.brain.access",
+    "enterprise.brain.conversation.archive",
+    "enterprise.brain.conversation.create",
+    "enterprise.brain.feedback.manage",
+    "enterprise.brain.message.create",
+    "enterprise.brain.read",
+    "enterprise.brain.run.cancel",
+    "enterprise.brain.source.read",
+    "enterprise.brain.report.create",
+    "enterprise.brain.report.read",
     "workspace.context.switch",
     "workspace.entitlement.read",
     "workspace.membership.leave",
@@ -206,6 +227,7 @@ MEMBER_PERMISSION_CODES = (
     "workflow.run.create",
     "workflow.run.read",
 )
+ENTERPRISE_ONLY_PERMISSION_PREFIXES = ("enterprise.brain.",)
 
 
 @dataclass(frozen=True)
@@ -341,10 +363,16 @@ class RolePermissionUnitOfWork(Protocol):
 def system_role_permission_seed(
     *,
     workspace_id: UUID,
+    workspace_type: WorkspaceType,
     owner_role_id: UUID,
     member_role_id: UUID,
 ) -> tuple[RolePermissionGrant, ...]:
-    """系统角色的默认授权必须同时供 Migration 与新空间写入使用。"""
+    """按空间类型生成系统角色授权，个人空间不得获得企业专属能力。"""
+
+    def applies_to_workspace(code: str) -> bool:
+        return workspace_type == "enterprise" or not code.startswith(
+            ENTERPRISE_ONLY_PERMISSION_PREFIXES
+        )
 
     return tuple(
         RolePermissionGrant(
@@ -355,6 +383,7 @@ def system_role_permission_seed(
             maximum_security_level="RESTRICTED",
         )
         for code in OWNER_PERMISSION_CODES
+        if applies_to_workspace(code)
     ) + tuple(
         RolePermissionGrant(
             workspace_id,
@@ -364,4 +393,5 @@ def system_role_permission_seed(
             maximum_security_level="INTERNAL",
         )
         for code in MEMBER_PERMISSION_CODES
+        if applies_to_workspace(code)
     )

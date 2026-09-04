@@ -121,7 +121,7 @@ class SqlAlchemyRetrievalPlanningRepository(RetrievalPlanningRepository):
             .where(assistant_runs.c.run_id == run_id)
         ).one()
         components = cast("dict[str, str]", runtime.component_versions)
-        if row.conversation_kind == "private":
+        if row.conversation_kind in {"private", "enterprise_brain"}:
             knowledge_base_ids = (
                 frozenset(row.knowledge_base_ids) if row.knowledge_base_ids is not None else None
             )

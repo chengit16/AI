@@ -20,6 +20,7 @@ const WorkspaceOrganizationPage = lazy(() => import("@/pages/workspace/organizat
 const PermissionsAuditPage = lazy(() => import("@/pages/workspace/permissionsAudit"));
 const WorkspaceOverviewPage = lazy(() => import("@/pages/workspace/overview"));
 const EnterpriseKnowledgePage = lazy(() => import("@/pages/workspace/enterpriseKnowledge"));
+const EnterpriseBrainPage = lazy(() => import("@/pages/workspace/enterpriseBrain"));
 const KnowledgeProductionPage = lazy(() => import("@/pages/workspace/knowledge"));
 const AssistantConversationsPage = lazy(() => import("@/pages/workspace/assistant"));
 const WorkflowDesignPage = lazy(() => import("@/pages/workspace/workflows"));
@@ -69,8 +70,8 @@ function RequireMenuRoute({ children }: { children: ReactNode }) {
 }
 
 function RequirePlatformAdministrator({ children }: { children: ReactNode }) {
-  const { providers, isDenied } = usePlatformAdministration();
-  if (providers.isLoading) return <Skeleton active paragraph={{ rows: 10 }} />;
+  const { administration, isDenied } = usePlatformAdministration();
+  if (administration.isLoading) return <Skeleton active paragraph={{ rows: 10 }} />;
   if (isDenied) {
     return (
       <StateView
@@ -81,7 +82,7 @@ function RequirePlatformAdministrator({ children }: { children: ReactNode }) {
       />
     );
   }
-  if (providers.isError) {
+  if (administration.isError) {
     return (
       <StateView
         kind="error"
@@ -147,6 +148,14 @@ export function AppRoutes() {
               element={
                 <RequireMenuRoute>
                   <EnterpriseKnowledgePage />
+                </RequireMenuRoute>
+              }
+            />
+            <Route
+              path={pageRoutes.EnterpriseBrainPage}
+              element={
+                <RequireMenuRoute>
+                  <EnterpriseBrainPage />
                 </RequireMenuRoute>
               }
             />

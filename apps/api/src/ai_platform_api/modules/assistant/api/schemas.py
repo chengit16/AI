@@ -41,6 +41,99 @@ class ConversationListResponse(BaseModel):
     items: list[ConversationResponse]
 
 
+class CreateEnterpriseBrainConversationRequest(BaseModel):
+    """表示选择一个团队知识域创建企业大脑会话。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    knowledge_domain_id: UUID
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class EnterpriseBrainConversationResponse(BaseModel):
+    """表示当前账号自己的企业大脑会话及冻结知识域版本。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: UUID
+    workspace_id: UUID
+    created_by_account_id: UUID
+    knowledge_domain_id: UUID
+    knowledge_domain_policy_version: int = Field(ge=1)
+    title: str | None
+    status: Literal["active", "archived"]
+    created_at: datetime
+    updated_at: datetime
+    version: int = Field(ge=1)
+
+
+class EnterpriseBrainConversationListResponse(BaseModel):
+    """表示当前账号企业大脑会话列表。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[EnterpriseBrainConversationResponse]
+
+
+class CreateEnterpriseBrainReportRequest(BaseModel):
+    """表示从一条已完成企业回答生成不可变报告。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message_id: UUID
+    template: Literal["briefing", "risk_review", "comparison"]
+    title: str = Field(min_length=1, max_length=200)
+
+
+class EnterpriseBrainReportResponse(BaseModel):
+    """表示企业大脑报告元数据与 Markdown 正文。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    report_id: UUID
+    workspace_id: UUID
+    created_by_account_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    run_id: UUID
+    template: Literal["briefing", "risk_review", "comparison"]
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=200_000)
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    citation_count: int = Field(ge=0)
+    idempotency_key: str = Field(min_length=8, max_length=128)
+    created_at: datetime
+
+
+class EnterpriseBrainReportListResponse(BaseModel):
+    """表示当前账号创建的企业大脑报告列表。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[EnterpriseBrainReportResponse]
+
+
+class EnterpriseBrainOverviewResponse(BaseModel):
+    """表示企业大脑页面的低敏统计、时间窗与当前账号涉及的知识域。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workspace_id: UUID
+    workspace_name: str = Field(min_length=1, max_length=120)
+    generated_at: datetime
+    window_started_at: datetime
+    window_ended_at: datetime
+    active_conversation_count: int = Field(ge=0)
+    archived_conversation_count: int = Field(ge=0)
+    run_count_30d: int = Field(ge=0)
+    completed_run_count_30d: int = Field(ge=0)
+    failed_run_count_30d: int = Field(ge=0)
+    cancelled_run_count_30d: int = Field(ge=0)
+    token_count_30d: int = Field(ge=0)
+    estimated_cost_microunits_30d: int = Field(ge=0)
+    knowledge_domain_ids: list[UUID] = Field(default_factory=list)
+
+
 class CreateMessagePartRequest(BaseModel):
     """表示首期可提交的文本消息 Part；图片问答保持后置。"""
 
@@ -146,6 +239,8 @@ class AssistantRunResponse(BaseModel):
     knowledge_base_ids: list[UUID] | None = None
     document_ids: list[UUID] | None = None
     attachment_ids: list[UUID] = Field(default_factory=list)
+    knowledge_domain_id: UUID | None = None
+    knowledge_domain_policy_version: int | None = Field(default=None, ge=1)
     status: Literal["queued", "running", "completed", "failed", "cancelled"]
     trace_id: str = Field(min_length=16, max_length=64)
     created_at: datetime

@@ -10,6 +10,14 @@ Capability = Literal["generation", "streaming", "tools", "structured_output"]
 SecurityLevel = Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
 
 
+class PlatformAdministrationResponse(BaseModel):
+    """定义当前浏览器账号的平台管理员资格低敏响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    is_platform_administrator: bool
+
+
 class CreateModelProviderRequest(BaseModel):
     """定义创建模型供应商操作的请求字段与协议校验边界。"""
 

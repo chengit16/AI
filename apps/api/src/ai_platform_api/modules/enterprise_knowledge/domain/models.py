@@ -466,7 +466,10 @@ class EnterpriseKnowledgeRepository(Protocol):
         domain_id: UUID,
         account_id: UUID,
         authorized_workspace: bool,
-        authorized_knowledge_base_ids: frozenset[UUID],
+        authorized_department_ids: frozenset[UUID],
+        authorized_account_ids: frozenset[UUID],
+        authorized_document_ids: frozenset[UUID],
+        maximum_security_level: SecurityLevel,
     ) -> ResolvedKnowledgeDomainScope | None: ...
 
 

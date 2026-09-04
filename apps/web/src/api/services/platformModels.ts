@@ -17,6 +17,14 @@ export type AiRuntimeConfig = components["schemas"]["AiRuntimeConfigResponse"];
 /** 创建主备路由、预算和超时组合的请求契约。 */
 export type CreateAiRuntimeConfigRequest = components["schemas"]["CreateAiRuntimeConfigRequest"];
 
+/** 查询当前浏览器账号的平台管理员资格，不读取供应商或运行配置。 */
+export function getPlatformAdministration(signal?: AbortSignal) {
+  return apiRequest<components["schemas"]["PlatformAdministrationResponse"]>(
+    "/api/v1/platform/administration",
+    { workspaceId: null, signal },
+  );
+}
+
 /** 查询平台全部脱敏模型供应商配置。 */
 export async function getPlatformModelProviders(signal?: AbortSignal) {
   const response = await apiRequest<

@@ -70,6 +70,12 @@ class ModelProviderConfigurationService:
             self._require_administrator(unit_of_work, context.account_id)
             return unit_of_work.providers.list_configurations()
 
+    def is_platform_administrator(self, context: PlatformRequestContext) -> bool:
+        """返回当前浏览器账号的平台管理员资格，不读取任何治理业务数据。"""
+
+        with self._unit_of_work as unit_of_work:
+            return unit_of_work.providers.is_platform_administrator(context.account_id)
+
     def create(
         self,
         context: PlatformRequestContext,

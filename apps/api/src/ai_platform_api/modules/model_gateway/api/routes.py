@@ -24,6 +24,7 @@ from ai_platform_api.modules.model_gateway.api.schemas import (
     GatewayPolicySchema,
     ModelProviderConfigurationListResponse,
     ModelProviderConfigurationResponse,
+    PlatformAdministrationResponse,
     ReviewModelProviderDataPolicyRequest,
     RotateModelProviderCredentialRequest,
     RuntimeComponentVersionsSchema,
@@ -41,8 +42,31 @@ from ai_platform_api.modules.model_gateway.application.runtime_configurations im
     RuntimeRouteDraft,
 )
 
+administration_router = APIRouter(prefix="/platform/administration", tags=["平台管理资格"])
 router = APIRouter(prefix="/platform/model-providers", tags=["平台模型供应商"])
 runtime_router = APIRouter(prefix="/platform/ai-runtime-configs", tags=["平台 AI 运行配置"])
+
+
+@administration_router.get(
+    "",
+    response_model=PlatformAdministrationResponse,
+    operation_id="getPlatformAdministration",
+    responses=error_responses(401, 422, 500),
+)
+def get_platform_administration(
+    response: Response,
+    context: Annotated[PlatformRequestContext, Depends(trusted_platform_context)],
+    service: Annotated[
+        ModelProviderConfigurationService,
+        Depends(model_provider_configuration_service),
+    ],
+) -> PlatformAdministrationResponse:
+    """查询当前 Session 账号资格；不返回管理员名单或模型治理事实。"""
+
+    response.headers["Cache-Control"] = "no-store"
+    return PlatformAdministrationResponse(
+        is_platform_administrator=service.is_platform_administrator(context)
+    )
 
 
 @router.get(

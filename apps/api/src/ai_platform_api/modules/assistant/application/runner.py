@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from typing import Protocol
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from ai_platform_backend.observability import observed_operation
 
 from ai_platform_api.common.errors import PlatformError
 from ai_platform_api.common.request_context import RequestContext
-from ai_platform_api.modules.assistant.application.service import AssistantConversationService
 from ai_platform_api.modules.assistant.domain.models import AssistantRun, ConversationAttachment
 from ai_platform_api.modules.model_gateway.application.context import (
     AuthorizedModelContextBuilder,
@@ -57,12 +57,41 @@ class AssistantRunExecutionResult:
     error_code: str | None = None
 
 
+class AssistantRunLifecycle(Protocol):
+    """抽象普通助手与企业大脑共用的运行生命周期窄接口。"""
+
+    def claim_run(self, context: RequestContext, *, run_id: UUID) -> AssistantRun | None: ...
+
+    def complete_run(
+        self,
+        context: RequestContext,
+        *,
+        run_id: UUID,
+        text: str,
+    ) -> AssistantRun: ...
+
+    def fail_run(
+        self,
+        context: RequestContext,
+        *,
+        run_id: UUID,
+        error_code: str,
+    ) -> AssistantRun: ...
+
+    def get_run_attachments(
+        self,
+        context: RequestContext,
+        *,
+        run_id: UUID,
+    ) -> tuple[ConversationAttachment, ...]: ...
+
+
 class AssistantRunExecutor:
     """认领一次排队 Run，并把 RAG 问答结果写入消息与可恢复事件。"""
 
     def __init__(
         self,
-        conversations: AssistantConversationService,
+        conversations: AssistantRunLifecycle,
         retrieval_planning: BoundedRetrievalPlanningService,
         retrieval_evidence: RetrievalEvidenceService,
         runtime_releases: RuntimeReleaseLoader,

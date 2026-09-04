@@ -21,13 +21,14 @@ from ai_platform_api.modules.enterprise_knowledge.infrastructure.sqlalchemy impo
 )
 from ai_platform_api.persistence.tables import (
     audit_records,
+    documents,
     outbox_events,
     team_knowledge_domain_rag_policies,
     workspace_memberships,
 )
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Connection, func, select, text
+from sqlalchemy import Connection, func, select, text, update
 
 from tests.integration.test_p1d01_knowledge_postgres import (
     KnowledgeHarness,
@@ -86,6 +87,8 @@ def _authorized(
     permission_code: str,
     *,
     workspace: bool = True,
+    department_ids: frozenset[UUID] = frozenset(),
+    account_ids: frozenset[UUID] = frozenset(),
     resource_ids: frozenset[UUID] = frozenset(),
     field_mask: frozenset[str] = frozenset(),
     clearance: SecurityLevel = "RESTRICTED",
@@ -98,6 +101,8 @@ def _authorized(
         authorized_policy_decision_id=UUID("90000000-0000-4000-8000-000000000931"),
         authorized_policy_version=31,
         authorized_workspace=workspace,
+        authorized_department_ids=department_ids,
+        authorized_account_ids=account_ids,
         authorized_resource_ids=resource_ids,
         authorized_field_mask=field_mask,
         authorized_maximum_security_level=clearance,
@@ -289,6 +294,15 @@ def test_domain_scope_intersects_pdp_and_fails_closed_after_status_changes(
     base = knowledge_database.knowledge.create_knowledge_base(
         owner_context, name="合成 P6B-03 团队知识库", default_visibility="workspace"
     )
+    document_id, _ = _create_document(
+        knowledge_database,
+        owner_context,
+        base.knowledge_base_id,
+        title="合成 P6B-03 团队文档",
+        security_level="PUBLIC",
+        size_bytes=128,
+        published=False,
+    )
     domain = service.create_domain(
         _authorized(owner_context, "enterprise.domain.create"),
         workspace_id=workspace_id,
@@ -307,7 +321,7 @@ def test_domain_scope_intersects_pdp_and_fails_closed_after_status_changes(
             member_context,
             "enterprise.domain.resolve",
             workspace=False,
-            resource_ids=frozenset({base.knowledge_base_id, domain.domain_id}),
+            resource_ids=frozenset({domain.domain_id, document_id}),
         ),
         workspace_id=workspace_id,
         domain_id=domain.domain_id,
@@ -375,7 +389,7 @@ def test_domain_scope_intersects_pdp_and_fails_closed_after_status_changes(
         _authorized(
             member_context,
             "enterprise.domain.resolve",
-            resource_ids=frozenset({domain.domain_id}),
+            resource_ids=frozenset({domain.domain_id, document_id}),
         ),
         workspace_id=workspace_id,
         domain_id=domain.domain_id,
@@ -398,13 +412,201 @@ def test_domain_scope_intersects_pdp_and_fails_closed_after_status_changes(
         _authorized(
             member_context,
             "enterprise.domain.resolve",
-            resource_ids=frozenset({domain.domain_id, base.knowledge_base_id}),
+            resource_ids=frozenset({domain.domain_id, document_id}),
         ),
         workspace_id=workspace_id,
         domain_id=domain.domain_id,
     )
     assert inactive.empty_reason == "member_inactive"
     assert inactive.effective_knowledge_base_ids == ()
+
+
+def test_domain_scope_maps_document_pdp_union_visibility_and_security(
+    knowledge_database: KnowledgeHarness,
+) -> None:
+    """文档级工作空间、部门、自身、资源和密级授权只映射命中的知识库。"""
+
+    owner = register(knowledge_database, identity="p6b03-scope-owner")
+    member = register(knowledge_database, identity="p6b03-scope-member")
+    workspace_id, owner_context, member_context = join_enterprise(knowledge_database, owner, member)
+    department = knowledge_database.organization.create_department(
+        owner_context,
+        workspace_id=workspace_id,
+        name="合成 P6B-03 范围部门",
+        parent_department_id=None,
+    )
+    knowledge_database.organization.assign_member(
+        owner_context,
+        workspace_id=workspace_id,
+        target_account_id=member.account_id,
+        department_ids=(department.department_id,),
+        primary_department_id=department.department_id,
+        position_ids=(),
+    )
+    service = EnterpriseKnowledgeService(
+        SqlAlchemyEnterpriseKnowledgeUnitOfWork(knowledge_database.sessions)
+    )
+    bases = {
+        "workspace": knowledge_database.knowledge.create_knowledge_base(
+            owner_context,
+            name="合成 P6B-03 工作空间范围",
+            default_visibility="workspace",
+        ),
+        "private": knowledge_database.knowledge.create_knowledge_base(
+            owner_context,
+            name="合成 P6B-03 他人私有范围",
+            default_visibility="private",
+        ),
+        "self": knowledge_database.knowledge.create_knowledge_base(
+            owner_context,
+            name="合成 P6B-03 自身范围",
+            default_visibility="private",
+        ),
+        "department": knowledge_database.knowledge.create_knowledge_base(
+            owner_context,
+            name="合成 P6B-03 部门范围",
+            default_visibility="departments",
+            department_ids=frozenset({department.department_id}),
+        ),
+        "restricted": knowledge_database.knowledge.create_knowledge_base(
+            owner_context,
+            name="合成 P6B-03 密级范围",
+            default_visibility="workspace",
+        ),
+    }
+    document_ids: dict[str, UUID] = {}
+    for key, base in bases.items():
+        document_id, _ = _create_document(
+            knowledge_database,
+            owner_context,
+            base.knowledge_base_id,
+            title=f"合成 P6B-03 {key} 文档",
+            security_level="RESTRICTED" if key == "restricted" else "PUBLIC",
+            size_bytes=128,
+            published=False,
+        )
+        document_ids[key] = document_id
+    # 知识写入口当前仅允许 Owner 创建；测试只替换合成文档创建者以构造 self 授权事实。
+    with knowledge_database.engine.begin() as connection:
+        connection.execute(
+            update(documents)
+            .where(documents.c.document_id == document_ids["self"])
+            .values(created_by_account_id=member.account_id)
+        )
+
+    domain = service.create_domain(
+        _authorized(owner_context, "enterprise.domain.create"),
+        workspace_id=workspace_id,
+        name="合成授权矩阵知识域",
+        description=None,
+        member_ids=(_membership_id(knowledge_database, workspace_id, member.account_id),),
+        department_ids=(),
+        knowledge_base_ids=tuple(base.knowledge_base_id for base in bases.values()),
+        rag_mode="balanced",
+        top_k=8,
+        minimum_score=0.25,
+    )
+
+    workspace_scope = service.resolve_domain_scope(
+        _authorized(
+            member_context,
+            "enterprise.domain.resolve",
+            clearance="PUBLIC",
+        ),
+        workspace_id=workspace_id,
+        domain_id=domain.domain_id,
+    )
+    assert set(workspace_scope.effective_knowledge_base_ids) == {
+        bases["workspace"].knowledge_base_id,
+        bases["self"].knowledge_base_id,
+        bases["department"].knowledge_base_id,
+    }
+    assert bases["private"].knowledge_base_id not in (workspace_scope.effective_knowledge_base_ids)
+    assert bases["restricted"].knowledge_base_id not in (
+        workspace_scope.effective_knowledge_base_ids
+    )
+
+    cases: tuple[
+        tuple[
+            str,
+            frozenset[UUID],
+            frozenset[UUID],
+            frozenset[UUID],
+            SecurityLevel,
+        ],
+        ...,
+    ] = (
+        (
+            "department",
+            frozenset({department.department_id}),
+            frozenset(),
+            frozenset({domain.domain_id}),
+            "PUBLIC",
+        ),
+        (
+            "self",
+            frozenset(),
+            frozenset({member.account_id}),
+            frozenset({domain.domain_id}),
+            "PUBLIC",
+        ),
+        (
+            "private",
+            frozenset(),
+            frozenset(),
+            frozenset({domain.domain_id, document_ids["private"]}),
+            "PUBLIC",
+        ),
+        (
+            "restricted",
+            frozenset(),
+            frozenset(),
+            frozenset({domain.domain_id, document_ids["restricted"]}),
+            "RESTRICTED",
+        ),
+    )
+    for key, department_ids, account_ids, resource_ids, clearance in cases:
+        scope = service.resolve_domain_scope(
+            _authorized(
+                member_context,
+                "enterprise.domain.resolve",
+                workspace=False,
+                department_ids=department_ids,
+                account_ids=account_ids,
+                resource_ids=resource_ids,
+                clearance=clearance,
+            ),
+            workspace_id=workspace_id,
+            domain_id=domain.domain_id,
+        )
+        assert scope.effective_knowledge_base_ids == (bases[key].knowledge_base_id,)
+
+    low_clearance = service.resolve_domain_scope(
+        _authorized(
+            member_context,
+            "enterprise.domain.resolve",
+            workspace=False,
+            resource_ids=frozenset({domain.domain_id, document_ids["restricted"]}),
+            clearance="PUBLIC",
+        ),
+        workspace_id=workspace_id,
+        domain_id=domain.domain_id,
+    )
+    assert low_clearance.empty_reason == "pdp_scope_empty"
+    assert low_clearance.effective_knowledge_base_ids == ()
+
+    empty_scope = service.resolve_domain_scope(
+        _authorized(
+            member_context,
+            "enterprise.domain.resolve",
+            workspace=False,
+            resource_ids=frozenset({domain.domain_id}),
+        ),
+        workspace_id=workspace_id,
+        domain_id=domain.domain_id,
+    )
+    assert empty_scope.empty_reason == "pdp_scope_empty"
+    assert empty_scope.effective_knowledge_base_ids == ()
 
 
 def test_cross_workspace_and_personal_references_are_denied(

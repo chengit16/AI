@@ -16,6 +16,9 @@ from ai_platform_api.common.api_errors import ErrorResponse
 from ai_platform_api.config import Settings, get_settings
 from ai_platform_api.modules.agent_control.api.routes import router as agent_control_router
 from ai_platform_api.modules.agent_operations.api.routes import router as agent_operations_router
+from ai_platform_api.modules.assistant.api.enterprise_brain_routes import (
+    router as enterprise_brain_router,
+)
 from ai_platform_api.modules.assistant.api.routes import router as assistant_router
 from ai_platform_api.modules.authorization.api.routes import (
     menu_router,
@@ -37,6 +40,9 @@ from ai_platform_api.modules.identity.api.team_management_routes import (
 from ai_platform_api.modules.integration.api.routes import router as integration_operations_router
 from ai_platform_api.modules.knowledge.api.routes import router as knowledge_router
 from ai_platform_api.modules.lifecycle.api.routes import router as lifecycle_router
+from ai_platform_api.modules.model_gateway.api.routes import (
+    administration_router as platform_administration_router,
+)
 from ai_platform_api.modules.model_gateway.api.routes import (
     router as model_provider_router,
 )
@@ -133,12 +139,17 @@ def create_app(
     application.state.ai_runtime_configuration_service = dependencies.ai_runtime_configurations
     application.state.model_runtime_service = dependencies.model_runtime
     application.state.assistant_conversation_service = dependencies.assistant_conversations
+    application.state.enterprise_brain_conversation_service = (
+        dependencies.enterprise_brain_conversations
+    )
     application.state.assistant_run_executor = dependencies.assistant_run_executor
+    application.state.enterprise_brain_run_executor = dependencies.enterprise_brain_run_executor
     application.state.agent_control_service = dependencies.agent_controls
     application.state.agent_operations_service = dependencies.agent_operations
     application.state.service_governance_service = dependencies.service_governance
     application.state.service_invocation_service = dependencies.service_invocations
     application.state.assistant_source_service = dependencies.assistant_sources
+    application.state.enterprise_brain_source_service = dependencies.enterprise_brain_sources
     application.state.streaming_service = dependencies.streaming
     application.state.retrieval_planning_service = dependencies.retrieval_planning
     application.state.retrieval_evidence_service = dependencies.retrieval_evidence
@@ -171,9 +182,11 @@ def create_app(
     application.include_router(authorization_router, prefix="/api/v1")
     application.include_router(menu_router, prefix="/api/v1")
     application.include_router(knowledge_router, prefix="/api/v1")
+    application.include_router(platform_administration_router, prefix="/api/v1")
     application.include_router(model_provider_router, prefix="/api/v1")
     application.include_router(ai_runtime_router, prefix="/api/v1")
     application.include_router(assistant_router, prefix="/api/v1")
+    application.include_router(enterprise_brain_router, prefix="/api/v1")
     application.include_router(agent_control_router, prefix="/api/v1")
     application.include_router(agent_operations_router, prefix="/api/v1")
     application.include_router(service_governance_router, prefix="/api/v1")
